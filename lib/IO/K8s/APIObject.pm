@@ -44,8 +44,13 @@ sub import {
     # First, do everything IO::K8s::Resource does
     IO::K8s::Resource->import::into($caller);
 
-    # Then apply the APIObject role
+    # Then apply the APIObject role (before registering metadata)
     Moo::Role->apply_roles_to_package($caller, 'IO::K8s::Role::APIObject');
+
+    # Register metadata attribute using the k8s DSL
+    # This allows _inflate_struct to properly inflate metadata as ObjectMeta
+    # The k8s function skips attribute creation if it already exists (from the role)
+    $caller->can('k8s')->('metadata', 'Meta::V1::ObjectMeta');
 }
 
 1;

@@ -3,7 +3,7 @@ package IO::K8s;
 
 use v5.10;
 use Moo;
-use Module::Runtime qw/require_module/;
+use Module::Runtime qw(require_module);
 use JSON::MaybeXS;
 use namespace::clean;
 
@@ -263,7 +263,7 @@ sub _find_definition_for_kind {
 }
 
 sub load_class {
-    my $class = shift;
+    my ($self, $class) = @_;
     require_module $class;
 }
 
@@ -291,7 +291,7 @@ sub struct_to_object {
 
     # Two arguments: class and params
     my $class = $self->expand_class($class_or_struct);
-    load_class($class);
+    $self->load_class($class);
     my $inflated = $self->_inflate_struct($class, $params);
     return $class->new(%$inflated);
 }
@@ -306,7 +306,7 @@ sub inflate {
         or die "Cannot inflate: missing 'kind' field in data";
 
     my $class = $self->expand_class($kind);
-    load_class($class);
+    $self->load_class($class);
     my $inflated = $self->_inflate_struct($class, $struct);
     return $class->new(%$inflated);
 }
@@ -333,9 +333,6 @@ sub _inflate_struct {
     my $attr_info = IO::K8s::Resource::_k8s_attr_info($class);
     my %args;
 
-    # Check if this is an APIObject (has metadata from Role)
-    my $is_api_object = $class->can('_is_resource');
-
     for my $attr (keys %$params) {
         my $value = $params->{$attr};
         next unless defined $value;
@@ -343,15 +340,6 @@ sub _inflate_struct {
         # Pass through opaque fields without type coercion
         if ($opaque_fields{$attr}) {
             $args{$attr} = $value;
-            next;
-        }
-
-        # Handle metadata from APIObject role specially
-        if ($attr eq 'metadata' && $is_api_object && ref $value eq 'HASH') {
-            $args{$attr} = $self->struct_to_object(
-                'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta',
-                $value
-            );
             next;
         }
 

@@ -10,6 +10,9 @@ This role is automatically applied when using C<IO::K8s::APIObject>.
 It provides the C<metadata> attribute and auto-derives C<apiVersion> and C<kind>
 from the class name.
 
+Note: The metadata attribute is registered in IO::K8s::APIObject's import
+to ensure proper class registration for inflation.
+
 =cut
 
 has metadata => (

@@ -10,7 +10,8 @@ use JSON::MaybeXS ();
 use Scalar::Util qw(blessed);
 
 # Registry: class -> attr -> { type, class, is_array, is_hash, is_bool, is_int }
-my %_attr_registry;
+# Use 'our' to make it a proper package variable accessible via symbol table
+our %_attr_registry;
 
 # Class name expansion map
 my %_class_prefix = (
@@ -65,7 +66,8 @@ sub import {
 
     # Export k8s function via Package::Stash
     my $stash = Package::Stash->new($caller);
-    $stash->add_symbol('&k8s', sub { _k8s($caller, @_) });
+    my $captured_caller = $caller;  # Capture in own lexical
+    $stash->add_symbol('&k8s', sub { IO::K8s::Resource::_k8s($captured_caller, @_) });
 }
 
 
@@ -98,6 +100,9 @@ sub _is_type_tiny {
 
 sub _k8s {
     my ($caller, $name, $type_spec, $required_marker) = @_;
+
+    # Ensure the registry entry exists
+    $_attr_registry{$caller} = {} unless exists $_attr_registry{$caller};
 
     my %info;
     my $isa;
@@ -175,10 +180,14 @@ sub _k8s {
         }
     }
 
-    # Register
-    $_attr_registry{$caller}{$name} = \%info;
+
+    # Register - use hash slice to copy values, not reference
+    $_attr_registry{$caller}{$name} = { %info };
     no strict 'refs';
     push @{"${caller}::_k8s_attributes"}, $name;
+
+    # Only create the attribute if it doesn't already exist (e.g., from a role)
+    return if $caller->can($name);
 
     # Call Moo's has
     my $has = $caller->can('has');
