@@ -86,7 +86,7 @@ my %DEFAULT_RESOURCE_MAP = (
 );
 
 has json => (is => 'ro', default => sub {
-    return JSON::MaybeXS->new->canonical;
+    return JSON::MaybeXS->new(utf8 => 1, canonical => 1);
 });
 
 # Resource map - can be customized per instance

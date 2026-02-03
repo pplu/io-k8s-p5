@@ -39,6 +39,17 @@ my %_class_prefix = (
     'KubeAggregator' => 'IO::K8s::KubeAggregator::Pkg::Apis::Apiregistration',
 );
 
+# JSON encoder for serialization
+has json => (
+    is      => 'ro',
+    lazy    => 1,
+    builder => '_build_json',
+);
+
+sub _build_json {
+    return JSON::MaybeXS->new(utf8 => 1, canonical => 1);
+}
+
 sub import {
     my $class = shift;
     my $caller = caller;
@@ -234,8 +245,7 @@ sub TO_JSON {
 
 sub to_json {
     my $self = shift;
-    state $json = JSON::MaybeXS->new->canonical;
-    return $json->encode($self->TO_JSON);
+    return $self->json->encode($self->TO_JSON);
 }
 
 sub TO_YAML {
