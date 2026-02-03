@@ -1,13 +1,18 @@
-requires 'Moose';
+requires 'Moo', '2.000000';
+requires 'Type::Tiny', '2.000000';
+requires 'Types::Standard';
 requires 'JSON::MaybeXS';
-requires 'Module::Runtime';
+requires 'YAML::PP';
+requires 'Scalar::Util';
+requires 'Import::Into';
+requires 'Package::Stash';
+requires 'namespace::clean';
 
 on 'test' => sub {
-  requires 'Test::More';
-  requires 'Test::Exception';
-  requires 'Test::Class::Moose::Load';
+    requires 'Test::More';
+    requires 'Test::Exception';
 };
 
 on 'develop' => sub {
-  requires 'KubeBuilder';
+    requires 'Path::Tiny';
 };

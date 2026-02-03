@@ -1,0 +1,6 @@
+package IO::K8s::Api::Certificates::V1beta1::CertificateSigningRequestList;
+# ABSTRACT: Deprecated - use IO::K8s::List instead
+use strict;
+use warnings;
+warn __PACKAGE__ . " is deprecated, use IO::K8s::List instead";
+1;

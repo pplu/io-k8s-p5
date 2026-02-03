@@ -1,0 +1,23 @@
+package IO::K8s::Api::Authentication::V1alpha1::SelfSubjectReview;
+# ABSTRACT: SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request. When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
+
+use IO::K8s::APIObject;
+
+=head1 DESCRIPTION
+
+SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request. When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
+
+This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
+C<metadata>, C<api_version()>, and C<kind()>.
+
+=cut
+
+k8s status => 'Authentication::V1alpha1::SelfSubjectReviewStatus';
+
+=attr status
+
+Status is filled in by the server with the user attributes.
+
+=cut
+
+1;

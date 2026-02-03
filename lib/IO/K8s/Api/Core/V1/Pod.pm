@@ -1,0 +1,32 @@
+package IO::K8s::Api::Core::V1::Pod;
+# ABSTRACT: Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.
+
+use IO::K8s::APIObject;
+with 'IO::K8s::Role::Namespaced';
+
+=head1 DESCRIPTION
+
+Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.
+
+This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
+C<metadata>, C<api_version()>, and C<kind()>.
+
+=cut
+
+k8s spec => 'Core::V1::PodSpec';
+
+=attr spec
+
+Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+
+=cut
+
+k8s status => 'Core::V1::PodStatus';
+
+=attr status
+
+Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+
+=cut
+
+1;
