@@ -3,7 +3,7 @@ package IO::K8s::Api::Admissionregistration::V1::ValidatingAdmissionPolicyBindin
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources. ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
 
@@ -14,6 +14,7 @@ The CEL expressions of a policy must have a computed CEL cost below the maximum 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
 
+
 =cut
 
 k8s spec => 'Admissionregistration::V1::ValidatingAdmissionPolicyBindingSpec';
@@ -22,6 +23,12 @@ k8s spec => 'Admissionregistration::V1::ValidatingAdmissionPolicyBindingSpec';
 
 Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#validatingadmissionpolicybinding-v1-admissionregistration.k8s.io>
+
+
+=cut
 1;

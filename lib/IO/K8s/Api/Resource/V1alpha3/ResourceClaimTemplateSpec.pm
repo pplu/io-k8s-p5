@@ -3,7 +3,7 @@ package IO::K8s::Api::Resource::V1alpha3::ResourceClaimTemplateSpec;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 

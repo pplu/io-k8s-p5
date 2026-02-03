@@ -3,7 +3,7 @@ package IO::K8s::Api::Resource::V1alpha3::ResourceSlice;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 ResourceSlice represents one or more resources in a pool of similar resources, managed by a common driver. A pool may span more than one ResourceSlice, and exactly how many ResourceSlices comprise a pool is determined by the driver.
 
@@ -20,6 +20,7 @@ This is an alpha type and requires enabling the DynamicResourceAllocation featur
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
 
+
 =cut
 
 k8s spec => 'Resource::V1alpha3::ResourceSliceSpec', 'required';
@@ -30,6 +31,12 @@ Contains the information published by the driver.
 
 Changing the spec automatically increments the metadata.generation number.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#resourceslice-v1alpha3-resource.k8s.io>
+
+
+=cut
 1;

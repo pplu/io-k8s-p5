@@ -3,7 +3,7 @@ package IO::K8s::Api::Certificates::V1::CertificateSigningRequest;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 CertificateSigningRequest objects provide a mechanism to obtain x509 certificates by submitting a certificate signing request, and having it asynchronously approved and issued.
 
@@ -16,6 +16,7 @@ This API can be used to request client certificates to authenticate to kube-apis
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
 
+
 =cut
 
 k8s spec => 'Certificates::V1::CertificateSigningRequestSpec', 'required';
@@ -23,6 +24,7 @@ k8s spec => 'Certificates::V1::CertificateSigningRequestSpec', 'required';
 =attr spec
 
 spec contains the certificate request, and is immutable after creation. Only the request, signerName, expirationSeconds, and usages fields can be set on creation. Other fields are derived by Kubernetes and cannot be modified by users.
+
 
 =cut
 
@@ -32,6 +34,12 @@ k8s status => 'Certificates::V1::CertificateSigningRequestStatus';
 
 status contains information about whether the request is approved or denied, and the certificate issued by the signer, or the failure condition indicating signer failure.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#certificatesigningrequest-v1-certificates.k8s.io>
+
+
+=cut
 1;

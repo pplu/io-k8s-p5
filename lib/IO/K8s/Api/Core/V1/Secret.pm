@@ -4,7 +4,7 @@ package IO::K8s::Api::Core::V1::Secret;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.
 
@@ -44,5 +44,9 @@ k8s type => Str;
 Used to facilitate programmatic handling of secret data. More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 
 =cut
+=seealso
 
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#secret-v1-core>
+
+=cut
 1;

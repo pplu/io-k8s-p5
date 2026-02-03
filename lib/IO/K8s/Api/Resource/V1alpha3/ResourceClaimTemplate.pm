@@ -4,7 +4,7 @@ package IO::K8s::Api::Resource::V1alpha3::ResourceClaimTemplate;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 ResourceClaimTemplate is used to produce ResourceClaim objects.
 
@@ -12,6 +12,7 @@ This is an alpha type and requires enabling the DynamicResourceAllocation featur
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -23,6 +24,12 @@ Describes the ResourceClaim that is to be generated.
 
 This field is immutable. A ResourceClaim will get created by the control plane for a Pod when needed and then not get updated anymore.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#resourceclaimtemplate-v1alpha3-resource.k8s.io>
+
+
+=cut
 1;

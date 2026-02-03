@@ -3,7 +3,7 @@ package IO::K8s::Api::Batch::V1::JobTemplateSpec;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 JobTemplateSpec describes the data a Job should have when created from a template
 

@@ -3,12 +3,13 @@ package IO::K8s::Api::Flowcontrol::V1::PriorityLevelConfiguration;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 PriorityLevelConfiguration represents the configuration of a priority level.
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -18,6 +19,7 @@ k8s spec => 'Flowcontrol::V1::PriorityLevelConfigurationSpec';
 
 `spec` is the specification of the desired behavior of a "request-priority". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
+
 =cut
 
 k8s status => 'Flowcontrol::V1::PriorityLevelConfigurationStatus';
@@ -26,6 +28,12 @@ k8s status => 'Flowcontrol::V1::PriorityLevelConfigurationStatus';
 
 `status` is the current status of a "request-priority". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#prioritylevelconfiguration-v1-flowcontrol.apiserver.k8s.io>
+
+
+=cut
 1;

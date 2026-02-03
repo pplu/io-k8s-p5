@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::ComponentStatus;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 ComponentStatus (and ComponentStatusList) holds the cluster validation info. Deprecated: This API is deprecated in v1.19+
 

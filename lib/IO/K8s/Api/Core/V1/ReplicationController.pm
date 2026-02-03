@@ -4,7 +4,7 @@ package IO::K8s::Api::Core::V1::ReplicationController;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 ReplicationController represents the configuration of a replication controller.
 
@@ -28,5 +28,9 @@ k8s status => 'Core::V1::ReplicationControllerStatus';
 Status is the most recently observed status of the replication controller. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
 =cut
+=seealso
 
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#replicationcontroller-v1-core>
+
+=cut
 1;

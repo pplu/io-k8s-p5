@@ -4,12 +4,13 @@ package IO::K8s::Api::Autoscaling::V2::HorizontalPodAutoscaler;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -19,6 +20,7 @@ k8s spec => 'Autoscaling::V2::HorizontalPodAutoscalerSpec';
 
 spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 
+
 =cut
 
 k8s status => 'Autoscaling::V2::HorizontalPodAutoscalerStatus';
@@ -27,6 +29,12 @@ k8s status => 'Autoscaling::V2::HorizontalPodAutoscalerStatus';
 
 status is the current information about the autoscaler.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#horizontalpodautoscaler-v2-autoscaling.k8s.io>
+
+
+=cut
 1;

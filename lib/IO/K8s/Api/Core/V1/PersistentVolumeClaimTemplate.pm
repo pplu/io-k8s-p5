@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::PersistentVolumeClaimTemplate;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 PersistentVolumeClaimTemplate is used to produce PersistentVolumeClaim objects as part of an EphemeralVolumeSource.
 

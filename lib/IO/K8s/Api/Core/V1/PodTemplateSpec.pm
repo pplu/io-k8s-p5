@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::PodTemplateSpec;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 PodTemplateSpec describes the data a pod should have when created from a template
 

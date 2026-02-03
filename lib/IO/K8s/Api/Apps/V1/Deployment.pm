@@ -4,7 +4,7 @@ package IO::K8s::Api::Apps::V1::Deployment;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 Deployment enables declarative updates for Pods and ReplicaSets.
 
@@ -26,6 +26,12 @@ k8s status => 'Apps::V1::DeploymentStatus';
 =attr status
 
 Most recently observed status of the Deployment.
+
+=cut
+
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#deployment-v1-apps>
 
 =cut
 

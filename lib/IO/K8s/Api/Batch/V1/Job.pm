@@ -4,12 +4,13 @@ package IO::K8s::Api::Batch::V1::Job;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 Job represents the configuration of a single job.
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -19,6 +20,7 @@ k8s spec => 'Batch::V1::JobSpec';
 
 Specification of the desired behavior of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
+
 =cut
 
 k8s status => 'Batch::V1::JobStatus';
@@ -27,6 +29,12 @@ k8s status => 'Batch::V1::JobStatus';
 
 Current status of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#job-v1-batch>
+
+
+=cut
 1;

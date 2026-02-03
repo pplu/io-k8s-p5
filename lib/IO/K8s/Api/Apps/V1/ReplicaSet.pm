@@ -4,12 +4,13 @@ package IO::K8s::Api::Apps::V1::ReplicaSet;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -19,6 +20,7 @@ k8s spec => 'Apps::V1::ReplicaSetSpec';
 
 Spec defines the specification of the desired behavior of the ReplicaSet. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
+
 =cut
 
 k8s status => 'Apps::V1::ReplicaSetStatus';
@@ -27,6 +29,12 @@ k8s status => 'Apps::V1::ReplicaSetStatus';
 
 Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#replicaset-v1-apps>
+
+
+=cut
 1;

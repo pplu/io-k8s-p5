@@ -4,7 +4,7 @@ package IO::K8s::Api::Storage::V1::CSIStorageCapacity;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 CSIStorageCapacity stores the result of one CSI GetCapacity call. For a given StorageClass, this describes the available capacity in a particular topology segment. This can be used when considering where to instantiate new PersistentVolumes.
 
@@ -19,6 +19,7 @@ They are consumed by the kube-scheduler when a CSI driver opts into capacity-awa
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
 
+
 =cut
 
 k8s capacity => Str;
@@ -28,6 +29,7 @@ k8s capacity => Str;
 capacity is the value reported by the CSI driver in its GetCapacityResponse for a GetCapacityRequest with topology and parameters that match the previous fields.
 
 The semantic is currently (CSI spec 1.2) defined as: The available capacity, in bytes, of the storage that can be used to provision volumes. If not set, that information is currently unavailable.
+
 
 =cut
 
@@ -39,6 +41,7 @@ maximumVolumeSize is the value reported by the CSI driver in its GetCapacityResp
 
 This is defined since CSI spec 1.4.0 as the largest size that may be used in a CreateVolumeRequest.capacity_range.required_bytes field to create a volume with the same parameters as those in GetCapacityRequest. The corresponding value in the Kubernetes API is ResourceRequirements.Requests in a volume claim.
 
+
 =cut
 
 k8s nodeTopology => 'Meta::V1::LabelSelector';
@@ -46,6 +49,7 @@ k8s nodeTopology => 'Meta::V1::LabelSelector';
 =attr nodeTopology
 
 nodeTopology defines which nodes have access to the storage for which capacity was reported. If not set, the storage is not accessible from any node in the cluster. If empty, the storage is accessible from all nodes. This field is immutable.
+
 
 =cut
 
@@ -55,6 +59,12 @@ k8s storageClassName => Str, 'required';
 
 storageClassName represents the name of the StorageClass that the reported capacity applies to. It must meet the same requirements as the name of a StorageClass object (non-empty, DNS subdomain). If that object no longer exists, the CSIStorageCapacity object is obsolete and should be removed by its creator. This field is immutable.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#csistoragecapacity-v1-storage.k8s.io>
+
+
+=cut
 1;

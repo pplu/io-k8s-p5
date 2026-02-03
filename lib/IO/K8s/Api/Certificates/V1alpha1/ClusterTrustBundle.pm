@@ -3,7 +3,7 @@ package IO::K8s::Api::Certificates::V1alpha1::ClusterTrustBundle;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors (root certificates).
 
@@ -14,6 +14,7 @@ It can be optionally associated with a particular assigner, in which case it con
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
 
+
 =cut
 
 k8s spec => 'Certificates::V1alpha1::ClusterTrustBundleSpec', 'required';
@@ -22,6 +23,12 @@ k8s spec => 'Certificates::V1alpha1::ClusterTrustBundleSpec', 'required';
 
 spec contains the signer (if any) and trust anchors.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#clustertrustbundle-v1alpha1-certificates.k8s.io>
+
+
+=cut
 1;

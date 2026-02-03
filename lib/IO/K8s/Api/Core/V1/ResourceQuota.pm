@@ -4,7 +4,7 @@ package IO::K8s::Api::Core::V1::ResourceQuota;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 ResourceQuota sets aggregate quota restrictions enforced per namespace
 
@@ -28,5 +28,9 @@ k8s status => 'Core::V1::ResourceQuotaStatus';
 Status defines the actual enforced quota and its current usage. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
 =cut
+=seealso
 
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#resourcequota-v1-core>
+
+=cut
 1;

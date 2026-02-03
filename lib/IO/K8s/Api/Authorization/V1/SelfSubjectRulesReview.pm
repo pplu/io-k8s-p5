@@ -3,12 +3,13 @@ package IO::K8s::Api::Authorization::V1::SelfSubjectRulesReview;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server's authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -18,6 +19,7 @@ k8s spec => 'Authorization::V1::SelfSubjectRulesReviewSpec', 'required';
 
 Spec holds information about the request being evaluated.
 
+
 =cut
 
 k8s status => 'Authorization::V1::SubjectRulesReviewStatus';
@@ -26,6 +28,12 @@ k8s status => 'Authorization::V1::SubjectRulesReviewStatus';
 
 Status is filled in by the server and indicates the set of actions a user can perform.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#selfsubjectrulesreview-v1-authorization.k8s.io>
+
+
+=cut
 1;

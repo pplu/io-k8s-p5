@@ -3,12 +3,13 @@ package IO::K8s::Api::Storage::V1alpha1::VolumeAttributesClass;
 
 use IO::K8s::APIObject;
 
-=head1 DESCRIPTION
+=description
 
 VolumeAttributesClass represents a specification of mutable volume attributes defined by the CSI driver. The class can be specified during dynamic provisioning of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -17,6 +18,7 @@ k8s driverName => Str, 'required';
 =attr driverName
 
 Name of the CSI driver This field is immutable.
+
 
 =cut
 
@@ -28,6 +30,12 @@ parameters hold volume attributes defined by the CSI driver. These values are op
 
 This field is required and must contain at least one key/value pair. The keys cannot be empty, and the maximum number of parameters is 512, with a cumulative max size of 256K. If the CSI driver rejects invalid parameters, the target PersistentVolumeClaim will be set to an "Infeasible" state in the modifyVolumeStatus field.
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#volumeattributesclass-v1alpha1-storage.k8s.io>
+
+
+=cut
 1;

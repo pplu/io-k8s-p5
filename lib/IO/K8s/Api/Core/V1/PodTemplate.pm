@@ -4,12 +4,13 @@ package IO::K8s::Api::Core::V1::PodTemplate;
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 
-=head1 DESCRIPTION
+=description
 
 PodTemplate describes a template for creating copies of a predefined pod.
 
 This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
 C<metadata>, C<api_version()>, and C<kind()>.
+
 
 =cut
 
@@ -19,6 +20,12 @@ k8s template => 'Core::V1::PodTemplateSpec';
 
 Template defines the pods that will be created from this pod template. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
-=cut
 
+=cut
+=seealso
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#podtemplate-v1-core>
+
+
+=cut
 1;
