@@ -55,12 +55,34 @@ my $json = $k8s->object_to_json($svc);
 my $struct = $k8s->object_to_struct($pod);
 ```
 
+## Custom Resource Definitions (CRDs)
+
+Write your own CRD classes using `IO::K8s::APIObject`:
+
+```perl
+package My::StaticWebSite;
+use IO::K8s::APIObject
+    api_version     => 'homelab.example.com/v1',
+    resource_plural => 'staticwebsites';
+with 'IO::K8s::Role::Namespaced';
+
+k8s spec   => { Str => 1 };
+k8s status => { Str => 1 };
+1;
+```
+
+Or generate them dynamically from an OpenAPI schema using `IO::K8s::AutoGen`.
+
+See the full POD documentation for details on the class architecture and CRD support.
+
 ## Features
 
 - Support for Kubernetes v1.31 API objects
 - Type-safe object creation and serialization
 - Lightweight Moo-based implementation
 - Handles all Kubernetes resource types (Pods, Services, Deployments, etc.)
+- Custom Resource Definition (CRD) support with `IO::K8s::APIObject` import parameters
+- Dynamic class generation from OpenAPI schemas via `IO::K8s::AutoGen`
 - Proper handling of namespaced resources
 - Canonical JSON output for consistent API requests
 

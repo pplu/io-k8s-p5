@@ -144,6 +144,9 @@ sub expand_class {
     # Already a full IO::K8s class name - return as-is
     return $class if $class =~ /^IO::K8s::/;
 
+    # Already a loaded class (e.g. CRD class passed by ref) - return as-is
+    return $class if _class_exists($class);
+
     my $map = ref($self) ? $self->resource_map : \%DEFAULT_RESOURCE_MAP;
 
     # Short name like "Pod" - look up in resource_map
@@ -490,11 +493,160 @@ in JSON that can be sent to Kubernetes.
 
 It also inflates JSON returned by Kubernetes into typed Perl objects.
 
-=head1 CUSTOM RESOURCES AND AUTO-GENERATION
+=head1 CLASS ARCHITECTURE
 
-IO::K8s can automatically generate classes for Custom Resources (CRDs) and other
-types not included in the built-in classes. This requires providing the cluster's
-OpenAPI specification:
+IO::K8s uses a layered architecture. Understanding these layers helps when
+working with built-in resources or writing your own CRD classes.
+
+=head2 IO::K8s::Resource (base layer)
+
+All Kubernetes objects inherit from L<IO::K8s::Resource>. It provides:
+
+=over 4
+
+=item * L<Moo> class setup
+
+=item * The C<k8s> DSL for declaring attributes with Kubernetes types
+
+=item * C<TO_JSON> / C<to_json> serialization
+
+=item * Type registry for inflation (JSON -> objects)
+
+=back
+
+The C<k8s> DSL supports these type specifications:
+
+  k8s name     => 'Str';                   # string attribute
+  k8s replicas => 'Int';                   # integer attribute
+  k8s ready    => 'Bool';                  # boolean attribute
+  k8s spec     => 'Core::V1::PodSpec';     # nested IO::K8s object
+  k8s ports    => ['Core::V1::ServicePort']; # array of objects
+  k8s labels   => { Str => 1 };            # hash of strings
+  k8s items    => ['+Full::Class::Name'];  # array with full class (+ prefix)
+
+=head2 IO::K8s::APIObject (top-level resources)
+
+L<IO::K8s::APIObject> extends C<IO::K8s::Resource> for top-level API objects
+(Pod, Deployment, Service, etc.) by applying L<IO::K8s::Role::APIObject>.
+This adds:
+
+=over 4
+
+=item * C<metadata> attribute (L<IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta>)
+
+=item * C<api_version()> - derived from class name for built-in types, or set via import parameter for CRDs
+
+=item * C<kind()> - derived from the last segment of the class name
+
+=item * C<resource_plural()> - returns C<undef> (auto-pluralize) by default, override for CRDs
+
+=item * C<to_yaml()> - serialize to YAML suitable for C<kubectl apply -f>
+
+=item * C<save($file)> - write YAML to file
+
+=back
+
+=head2 IO::K8s::Role::Namespaced (marker role)
+
+L<IO::K8s::Role::Namespaced> is a marker role for namespace-scoped resources.
+L<Kubernetes::REST> checks this to build the correct URL path (with or without
+C</namespaces/{ns}/>).
+
+=head1 WRITING CRD CLASSES
+
+To use Custom Resource Definitions with L<Kubernetes::REST>, write a Perl
+class using C<IO::K8s::APIObject>. This is the same base used by all built-in
+Kubernetes types like Pod, Deployment, and Service.
+
+=head2 Minimal CRD class
+
+  package My::StaticWebSite;
+  use IO::K8s::APIObject
+      api_version     => 'homelab.example.com/v1',
+      resource_plural => 'staticwebsites';
+  with 'IO::K8s::Role::Namespaced';
+
+  k8s spec   => { Str => 1 };
+  k8s status => { Str => 1 };
+  1;
+
+That's it - 6 lines of actual code. This class now supports:
+
+  my $site = My::StaticWebSite->new(
+      metadata => $meta_object,
+      spec     => { domain => 'blog.example.com', image => 'nginx' },
+  );
+  $site->kind;          # "StaticWebSite"
+  $site->api_version;   # "homelab.example.com/v1"
+  $site->to_yaml;       # full YAML output
+  $site->TO_JSON;       # hashref for JSON encoding
+
+=head2 Import parameters
+
+C<use IO::K8s::APIObject> accepts these parameters:
+
+=over 4
+
+=item C<api_version> (required for CRDs)
+
+The CRD's C<group/version>, e.g. C<'homelab.example.com/v1'>. For built-in
+types this is derived from the class name (C<IO::K8s::Api::Core::V1::Pod>
+gives C<v1>), but CRDs must specify it explicitly since their class names
+don't follow the C<IO::K8s::Api::*> convention.
+
+=item C<resource_plural> (recommended for CRDs)
+
+The plural resource name for URL building, e.g. C<'staticwebsites'>. Must
+match the CRD's C<spec.names.plural>. If omitted, L<Kubernetes::REST>
+auto-pluralizes the kind name (C<StaticWebSite> -> C<staticwebsites>), but
+this heuristic doesn't work for all names.
+
+=back
+
+=head2 Namespaced vs cluster-scoped
+
+Apply C<IO::K8s::Role::Namespaced> for namespace-scoped CRDs (the common
+case). Omit it for cluster-scoped CRDs:
+
+  # Namespaced CRD (most CRDs):
+  package My::StaticWebSite;
+  use IO::K8s::APIObject api_version => 'homelab.example.com/v1', ...;
+  with 'IO::K8s::Role::Namespaced';
+
+  # Cluster-scoped CRD (rare):
+  package My::ClusterBackupPolicy;
+  use IO::K8s::APIObject api_version => 'backup.example.com/v1', ...;
+  # No 'with Namespaced' - this is cluster-wide
+
+=head2 Registering with Kubernetes::REST
+
+Register your CRD class in the resource map using the C<+> prefix (which
+means "use this full class name as-is"):
+
+  use Kubernetes::REST::Kubeconfig;
+  use My::StaticWebSite;
+
+  my $api = Kubernetes::REST::Kubeconfig->new->api;
+  $api->resource_map->{StaticWebSite} = '+My::StaticWebSite';
+
+  # Now use it like any built-in resource
+  my $site = $api->create($api->new_object(StaticWebSite =>
+      metadata => { name => 'my-blog', namespace => 'default' },
+      spec     => { domain => 'blog.example.com', image => 'nginx' },
+  ));
+
+See L<Kubernetes::REST::Example> for complete CRUD examples with CRDs.
+
+=head1 AUTO-GENERATION
+
+IO::K8s can automatically generate classes for Custom Resources and other
+types not included in the built-in classes. This is an alternative to
+writing CRD classes by hand.
+
+=head2 From cluster OpenAPI spec
+
+Provide the cluster's OpenAPI spec and IO::K8s will auto-generate classes
+on demand:
 
   use IO::K8s;
   use Kubernetes::REST::Kubeconfig;
@@ -505,16 +657,34 @@ OpenAPI specification:
   my $spec = JSON::MaybeXS->new->decode($resp->content);
 
   # Create IO::K8s with auto-generation enabled
-  my $k8s = IO::K8s->new(
-      openapi_spec => $spec,
-  );
+  my $k8s = IO::K8s->new(openapi_spec => $spec);
 
   # Now inflate works for ANY type in the cluster
-  my $addon = $k8s->inflate($k3s_addon_json);      # k3s.cattle.io/v1 Addon
-  my $chart = $k8s->inflate($helmchart_json);      # helm.cattle.io/v1 HelmChart
+  my $addon = $k8s->inflate($k3s_addon_json);   # k3s.cattle.io/v1 Addon
+  my $chart = $k8s->inflate($helmchart_json);   # helm.cattle.io/v1 HelmChart
 
 Auto-generated classes are placed in a unique namespace per IO::K8s instance
 (e.g., C<IO::K8s::_AUTOGEN_abc123::...>) to avoid collisions.
+
+=head2 Explicit generation with IO::K8s::AutoGen
+
+For more control, use L<IO::K8s::AutoGen> directly:
+
+  use IO::K8s::AutoGen;
+
+  my $class = IO::K8s::AutoGen::get_or_generate(
+      'com.example.homelab.v1.StaticWebSite',  # definition name
+      $schema,                                   # OpenAPI schema
+      {},                                        # all definitions
+      'MyApp::K8s',                              # namespace
+      api_version     => 'homelab.example.com/v1',
+      kind            => 'StaticWebSite',
+      resource_plural => 'staticwebsites',
+      is_namespaced   => 1,
+  );
+
+  # Register with Kubernetes::REST
+  $api->resource_map->{StaticWebSite} = "+$class";
 
 =head2 Custom Class Namespaces
 
@@ -714,7 +884,11 @@ namespace-scoped.
 
 =head1 SEE ALSO
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/>, L<Kubernetes::REST>
+L<Kubernetes::REST> - REST client for the Kubernetes API, uses IO::K8s for typed request/response objects
+
+L<Kubernetes::REST::Example> - Comprehensive examples for using Kubernetes::REST with IO::K8s against a real cluster (Minikube, K3s, etc.)
+
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/>
 
 =head1 BUGS and SOURCE
 

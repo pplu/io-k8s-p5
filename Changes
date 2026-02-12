@@ -8,6 +8,10 @@ Revision history for IO-K8s
   - Improved attribute metadata handling with IO::K8s::Resource
   - Added IO::K8s::APIObject and IO::K8s::Role::APIObject for better API object support
   - Added support for namespaced resources via IO::K8s::Role::Namespaced
+  - Added resource_plural support to IO::K8s::Role::APIObject for CRD classes
+  - IO::K8s::APIObject accepts import parameters (api_version, resource_plural) for CRDs
+  - IO::K8s::AutoGen supports CRD metadata (api_version, kind, resource_plural, is_namespaced)
+  - expand_class recognizes already-loaded classes (needed for CRD classes)
   - Improved JSON serialization with canonical output
   - Better handling of opaque fields (fieldsV1, rawExtension, raw)
   - Deprecation stubs for removed List classes (backwards compatibility)

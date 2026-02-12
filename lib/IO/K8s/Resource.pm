@@ -191,7 +191,7 @@ sub _k8s {
 
     # Call Moo's has
     my $has = $caller->can('has');
-    $has->($name, is => 'ro', isa => $isa, ($required ? (required => 1) : ()));
+    $has->($name, is => 'rw', isa => $isa, ($required ? (required => 1) : ()));
 }
 
 # Get attribute info

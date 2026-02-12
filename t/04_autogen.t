@@ -211,4 +211,125 @@ subtest 'class_namespaces priority' => sub {
     is($class2, 'IO::K8s::Api::Core::V1::Pod', 'built-in class found');
 };
 
+# Test 6: AutoGen with x-kubernetes-group-version-kind (CRD-style)
+subtest 'autogen CRD with GVK metadata' => sub {
+    IO::K8s::AutoGen::clear_cache();
+
+    my $schema = {
+        type => 'object',
+        'x-kubernetes-group-version-kind' => [{
+            group   => 'homelab.example.com',
+            version => 'v1',
+            kind    => 'StaticWebSite',
+        }],
+        properties => {
+            apiVersion => { type => 'string' },
+            kind       => { type => 'string' },
+            metadata   => { '$ref' => '#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta' },
+            spec       => {
+                type => 'object',
+                properties => {
+                    domain   => { type => 'string' },
+                    image    => { type => 'string' },
+                    replicas => { type => 'integer' },
+                    tls      => { type => 'boolean' },
+                },
+            },
+            status => {
+                type => 'object',
+                properties => {
+                    readyReplicas => { type => 'integer' },
+                    url           => { type => 'string' },
+                },
+            },
+        },
+    };
+
+    my $class = IO::K8s::AutoGen::get_or_generate(
+        'com.example.homelab.v1.StaticWebSite',
+        $schema,
+        {},
+        'IO::K8s::_AUTOGEN_crd_test',
+    );
+
+    ok($class, 'got class back');
+    ok($class->can('new'), 'class has new');
+    ok($class->can('api_version'), 'class has api_version');
+    ok($class->can('kind'), 'class has kind');
+    ok($class->can('resource_plural'), 'class has resource_plural');
+    ok($class->can('metadata'), 'class has metadata (from Role::APIObject)');
+    ok($class->can('to_yaml'), 'class has to_yaml (from Role::APIObject)');
+
+    # Verify class methods
+    is($class->api_version, 'homelab.example.com/v1', 'api_version method');
+    is($class->kind, 'StaticWebSite', 'kind method');
+    is($class->resource_plural, undef, 'resource_plural undef (auto-pluralize)');
+
+    # Create instance
+    my $obj = $class->new(
+        spec => { domain => 'test.example.com', image => 'nginx:latest', replicas => 1 },
+    );
+    ok($obj, 'created instance');
+    is($obj->api_version, 'homelab.example.com/v1', 'instance api_version');
+    is($obj->kind, 'StaticWebSite', 'instance kind');
+    ok($obj->spec, 'has spec');
+    is($obj->spec->{domain}, 'test.example.com', 'spec.domain');
+
+    # Serialization
+    my $data = $obj->TO_JSON;
+    is($data->{apiVersion}, 'homelab.example.com/v1', 'TO_JSON apiVersion');
+    is($data->{kind}, 'StaticWebSite', 'TO_JSON kind');
+
+    # YAML
+    my $yaml = $obj->to_yaml;
+    like($yaml, qr/apiVersion:\s*homelab\.example\.com\/v1/, 'YAML apiVersion');
+    like($yaml, qr/kind:\s*StaticWebSite/, 'YAML kind');
+};
+
+# Test 7: AutoGen with explicit options (resource_plural, is_namespaced)
+subtest 'autogen CRD with explicit options' => sub {
+    IO::K8s::AutoGen::clear_cache();
+
+    my $schema = {
+        type => 'object',
+        properties => {
+            apiVersion => { type => 'string' },
+            kind       => { type => 'string' },
+            spec       => {
+                type => 'object',
+                properties => {
+                    schedule  => { type => 'string' },
+                    target    => { type => 'string' },
+                    retention => { type => 'integer' },
+                },
+            },
+        },
+    };
+
+    my $class = IO::K8s::AutoGen::get_or_generate(
+        'com.example.homelab.v1.BackupSchedule',
+        $schema,
+        {},
+        'IO::K8s::_AUTOGEN_crd_opts_test',
+        api_version     => 'homelab.example.com/v1',
+        kind            => 'BackupSchedule',
+        resource_plural => 'backupschedules',
+        is_namespaced   => 1,
+    );
+
+    ok($class, 'got class back');
+    is($class->api_version, 'homelab.example.com/v1', 'api_version from opts');
+    is($class->kind, 'BackupSchedule', 'kind from opts');
+    is($class->resource_plural, 'backupschedules', 'resource_plural from opts');
+    ok($class->does('IO::K8s::Role::Namespaced'), 'is namespaced');
+    ok($class->does('IO::K8s::Role::APIObject'), 'has APIObject role');
+
+    # Create instance
+    my $obj = $class->new(
+        spec => { schedule => '0 2 * * *', target => '/data', retention => 7 },
+    );
+    is($obj->kind, 'BackupSchedule', 'instance kind');
+    is($obj->spec->{schedule}, '0 2 * * *', 'spec.schedule');
+};
+
 done_testing;

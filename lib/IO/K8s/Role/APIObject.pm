@@ -16,7 +16,7 @@ to ensure proper class registration for inflation.
 =cut
 
 has metadata => (
-    is => 'ro',
+    is => 'rw',
     isa => Maybe[InstanceOf['IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta']],
 );
 
@@ -26,9 +26,27 @@ Standard object's metadata. See L<IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::Ob
 
 =cut
 
+# Map IO::K8s short group names to full Kubernetes API group names
+my %API_GROUP_MAP = (
+    rbac                  => 'rbac.authorization.k8s.io',
+    networking            => 'networking.k8s.io',
+    storage               => 'storage.k8s.io',
+    admissionregistration => 'admissionregistration.k8s.io',
+    certificates          => 'certificates.k8s.io',
+    coordination          => 'coordination.k8s.io',
+    events                => 'events.k8s.io',
+    scheduling            => 'scheduling.k8s.io',
+    authentication        => 'authentication.k8s.io',
+    authorization         => 'authorization.k8s.io',
+    node                  => 'node.k8s.io',
+    discovery             => 'discovery.k8s.io',
+    flowcontrol           => 'flowcontrol.apiserver.k8s.io',
+);
+
 # Derive apiVersion from class name
 # IO::K8s::Api::Core::V1::Pod -> v1
 # IO::K8s::Api::Apps::V1::Deployment -> apps/v1
+# IO::K8s::Api::Rbac::V1::Role -> rbac.authorization.k8s.io/v1
 sub api_version {
     my ($self) = @_;
     my $class = ref($self) || $self;
@@ -36,7 +54,9 @@ sub api_version {
     if ($class =~ /^IO::K8s::Api::(\w+)::(\w+)::/) {
         my ($group, $version) = ($1, $2);
         $version = lc($version);
-        return $group eq 'Core' ? $version : lc($group) . '/' . $version;
+        return $version if $group eq 'Core';
+        my $group_lc = lc($group);
+        return ($API_GROUP_MAP{$group_lc} // $group_lc) . '/' . $version;
     }
     return undef;
 }
@@ -69,12 +89,25 @@ Returns the Kubernetes kind derived from the class name.
 
 =cut
 
+sub resource_plural { undef }
+
+=method resource_plural
+
+Returns the plural resource name for URL building, or C<undef> to use
+automatic pluralization. Override this in CRD classes where the plural
+name is not simply the lowercased kind with an "s" appended:
+
+    sub resource_plural { 'staticwebsites' }
+
+=cut
+
 sub _is_resource { 1 }
 
 sub to_yaml {
     my ($self) = @_;
     require YAML::PP;
-    return YAML::PP::Dump($self->TO_JSON);
+    my $yp = YAML::PP->new(schema => [qw/JSON/], boolean => 'JSON::PP');
+    return $yp->dump_string($self->TO_JSON);
 }
 
 =method to_yaml

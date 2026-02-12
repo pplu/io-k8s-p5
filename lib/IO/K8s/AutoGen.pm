@@ -41,19 +41,24 @@ sub is_autogen {
 }
 
 # Get or generate a class from schema
+# Options hash can include:
+#   api_version      => 'stable.example.com/v1'
+#   kind             => 'StaticWebSite'
+#   resource_plural  => 'staticwebsites'
+#   is_namespaced    => 1
 sub get_or_generate {
-    my ($def_name, $schema, $all_defs, $namespace) = @_;
+    my ($def_name, $schema, $all_defs, $namespace, %opts) = @_;
 
     my $class = def_to_class($def_name, $namespace);
     return $class if $_generated{$class};
 
-    _generate_class($class, $def_name, $schema, $all_defs, $namespace);
+    _generate_class($class, $def_name, $schema, $all_defs, $namespace, %opts);
     return $class;
 }
 
 # Generate a class from OpenAPI schema using IO::K8s::Resource
 sub _generate_class {
-    my ($class, $def_name, $schema, $all_defs, $namespace) = @_;
+    my ($class, $def_name, $schema, $all_defs, $namespace, %opts) = @_;
 
     return if $_generated{$class};
     $_generated{$class} = 1;  # Mark early to prevent recursion
@@ -112,8 +117,46 @@ sub _generate_class {
         $k8s->($prop, $type_spec);
     }
 
-    # For auto-generated classes, apiVersion/kind/metadata come from schema as attributes
-    # No need to apply Role::APIObject since that derives from class name
+    # Determine api_version/kind from schema or explicit options
+    my ($api_ver, $kind_val, $res_plural, $is_namespaced);
+
+    if (my $gvk = $schema->{'x-kubernetes-group-version-kind'}) {
+        my $entry = ref($gvk) eq 'ARRAY' ? $gvk->[0] : $gvk;
+        my $group = $entry->{group} // '';
+        my $version = $entry->{version} // '';
+        $kind_val = $entry->{kind} // '';
+        $api_ver = $group ? "$group/$version" : $version;
+    }
+
+    # Explicit options override schema-derived values
+    $api_ver       = $opts{api_version}     if exists $opts{api_version};
+    $kind_val      = $opts{kind}            if exists $opts{kind};
+    $res_plural    = $opts{resource_plural} if exists $opts{resource_plural};
+    $is_namespaced = $opts{is_namespaced}   if exists $opts{is_namespaced};
+
+    # Install class methods if we have api_version/kind
+    if (defined $api_ver && defined $kind_val) {
+        my $stash = Package::Stash->new($class);
+
+        $stash->add_symbol('&api_version', sub { $api_ver });
+        $stash->add_symbol('&kind', sub { $kind_val });
+        $stash->add_symbol('&resource_plural', sub { $res_plural });
+
+        # Apply Role::APIObject for metadata, to_yaml, save, etc.
+        require Moo::Role;
+        require IO::K8s::Role::APIObject;
+        Moo::Role->apply_roles_to_package($class, 'IO::K8s::Role::APIObject');
+
+        # Register metadata attribute via k8s DSL so _inflate_struct knows the type
+        # (same as IO::K8s::APIObject::import does for hand-written classes)
+        $k8s->('metadata', 'Meta::V1::ObjectMeta');
+
+        # Apply Namespaced role if requested or schema suggests it
+        if ($is_namespaced) {
+            require IO::K8s::Role::Namespaced;
+            Moo::Role->apply_roles_to_package($class, 'IO::K8s::Role::Namespaced');
+        }
+    }
 
     return $class;
 }

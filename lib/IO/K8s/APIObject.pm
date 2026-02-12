@@ -9,11 +9,24 @@ use Moo::Role ();
 
 =head1 SYNOPSIS
 
+    # Built-in API object (api_version/kind derived from class name):
     package IO::K8s::Api::Core::V1::Pod;
     use IO::K8s::APIObject;
 
     k8s spec => 'Core::V1::PodSpec';
     k8s status => 'Core::V1::PodStatus';
+
+    1;
+
+    # Custom Resource Definition (CRD):
+    package My::StaticWebSite;
+    use IO::K8s::APIObject
+        api_version     => 'homelab.example.com/v1',
+        resource_plural => 'staticwebsites';
+    with 'IO::K8s::Role::Namespaced';
+
+    k8s spec   => { Str => 1 };
+    k8s status => { Str => 1 };
 
     1;
 
@@ -30,7 +43,13 @@ Automatically applies L<IO::K8s::Role::APIObject> which provides:
 
 =item * C<kind()> method (derived from class name)
 
+=item * C<resource_plural()> method (returns undef = auto-pluralize)
+
 =back
+
+For Custom Resource Definitions (CRDs), pass C<api_version> and
+optionally C<resource_plural> as import parameters. These are installed
+as class methods before the role is composed, avoiding redefinition warnings.
 
 Use C<IO::K8s::Resource> for embedded objects (PodSpec, Container, etc.)
 and C<IO::K8s::APIObject> for top-level resources (Pod, Deployment, Service, etc.)
@@ -39,10 +58,22 @@ and C<IO::K8s::APIObject> for top-level resources (Pod, Deployment, Service, etc
 
 sub import {
     my $class = shift;
+    my %params = @_;
     my $caller = caller;
 
     # First, do everything IO::K8s::Resource does
     IO::K8s::Resource->import::into($caller);
+
+    # Install CRD overrides *before* applying the role
+    # This way the role sees these methods and doesn't install its defaults
+    if (my $api_ver = $params{api_version}) {
+        my $stash = Package::Stash->new($caller);
+        $stash->add_symbol('&api_version', sub { $api_ver });
+    }
+    if (my $plural = $params{resource_plural}) {
+        my $stash = Package::Stash->new($caller);
+        $stash->add_symbol('&resource_plural', sub { $plural });
+    }
 
     # Then apply the APIObject role (before registering metadata)
     Moo::Role->apply_roles_to_package($caller, 'IO::K8s::Role::APIObject');
