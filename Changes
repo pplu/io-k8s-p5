@@ -1,5 +1,7 @@
 Revision history for IO-K8s
 
+{{$NEXT}}
+
 1.000     2026-02-13 01:52:24Z
   - Major refactoring: Migrated from Moose to Moo for lighter dependencies
   - Replaced YAML::XS with YAML::PP for pure Perl implementation

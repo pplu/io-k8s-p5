@@ -1,4 +1,5 @@
 package IO::K8s::Api::Core::V1::PodTemplateList;
+our $VERSION = '1.001';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::StatefulSetStatus;
 # ABSTRACT: StatefulSetStatus represents the current state of a StatefulSet.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s availableReplicas => Int;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::LimitRangeItem;
 # ABSTRACT: LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s default => { Str => 1 };

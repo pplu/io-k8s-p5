@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::DaemonSetCondition;
 # ABSTRACT: DaemonSetCondition describes the state of a DaemonSet at a certain point.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s lastTransitionTime => Str;

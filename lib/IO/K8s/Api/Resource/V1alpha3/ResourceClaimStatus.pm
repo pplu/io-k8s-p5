@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::ResourceClaimStatus;
 # ABSTRACT: ResourceClaimStatus tracks whether the resource has been allocated and what the result of that was.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s allocation => 'Resource::V1alpha3::AllocationResult';

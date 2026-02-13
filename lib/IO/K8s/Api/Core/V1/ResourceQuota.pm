@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ResourceQuota;
 # ABSTRACT: ResourceQuota sets aggregate quota restrictions enforced per namespace
-
+our $VERSION = '1.001';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

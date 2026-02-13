@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::GRPCAction;
 # ABSTRACT: 
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s port => Int, 'required';

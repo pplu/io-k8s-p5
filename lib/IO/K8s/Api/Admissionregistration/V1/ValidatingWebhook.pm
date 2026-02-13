@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1::ValidatingWebhook;
 # ABSTRACT: ValidatingWebhook describes an admission webhook and the resources and operations it applies to.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s admissionReviewVersions => [Str], 'required';

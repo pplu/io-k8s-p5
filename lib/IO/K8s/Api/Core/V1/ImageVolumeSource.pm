@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ImageVolumeSource;
 # ABSTRACT: ImageVolumeSource represents a image volume resource.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s pullPolicy => Str;

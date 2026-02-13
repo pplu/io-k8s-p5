@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ServicePort;
 # ABSTRACT: ServicePort contains information on service's port.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s appProtocol => Str;

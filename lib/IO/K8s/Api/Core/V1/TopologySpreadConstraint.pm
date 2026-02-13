@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::TopologySpreadConstraint;
 # ABSTRACT: TopologySpreadConstraint specifies how to spread matching pods among the given topology.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s labelSelector => 'Meta::V1::LabelSelector';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Batch::V1::SuccessPolicy;
 # ABSTRACT: SuccessPolicy describes when a Job can be declared as succeeded based on the success of some indexes.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s rules => ['Batch::V1::SuccessPolicyRule'], 'required';

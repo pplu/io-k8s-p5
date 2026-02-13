@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::LocalObjectReference;
 # ABSTRACT: LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s name => Str;

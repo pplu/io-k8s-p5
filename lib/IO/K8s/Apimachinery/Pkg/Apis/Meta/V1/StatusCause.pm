@@ -1,6 +1,6 @@
 package IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::StatusCause;
 # ABSTRACT: StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s field => Str;

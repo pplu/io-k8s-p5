@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::NetworkPolicy;
 # ABSTRACT: NetworkPolicy describes what network traffic is allowed for a set of Pods
-
+our $VERSION = '1.001';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

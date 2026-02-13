@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1beta1::ParamRef;
 # ABSTRACT: ParamRef describes how to locate the params to be used as input to expressions of rules applied by a policy binding.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s name => Str;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ContainerPort;
 # ABSTRACT: ContainerPort represents a network port in a single container.
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s containerPort => Int, 'required';

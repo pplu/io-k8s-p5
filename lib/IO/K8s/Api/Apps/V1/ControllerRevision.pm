@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::ControllerRevision;
 # ABSTRACT: ControllerRevision implements an immutable snapshot of state data.
-
+our $VERSION = '1.001';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

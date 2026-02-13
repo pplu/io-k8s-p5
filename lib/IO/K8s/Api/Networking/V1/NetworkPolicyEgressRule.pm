@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::NetworkPolicyEgressRule;
 # ABSTRACT: NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to. This type is beta-level in 1.8
-
+our $VERSION = '1.001';
 use IO::K8s::Resource;
 
 k8s ports => ['Networking::V1::NetworkPolicyPort'];

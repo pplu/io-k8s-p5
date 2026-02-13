@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1::ValidatingWebhookConfiguration;
 # ABSTRACT: ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
-
+our $VERSION = '1.001';
 use IO::K8s::APIObject;
 
 =description
