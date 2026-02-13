@@ -70,9 +70,13 @@ sub _build_dsl_code {
     my $map = $k8s->resource_map;
 
     for my $kind (keys %$map) {
+        # Skip domain-qualified names (contain /) - not valid Perl identifiers
+        next if $kind =~ m{/};
+
         $code .= qq{
-            sub $kind (&) {
+            sub $kind (&@) {
                 my \$block = shift;
+                my \$api_version = shift;
                 my \%args = \$block->();
 
                 # Convenience: move name/namespace/labels/annotations to metadata
@@ -83,7 +87,9 @@ sub _build_dsl_code {
                 }
 
                 my \$k8s = \$IO::K8s::Manifest::_k8s_instance;
-                my \$obj = \$k8s->new_object('$kind', \%args);
+                my \$obj = \$api_version
+                    ? \$k8s->new_object('$kind', \\\%args, \$api_version)
+                    : \$k8s->new_object('$kind', \\\%args);
 
                 \$IO::K8s::Manifest::_collector->add(\$obj)
                     if \$IO::K8s::Manifest::_collector;

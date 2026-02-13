@@ -55,6 +55,38 @@ my $json = $k8s->object_to_json($svc);
 my $struct = $k8s->object_to_struct($pod);
 ```
 
+## External Resource Maps
+
+Merge resource maps from external packages (e.g. CRD distributions like a future `IO::K8s::Cilium`):
+
+```perl
+# At construction time
+my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+
+# Or at runtime
+$k8s->add('IO::K8s::Cilium');
+
+# Disambiguate colliding kind names
+$k8s->new_object('NetworkPolicy', { ... });                  # core (first-registered)
+$k8s->new_object('NetworkPolicy', { ... }, 'cilium.io/v2');  # Cilium
+$k8s->new_object('cilium.io/v2/NetworkPolicy', { ... });     # domain-qualified
+
+# inflate() auto-uses apiVersion from JSON data
+$k8s->inflate('{"kind":"NetworkPolicy","apiVersion":"cilium.io/v2",...}');
+```
+
+### pk8s DSL disambiguation
+
+In `.pk8s` manifest files, pass the api_version after the block (no comma, like `grep`/`map` syntax):
+
+```perl
+# Core NetworkPolicy (default)
+NetworkPolicy { name => 'deny-all', spec => { podSelector => {} } };
+
+# Firewall NetworkPolicy (disambiguated)
+NetworkPolicy { name => 'fw-deny', spec => { action => 'deny' } } 'firewall.example.com/v1';
+```
+
 ## Custom Resource Definitions (CRDs)
 
 Write your own CRD classes using `IO::K8s::APIObject`:
@@ -82,6 +114,8 @@ See the full POD documentation for details on the class architecture and CRD sup
 - Lightweight Moo-based implementation
 - Handles all Kubernetes resource types (Pods, Services, Deployments, etc.)
 - Custom Resource Definition (CRD) support with `IO::K8s::APIObject` import parameters
+- External resource map support with collision handling (`add()`, `with` constructor param)
+- Domain-qualified resource names for disambiguation (`api_version/Kind`)
 - Dynamic class generation from OpenAPI schemas via `IO::K8s::AutoGen`
 - Proper handling of namespaced resources
 - Canonical JSON output for consistent API requests
@@ -96,11 +130,11 @@ See the full POD documentation for details on the class architecture and CRD sup
 ## Authors
 
 - Torsten Raudssus <torsten@raudssus.de>
-- Jose Luis Martinez <jlmartinez@capside.com> (original author, inactive)
+- Jose Luis Martinez <jlmartin@cpan.org> (original author, inactive)
 
 ## License
 
-Copyright (c) 2018 by CAPSiDE
+Copyright (c) 2018 by Jose Luis Martinez
 
 This code is distributed under the Apache 2 License. The full text of the license can be found in the LICENSE file included with this module.
 

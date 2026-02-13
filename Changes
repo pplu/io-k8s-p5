@@ -1,6 +1,14 @@
 Revision history for IO-K8s
 
 {{$NEXT}}
+  - Added IO::K8s::Role::ResourceMap for external resource map providers
+  - Added add() method to merge external resource maps (e.g. CRD packages)
+  - Added 'with' constructor parameter for merging resource maps at construction
+  - Added domain-qualified resource names (api_version/Kind) for collision handling
+  - expand_class(), new_object(), inflate() now support api_version disambiguation
+  - pk8s DSL functions accept optional api_version second argument
+  - resource_map default now returns a copy per instance (safe for mutation)
+  - Updated original author email and copyright holder
 
 1.000     2026-02-13 01:52:24Z
   - Major refactoring: Migrated from Moose to Moo for lighter dependencies
