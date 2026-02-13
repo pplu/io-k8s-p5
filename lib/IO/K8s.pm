@@ -1004,26 +1004,45 @@ Serialize an IO::K8s object to JSON.
 
 Convert an IO::K8s object to a plain Perl hashref.
 
+=head1 CILIUM CRD SUPPORT
+
+IO::K8s includes L<IO::K8s::Cilium> with 23 Cilium CRD classes covering
+C<cilium.io/v2> (12 CRDs) and C<cilium.io/v2alpha1> (11 CRDs). These are
+not loaded by default -- opt in at construction:
+
+  my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+
+  my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+      metadata => { name => 'allow-dns', namespace => 'kube-system' },
+      spec => { endpointSelector => { matchLabels => { app => 'dns' } } },
+  );
+
+  print $cnp->to_yaml;
+
+All Cilium kinds are C<Cilium>-prefixed, so there are no collisions with
+core Kubernetes kind names.
+
 =head1 EXTERNAL RESOURCE MAPS
 
-IO::K8s supports merging resource maps from external packages (like a
-hypothetical C<IO::K8s::Cilium> for Cilium CRDs). This allows multiple
-packages to provide typed Kubernetes objects that work together.
+IO::K8s supports merging resource maps from external packages (like
+L<IO::K8s::Cilium> for Cilium CRDs). This allows multiple packages to
+provide typed Kubernetes objects that work together.
 
 =head2 Writing a resource map provider
 
 Create a class that consumes L<IO::K8s::Role::ResourceMap>:
 
-  package IO::K8s::Cilium;
+  package My::CRD::Provider;
   use Moo;
   with 'IO::K8s::Role::ResourceMap';
 
   sub resource_map {
       return {
-          CiliumNetworkPolicy => '+IO::K8s::Cilium::V2::CiliumNetworkPolicy',
-          NetworkPolicy       => '+IO::K8s::Cilium::V2::NetworkPolicy',
+          MyCustomKind => '+My::CRD::V1::MyCustomKind',
       };
   }
+
+See L<IO::K8s::Cilium> for a real-world example with 23 CRD classes.
 
 =head2 Collision handling
 
@@ -1031,19 +1050,19 @@ When two providers register the same kind name, the first-registered entry
 keeps the short name. Both entries are always reachable via domain-qualified
 names (C<api_version/Kind>):
 
-  my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+  my $k8s = IO::K8s->new(with => ['My::Firewall::Provider']);
 
   # Short name -> core (first-registered)
   $k8s->expand_class('NetworkPolicy');
   # -> IO::K8s::Api::Networking::V1::NetworkPolicy
 
   # Domain-qualified -> specific version
-  $k8s->expand_class('cilium.io/v2/NetworkPolicy');
-  # -> IO::K8s::Cilium::V2::NetworkPolicy
+  $k8s->expand_class('firewall.example.com/v1/NetworkPolicy');
+  # -> My::Firewall::V1::NetworkPolicy
 
   # api_version parameter for disambiguation
-  $k8s->expand_class('NetworkPolicy', 'cilium.io/v2');
-  # -> IO::K8s::Cilium::V2::NetworkPolicy
+  $k8s->expand_class('NetworkPolicy', 'firewall.example.com/v1');
+  # -> My::Firewall::V1::NetworkPolicy
 
 =head2 Disambiguation in pk8s DSL
 
@@ -1052,8 +1071,8 @@ In C<.pk8s> manifest files, pass the api_version as a second argument:
   # Core NetworkPolicy (default)
   NetworkPolicy { name => 'deny-all', spec => { ... } };
 
-  # Cilium NetworkPolicy (disambiguated, no comma - like grep/map syntax)
-  NetworkPolicy { name => 'deny-all', spec => { ... } } 'cilium.io/v2';
+  # Firewall NetworkPolicy (disambiguated, no comma - like grep/map syntax)
+  NetworkPolicy { name => 'deny-all', spec => { ... } } 'firewall.example.com/v1';
 
 =head1 UPGRADING FROM PREVIOUS VERSIONS
 

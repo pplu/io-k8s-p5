@@ -55,9 +55,29 @@ my $json = $k8s->object_to_json($svc);
 my $struct = $k8s->object_to_struct($pod);
 ```
 
+## Cilium CRD Support
+
+IO::K8s includes `IO::K8s::Cilium` with 23 Cilium CRD classes covering `cilium.io/v2` and `cilium.io/v2alpha1`. Not loaded by default - opt in at construction:
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+
+# Create Cilium resources like any built-in type
+my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+    metadata => { name => 'allow-dns', namespace => 'kube-system' },
+    spec => { endpointSelector => {} },
+);
+
+# Inflate from JSON/YAML
+my $obj = $k8s->inflate($cilium_json);  # auto-detects kind + apiVersion
+
+# Serialize
+print $cnp->to_yaml;
+```
+
 ## External Resource Maps
 
-Merge resource maps from external packages (e.g. CRD distributions like a future `IO::K8s::Cilium`):
+Merge resource maps from external packages (e.g. `IO::K8s::Cilium` or your own CRD packages):
 
 ```perl
 # At construction time
@@ -66,25 +86,31 @@ my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
 # Or at runtime
 $k8s->add('IO::K8s::Cilium');
 
-# Disambiguate colliding kind names
-$k8s->new_object('NetworkPolicy', { ... });                  # core (first-registered)
-$k8s->new_object('NetworkPolicy', { ... }, 'cilium.io/v2');  # Cilium
-$k8s->new_object('cilium.io/v2/NetworkPolicy', { ... });     # domain-qualified
+# Disambiguate colliding kind names with domain-qualified strings
+$k8s->new_object('cilium.io/v2/CiliumNetworkPolicy', { ... });
+
+# Or with api_version parameter
+$k8s->new_object('CiliumNetworkPolicy', { ... }, 'cilium.io/v2');
 
 # inflate() auto-uses apiVersion from JSON data
-$k8s->inflate('{"kind":"NetworkPolicy","apiVersion":"cilium.io/v2",...}');
+$k8s->inflate('{"kind":"CiliumNetworkPolicy","apiVersion":"cilium.io/v2",...}');
 ```
 
-### pk8s DSL disambiguation
+### pk8s DSL
 
-In `.pk8s` manifest files, pass the api_version after the block (no comma, like `grep`/`map` syntax):
+In `.pk8s` manifest files, Cilium kinds work directly:
 
 ```perl
-# Core NetworkPolicy (default)
-NetworkPolicy { name => 'deny-all', spec => { podSelector => {} } };
+CiliumNetworkPolicy {
+    name => 'allow-dns',
+    namespace => 'kube-system',
+    spec => { endpointSelector => {} },
+};
 
-# Firewall NetworkPolicy (disambiguated)
-NetworkPolicy { name => 'fw-deny', spec => { action => 'deny' } } 'firewall.example.com/v1';
+CiliumNode {
+    name => 'worker-1',
+    spec => { addresses => [{ type => 'InternalIP', ip => '10.0.0.1' }] },
+};
 ```
 
 ## Custom Resource Definitions (CRDs)

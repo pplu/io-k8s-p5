@@ -1,6 +1,7 @@
 Revision history for IO-K8s
 
 {{$NEXT}}
+  - Added IO::K8s::Cilium with 23 Cilium CRD classes (cilium.io/v2 and cilium.io/v2alpha1)
   - Added IO::K8s::Role::ResourceMap for external resource map providers
   - Added add() method to merge external resource maps (e.g. CRD packages)
   - Added 'with' constructor parameter for merging resource maps at construction
