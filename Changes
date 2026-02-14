@@ -1,6 +1,6 @@
 Revision history for IO-K8s
 
-{{$NEXT}}
+1.001     2026-02-14 19:07:12Z
   - Added IO::K8s::Types::Net with Net::IP-backed IP/CIDR type constraints
   - Added convenience methods to IO::K8s::Role::APIObject: labels, annotations,
     status conditions, and owner references for all API objects
