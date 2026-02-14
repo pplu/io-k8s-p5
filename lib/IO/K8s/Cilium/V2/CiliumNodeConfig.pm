@@ -10,3 +10,21 @@ k8s spec   => { Str => 1 };
 k8s status => { Str => 1 };
 
 1;
+
+__END__
+
+=head1 DESCRIPTION
+
+This namespace-scoped resource provides per-node Cilium agent configuration overrides, allowing node-specific customization of Cilium behavior. It uses API version C<cilium.io/v2>. The C<spec> and C<status> fields contain opaque CRD-specific data structures managed by the Cilium operator.
+
+=seealso
+
+=over
+
+=item * L<IO::K8s::Cilium> - Main Cilium CRD namespace
+
+=item * L<https://docs.cilium.io/en/stable/network/node-specific/> - Upstream Cilium node-specific configuration documentation
+
+=back
+
+=cut

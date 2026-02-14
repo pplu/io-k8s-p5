@@ -35,3 +35,49 @@ sub resource_map {
 }
 
 1;
+
+__END__
+
+=head1 SYNOPSIS
+
+    my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+
+    my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+        metadata => { name => 'allow-dns', namespace => 'kube-system' },
+        spec => { endpointSelector => {} },
+    );
+
+    print $cnp->to_yaml;
+
+=head1 DESCRIPTION
+
+Resource map provider for L<Cilium|https://cilium.io/> Custom Resource
+Definitions. Registers 23 CRD classes covering C<cilium.io/v2> and
+C<cilium.io/v2alpha1>.
+
+Not loaded by default — opt in via the C<with> constructor parameter of
+L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.
+
+=head2 Included CRDs (cilium.io/v2)
+
+CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy,
+CiliumLocalRedirectPolicy, CiliumEgressGatewayPolicy, CiliumIdentity,
+CiliumEndpoint, CiliumNode, CiliumNodeConfig, CiliumLoadBalancerIPPool,
+CiliumEnvoyConfig, CiliumClusterwideEnvoyConfig, CiliumExternalWorkload
+
+=head2 Included CRDs (cilium.io/v2alpha1)
+
+CiliumEndpointSlice, CiliumL2AnnouncementPolicy, CiliumBGPPeeringPolicy,
+CiliumBGPClusterConfig, CiliumBGPPeerConfig, CiliumBGPAdvertisement,
+CiliumBGPNodeConfig, CiliumBGPNodeConfigOverride, CiliumGatewayClassConfig,
+CiliumCIDRGroup, CiliumPodIPPool
+
+=seealso
+
+L<IO::K8s>
+
+L<Cilium documentation|https://docs.cilium.io/>
+
+L<Cilium CRD reference|https://docs.cilium.io/en/stable/network/kubernetes/policy/>
+
+=cut

@@ -55,24 +55,152 @@ my $json = $k8s->object_to_json($svc);
 my $struct = $k8s->object_to_struct($pod);
 ```
 
-## Cilium CRD Support
+## Bundled CRD Providers
 
-IO::K8s includes `IO::K8s::Cilium` with 23 Cilium CRD classes covering `cilium.io/v2` and `cilium.io/v2alpha1`. Not loaded by default - opt in at construction:
+IO::K8s ships with CRD classes for popular Kubernetes ecosystem projects. None are loaded by default - opt in at construction:
+
+```perl
+my $k8s = IO::K8s->new(with => [
+    'IO::K8s::Cilium',
+    'IO::K8s::Traefik',
+    'IO::K8s::CertManager',
+    'IO::K8s::K3s',
+    'IO::K8s::GatewayAPI',
+]);
+```
+
+### Cilium (23 CRDs)
+
+`IO::K8s::Cilium` covers `cilium.io/v2` and `cilium.io/v2alpha1`:
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
-
-# Create Cilium resources like any built-in type
 my $cnp = $k8s->new_object('CiliumNetworkPolicy',
     metadata => { name => 'allow-dns', namespace => 'kube-system' },
     spec => { endpointSelector => {} },
 );
+```
 
-# Inflate from JSON/YAML
-my $obj = $k8s->inflate($cilium_json);  # auto-detects kind + apiVersion
+### Traefik (10 CRDs)
 
-# Serialize
-print $cnp->to_yaml;
+`IO::K8s::Traefik` covers `traefik.io/v1alpha1`:
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::Traefik']);
+my $ir = $k8s->new_object('IngressRoute',
+    metadata => { name => 'my-route', namespace => 'default' },
+    spec => { entryPoints => ['web'], routes => [{ match => 'Host(`example.com`)' }] },
+);
+```
+
+### cert-manager (6 CRDs)
+
+`IO::K8s::CertManager` covers `cert-manager.io/v1` and `acme.cert-manager.io/v1`:
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::CertManager']);
+my $cert = $k8s->new_object('Certificate',
+    metadata => { name => 'my-cert', namespace => 'default' },
+    spec => { secretName => 'my-cert-tls', issuerRef => { name => 'letsencrypt' } },
+);
+```
+
+### K3s (3 CRDs)
+
+`IO::K8s::K3s` covers `helm.cattle.io/v1` and `k3s.cattle.io/v1`:
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::K3s']);
+my $hc = $k8s->new_object('HelmChart',
+    metadata => { name => 'traefik', namespace => 'kube-system' },
+    spec => { chart => 'traefik' },
+);
+```
+
+### Gateway API (5 CRDs)
+
+`IO::K8s::GatewayAPI` covers `gateway.networking.k8s.io/v1` and `gateway.networking.k8s.io/v1beta1`:
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::GatewayAPI']);
+my $gw = $k8s->new_object('Gateway',
+    metadata => { name => 'my-gateway', namespace => 'default' },
+    spec => { gatewayClassName => 'istio', listeners => [{ name => 'http', port => 80 }] },
+);
+```
+
+## Convenience Roles
+
+All API objects automatically get label, annotation, condition, and owner reference methods:
+
+```perl
+# Labels & annotations (all API objects)
+$pod->add_label(app => 'web');
+$pod->add_labels(app => 'web', tier => 'frontend');
+$pod->has_label('app');            # true
+$pod->match_labels(app => 'web');  # true
+$pod->add_annotation('prometheus.io/scrape' => 'true');
+
+# Status conditions (objects with status)
+$deploy->is_ready;
+$deploy->is_condition_true('Available');
+$deploy->condition_message('Progressing');
+
+# Owner references
+$pod->set_owner($deployment);
+$pod->is_owned_by($deployment);
+```
+
+CRD classes automatically get deep-path spec manipulation via `SpecBuilder`:
+
+```perl
+$ir->spec_set('tls.secretName', 'my-cert');
+$ir->spec_get('routes.0.match');
+$ir->spec_push('routes', { match => 'Host(`api.example.com`)' });
+$ir->spec_merge(entryPoints => ['web', 'websecure']);
+$ir->spec_delete('tls');
+```
+
+Domain-specific builder roles provide fluent APIs for common tasks:
+
+```perl
+# Network policies (core K8s + Cilium)
+$netpol->select_pods(app => 'web')
+       ->allow_ingress_from_pods({ app => 'nginx' }, ports => [{ port => 8080 }])
+       ->allow_egress_to_dns
+       ->deny_all_egress;
+
+# HTTP routing (Ingress, HTTPRoute, IngressRoute)
+$route->add_hostname('example.com')
+      ->add_backend('api-v1', port => 8080, weight => 90)
+      ->add_path_match('/api', type => 'Prefix');
+
+# cert-manager
+$cert->for_domains('example.com', '*.example.com')
+     ->with_issuer('letsencrypt-prod', kind => 'ClusterIssuer')
+     ->store_in_secret('example-tls');
+
+# K3s Helm charts
+$chart->from_repo('https://traefik.github.io/charts', 'traefik')
+      ->set_version('25.0.0')
+      ->set_values(replicas => 3);
+
+# Traefik middleware
+$mw->rate_limit(average => 100, burst => 200)
+   ->strip_prefix('/api')
+   ->redirect_https;
+```
+
+### IP Type Validation
+
+`IO::K8s::Types::Net` provides Net::IP-backed type constraints:
+
+```perl
+use IO::K8s::Types::Net qw( IPv4 IPv6 IPAddress CIDR NetIP );
+use IO::K8s::Types::Net qw( parse_ip cidr_contains is_rfc1918 );
+
+cidr_contains('10.0.0.0/8', '10.1.2.3');  # true
+is_rfc1918('192.168.1.1');                 # true
 ```
 
 ## External Resource Maps
@@ -143,6 +271,10 @@ See the full POD documentation for details on the class architecture and CRD sup
 - External resource map support with collision handling (`add()`, `with` constructor param)
 - Domain-qualified resource names for disambiguation (`api_version/Kind`)
 - Dynamic class generation from OpenAPI schemas via `IO::K8s::AutoGen`
+- Convenience methods: labels, annotations, conditions, owner references on all API objects
+- Deep-path spec manipulation for CRD classes via `SpecBuilder`
+- Domain-specific builder roles for network policies, routing, certificates, Helm, and more
+- Net::IP-backed IP/CIDR type constraints (`IO::K8s::Types::Net`)
 - Proper handling of namespaced resources
 - Canonical JSON output for consistent API requests
 
