@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ConfigMap;
 # ABSTRACT: ConfigMap holds configuration data for pods to consume.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

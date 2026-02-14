@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::IngressTLS;
 # ABSTRACT: IngressTLS describes the transport layer security associated with an ingress.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s hosts => [Str];

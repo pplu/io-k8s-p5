@@ -1,6 +1,6 @@
 package IO::K8s::Api::Storage::V1::VolumeAttachment;
 # ABSTRACT: VolumeAttachment captures the intent to attach or detach the specified volume to/from the specified node. VolumeAttachment objects are non-namespaced.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::APIObject;
 
 =description

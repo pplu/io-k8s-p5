@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::DaemonSetSpec;
 # ABSTRACT: DaemonSetSpec is the specification of a daemon set.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s minReadySeconds => Int;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1alpha1::ValidatingAdmissionPolicyBindingSpec;
 # ABSTRACT: ValidatingAdmissionPolicyBindingSpec is the specification of the ValidatingAdmissionPolicyBinding.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s matchResources => 'Admissionregistration::V1alpha1::MatchResources';

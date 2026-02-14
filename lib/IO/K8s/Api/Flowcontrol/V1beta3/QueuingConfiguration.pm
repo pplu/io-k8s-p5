@@ -1,6 +1,6 @@
 package IO::K8s::Api::Flowcontrol::V1beta3::QueuingConfiguration;
 # ABSTRACT: QueuingConfiguration holds the configuration parameters for queuing.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s handSize => Int;

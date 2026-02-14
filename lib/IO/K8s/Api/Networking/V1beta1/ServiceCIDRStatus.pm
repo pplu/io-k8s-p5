@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1beta1::ServiceCIDRStatus;
 # ABSTRACT: ServiceCIDRStatus describes the current state of the ServiceCIDR.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s conditions => ['Meta::V1::Condition'];

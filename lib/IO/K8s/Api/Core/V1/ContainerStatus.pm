@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ContainerStatus;
 # ABSTRACT: ContainerStatus contains details for the current status of this container.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s allocatedResources => { Str => 1 };

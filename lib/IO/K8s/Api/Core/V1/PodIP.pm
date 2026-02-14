@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PodIP;
 # ABSTRACT: PodIP represents a single IP address allocated to the pod.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s ip => Str, 'required';

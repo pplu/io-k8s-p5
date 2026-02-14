@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::LimitRangeSpec;
 # ABSTRACT: LimitRangeSpec defines a min/max usage limit for resources that match on kind.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s limits => ['Core::V1::LimitRangeItem'], 'required';

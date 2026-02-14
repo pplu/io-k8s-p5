@@ -1,6 +1,6 @@
 package IO::K8s::Api::Flowcontrol::V1::PriorityLevelConfigurationSpec;
 # ABSTRACT: PriorityLevelConfigurationSpec specifies the configuration of a priority level.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s exempt => 'Flowcontrol::V1::ExemptPriorityLevelConfiguration';

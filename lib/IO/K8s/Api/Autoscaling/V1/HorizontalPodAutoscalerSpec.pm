@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V1::HorizontalPodAutoscalerSpec;
 # ABSTRACT: specification of a horizontal pod autoscaler.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s maxReplicas => Int, 'required';

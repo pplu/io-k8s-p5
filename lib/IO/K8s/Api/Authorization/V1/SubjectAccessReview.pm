@@ -1,6 +1,6 @@
 package IO::K8s::Api::Authorization::V1::SubjectAccessReview;
 # ABSTRACT: SubjectAccessReview checks whether or not a user or group can perform an action.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::APIObject;
 
 =description

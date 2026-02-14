@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::HostIP;
 # ABSTRACT: HostIP represents a single IP address allocated to the host.
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s ip => Str, 'required';

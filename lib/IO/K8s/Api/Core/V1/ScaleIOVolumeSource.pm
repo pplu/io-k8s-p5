@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ScaleIOVolumeSource;
 # ABSTRACT: ScaleIOVolumeSource represents a persistent ScaleIO volume
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use IO::K8s::Resource;
 
 k8s fsType => Str;
