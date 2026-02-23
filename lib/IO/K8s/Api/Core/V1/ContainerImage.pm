@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ContainerImage;
 # ABSTRACT: Describe a container image
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s names => [Str];

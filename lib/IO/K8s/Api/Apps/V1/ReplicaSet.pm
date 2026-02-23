@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::ReplicaSet;
 # ABSTRACT: ReplicaSet ensures that a specified number of pod replicas are running at any given time.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

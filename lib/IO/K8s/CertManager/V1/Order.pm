@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Order;
 # ABSTRACT: cert-manager ACME order
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::APIObject
     api_version     => 'acme.cert-manager.io/v1',
     resource_plural => 'orders';

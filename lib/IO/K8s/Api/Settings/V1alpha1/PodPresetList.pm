@@ -1,5 +1,5 @@
 package IO::K8s::Api::Settings::V1alpha1::PodPresetList;
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

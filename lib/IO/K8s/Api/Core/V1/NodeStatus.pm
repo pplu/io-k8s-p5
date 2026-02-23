@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NodeStatus;
 # ABSTRACT: NodeStatus is information about the current status of a node.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s addresses => ['Core::V1::NodeAddress'];

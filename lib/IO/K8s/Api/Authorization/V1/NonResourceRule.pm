@@ -1,6 +1,6 @@
 package IO::K8s::Api::Authorization::V1::NonResourceRule;
 # ABSTRACT: NonResourceRule holds information that describes a rule for the non-resource
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s nonResourceURLs => [Str];

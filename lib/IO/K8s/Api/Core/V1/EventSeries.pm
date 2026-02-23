@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::EventSeries;
 # ABSTRACT: EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s count => Int;

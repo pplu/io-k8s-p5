@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V2::ObjectMetricStatus;
 # ABSTRACT: ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s current => 'Autoscaling::V2::MetricValueStatus', 'required';

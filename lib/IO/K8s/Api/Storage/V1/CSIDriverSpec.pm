@@ -1,6 +1,6 @@
 package IO::K8s::Api::Storage::V1::CSIDriverSpec;
 # ABSTRACT: CSIDriverSpec is the specification of a CSIDriver.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s attachRequired => Bool;

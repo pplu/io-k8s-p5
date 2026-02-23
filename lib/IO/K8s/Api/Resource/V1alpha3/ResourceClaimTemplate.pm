@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::ResourceClaimTemplate;
 # ABSTRACT: ResourceClaimTemplate is used to produce ResourceClaim objects. This is an alpha type and requires enabling the DynamicResourceAllocation feature gate.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

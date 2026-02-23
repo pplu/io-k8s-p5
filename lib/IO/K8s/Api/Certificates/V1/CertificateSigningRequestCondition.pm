@@ -1,6 +1,6 @@
 package IO::K8s::Api::Certificates::V1::CertificateSigningRequestCondition;
 # ABSTRACT: CertificateSigningRequestCondition describes a condition of a CertificateSigningRequest object
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s lastTransitionTime => Str;

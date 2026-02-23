@@ -1,6 +1,6 @@
 package IO::K8s::Role::ResourceMap;
 # ABSTRACT: Role for packages that provide a Kubernetes resource map
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use Moo::Role;
 
 requires 'resource_map';

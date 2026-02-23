@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1beta1::ValidatingAdmissionPolicyBinding;
 # ABSTRACT: ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources. ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::APIObject;
 
 =description

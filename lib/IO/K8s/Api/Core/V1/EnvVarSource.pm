@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::EnvVarSource;
 # ABSTRACT: EnvVarSource represents a source for the value of an EnvVar.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s configMapKeyRef => 'Core::V1::ConfigMapKeySelector';

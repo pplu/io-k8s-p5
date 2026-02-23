@@ -1,6 +1,6 @@
 package IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::DeleteOptions;
 # ABSTRACT: DeleteOptions may be provided when deleting an API object.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s apiVersion => Str;

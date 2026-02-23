@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::SelectableField;
 # ABSTRACT: SelectableField specifies the JSON path of a field that may be used with field selectors.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s jsonPath => Str, 'required';

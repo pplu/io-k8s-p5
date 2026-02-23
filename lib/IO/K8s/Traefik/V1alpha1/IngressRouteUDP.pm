@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::IngressRouteUDP;
 # ABSTRACT: Traefik UDP routing via IngressRouteUDP
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::APIObject
     api_version     => 'traefik.io/v1alpha1',
     resource_plural => 'ingressrouteudps';

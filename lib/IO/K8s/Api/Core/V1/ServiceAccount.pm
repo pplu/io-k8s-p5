@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ServiceAccount;
 # ABSTRACT: ServiceAccount binds together: * a name, understood by users, and perhaps by peripheral systems, for an identity * a principal that can be authenticated and authorized * a set of secrets
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

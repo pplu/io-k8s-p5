@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::NetworkPolicyPort;
 # ABSTRACT: NetworkPolicyPort describes a port to allow traffic on
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s endPort => Int;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Flowcontrol::V1::Subject;
 # ABSTRACT: Subject matches the originator of a request, as identified by the request authentication system. There are three ways of matching an originator; by user, group, or service account.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s group => 'Flowcontrol::V1::GroupSubject';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Authorization::V1::SelfSubjectRulesReviewSpec;
 # ABSTRACT: SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.
-our $VERSION = '1.002';
+our $VERSION = '1.003';
 use IO::K8s::Resource;
 
 k8s namespace => Str;
