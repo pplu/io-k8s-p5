@@ -51,6 +51,15 @@ my %DEFAULT_RESOURCE_MAP = (
     CSIStorageCapacity => 'Api::Storage::V1::CSIStorageCapacity',
     StorageClass => 'Api::Storage::V1::StorageClass',
     VolumeAttachment => 'Api::Storage::V1::VolumeAttachment',
+    # Authorization
+    LocalSubjectAccessReview => 'Api::Authorization::V1::LocalSubjectAccessReview',
+    SelfSubjectAccessReview => 'Api::Authorization::V1::SelfSubjectAccessReview',
+    SelfSubjectRulesReview => 'Api::Authorization::V1::SelfSubjectRulesReview',
+    SubjectAccessReview => 'Api::Authorization::V1::SubjectAccessReview',
+    # Authentication
+    SelfSubjectReview => 'Api::Authentication::V1::SelfSubjectReview',
+    TokenRequest => 'Api::Authentication::V1::TokenRequest',
+    TokenReview => 'Api::Authentication::V1::TokenReview',
     # RBAC
     ClusterRole => 'Api::Rbac::V1::ClusterRole',
     ClusterRoleBinding => 'Api::Rbac::V1::ClusterRoleBinding',
