@@ -1,6 +1,6 @@
 Revision history for IO-K8s
 
-{{$NEXT}}
+1.003     2026-02-28 00:35:50Z
 
 1.002     2026-02-23 02:37:32Z
   - Added Authorization API types to default resource map
