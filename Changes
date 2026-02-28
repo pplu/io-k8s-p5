@@ -1,6 +1,10 @@
 Revision history for IO-K8s
 
 {{$NEXT}}
+  - Fixed _inflate_struct not recognizing sanitized field names (x-kubernetes-*,
+    $ref, etc.) during JSON deserialization — Bool coercion and type inflation
+    were skipped for these fields, causing JSON::PP::Boolean type constraint
+    failures on e.g. x-kubernetes-preserve-unknown-fields
 
 1.004     2026-02-28 05:42:53Z
   - Fixed JSONSchemaProps compilation: field names with special characters
