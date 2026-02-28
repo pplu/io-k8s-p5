@@ -3,7 +3,7 @@ package IO::K8s::KubeAggregator::Pkg::Apis::Apiregistration::V1::APIServiceCondi
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s lastTransitionTime => Str;
+k8s lastTransitionTime => Time;
 
 =attr lastTransitionTime
 

@@ -11,7 +11,7 @@ Number of occurrences in this series up to the last heartbeat time
 
 =cut
 
-k8s lastObservedTime => Str;
+k8s lastObservedTime => Time;
 
 =attr lastObservedTime
 

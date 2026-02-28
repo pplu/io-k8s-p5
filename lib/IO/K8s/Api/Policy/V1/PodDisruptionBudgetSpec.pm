@@ -3,7 +3,7 @@ package IO::K8s::Api::Policy::V1::PodDisruptionBudgetSpec;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s maxUnavailable => Str;
+k8s maxUnavailable => IntOrStr;
 
 =attr maxUnavailable
 
@@ -11,7 +11,7 @@ An eviction is allowed if at most "maxUnavailable" pods selected by "selector" a
 
 =cut
 
-k8s minAvailable => Str;
+k8s minAvailable => IntOrStr;
 
 =attr minAvailable
 

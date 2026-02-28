@@ -3,7 +3,7 @@ package IO::K8s::Api::Coordination::V1::LeaseSpec;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s acquireTime => Str;
+k8s acquireTime => Time;
 
 =attr acquireTime
 
@@ -43,7 +43,7 @@ PreferredHolder signals to a lease holder that the lease has a more optimal hold
 
 =cut
 
-k8s renewTime => Str;
+k8s renewTime => Time;
 
 =attr renewTime
 

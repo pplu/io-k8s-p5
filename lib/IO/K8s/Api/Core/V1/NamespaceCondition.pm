@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::NamespaceCondition;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s lastTransitionTime => Str;
+k8s lastTransitionTime => Time;
 
 k8s message => Str;
 

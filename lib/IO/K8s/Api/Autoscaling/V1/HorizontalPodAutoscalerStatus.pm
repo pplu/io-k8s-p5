@@ -27,7 +27,7 @@ desiredReplicas is the  desired number of replicas of pods managed by this autos
 
 =cut
 
-k8s lastScaleTime => Str;
+k8s lastScaleTime => Time;
 
 =attr lastScaleTime
 

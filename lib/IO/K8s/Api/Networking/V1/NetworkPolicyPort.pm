@@ -11,7 +11,7 @@ endPort indicates that the range of ports from port to endPort if set, inclusive
 
 =cut
 
-k8s port => Str;
+k8s port => IntOrStr;
 
 =attr port
 

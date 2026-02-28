@@ -127,7 +127,7 @@ Status of resource claims.
 
 =cut
 
-k8s startTime => Str;
+k8s startTime => Time;
 
 =attr startTime
 

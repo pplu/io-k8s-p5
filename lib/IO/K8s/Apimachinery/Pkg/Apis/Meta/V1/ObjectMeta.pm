@@ -11,7 +11,7 @@ Annotations is an unstructured key value map stored with a resource that may be 
 
 =cut
 
-k8s creationTimestamp => Str;
+k8s creationTimestamp => Time;
 
 =attr creationTimestamp
 
@@ -27,7 +27,7 @@ Number of seconds allowed for this object to gracefully terminate before it will
 
 =cut
 
-k8s deletionTimestamp => Str;
+k8s deletionTimestamp => Time;
 
 =attr deletionTimestamp
 

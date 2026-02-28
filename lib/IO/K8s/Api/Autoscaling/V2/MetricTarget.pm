@@ -11,7 +11,7 @@ averageUtilization is the target value of the average of the resource metric acr
 
 =cut
 
-k8s averageValue => Str;
+k8s averageValue => Quantity;
 
 =attr averageValue
 
@@ -27,7 +27,7 @@ type represents whether the metric type is Utilization, Value, or AverageValue
 
 =cut
 
-k8s value => Str;
+k8s value => Quantity;
 
 =attr value
 

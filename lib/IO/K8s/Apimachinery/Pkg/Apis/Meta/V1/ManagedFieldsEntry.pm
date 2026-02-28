@@ -51,7 +51,7 @@ Subresource is the name of the subresource used to update that object, or empty 
 
 =cut
 
-k8s time => Str;
+k8s time => Time;
 
 =attr time
 

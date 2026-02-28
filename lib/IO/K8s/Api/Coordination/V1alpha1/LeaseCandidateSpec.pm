@@ -27,7 +27,7 @@ LeaseName is the name of the lease for which this candidate is contending. This 
 
 =cut
 
-k8s pingTime => Str;
+k8s pingTime => Time;
 
 =attr pingTime
 
@@ -43,7 +43,7 @@ PreferredStrategies indicates the list of strategies for picking the leader for 
 
 =cut
 
-k8s renewTime => Str;
+k8s renewTime => Time;
 
 =attr renewTime
 

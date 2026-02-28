@@ -11,7 +11,7 @@ Container name: required for volumes, optional for env vars
 
 =cut
 
-k8s divisor => Str;
+k8s divisor => Quantity;
 
 =attr divisor
 

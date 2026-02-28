@@ -11,7 +11,7 @@ Optional: Host name to connect to, defaults to the pod IP.
 
 =cut
 
-k8s port => Str, 'required';
+k8s port => IntOrStr, 'required';
 
 =attr port
 

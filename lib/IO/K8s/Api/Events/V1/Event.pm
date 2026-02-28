@@ -32,7 +32,7 @@ deprecatedCount is the deprecated field assuring backward compatibility with cor
 
 =cut
 
-k8s deprecatedFirstTimestamp => Str;
+k8s deprecatedFirstTimestamp => Time;
 
 =attr deprecatedFirstTimestamp
 
@@ -41,7 +41,7 @@ deprecatedFirstTimestamp is the deprecated field assuring backward compatibility
 
 =cut
 
-k8s deprecatedLastTimestamp => Str;
+k8s deprecatedLastTimestamp => Time;
 
 =attr deprecatedLastTimestamp
 
@@ -59,7 +59,7 @@ deprecatedSource is the deprecated field assuring backward compatibility with co
 
 =cut
 
-k8s eventTime => Str, 'required';
+k8s eventTime => Time, 'required';
 
 =attr eventTime
 

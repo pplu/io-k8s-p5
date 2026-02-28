@@ -3,7 +3,7 @@ package IO::K8s::Api::Certificates::V1::CertificateSigningRequestCondition;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s lastTransitionTime => Str;
+k8s lastTransitionTime => Time;
 
 =attr lastTransitionTime
 
@@ -11,7 +11,7 @@ lastTransitionTime is the time the condition last transitioned from one status t
 
 =cut
 
-k8s lastUpdateTime => Str;
+k8s lastUpdateTime => Time;
 
 =attr lastUpdateTime
 

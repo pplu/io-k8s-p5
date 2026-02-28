@@ -3,7 +3,7 @@ package IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::Condition;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s lastTransitionTime => Str, 'required';
+k8s lastTransitionTime => Time, 'required';
 
 =attr lastTransitionTime
 

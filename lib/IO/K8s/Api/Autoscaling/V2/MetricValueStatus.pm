@@ -11,7 +11,7 @@ currentAverageUtilization is the current value of the average of the resource me
 
 =cut
 
-k8s averageValue => Str;
+k8s averageValue => Quantity;
 
 =attr averageValue
 
@@ -19,7 +19,7 @@ averageValue is the current value of the average of the metric across all releva
 
 =cut
 
-k8s value => Str;
+k8s value => Quantity;
 
 =attr value
 

@@ -32,7 +32,7 @@ The number of times this event has occurred.
 
 =cut
 
-k8s eventTime => Str;
+k8s eventTime => Time;
 
 =attr eventTime
 
@@ -41,7 +41,7 @@ Time when this Event was first observed.
 
 =cut
 
-k8s firstTimestamp => Str;
+k8s firstTimestamp => Time;
 
 =attr firstTimestamp
 
@@ -59,7 +59,7 @@ The object that this event is about.
 
 =cut
 
-k8s lastTimestamp => Str;
+k8s lastTimestamp => Time;
 
 =attr lastTimestamp
 

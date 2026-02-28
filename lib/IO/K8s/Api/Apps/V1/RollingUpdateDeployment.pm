@@ -3,7 +3,7 @@ package IO::K8s::Api::Apps::V1::RollingUpdateDeployment;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s maxSurge => Str;
+k8s maxSurge => IntOrStr;
 
 =attr maxSurge
 
@@ -11,7 +11,7 @@ The maximum number of pods that can be scheduled above the desired number of pod
 
 =cut
 
-k8s maxUnavailable => Str;
+k8s maxUnavailable => IntOrStr;
 
 =attr maxUnavailable
 

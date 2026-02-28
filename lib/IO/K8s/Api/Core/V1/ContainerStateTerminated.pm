@@ -19,7 +19,7 @@ Exit status from the last termination of the container
 
 =cut
 
-k8s finishedAt => Str;
+k8s finishedAt => Time;
 
 =attr finishedAt
 
@@ -51,7 +51,7 @@ Signal from the last termination of the container
 
 =cut
 
-k8s startedAt => Str;
+k8s startedAt => Time;
 
 =attr startedAt
 

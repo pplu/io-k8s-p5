@@ -11,7 +11,7 @@ A list of pointers to currently running jobs.
 
 =cut
 
-k8s lastScheduleTime => Str;
+k8s lastScheduleTime => Time;
 
 =attr lastScheduleTime
 
@@ -19,7 +19,7 @@ Information when was the last time the job was successfully scheduled.
 
 =cut
 
-k8s lastSuccessfulTime => Str;
+k8s lastSuccessfulTime => Time;
 
 =attr lastSuccessfulTime
 

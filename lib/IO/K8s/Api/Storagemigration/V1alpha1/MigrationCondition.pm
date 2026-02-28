@@ -3,7 +3,7 @@ package IO::K8s::Api::Storagemigration::V1alpha1::MigrationCondition;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s lastUpdateTime => Str;
+k8s lastUpdateTime => Time;
 
 =attr lastUpdateTime
 

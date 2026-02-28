@@ -11,7 +11,7 @@ message represents the error encountered during Attach or Detach operation. This
 
 =cut
 
-k8s time => Str;
+k8s time => Time;
 
 =attr time
 

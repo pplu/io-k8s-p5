@@ -52,7 +52,7 @@ The IP protocol for this port. Supports "TCP", "UDP", and "SCTP". Default is TCP
 
 =cut
 
-k8s targetPort => Str;
+k8s targetPort => IntOrStr;
 
 =attr targetPort
 

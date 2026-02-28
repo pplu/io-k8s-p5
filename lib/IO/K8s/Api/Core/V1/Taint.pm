@@ -19,7 +19,7 @@ Required. The taint key to be applied to a node.
 
 =cut
 
-k8s timeAdded => Str;
+k8s timeAdded => Time;
 
 =attr timeAdded
 

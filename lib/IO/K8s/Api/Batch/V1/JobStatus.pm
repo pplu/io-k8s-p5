@@ -19,7 +19,7 @@ completedIndexes holds the completed indexes when .spec.completionMode = "Indexe
 
 =cut
 
-k8s completionTime => Str;
+k8s completionTime => Time;
 
 =attr completionTime
 
@@ -65,7 +65,7 @@ The number of active pods which have a Ready condition and are not terminating (
 
 =cut
 
-k8s startTime => Str;
+k8s startTime => Time;
 
 =attr startTime
 

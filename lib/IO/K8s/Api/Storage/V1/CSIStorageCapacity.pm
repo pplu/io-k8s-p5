@@ -22,7 +22,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s capacity => Str;
+k8s capacity => Quantity;
 
 =attr capacity
 
@@ -33,7 +33,7 @@ The semantic is currently (CSI spec 1.2) defined as: The available capacity, in 
 
 =cut
 
-k8s maximumVolumeSize => Str;
+k8s maximumVolumeSize => Quantity;
 
 =attr maximumVolumeSize
 

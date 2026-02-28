@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::NodeCondition;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s lastHeartbeatTime => Str;
+k8s lastHeartbeatTime => Time;
 
 =attr lastHeartbeatTime
 
@@ -11,7 +11,7 @@ Last time we got an update on a given condition.
 
 =cut
 
-k8s lastTransitionTime => Str;
+k8s lastTransitionTime => Time;
 
 =attr lastTransitionTime
 

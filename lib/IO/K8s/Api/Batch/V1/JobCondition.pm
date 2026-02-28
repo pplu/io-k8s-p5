@@ -3,7 +3,7 @@ package IO::K8s::Api::Batch::V1::JobCondition;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s lastProbeTime => Str;
+k8s lastProbeTime => Time;
 
 =attr lastProbeTime
 
@@ -11,7 +11,7 @@ Last time the condition was checked.
 
 =cut
 
-k8s lastTransitionTime => Str;
+k8s lastTransitionTime => Time;
 
 =attr lastTransitionTime
 

@@ -11,7 +11,7 @@ medium represents what type of storage medium should back this directory. The de
 
 =cut
 
-k8s sizeLimit => Str;
+k8s sizeLimit => Quantity;
 
 =attr sizeLimit
 

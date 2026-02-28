@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::ContainerStateRunning;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s startedAt => Str;
+k8s startedAt => Time;
 
 =attr startedAt
 

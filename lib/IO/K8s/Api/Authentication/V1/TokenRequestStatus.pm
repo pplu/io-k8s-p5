@@ -3,7 +3,7 @@ package IO::K8s::Api::Authentication::V1::TokenRequestStatus;
 our $VERSION = '1.003';
 use IO::K8s::Resource;
 
-k8s expirationTimestamp => Str, 'required';
+k8s expirationTimestamp => Time, 'required';
 
 =attr expirationTimestamp
 
