@@ -3,9 +3,9 @@ package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchem
 our $VERSION = '1.004';
 use IO::K8s::Resource;
 
-k8s $ref => Str;
+k8s '$ref' => Str;
 
-k8s $schema => Str;
+k8s '$schema' => Str;
 
 k8s additionalItems => 'Apiextensions::V1::JSONSchemaPropsOrBool';
 
@@ -89,7 +89,7 @@ k8s type => Str;
 
 k8s uniqueItems => Bool;
 
-k8s x-kubernetes-embedded-resource => Bool;
+k8s 'x-kubernetes-embedded-resource' => Bool;
 
 =attr x-kubernetes-embedded-resource
 
@@ -97,7 +97,7 @@ x-kubernetes-embedded-resource defines that the value is an embedded Kubernetes 
 
 =cut
 
-k8s x-kubernetes-int-or-string => Bool;
+k8s 'x-kubernetes-int-or-string' => Bool;
 
 =attr x-kubernetes-int-or-string
 
@@ -105,7 +105,7 @@ x-kubernetes-int-or-string specifies that this value is either an integer or a s
 
 =cut
 
-k8s x-kubernetes-list-map-keys => [Str];
+k8s 'x-kubernetes-list-map-keys' => [Str];
 
 =attr x-kubernetes-list-map-keys
 
@@ -113,7 +113,7 @@ x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `m
 
 =cut
 
-k8s x-kubernetes-list-type => Str;
+k8s 'x-kubernetes-list-type' => Str;
 
 =attr x-kubernetes-list-type
 
@@ -121,7 +121,7 @@ x-kubernetes-list-type annotates an array to further describe its topology. This
 
 =cut
 
-k8s x-kubernetes-map-type => Str;
+k8s 'x-kubernetes-map-type' => Str;
 
 =attr x-kubernetes-map-type
 
@@ -129,7 +129,7 @@ x-kubernetes-map-type annotates an object to further describe its topology. This
 
 =cut
 
-k8s x-kubernetes-preserve-unknown-fields => Bool;
+k8s 'x-kubernetes-preserve-unknown-fields' => Bool;
 
 =attr x-kubernetes-preserve-unknown-fields
 
@@ -137,7 +137,7 @@ x-kubernetes-preserve-unknown-fields stops the API server decoding step from pru
 
 =cut
 
-k8s x-kubernetes-validations => ['Apiextensions::V1::ValidationRule'];
+k8s 'x-kubernetes-validations' => ['Apiextensions::V1::ValidationRule'];
 
 =attr x-kubernetes-validations
 

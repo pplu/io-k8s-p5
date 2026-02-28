@@ -82,6 +82,9 @@ sub _generate_class {
     my $properties = $schema->{properties} // {};
 
     # Generate attributes using k8s DSL
+    # Property names with special characters ($ref, x-kubernetes-*) are
+    # automatically sanitized to valid Perl identifiers by _k8s(), with
+    # init_arg mapping so constructors still accept the original JSON keys.
     for my $prop (sort keys %$properties) {
         my $prop_schema = $properties->{$prop};
         my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop);

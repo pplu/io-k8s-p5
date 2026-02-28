@@ -1,6 +1,11 @@
 Revision history for IO-K8s
 
 {{$NEXT}}
+  - Fixed JSONSchemaProps compilation: field names with special characters
+    ($ref, $schema, x-kubernetes-*) are now automatically sanitized to valid
+    Perl identifiers (e.g. _ref, _schema, x_kubernetes_embedded_resource)
+    with init_arg mapping so constructors still accept the original JSON keys
+  - Added comprehensive compile test (t/02_compile_all.t) loading all 697 modules
 
 1.003     2026-02-28 00:35:50Z
 

@@ -52,27 +52,29 @@ sub TO_JSON {
         next unless defined $value;
 
         my $attr_info = $info->{$attr} // {};
+        # Use json_key for output when attr name differs from JSON field name
+        my $key = $attr_info->{json_key} // $attr;
 
         if ($attr_info->{is_bool}) {
-            $data{$attr} = $value ? JSON::MaybeXS::true : JSON::MaybeXS::false;
+            $data{$key} = $value ? JSON::MaybeXS::true : JSON::MaybeXS::false;
         } elsif ($attr_info->{is_int}) {
-            $data{$attr} = int($value);
+            $data{$key} = int($value);
         } elsif ($attr_info->{is_int_or_string}) {
-            $data{$attr} = ($value =~ /\A-?\d+\z/) ? int($value) : $value;
+            $data{$key} = ($value =~ /\A-?\d+\z/) ? int($value) : $value;
         } elsif ($attr_info->{is_object} && blessed($value) && $value->can('TO_JSON')) {
-            $data{$attr} = $value->TO_JSON;
+            $data{$key} = $value->TO_JSON;
         } elsif ($attr_info->{is_array_of_objects}) {
-            $data{$attr} = [ map { $_->TO_JSON } @$value ];
+            $data{$key} = [ map { $_->TO_JSON } @$value ];
         } elsif ($attr_info->{is_hash_of_objects}) {
-            $data{$attr} = { map { $_ => $value->{$_}->TO_JSON } keys %$value };
+            $data{$key} = { map { $_ => $value->{$_}->TO_JSON } keys %$value };
         } elsif ($attr_info->{is_array_of_int}) {
-            $data{$attr} = [ map { int($_) } @$value ];
+            $data{$key} = [ map { int($_) } @$value ];
         } elsif (ref $value eq 'ARRAY') {
-            $data{$attr} = $value;
+            $data{$key} = $value;
         } elsif (ref $value eq 'HASH') {
-            $data{$attr} = $value;
+            $data{$key} = $value;
         } else {
-            $data{$attr} = $value;
+            $data{$key} = $value;
         }
     }
     return \%data;
@@ -117,6 +119,13 @@ sub compare_to_schema {
     my $local_attrs = $IO::K8s::Resource::_attr_registry{$class} // {};
     my $schema_props = $schema->{properties} // {};
 
+    # Build json_key -> attr_name mapping for lookup
+    my %json_to_attr;
+    for my $attr (keys %$local_attrs) {
+        my $jk = $local_attrs->{$attr}{json_key} // $attr;
+        $json_to_attr{$jk} = $attr;
+    }
+
     my %result = (
         missing_locally   => [],
         missing_in_schema => [],
@@ -125,7 +134,8 @@ sub compare_to_schema {
 
     # Check schema properties against local attributes
     for my $prop (keys %$schema_props) {
-        if (!exists $local_attrs->{$prop}) {
+        my $attr = $json_to_attr{$prop};
+        if (!defined $attr) {
             # Special case: metadata comes from Role, not k8s DSL
             next if $prop eq 'metadata' && $class->can('metadata');
             # apiVersion and kind also come from Role
@@ -133,7 +143,7 @@ sub compare_to_schema {
             push @{$result{missing_locally}}, $prop;
         } else {
             # Compare types
-            my $local_type = _describe_local_type($local_attrs->{$prop});
+            my $local_type = _describe_local_type($local_attrs->{$attr});
             my $schema_type = _describe_schema_type($schema_props->{$prop});
             if ($local_type ne $schema_type) {
                 push @{$result{type_mismatch}}, {
@@ -147,8 +157,9 @@ sub compare_to_schema {
 
     # Check local attributes not in schema
     for my $attr (keys %$local_attrs) {
-        if (!exists $schema_props->{$attr}) {
-            push @{$result{missing_in_schema}}, $attr;
+        my $jk = $local_attrs->{$attr}{json_key} // $attr;
+        if (!exists $schema_props->{$jk}) {
+            push @{$result{missing_in_schema}}, $jk;
         }
     }
 

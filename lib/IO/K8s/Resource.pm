@@ -105,8 +105,21 @@ sub _is_type_tiny {
     return blessed($obj) && $obj->isa('Type::Tiny');
 }
 
+# Sanitize JSON field names into valid Perl identifiers for Moo attributes
+# $ref -> _ref, $schema -> _schema, x-kubernetes-foo -> x_kubernetes_foo
+sub _sanitize_attr_name {
+    my ($name) = @_;
+    return $name unless $name =~ /[^a-zA-Z0-9_]/;
+    (my $safe = $name) =~ s/^\$/_/;
+    $safe =~ s/-/_/g;
+    return $safe;
+}
+
 sub _k8s {
     my ($caller, $name, $type_spec, $required_marker) = @_;
+
+    my $json_key = $name;
+    my $attr_name = _sanitize_attr_name($name);
 
     # Ensure the registry entry exists
     $_attr_registry{$caller} = {} unless exists $_attr_registry{$caller};
@@ -179,17 +192,23 @@ sub _k8s {
     }
 
 
+    # Store json_key when it differs from the Perl attribute name
+    $info{json_key} = $json_key if $attr_name ne $json_key;
+
     # Register - use hash slice to copy values, not reference
-    $_attr_registry{$caller}{$name} = { %info };
+    $_attr_registry{$caller}{$attr_name} = { %info };
     no strict 'refs';
-    push @{"${caller}::_k8s_attributes"}, $name;
+    push @{"${caller}::_k8s_attributes"}, $attr_name;
 
     # Only create the attribute if it doesn't already exist (e.g., from a role)
-    return if $caller->can($name);
+    return if $caller->can($attr_name);
 
-    # Call Moo's has
+    # Call Moo's has — use init_arg to map JSON key to Perl-safe attribute name
     my $has = $caller->can('has');
-    $has->($name, is => 'rw', isa => $isa, ($required ? (required => 1) : ()));
+    $has->($attr_name, is => 'rw', isa => $isa,
+        ($required ? (required => 1) : ()),
+        ($attr_name ne $json_key ? (init_arg => $json_key) : ()),
+    );
 }
 
 1;
@@ -234,5 +253,15 @@ Short class names are auto-expanded:
 
     Core::V1::Pod      -> IO::K8s::Api::Core::V1::Pod
     Meta::V1::ObjectMeta -> IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta
+
+Field names that are not valid Perl identifiers are automatically sanitized:
+C<$ref> becomes C<_ref>, C<$schema> becomes C<_schema>, and hyphens are
+replaced with underscores (C<x-kubernetes-foo> becomes C<x_kubernetes_foo>).
+The original JSON key is preserved via C<init_arg> so constructors and
+C<FROM_HASH> still accept the original names, and C<TO_JSON> outputs the
+original keys.
+
+    k8s '$ref' => Str;                          # Moo attr: _ref
+    k8s 'x-kubernetes-list-type' => Str;        # Moo attr: x_kubernetes_list_type
 
 =cut
