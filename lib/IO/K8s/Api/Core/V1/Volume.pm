@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Volume;
 # ABSTRACT: Volume represents a named volume in a pod that may be accessed by any container in the pod.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s awsElasticBlockStore => 'Core::V1::AWSElasticBlockStoreVolumeSource';

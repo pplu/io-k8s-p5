@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::GCEPersistentDiskVolumeSource;
 # ABSTRACT: Represents a Persistent Disk resource in Google Compute Engine. A GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s fsType => Str;

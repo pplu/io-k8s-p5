@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumNetworkPolicy;
 # ABSTRACT: Cilium network policy for namespace-scoped network security
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumnetworkpolicies';

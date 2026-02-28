@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1::ValidatingAdmissionPolicySpec;
 # ABSTRACT: ValidatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s auditAnnotations => ['Admissionregistration::V1::AuditAnnotation'];

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::EnvFromSource;
 # ABSTRACT: EnvFromSource represents the source of a set of ConfigMaps
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s configMapRef => 'Core::V1::ConfigMapEnvSource';

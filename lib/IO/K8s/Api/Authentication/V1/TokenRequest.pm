@@ -1,6 +1,6 @@
 package IO::K8s::Api::Authentication::V1::TokenRequest;
 # ABSTRACT: TokenRequest requests a token for a given service account.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

@@ -1,5 +1,7 @@
 Revision history for IO-K8s
 
+{{$NEXT}}
+
 1.004     2026-02-28 05:42:53Z
   - Fixed JSONSchemaProps compilation: field names with special characters
     ($ref, $schema, x-kubernetes-*) are now automatically sanitized to valid

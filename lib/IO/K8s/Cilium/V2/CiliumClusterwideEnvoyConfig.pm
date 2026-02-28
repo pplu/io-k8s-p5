@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumClusterwideEnvoyConfig;
 # ABSTRACT: Cilium cluster-wide Envoy proxy configuration
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumclusterwideenvoyconfigs';

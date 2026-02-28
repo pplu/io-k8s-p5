@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NamespaceStatus;
 # ABSTRACT: NamespaceStatus is information about the current status of a Namespace.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s conditions => ['Core::V1::NamespaceCondition'];

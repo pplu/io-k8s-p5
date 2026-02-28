@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::ValidationRule;
 # ABSTRACT: ValidationRule describes a validation rule written in the CEL expression language.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s fieldPath => Str;

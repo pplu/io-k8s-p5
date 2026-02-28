@@ -1,6 +1,6 @@
 package IO::K8s::Api::Coordination::V1::LeaseSpec;
 # ABSTRACT: LeaseSpec is a specification of a Lease.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s acquireTime => Time;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::CSIVolumeSource;
 # ABSTRACT: Represents a source location of a volume to mount, managed by an external CSI driver
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s driver => Str, 'required';

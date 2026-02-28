@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PortworxVolumeSource;
 # ABSTRACT: PortworxVolumeSource represents a Portworx volume resource.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s fsType => Str;

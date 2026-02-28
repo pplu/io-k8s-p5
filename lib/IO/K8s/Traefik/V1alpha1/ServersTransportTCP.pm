@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::ServersTransportTCP;
 # ABSTRACT: Traefik TCP servers transport configuration
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::APIObject
     api_version     => 'traefik.io/v1alpha1',
     resource_plural => 'serverstransporttcps';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Flowcontrol::V1beta3::PriorityLevelConfigurationReference;
 # ABSTRACT: PriorityLevelConfigurationReference contains information that points to the "request-priority" being used.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

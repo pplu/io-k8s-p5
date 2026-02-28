@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::SELinuxOptions;
 # ABSTRACT: SELinuxOptions are the labels to be applied to the container
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s level => Str;

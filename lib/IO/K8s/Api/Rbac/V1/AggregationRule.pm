@@ -1,6 +1,6 @@
 package IO::K8s::Api::Rbac::V1::AggregationRule;
 # ABSTRACT: AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s clusterRoleSelectors => ['Meta::V1::LabelSelector'];

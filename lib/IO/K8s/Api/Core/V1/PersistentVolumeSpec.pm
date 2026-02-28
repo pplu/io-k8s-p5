@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PersistentVolumeSpec;
 # ABSTRACT: PersistentVolumeSpec is the specification of a persistent volume.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s accessModes => [Str];

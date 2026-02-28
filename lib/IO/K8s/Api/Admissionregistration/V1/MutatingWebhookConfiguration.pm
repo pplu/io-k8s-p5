@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1::MutatingWebhookConfiguration;
 # ABSTRACT: MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::APIObject;
 
 =description

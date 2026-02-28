@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1beta1::IPAddressSpec;
 # ABSTRACT: IPAddressSpec describe the attributes in an IP Address.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s parentRef => 'Networking::V1beta1::ParentReference', 'required';

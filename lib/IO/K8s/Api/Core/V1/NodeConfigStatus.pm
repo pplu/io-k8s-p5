@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NodeConfigStatus;
 # ABSTRACT: NodeConfigStatus describes the status of the config assigned by Node.Spec.ConfigSource.
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 use IO::K8s::Resource;
 
 k8s active => 'Core::V1::NodeConfigSource';
