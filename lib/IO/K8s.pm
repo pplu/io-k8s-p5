@@ -5,6 +5,7 @@ use v5.10;
 use Moo;
 use Module::Runtime qw(require_module);
 use JSON::MaybeXS;
+use Scalar::Util ();
 use namespace::clean;
 
 our $VERSION = '1.006';
@@ -438,6 +439,14 @@ sub new_object {
 
 sub _inflate_struct {
     my ($self, $class, $params) = @_;
+
+    # Blessed objects should be caught by struct_to_object before reaching
+    # here.  If one does slip through (defensive), extract its data rather
+    # than silently returning {} which would create an empty object.
+    if (Scalar::Util::blessed($params)) {
+        return $params->TO_JSON if $params->can('TO_JSON');
+        return {};
+    }
 
     return {} unless ref $params eq 'HASH';
 
