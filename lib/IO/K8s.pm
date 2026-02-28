@@ -391,6 +391,10 @@ sub struct_to_object {
 
     # Two arguments: class and params
     my $class = $self->expand_class($class_or_struct);
+
+    # Already an object of the right class — pass through as-is
+    return $params if Scalar::Util::blessed($params) && $params->isa($class);
+
     $self->load_class($class);
     my $inflated = $self->_inflate_struct($class, $params);
     return $class->new(%$inflated);

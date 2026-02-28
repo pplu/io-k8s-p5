@@ -1,6 +1,11 @@
 Revision history for IO-K8s
 
 {{$NEXT}}
+  - Fix struct_to_object destroying pre-built objects: when a typed IO::K8s
+    object was passed into a parent constructor (e.g. PersistentVolumeClaim in
+    StatefulSet.volumeClaimTemplates), _inflate_struct treated the blessed
+    object as a non-HASH ref and returned {}, producing an empty object.
+    Now passes through objects that already match the expected class.
 
 1.005     2026-02-28 06:43:29Z
   - Fixed _inflate_struct not recognizing sanitized field names (x-kubernetes-*,
