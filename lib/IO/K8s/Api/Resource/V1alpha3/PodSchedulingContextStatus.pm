@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::PodSchedulingContextStatus;
 # ABSTRACT: PodSchedulingContextStatus describes where resources for the Pod can be allocated.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s resourceClaims => ['Resource::V1alpha3::ResourceClaimSchedulingStatus'];

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V1::HorizontalPodAutoscalerStatus;
 # ABSTRACT: current status of a horizontal pod autoscaler
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s currentCPUUtilizationPercentage => Int;

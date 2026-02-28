@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::PodSchedulingContext;
 # ABSTRACT: PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation mode. This is an alpha type and requires enabling the DRAControlPlaneController feature gate.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

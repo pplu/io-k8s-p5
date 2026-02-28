@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Taint;
 # ABSTRACT: The node this Taint is attached to has the "effect" on any pod that does not tolerate the Taint.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s effect => Str, 'required';

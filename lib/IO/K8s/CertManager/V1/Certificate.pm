@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Certificate;
 # ABSTRACT: cert-manager X.509 certificate
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject
     api_version     => 'cert-manager.io/v1',
     resource_plural => 'certificates';

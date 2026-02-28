@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Challenge;
 # ABSTRACT: cert-manager ACME challenge
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject
     api_version     => 'acme.cert-manager.io/v1',
     resource_plural => 'challenges';

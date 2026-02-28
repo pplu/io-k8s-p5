@@ -1,6 +1,6 @@
 package IO::K8s::Api::Flowcontrol::V1beta3::PriorityLevelConfigurationCondition;
 # ABSTRACT: PriorityLevelConfigurationCondition defines the condition of priority level.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s lastTransitionTime => Time;

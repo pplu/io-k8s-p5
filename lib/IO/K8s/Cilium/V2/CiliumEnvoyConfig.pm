@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumEnvoyConfig;
 # ABSTRACT: Cilium Envoy proxy configuration
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumenvoyconfigs';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ModifyVolumeStatus;
 # ABSTRACT: ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s status => Str, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Authorization::V1::SelfSubjectAccessReview;
 # ABSTRACT: SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means "in all namespaces".  Self is a special case, because users should always be able to check whether they can perform an action
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject;
 
 =description

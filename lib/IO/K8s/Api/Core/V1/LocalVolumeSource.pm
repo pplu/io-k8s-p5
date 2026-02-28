@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::LocalVolumeSource;
 # ABSTRACT: Local represents directly-attached storage with node affinity (Beta feature)
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s fsType => Str;

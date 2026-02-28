@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Endpoints;
 # ABSTRACT: Endpoints is a collection of endpoints that implement the actual service.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PodOS;
 # ABSTRACT: PodOS defines the OS parameters of a pod.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

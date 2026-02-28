@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1alpha1::ParamKind;
 # ABSTRACT: ParamKind is a tuple of Group Kind and Version.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::Resource;
 
 k8s apiVersion => Str;

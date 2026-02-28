@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Binding;
 # ABSTRACT: Binding ties one object to another; for example, a pod is bound to a node by a scheduler. Deprecated in 1.7, please use the bindings subresource of pods instead.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Pod;
 # ABSTRACT: Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

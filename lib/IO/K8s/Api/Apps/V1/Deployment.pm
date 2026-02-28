@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::Deployment;
 # ABSTRACT: Deployment enables declarative updates for Pods and ReplicaSets.
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

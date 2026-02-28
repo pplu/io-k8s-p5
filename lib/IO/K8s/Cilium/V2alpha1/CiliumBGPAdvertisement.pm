@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumBGPAdvertisement;
 # ABSTRACT: Cilium BGP route advertisement
-our $VERSION = '1.003';
+our $VERSION = '1.004';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2alpha1',
     resource_plural => 'ciliumbgpadvertisements';
