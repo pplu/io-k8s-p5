@@ -1,6 +1,6 @@
 package IO::K8s::APIObject;
 # ABSTRACT: Base class for top-level Kubernetes API objects
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use v5.10;
 use IO::K8s::Resource ();
 use Import::Into;

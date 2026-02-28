@@ -1,6 +1,6 @@
 package IO::K8s::Api::Storage::V1::VolumeNodeResources;
 # ABSTRACT: VolumeNodeResources is a set of resource limits for scheduling of volumes.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s count => Int;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::RollingUpdateDaemonSet;
 # ABSTRACT: Spec to control the desired behavior of daemon set rolling update.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s maxSurge => IntOrStr;

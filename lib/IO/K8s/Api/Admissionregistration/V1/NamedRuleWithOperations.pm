@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1::NamedRuleWithOperations;
 # ABSTRACT: NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s apiGroups => [Str];

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Node;
 # ABSTRACT: Node is a worker node in Kubernetes. Each node will have a unique identifier in the cache (i.e. in etcd).
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::APIObject;
 
 =description

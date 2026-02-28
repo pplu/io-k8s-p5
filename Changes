@@ -1,5 +1,7 @@
 Revision history for IO-K8s
 
+{{$NEXT}}
+
 1.005     2026-02-28 06:43:29Z
   - Fixed _inflate_struct not recognizing sanitized field names (x-kubernetes-*,
     $ref, etc.) during JSON deserialization — Bool coercion and type inflation

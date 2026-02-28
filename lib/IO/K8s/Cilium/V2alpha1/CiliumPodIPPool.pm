@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumPodIPPool;
 # ABSTRACT: Cilium pod IP address pool
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2alpha1',
     resource_plural => 'ciliumpodippools';

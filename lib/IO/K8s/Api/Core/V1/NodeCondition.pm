@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NodeCondition;
 # ABSTRACT: NodeCondition contains condition information for a node.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s lastHeartbeatTime => Time;

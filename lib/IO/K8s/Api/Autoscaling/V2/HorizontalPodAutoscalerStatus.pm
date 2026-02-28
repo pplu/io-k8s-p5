@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V2::HorizontalPodAutoscalerStatus;
 # ABSTRACT: HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s conditions => ['Autoscaling::V2::HorizontalPodAutoscalerCondition'];

@@ -7,7 +7,7 @@ use Module::Runtime qw(require_module);
 use JSON::MaybeXS;
 use namespace::clean;
 
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 
 # Track which classes we've auto-generated
 my %_autogen_cache;

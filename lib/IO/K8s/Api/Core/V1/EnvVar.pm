@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::EnvVar;
 # ABSTRACT: EnvVar represents an environment variable present in a Container.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::CertificateRequest;
 # ABSTRACT: cert-manager certificate signing request
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::APIObject
     api_version     => 'cert-manager.io/v1',
     resource_plural => 'certificaterequests';

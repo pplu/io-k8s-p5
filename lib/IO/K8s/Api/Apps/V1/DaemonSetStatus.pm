@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::DaemonSetStatus;
 # ABSTRACT: DaemonSetStatus represents the current status of a daemon set.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s collisionCount => Int;

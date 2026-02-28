@@ -1,6 +1,6 @@
 package IO::K8s::Api::Authentication::V1::UserInfo;
 # ABSTRACT: UserInfo holds the information about the user needed to implement the user.Info interface.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s extra => { Str => 1 };

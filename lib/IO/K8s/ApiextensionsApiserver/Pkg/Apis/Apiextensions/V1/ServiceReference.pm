@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::ServiceReference;
 # ABSTRACT: ServiceReference holds a reference to Service.legacy.k8s.io
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

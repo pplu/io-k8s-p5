@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NFSVolumeSource;
 # ABSTRACT: Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s path => Str, 'required';

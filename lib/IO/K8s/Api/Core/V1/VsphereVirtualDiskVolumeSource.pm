@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::VsphereVirtualDiskVolumeSource;
 # ABSTRACT: Represents a vSphere volume resource.
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s fsType => Str;

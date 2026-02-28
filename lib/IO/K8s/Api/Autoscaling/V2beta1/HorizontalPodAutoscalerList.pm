@@ -1,5 +1,5 @@
 package IO::K8s::Api::Autoscaling::V2beta1::HorizontalPodAutoscalerList;
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

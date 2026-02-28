@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::IngressPortStatus;
 # ABSTRACT: IngressPortStatus represents the error condition of a service port
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use IO::K8s::Resource;
 
 k8s error => Str;
