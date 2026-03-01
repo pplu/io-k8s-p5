@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::IngressLoadBalancerIngress;
 # ABSTRACT: IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s hostname => Str;

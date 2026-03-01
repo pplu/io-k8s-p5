@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI;
 # ABSTRACT: Gateway API CRD resource map provider for IO::K8s
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 

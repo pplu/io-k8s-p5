@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::StatefulSetSpec;
 # ABSTRACT: A StatefulSetSpec is the specification of a StatefulSet.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s minReadySeconds => Int;

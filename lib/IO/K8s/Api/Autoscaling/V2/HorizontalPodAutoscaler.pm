@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V2::HorizontalPodAutoscaler;
 # ABSTRACT: HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

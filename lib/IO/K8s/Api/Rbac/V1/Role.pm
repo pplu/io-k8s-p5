@@ -1,6 +1,6 @@
 package IO::K8s::Api::Rbac::V1::Role;
 # ABSTRACT: Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

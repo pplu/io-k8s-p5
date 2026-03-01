@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PersistentVolumeClaim;
 # ABSTRACT: PersistentVolumeClaim is a user's request for and claim to a persistent volume
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

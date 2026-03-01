@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PodTemplate;
 # ABSTRACT: PodTemplate describes a template for creating copies of a predefined pod.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

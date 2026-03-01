@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumNode;
 # ABSTRACT: Cilium node configuration and status
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumnodes';

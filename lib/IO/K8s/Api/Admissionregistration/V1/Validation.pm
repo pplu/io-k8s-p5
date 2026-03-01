@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1::Validation;
 # ABSTRACT: Validation specifies the CEL expression which is used to apply the validation.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s expression => Str, 'required';

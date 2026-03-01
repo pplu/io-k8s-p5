@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PersistentVolumeClaimSpec;
 # ABSTRACT: PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s accessModes => [Str];

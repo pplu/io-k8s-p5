@@ -1,6 +1,6 @@
 package IO::K8s::Api::Flowcontrol::V1beta3::UserSubject;
 # ABSTRACT: UserSubject holds detailed information for user-kind subject.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

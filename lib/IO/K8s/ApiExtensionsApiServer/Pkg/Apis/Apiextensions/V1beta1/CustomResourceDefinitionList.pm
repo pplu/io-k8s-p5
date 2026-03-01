@@ -1,5 +1,5 @@
 package IO::K8s::ApiExtensionsApiServer::Pkg::Apis::Apiextensions::V1beta1::CustomResourceDefinitionList;
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

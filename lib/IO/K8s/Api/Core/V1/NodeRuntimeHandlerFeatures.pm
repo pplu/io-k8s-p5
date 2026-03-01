@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NodeRuntimeHandlerFeatures;
 # ABSTRACT: NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s recursiveReadOnlyMounts => Bool;

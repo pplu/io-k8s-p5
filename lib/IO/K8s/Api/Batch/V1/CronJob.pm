@@ -1,6 +1,6 @@
 package IO::K8s::Api::Batch::V1::CronJob;
 # ABSTRACT: CronJob represents the configuration of a single cron job.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

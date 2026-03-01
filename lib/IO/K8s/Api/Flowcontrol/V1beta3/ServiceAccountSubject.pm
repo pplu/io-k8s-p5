@@ -1,6 +1,6 @@
 package IO::K8s::Api::Flowcontrol::V1beta3::ServiceAccountSubject;
 # ABSTRACT: ServiceAccountSubject holds detailed information for service-account-kind subject.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceSubresources;
 # ABSTRACT: CustomResourceSubresources defines the status and scale subresources for CustomResources.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s scale => 'Apiextensions::V1::CustomResourceSubresourceScale';

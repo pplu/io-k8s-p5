@@ -1,6 +1,6 @@
 package IO::K8s::Api::Batch::V1::SuccessPolicyRule;
 # ABSTRACT: SuccessPolicyRule describes rule for declaring a Job as succeeded. Each rule must have at least one of the "succeededIndexes" or "succeededCount" specified.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s succeededCount => Int;

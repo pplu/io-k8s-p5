@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::IngressClassSpec;
 # ABSTRACT: IngressClassSpec provides information about the class of an Ingress.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s controller => Str;

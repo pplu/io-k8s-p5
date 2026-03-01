@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::DaemonSetUpdateStrategy;
 # ABSTRACT: DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s rollingUpdate => 'Apps::V1::RollingUpdateDaemonSet';

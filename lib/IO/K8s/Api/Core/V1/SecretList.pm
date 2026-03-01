@@ -1,5 +1,5 @@
 package IO::K8s::Api::Core::V1::SecretList;
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

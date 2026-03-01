@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::IngressRule;
 # ABSTRACT: IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s host => Str;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ContainerState;
 # ABSTRACT: ContainerState holds a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::Resource;
 
 k8s running => 'Core::V1::ContainerStateRunning';

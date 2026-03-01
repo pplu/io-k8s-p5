@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Issuer;
 # ABSTRACT: cert-manager namespace-scoped certificate issuer
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use IO::K8s::APIObject
     api_version     => 'cert-manager.io/v1',
     resource_plural => 'issuers';
