@@ -88,7 +88,8 @@ sub to_json {
 sub TO_YAML {
     my $self = shift;
     require YAML::PP;
-    return YAML::PP::Dump($self->TO_JSON);
+    my $yp = YAML::PP->new(schema => [qw/JSON/], boolean => 'JSON::PP');
+    return $yp->dump_string($self->TO_JSON);
 }
 
 sub to_yaml {
