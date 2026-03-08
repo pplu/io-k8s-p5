@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ResourceStatus;
 # ABSTRACT: 
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

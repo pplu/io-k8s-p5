@@ -1,5 +1,5 @@
 package IO::K8s::Api::Admissionregistration::V1alpha1::InitializerConfigurationList;
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

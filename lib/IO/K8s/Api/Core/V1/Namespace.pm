@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Namespace;
 # ABSTRACT: Namespace provides a scope for Names. Use of multiple namespaces is optional.
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::APIObject;
 
 =description

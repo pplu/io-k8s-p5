@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::TraefikService;
 # ABSTRACT: Traefik weighted round-robin and mirroring service
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::APIObject
     api_version     => 'traefik.io/v1alpha1',
     resource_plural => 'traefikservices';

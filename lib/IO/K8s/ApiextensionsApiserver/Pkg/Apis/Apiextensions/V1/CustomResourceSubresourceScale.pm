@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceSubresourceScale;
 # ABSTRACT: CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::Resource;
 
 k8s labelSelectorPath => Str;

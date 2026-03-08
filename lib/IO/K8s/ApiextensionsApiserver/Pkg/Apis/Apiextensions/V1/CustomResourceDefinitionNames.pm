@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceDefinitionNames;
 # ABSTRACT: CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::Resource;
 
 k8s categories => [Str];

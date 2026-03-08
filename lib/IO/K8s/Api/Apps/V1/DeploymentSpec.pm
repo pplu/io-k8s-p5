@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::DeploymentSpec;
 # ABSTRACT: DeploymentSpec is the specification of the desired behavior of the Deployment.
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::Resource;
 
 k8s minReadySeconds => Int;

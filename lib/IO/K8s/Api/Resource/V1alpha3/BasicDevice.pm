@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::BasicDevice;
 # ABSTRACT: BasicDevice defines one device instance.
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::Resource;
 
 k8s attributes => { 'Resource::V1alpha3::DeviceAttribute' => 1 };

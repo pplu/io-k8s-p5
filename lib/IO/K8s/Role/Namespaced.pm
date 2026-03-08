@@ -1,5 +1,5 @@
 package IO::K8s::Role::Namespaced;
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 # ABSTRACT: Role for Kubernetes resources that live in a namespace
 use Moo::Role;
 

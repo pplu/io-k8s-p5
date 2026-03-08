@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ReplicationController;
 # ABSTRACT: ReplicationController represents the configuration of a replication controller.
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

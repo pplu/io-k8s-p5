@@ -1,6 +1,6 @@
 package IO::K8s::Role::HelmManaged;
 # ABSTRACT: Role for K3s Helm chart management
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use Moo::Role;
 
 sub from_repo {
