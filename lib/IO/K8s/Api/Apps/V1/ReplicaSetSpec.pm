@@ -1,6 +1,6 @@
 package IO::K8s::Api::Apps::V1::ReplicaSetSpec;
 # ABSTRACT: ReplicaSetSpec is the specification of a ReplicaSet.
-our $VERSION = '1.009';
+our $VERSION = '1.010';
 use IO::K8s::Resource;
 
 k8s minReadySeconds => Int;

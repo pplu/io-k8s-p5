@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ISCSIPersistentVolumeSource;
 # ABSTRACT: ISCSIPersistentVolumeSource represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.
-our $VERSION = '1.009';
+our $VERSION = '1.010';
 use IO::K8s::Resource;
 
 k8s chapAuthDiscovery => Bool;

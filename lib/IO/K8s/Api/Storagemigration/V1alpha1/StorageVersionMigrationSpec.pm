@@ -1,6 +1,6 @@
 package IO::K8s::Api::Storagemigration::V1alpha1::StorageVersionMigrationSpec;
 # ABSTRACT: Spec of the storage version migration.
-our $VERSION = '1.009';
+our $VERSION = '1.010';
 use IO::K8s::Resource;
 
 k8s continueToken => Str;

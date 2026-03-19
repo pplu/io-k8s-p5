@@ -1,6 +1,6 @@
 package IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::Preconditions;
 # ABSTRACT: Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
-our $VERSION = '1.009';
+our $VERSION = '1.010';
 use IO::K8s::Resource;
 
 k8s resourceVersion => Str;

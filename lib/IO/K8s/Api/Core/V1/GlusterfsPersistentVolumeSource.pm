@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::GlusterfsPersistentVolumeSource;
 # ABSTRACT: Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.
-our $VERSION = '1.009';
+our $VERSION = '1.010';
 use IO::K8s::Resource;
 
 k8s endpoints => Str, 'required';
