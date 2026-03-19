@@ -202,7 +202,12 @@ sub _k8s {
 
     # Call Moo's has — use init_arg to map JSON key to Perl-safe attribute name
     my $has = $caller->can('has');
-    $has->($attr_name, is => 'rw', isa => $isa,
+    my @coerce;
+    # Bool attributes: coerce \0/\1 refs and JSON booleans to plain 0/1
+    if ($info{is_bool}) {
+        @coerce = (coerce => sub { ref $_[0] ? (${$_[0]} ? 1 : 0) : ($_[0] ? 1 : 0) });
+    }
+    $has->($attr_name, is => 'rw', isa => $isa, @coerce,
         ($required ? (required => 1) : ()),
         ($attr_name ne $json_key ? (init_arg => $json_key) : ()),
     );
