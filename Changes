@@ -1,6 +1,6 @@
 Revision history for IO-K8s
 
-{{$NEXT}}
+1.009     2026-03-19 21:29:24Z
   - Fix: coerce \0/\1 refs to plain 0/1 for Bool attributes — Perl's \0 is a
     truthy reference, so users passing \0 expecting JSON false got wrong results.
     Bool attributes now dereference scalar refs before coercing.
