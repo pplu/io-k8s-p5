@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V1::Scale;
 # ABSTRACT: Scale represents a scaling request for a resource.
-our $VERSION = '1.010';
+our $VERSION = '1.011';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

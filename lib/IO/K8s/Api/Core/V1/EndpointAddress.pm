@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::EndpointAddress;
 # ABSTRACT: EndpointAddress is a tuple that describes single IP address.
-our $VERSION = '1.010';
+our $VERSION = '1.011';
 use IO::K8s::Resource;
 
 k8s hostname => Str;

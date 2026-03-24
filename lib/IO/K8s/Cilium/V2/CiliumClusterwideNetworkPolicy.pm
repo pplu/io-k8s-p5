@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumClusterwideNetworkPolicy;
 # ABSTRACT: Cilium cluster-wide network policy
-our $VERSION = '1.010';
+our $VERSION = '1.011';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumclusterwidenetworkpolicies';
