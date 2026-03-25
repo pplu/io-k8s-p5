@@ -1,5 +1,5 @@
 package IO::K8s::Api::Storage::V1alpha1::VolumeAttachmentList;
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

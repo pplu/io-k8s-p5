@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumCIDRGroup;
 # ABSTRACT: Cilium CIDR group for IP address management
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumcidrgroups';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Batch::V1::PodFailurePolicy;
 # ABSTRACT: PodFailurePolicy describes how failed pods influence the backoffLimit.
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 use IO::K8s::Resource;
 
 k8s rules => ['Batch::V1::PodFailurePolicyRule'], 'required';

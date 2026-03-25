@@ -1,6 +1,6 @@
 package IO::K8s::Resource;
 # ABSTRACT: Base class for all Kubernetes resources
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 use v5.10;
 use Moo ();
 use Moo::Role ();

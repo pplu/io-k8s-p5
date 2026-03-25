@@ -1,5 +1,5 @@
 package IO::K8s::Api::Events::V1beta1::EventList;
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 # ABSTRACT: Deprecated - use IO::K8s::List instead
 use strict;
 use warnings;

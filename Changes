@@ -1,5 +1,7 @@
 Revision history for IO-K8s
 
+{{$NEXT}}
+
 1.100     2026-03-25 19:17:28Z
   - Added IO::K8s::AgentSandbox with 4 CRD classes for agent-sandbox (v0.2.1):
     Sandbox (agents.x-k8s.io/v1alpha1), SandboxClaim, SandboxTemplate,

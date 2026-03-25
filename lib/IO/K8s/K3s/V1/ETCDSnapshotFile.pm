@@ -1,6 +1,6 @@
 package IO::K8s::K3s::V1::ETCDSnapshotFile;
 # ABSTRACT: K3s etcd snapshot file
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 use IO::K8s::APIObject
     api_version     => 'k3s.cattle.io/v1',
     resource_plural => 'etcdsnapshotfiles';

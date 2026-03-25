@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1alpha1::Sandbox;
 # ABSTRACT: Isolated runtime environment for AI agents
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 use IO::K8s::APIObject
     api_version     => 'agents.x-k8s.io/v1alpha1',
     resource_plural => 'sandboxes';

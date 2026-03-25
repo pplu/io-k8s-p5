@@ -1,6 +1,6 @@
 package IO::K8s::Role::Loadbalanced;
 # ABSTRACT: Role for traffic distribution (weighted backends, mirroring)
-our $VERSION = '1.011';
+our $VERSION = '1.101';
 use Moo::Role;
 
 sub set_weighted {
