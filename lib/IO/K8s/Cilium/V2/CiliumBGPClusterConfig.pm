@@ -1,8 +1,8 @@
-package IO::K8s::Cilium::V2alpha1::CiliumBGPClusterConfig;
+package IO::K8s::Cilium::V2::CiliumBGPClusterConfig;
 # ABSTRACT: Cilium BGP cluster configuration
 our $VERSION = '1.011';
 use IO::K8s::APIObject
-    api_version     => 'cilium.io/v2alpha1',
+    api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumbgpclusterconfigs';
 
 k8s spec   => { Str => 1 };
@@ -14,7 +14,7 @@ __END__
 
 =head1 DESCRIPTION
 
-This cluster-scoped resource provides cluster-level BGP configuration for Cilium's BGP control plane, defining global BGP settings and policies. It uses API version C<cilium.io/v2alpha1>. The C<spec> and C<status> fields contain opaque CRD-specific data structures managed by the Cilium BGP control plane controller.
+This cluster-scoped resource provides cluster-level BGP configuration for Cilium's BGP control plane, defining global BGP settings and policies. It uses API version C<cilium.io/v2>. The C<spec> and C<status> fields contain opaque CRD-specific data structures managed by the Cilium BGP control plane controller.
 
 =seealso
 

@@ -4,6 +4,8 @@ our $VERSION = '1.011';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
+sub upstream_version { 'v1.19.3' }  # cert-manager/cert-manager
+
 sub resource_map {
     return {
         # cert-manager.io/v1

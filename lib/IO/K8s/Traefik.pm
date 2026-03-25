@@ -4,6 +4,8 @@ our $VERSION = '1.011';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
+sub upstream_version { 'v3.0.0' }  # traefik/traefik (CRD set stable across all v3.x)
+
 sub resource_map {
     return {
         IngressRoute        => 'Traefik::V1alpha1::IngressRoute',

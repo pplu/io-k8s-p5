@@ -4,6 +4,8 @@ our $VERSION = '1.011';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
+sub upstream_version { 'v1.1.0' }  # kubernetes-sigs/gateway-api (GA types only)
+
 sub resource_map {
     return {
         # gateway.networking.k8s.io/v1

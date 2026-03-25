@@ -1,8 +1,8 @@
-package IO::K8s::Cilium::V2alpha1::CiliumBGPNodeConfig;
+package IO::K8s::Cilium::V2::CiliumBGPNodeConfig;
 # ABSTRACT: Cilium BGP per-node configuration
 our $VERSION = '1.011';
 use IO::K8s::APIObject
-    api_version     => 'cilium.io/v2alpha1',
+    api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumbgpnodeconfigs';
 
 k8s spec   => { Str => 1 };
@@ -14,7 +14,7 @@ __END__
 
 =head1 DESCRIPTION
 
-This cluster-scoped resource provides per-node BGP configuration for Cilium's BGP control plane, allowing node-specific BGP settings and peer relationships. It uses API version C<cilium.io/v2alpha1>. The C<spec> and C<status> fields contain opaque CRD-specific data structures managed by the Cilium BGP control plane controller.
+This cluster-scoped resource provides per-node BGP configuration for Cilium's BGP control plane, allowing node-specific BGP settings and peer relationships. It uses API version C<cilium.io/v2>. The C<spec> and C<status> fields contain opaque CRD-specific data structures managed by the Cilium BGP control plane controller.
 
 =seealso
 
