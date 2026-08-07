@@ -1,5 +1,5 @@
 ---
-name: io-k8s
+name: perl-kubernetes-classes
 description: "IO::K8s — How to create and use typed Kubernetes objects in Perl"
 user-invocable: false
 allowed-tools: Read, Grep, Glob

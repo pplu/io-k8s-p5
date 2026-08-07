@@ -1,6 +1,6 @@
 ---
-name: dzil-author-getty
-description: "Explains @Author::GETTY plugin bundle configuration and conventions"
+name: perl-release-author-getty
+description: "Load when dist.ini contains [@Author::GETTY] — bundle options, POD conventions (=attr/=method/=opt), next-version semantics, dzil release workflow, copyright_year, Changes/{{$NEXT}}"
 user-invocable: false
 allowed-tools: Read, Grep
 model: sonnet
@@ -37,6 +37,7 @@ copyright_holder = Copyright Owner
 - `task = 1` - TaskWeaver + AutoVersion
 - `manual_version = x.x` - Manual version
 - `major_version = 2` - Major version for AutoVersion
+- `version_finder = :MainModule` - restrict `$VERSION` rewrites/bumps to the main module only (see "version_finder = :MainModule — opt-in, not the default" below). Multi-value; forwarded to RewriteVersion::Transitional + BumpVersionAfterRelease (default path) and PkgVersion (task/manual_version path).
 
 ### Support
 - `irc = #channel` - IRC channel
@@ -100,6 +101,67 @@ For wrapping C libraries with Alien::Base:
 
 **Auto-generated sections (do NOT write manually):**
 NAME, VERSION, AUTHOR, SUPPORT, CONTRIBUTING, COPYRIGHT
+
+## Versioning Convention — CRITICAL
+
+**The version in the repository is always the NEXT release version, not the current one.**
+
+Before a release, the files already contain the upcoming version:
+- `dist.ini` or module `$VERSION` = e.g. `1.005`
+- `Changes` has `{{$NEXT}}` as the placeholder for unreleased changes
+- The currently released version on CPAN is `1.004`
+
+After `dzil release` runs:
+1. `{{$NEXT}}` in Changes is replaced with `1.005` + release date
+2. The version is bumped to `1.006` (or next AutoVersion value)
+3. A Git tag `v1.005` is created
+
+**Do NOT treat the version in dist.ini as the released version.** If the user asks "what version is released?", check CPAN or git tags — not the current `$VERSION` in the files.
+
+**Do NOT bump the version manually before a release** — `dzil release` handles this automatically.
+
+### `version_finder = :MainModule` — opt-in, not the default
+
+**Default across GETTY's distributions: `our $VERSION` in every `.pm` file**, rewritten/bumped
+by `[@Git::VersionManager]` (RewriteVersion::Transitional + BumpVersionAfterRelease) on release.
+Do not strip `$VERSION` from sibling modules unless the dist.ini says otherwise — this is the
+normal case, not a legacy fallback.
+
+A small number of distributions instead scope `$VERSION` to the main module only (`lib/Foo.pm`),
+with no `$VERSION` line in sibling `.pm` files. This is strictly opt-in via:
+
+```ini
+[@Author::GETTY]
+version_finder = :MainModule
+```
+
+**Do not add this option to a distribution's dist.ini on your own initiative** and do not
+describe it as "the convention" — check the actual dist.ini before assuming either style applies.
+
+How it works when set:
+- `version_finder = :MainModule` scopes the RewriteVersion::Transitional/BumpVersionAfterRelease
+  rewrite/bump to the main module, so sibling files are never touched.
+- `[MetaProvides::Package] inherit_version=1, inherit_missing=1` (always in the bundle) fills
+  `META.json` `provides` with the dist version for **every** package, so PAUSE/CPAN indexing
+  stays correct even though the sibling `.pm` files have no `$VERSION` at runtime.
+- Sibling modules resolve their version as `$MainModule::VERSION` at runtime
+  (e.g. `$Goldmine::VERSION`) — there is no per-file `$VERSION` to read.
+- On the `[PkgVersion]` path it also avoids the build-time failure when a sibling
+  module already carries its own `$VERSION` — PkgVersion refuses to overwrite one.
+
+Verify before touching a `:MainModule` distribution:
+```bash
+grep -n "version_finder" dist.ini   # confirm the option is actually set
+grep -rl 'our $VERSION' lib         # should list ONLY the main module
+```
+
+## Release Workflow
+
+```bash
+# Before release: check Changes, ensure {{$NEXT}} section has entries
+# Then:
+dzil release        # Builds, tests, uploads to CPAN, bumps version, commits, tags
+```
 
 ## Conventions
 
