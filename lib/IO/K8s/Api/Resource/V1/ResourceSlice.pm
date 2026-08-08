@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1::ResourceSlice;
 # ABSTRACT: ResourceSlice represents one or more resources in a pool of similar resources, managed by a common driver. A pool may span more than one ResourceSlice, and exactly how many ResourceSlices comprise a pool is determined by the driver.
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::APIObject;
 
 =description

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::DeviceRequestAllocationResult;
 # ABSTRACT: DeviceRequestAllocationResult contains the allocation result for one request.
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::Resource;
 
 k8s device => Str, 'required';

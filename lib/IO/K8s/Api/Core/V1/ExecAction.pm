@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ExecAction;
 # ABSTRACT: ExecAction describes a "run in container" action.
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::Resource;
 
 k8s command => [Str];

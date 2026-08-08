@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1::DeviceCapacity;
 # ABSTRACT: DeviceCapacity describes a quantity associated with a device.
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::Resource;
 
 k8s requestPolicy => 'Resource::V1::CapacityRequestPolicy';

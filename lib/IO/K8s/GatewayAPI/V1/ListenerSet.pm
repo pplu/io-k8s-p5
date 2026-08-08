@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::ListenerSet;
 # ABSTRACT: Gateway API listeners defined independently of a Gateway
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1',
     resource_plural => 'listenersets';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Rbac::V1::RoleRef;
 # ABSTRACT: RoleRef contains information that points to the role being used
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::Resource;
 
 k8s apiGroup => Str, 'required';

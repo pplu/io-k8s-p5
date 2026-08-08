@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::FCVolumeSource;
 # ABSTRACT: Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::Resource;
 
 k8s fsType => Str;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NodeSystemInfo;
 # ABSTRACT: NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::Resource;
 
 k8s architecture => Str, 'required';

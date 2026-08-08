@@ -1,6 +1,6 @@
 package IO::K8s::Api::Node::V1::Overhead;
 # ABSTRACT: Overhead structure represents the resource overhead associated with running a pod.
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use IO::K8s::Resource;
 
 k8s podFixed => { Str => 1 };

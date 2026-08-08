@@ -8,7 +8,7 @@ use JSON::MaybeXS;
 use Scalar::Util ();
 use namespace::clean;
 
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 
 # Track which classes we've auto-generated
 my %_autogen_cache;

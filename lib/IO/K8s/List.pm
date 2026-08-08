@@ -1,6 +1,6 @@
 package IO::K8s::List;
 # ABSTRACT: Generic list container for Kubernetes API responses
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use v5.10;
 use Moo;
 use Types::Standard qw( ArrayRef InstanceOf Maybe Str );

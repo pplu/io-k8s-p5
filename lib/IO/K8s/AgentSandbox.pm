@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox;
 # ABSTRACT: AgentSandbox CRD resource map provider for IO::K8s
-our $VERSION = '1.101';
+our $VERSION = '1.105';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
