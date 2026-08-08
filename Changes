@@ -1,5 +1,7 @@
 Revision history for IO-K8s
 
+{{$NEXT}}
+
 1.105     2026-08-08 18:51:44Z
 
   - Removed the 76 individual *List classes (PodList, ServiceList,

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1beta1::ServiceCIDRSpec;
 # ABSTRACT: ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.
-our $VERSION = '1.105';
+our $VERSION = '1.106';
 use IO::K8s::Resource;
 
 k8s cidrs => [Str];

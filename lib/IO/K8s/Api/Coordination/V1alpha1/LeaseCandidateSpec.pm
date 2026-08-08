@@ -1,6 +1,6 @@
 package IO::K8s::Api::Coordination::V1alpha1::LeaseCandidateSpec;
 # ABSTRACT: LeaseCandidateSpec is a specification of a Lease.
-our $VERSION = '1.105';
+our $VERSION = '1.106';
 use IO::K8s::Resource;
 
 k8s binaryVersion => Str;

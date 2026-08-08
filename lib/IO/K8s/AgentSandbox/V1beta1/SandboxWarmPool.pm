@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1beta1::SandboxWarmPool;
 # ABSTRACT: Pre-warmed pool of sandbox instances
-our $VERSION = '1.105';
+our $VERSION = '1.106';
 use IO::K8s::APIObject
     api_version     => 'extensions.agents.x-k8s.io/v1beta1',
     resource_plural => 'sandboxwarmpools';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ComponentStatus;
 # ABSTRACT: ComponentStatus (and ComponentStatusList) holds the cluster validation info. Deprecated: This API is deprecated in v1.19+
-our $VERSION = '1.105';
+our $VERSION = '1.106';
 use IO::K8s::APIObject;
 
 =description

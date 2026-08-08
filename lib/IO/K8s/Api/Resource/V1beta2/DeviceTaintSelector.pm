@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1beta2::DeviceTaintSelector;
 # ABSTRACT: DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.
-our $VERSION = '1.105';
+our $VERSION = '1.106';
 use IO::K8s::Resource;
 
 k8s device => Str;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ContainerRestartRule;
 # ABSTRACT: ContainerRestartRule describes how a container exit is handled.
-our $VERSION = '1.105';
+our $VERSION = '1.106';
 use IO::K8s::Resource;
 
 k8s action => Str, 'required';
