@@ -4,7 +4,7 @@ our $VERSION = '1.101';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
-sub upstream_version { 'v1.35.1+k3s1' }
+sub upstream_version { 'v1.36.3+k3s1' }
 
 sub resource_map {
     return {

@@ -17,6 +17,8 @@ __END__
 
 This class represents a HelmChartConfig custom resource in the C<helm.cattle.io/v1> API group. HelmChartConfig resources provide value overrides and configuration for HelmChart resources without modifying the chart definition itself, enabling customization of deployed Helm charts. This is a namespace-scoped resource where the C<spec> and C<status> fields are opaque hash structures defined by the K3s API.
 
+As of the C<helm-controller> version shipped with K3s v1.36.3+k3s1, C<spec> accepts C<values> (structured YAML/JSON overrides, same semantics as on HelmChart), C<serverSide> (C<"true">|C<"false">|C<"auto">, controls Helm server-side-apply), and C<forceConflicts> (optional bool, force managed-field ownership on server-side-apply conflicts). C<failurePolicy> now also accepts C<retry> in addition to the existing C<abort>|C<reinstall>. All of these pass through transparently via the opaque C<spec> hash above.
+
 =seealso
 
 =over

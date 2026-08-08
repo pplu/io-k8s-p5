@@ -115,6 +115,14 @@ RestartPolicy defines the restart behavior of individual containers in a pod. Th
 
 =cut
 
+k8s restartPolicyRules => ['Core::V1::ContainerRestartRule'];
+
+=attr restartPolicyRules
+
+Represents a list of rules to be checked to determine if the container should be restarted on exit. The rules are evaluated in order. Once a rule matches a container exit condition, the remaining rules are ignored. If no rule matches the container exit condition, the Container-level restart policy determines the whether the container is restarted or not. Constraints on the rules: - At most 20 rules are allowed. - Rules can have the same action. - Identical rules are not forbidden in validations. When rules are specified, container MUST set RestartPolicy explicitly even it if matches the Pod's RestartPolicy.
+
+=cut
+
 k8s securityContext => 'Core::V1::SecurityContext';
 
 =attr securityContext

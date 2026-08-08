@@ -4,7 +4,7 @@ our $VERSION = '1.101';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
-sub upstream_version { 'v1.19.2' }  # cilium/cilium
+sub upstream_version { 'v1.20.0' }  # cilium/cilium
 
 sub resource_map {
     return {
@@ -31,6 +31,7 @@ sub resource_map {
         CiliumL2AnnouncementPolicy     => 'Cilium::V2alpha1::CiliumL2AnnouncementPolicy',
         CiliumGatewayClassConfig       => 'Cilium::V2alpha1::CiliumGatewayClassConfig',
         CiliumPodIPPool                => 'Cilium::V2alpha1::CiliumPodIPPool',
+        CiliumDatapathPlugin           => 'Cilium::V2alpha1::CiliumDatapathPlugin',
     };
 }
 
@@ -52,8 +53,8 @@ __END__
 =head1 DESCRIPTION
 
 Resource map provider for L<Cilium|https://cilium.io/> Custom Resource
-Definitions. Registers 21 CRD classes covering C<cilium.io/v2> and
-C<cilium.io/v2alpha1>, matching upstream Cilium v1.19.2.
+Definitions. Registers 22 CRD classes covering C<cilium.io/v2> and
+C<cilium.io/v2alpha1>, matching upstream Cilium v1.20.0.
 
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.
@@ -70,7 +71,7 @@ CiliumBGPNodeConfig, CiliumBGPNodeConfigOverride
 =head2 Included CRDs (cilium.io/v2alpha1)
 
 CiliumEndpointSlice, CiliumL2AnnouncementPolicy,
-CiliumGatewayClassConfig, CiliumPodIPPool
+CiliumGatewayClassConfig, CiliumPodIPPool, CiliumDatapathPlugin
 
 =seealso
 

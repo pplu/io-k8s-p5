@@ -3,6 +3,14 @@ package IO::K8s::Api::Core::V1::PodStatus;
 our $VERSION = '1.101';
 use IO::K8s::Resource;
 
+k8s allocatedResources => { Str => 1 };
+
+=attr allocatedResources
+
+AllocatedResources is the total amount of CPU and Memory resources allocated to the pod's containers by the node. It supports specifying Requests and Limits for "cpu" and "memory" resource names only. Kubelet sets this value to the pod-level resources.requests upon successful pod admission and after successfully admitting desired pod-level resource resize.
+
+=cut
+
 k8s conditions => ['Core::V1::PodCondition'];
 
 =attr conditions
@@ -24,6 +32,14 @@ k8s ephemeralContainerStatuses => ['Core::V1::ContainerStatus'];
 =attr ephemeralContainerStatuses
 
 Status for any ephemeral containers that have run in this pod.
+
+=cut
+
+k8s extendedResourceClaimStatus => 'Core::V1::PodExtendedResourceClaimStatus';
+
+=attr extendedResourceClaimStatus
+
+Status of extended resource claims.
 
 =cut
 
@@ -59,11 +75,27 @@ A human readable message indicating details about why the pod is in this conditi
 
 =cut
 
+k8s nodeAllocatableResourceClaimStatuses => ['Core::V1::NodeAllocatableResourceClaimStatus'];
+
+=attr nodeAllocatableResourceClaimStatuses
+
+Status of node-allocatable resources backed by DRA resource claims.
+
+=cut
+
 k8s nominatedNodeName => Str;
 
 =attr nominatedNodeName
 
 nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.
+
+=cut
+
+k8s observedGeneration => Int;
+
+=attr observedGeneration
+
+If set, this represents the .metadata.generation that the pod status was set based upon. This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
 
 =cut
 
@@ -115,7 +147,7 @@ k8s resize => Str;
 
 =attr resize
 
-Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to "Proposed"
+Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to "Proposed" Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress. PodResizePending will track states where the container requests do not match pod status. PodResizeInProgress will track in-progress resizes, and populate its reason field when it is unable to complete the resize.
 
 =cut
 
@@ -124,6 +156,16 @@ k8s resourceClaimStatuses => ['Core::V1::PodResourceClaimStatus'];
 =attr resourceClaimStatuses
 
 Status of resource claims.
+
+=cut
+
+k8s resources => 'Core::V1::ResourceRequirements';
+
+=attr resources
+
+Resources is the total amount of CPU and Memory resources allocated to the pod's containers by the node's kubelet. It supports specifying Requests and Limits for "cpu" and "memory" resource names only. ResourceClaims are not supported.
+
+This value is only set when PodLevelResources feature gate is enabled and the total container resource requests do not exceed pod-level resource requests, or if the resource requests are equal.
 
 =cut
 

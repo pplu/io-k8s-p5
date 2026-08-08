@@ -51,6 +51,14 @@ Endpoints of daemons running on the Node.
 
 =cut
 
+k8s declaredFeatures => [Str];
+
+=attr declaredFeatures
+
+DeclaredFeatures is the list of feature names that a Node has declared support for. This field is populated by the kubelet and reflects the features it is capable of, regardless of whether the corresponding feature gates are enabled on the API server.
+
+=cut
+
 k8s features => 'Core::V1::NodeFeatures';
 
 =attr features

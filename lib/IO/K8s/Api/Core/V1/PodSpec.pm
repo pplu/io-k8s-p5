@@ -115,6 +115,16 @@ Specifies the hostname of the Pod If not specified, the pod's hostname will be s
 
 =cut
 
+k8s hostnameOverride => Str;
+
+=attr hostnameOverride
+
+HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.
+
+This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters. Requires the HostnameOverride feature gate to be enabled.
+
+=cut
+
 k8s imagePullSecrets => ['Core::V1::LocalObjectReference'];
 
 =attr imagePullSecrets
@@ -211,6 +221,18 @@ This field is immutable.
 
 =cut
 
+k8s resources => 'Core::V1::ResourceRequirements';
+
+=attr resources
+
+Resources is the total amount of CPU and Memory resources required by all containers in the pod. It supports specifying Requests and Limits for "cpu" and "memory" resource names only. ResourceClaims are not supported.
+
+This field enables fine-grained control over resource allocation for the entire pod, allowing resource sharing among containers in a pod.
+
+This is an alpha field and requires enabling the PodLevelResources feature gate.
+
+=cut
+
 k8s restartPolicy => Str;
 
 =attr restartPolicy
@@ -242,6 +264,16 @@ k8s schedulingGates => ['Core::V1::PodSchedulingGate'];
 SchedulingGates is an opaque list of values that if specified will block scheduling the pod. If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the scheduler will not attempt to schedule the pod.
 
 SchedulingGates can only be set at pod creation time, and be removed only afterwards.
+
+=cut
+
+k8s schedulingGroup => 'Core::V1::PodSchedulingGroup';
+
+=attr schedulingGroup
+
+SchedulingGroup references a runtime instance of PodGroup used for gang-scheduling this Pod together with other Pods that belong to the same group.
+
+This is an alpha field and requires enabling a gang-scheduling feature gate.
 
 =cut
 

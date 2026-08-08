@@ -12,6 +12,7 @@ k8s spec => {
     shutdownTime          => Time,
     shutdownPolicy        => Str,
     replicas              => Int,
+    service               => Bool,
 };
 k8s status => {
     serviceFQDN => Str,
@@ -19,6 +20,7 @@ k8s status => {
     conditions  => { Str => 1 },
     replicas    => Int,
     selector    => Str,
+    podIPs      => [Str],
 };
 
 1;
@@ -32,11 +34,19 @@ singleton workload scheduled on Kubernetes nodes. This is a namespace-scoped res
 using API version C<agents.x-k8s.io/v1alpha1>. The C<spec> and C<status> fields are
 typed inline structs generated from the upstream AgentSandbox Go types.
 
+As of upstream AgentSandbox v0.5.4, this API version is still served but is no longer
+the storage version — C<agents.x-k8s.io/v1beta1> (see
+L<IO::K8s::AgentSandbox::V1beta1::Sandbox>) is now canonical. This C<v1alpha1> track
+still carries C<spec.replicas> / C<status.replicas>, unlike C<v1beta1>, but has gained
+C<spec.service> and C<status.podIPs>.
+
 =seealso
 
 =over
 
 =item * L<IO::K8s::AgentSandbox>
+
+=item * L<IO::K8s::AgentSandbox::V1beta1::Sandbox>
 
 =item * L<https://github.com/kubernetes-sigs/agent-sandbox>
 

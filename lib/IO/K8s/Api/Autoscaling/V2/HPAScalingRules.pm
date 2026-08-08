@@ -27,4 +27,16 @@ stabilizationWindowSeconds is the number of seconds for which past recommendatio
 
 =cut
 
+k8s tolerance => Quantity;
+
+=attr tolerance
+
+tolerance is the tolerance on the ratio between the current and desired metric value under which no additional scaling is performed. If not set, the default cluster-wide tolerance is applied (by default 10%).
+
+For example, if autoscaling is triggered by consecutive (in a row) metric values, that violate the tolerance and this is configured to 0.1, this means that we will start scaling up/down only when the ratio of desired metric value to the current metric value is more than 1.1 or less than 0.9 respectively.
+
+This is a beta field and requires enabling the HPAConfigurableTolerance feature gate.
+
+=cut
+
 1;

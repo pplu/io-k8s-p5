@@ -51,4 +51,14 @@ Replicas is the most recently observed number of replicas. More info: https://ku
 
 =cut
 
+k8s terminatingReplicas => Int;
+
+=attr terminatingReplicas
+
+Total number of terminating pods targeted by this replica set. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
+
+This is a beta field. It is only populated by servers that enable the DeploymentReplicaSetTerminatingReplicas feature gate.
+
+=cut
+
 1;
