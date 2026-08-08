@@ -145,7 +145,7 @@ How it works when set:
   `META.json` `provides` with the dist version for **every** package, so PAUSE/CPAN indexing
   stays correct even though the sibling `.pm` files have no `$VERSION` at runtime.
 - Sibling modules resolve their version as `$MainModule::VERSION` at runtime
-  (e.g. `$Goldmine::VERSION`) — there is no per-file `$VERSION` to read.
+  (e.g. `$Foo::VERSION`) — there is no per-file `$VERSION` to read.
 - On the `[PkgVersion]` path it also avoids the build-time failure when a sibling
   module already carries its own `$VERSION` — PkgVersion refuses to overwrite one.
 
