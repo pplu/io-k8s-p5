@@ -1,0 +1,75 @@
+---
+claimed_at: 2026-08-09T15:43:26Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T15:01:46Z
+id: 9
+priority: medium
+started: 2026-08-09
+status: done
+tags:
+- tooling
+- coverage
+- maintenance
+title: 'Maint-Skript: Upstream-OpenAPI-Spec-Drift-Check (Version-Diff + Coverage-Report)'
+updated: 2026-08-09T15:43:26Z
+---
+
+Aus der Diskussion zum systematischen v1.36-Coverage-Abgleich (karr #4-#8): der
+Abgleich wurde diesmal von Hand gemacht (swagger.json runterladen, Registry
+dumpen, Definitionskeys auf Perl-Klassennamen mappen, Feld-fuer-Feld diffen).
+Das sollte ein wiederholbares Skript werden statt bei jedem Versions-Sprung neu
+von Hand gebaut zu werden.
+
+Gewuenschter Umfang:
+
+  1. Laedt (oder nimmt als Pfad) das swagger.json fuer einen Kubernetes-Tag
+     (default: neuestes Release, https://api.github.com/repos/kubernetes/
+     kubernetes/tags fuer die Tag-Liste, raw.githubusercontent.com/kubernetes/
+     kubernetes/<tag>/api/openapi-spec/swagger.json fuer die Spec selbst).
+  2. Ladt alle lib/IO/K8s/**/*.pm (wie t/34_registry_guard.t) und liest
+     %IO::K8s::Resource::_attr_registry aus -- das ist die Ist-Abdeckung.
+  3. Mappt jeden Upstream-Definitionskey auf den erwarteten Perl-Klassennamen
+     nach der bestehenden Namenskonvention: "io.k8s.<group>.<version>.<Kind>"
+     -> "IO::K8s::Api::<Group>::<Version>::<Kind>", mit denselben
+     Sonderfaellen wie in Resource.pm's %_class_prefix bzw. AutoGen.pm's
+     _schema_to_type_spec (apimachinery.pkg.apis.meta -> Apimachinery::Pkg::
+     Apis::Meta, apiextensions-apiserver.pkg.apis.apiextensions ->
+     ApiextensionsApiserver::Pkg::Apis::Apiextensions, kube-aggregator.pkg.
+     apis.apiregistration -> KubeAggregator::Pkg::Apis::Apiregistration,
+     Bindestrich-Segmente wie "apiextensions-apiserver" -> CamelCase
+     zusammenziehen). Referenzimplementierung dieser Mapping-Logik liegt (nur
+     fuer diese Session) unter /tmp/claude-1000/-storage-raid-home-getty-dev-
+     perl-io-k8s-p5/78767137-c6b8-4493-89da-86f9dc6a2013/scratchpad/diff.py
+     und gen_dra.py -- als Vorlage lesen, nicht 1:1 uebernehmen (Python, muss
+     nach Perl portiert werden).
+  4. Diff je Definition: fehlende Kinds (hoechstes Gewicht), fehlende Felder
+     auf existierenden Klassen deren Zieltyp auch fehlt (zweithoechstes
+     Gewicht -- das ist die Fehlerklasse, die t/34 nicht sieht, siehe dessen
+     Kommentar), fehlende Felder ohne neuen Typ (mittel), entfernte/umbenannte
+     Upstream-Definitionen bei denen die Perl-Klasse noch existiert (niedrig,
+     nur Info).
+  5. Feste Allowlist/Exceptions-Liste (als Datei, von Maintainern pflegbar)
+     fuer bewusst beibehaltene Alt-Versionen (die 90 entfernten *List-Klassen,
+     die alten Beta/Alpha-Tracks von admissionregistration/flowcontrol/
+     authentication/coordination, die "classic DRA" v1alpha3-Teilmenge, die
+     als Skalar/HashRef statt Klasse modellierten apimachinery-Typen wie
+     Quantity/Time/IntOrStr/FieldsV1/RawExtension) -- sonst floodet jeder Lauf
+     mit laengst getroffenen Entscheidungen.
+  6. Zusaetzlich: Vergleich zweier Upstream-Tags gegeneinander (aktuell
+     gepinnte Version vs. neuestes Release), gewichtet nach Signifikanz (neuer
+     Kind > neues Pflichtfeld > neues optionales Feld > reine
+     Beschreibungsaenderung) -- das ist die eigentliche "lohnt sich ein
+     Upgrade"-Frage.
+  7. Reiner Report (stdout, optional Datei), erstellt KEINE karr-Tickets
+     automatisch -- das bleibt eine bewusste menschliche/Agenten-Entscheidung.
+  8. In CLAUDE.md oder einem Skill dokumentieren, damit zukuenftige Sessions
+     wissen, dass es das Tool gibt und wie es aufgerufen wird.
+
+Ablageort: vermutlich maint/ oder tools/ (noch keine Konvention in diesem
+Repo -- pruefen, ob es bereits ein Verzeichnis fuer Nicht-lib-Skripte gibt,
+sonst eines anlegen und in dist.ini pruefen ob es vom Build ausgeschlossen
+werden muss, z.B. per MANIFEST.SKIP, damit es nicht versehentlich mit auf
+CPAN landet).
+Built maint/spec-drift-check.pl (+ maint/spec-drift-exceptions.yaml). Coverage mode: downloads/caches a swagger.json (default: latest stable tag via GitHub tags API), loads the real %IO::K8s::Resource::_attr_registry from lib/IO/K8s/**/*.pm, maps io.k8s.* def keys to Perl class names per Resource.pm's %_class_prefix conventions, and reports 4 tiers (missing Kind > missing type incl. the t/34-blind missing-field-with-missing-target case > missing field on a shipped class > info: extra field / stale perl-only). Compare mode (--from/--to) diffs two upstream tags directly, weighted new-Kind > new-required-field > new-optional-field > description-only, plus bonus removed-* tiers (flagged as beyond the literal ask). Exceptions file suppresses the 4 documented false-positive classes (dropped *List kinds via a structural rule, old back-compat API tracks via whole-namespace prefixes, apimachinery scalar/opaque barewords) -- never hardcoded in the script. Never touches lib/ or karr. Tested for real: default run hit the network, resolved v1.36.3, and reproduced the #4-#8 findings against current lib/ state (0 stale/perl-only false positives after broadening the perl_only exceptions to namespace-level; found one new possible gap -- ResourceClaimTemplateSpec.metadata on v1beta1/v1beta2 -- that overlaps the DRA work in progress on #4, flagging rather than filing). Documented in CLAUDE.md and the io-k8s-core skill. Full suite still green (prove -lr t/, 2095 tests).
