@@ -1,0 +1,83 @@
+---
+claimed_at: 2026-08-09T02:20:59Z
+claimed_by: claude
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T00:20:23Z
+id: 2
+priority: high
+started: 2026-08-09
+status: done
+tags:
+- bug
+- expand-class
+- kubeaggregator
+- missing-class
+title: 'KubeAggregator refs resolve to non-existent IO::K8s::Api::* classes: _expand_class
+  cannot match CamelCase prefixes'
+updated: 2026-08-09T02:37:30Z
+---
+
+## Symptom
+
+Every `KubeAggregator` cross-reference resolves to a class that does not exist,
+so inflating an `APIService` dies the same way ticket #1 does:
+
+```
+Can't locate IO/K8s/Api/KubeAggregator/V1/APIServiceSpec.pm in @INC
+```
+
+Four declarations are affected:
+
+| file | line | declares | resolves to (wrong) |
+|---|---|---|---|
+| `KubeAggregator/.../V1/APIService.pm` | 15 | `KubeAggregator::V1::APIServiceSpec` | `IO::K8s::Api::KubeAggregator::V1::APIServiceSpec` |
+| `KubeAggregator/.../V1/APIService.pm` | 23 | `KubeAggregator::V1::APIServiceStatus` | `IO::K8s::Api::KubeAggregator::V1::APIServiceStatus` |
+| `KubeAggregator/.../V1/APIServiceSpec.pm` | 38 | `KubeAggregator::V1::ServiceReference` | `IO::K8s::Api::KubeAggregator::V1::ServiceReference` |
+| `KubeAggregator/.../V1/APIServiceStatus.pm` | 6 | `['KubeAggregator::V1::APIServiceCondition']` | `IO::K8s::Api::KubeAggregator::V1::APIServiceCondition` |
+
+The classes themselves are shipped and fine — they live under
+`IO::K8s::KubeAggregator::Pkg::Apis::Apiregistration::V1::`. Only the resolution
+is wrong.
+
+## Cause
+
+`_expand_class` in `lib/IO/K8s/Resource.pm:88` matches a prefix with:
+
+```perl
+if ($short =~ /^([A-Z][a-z]+)::/) {
+```
+
+`[A-Z][a-z]+` is one capital followed by lowercase only, so it cannot match a
+CamelCase prefix. For `KubeAggregator::V1::APIServiceSpec` it tries to match
+`Kube` and then requires `::`, finds `A`, and fails. Expansion falls through to
+the default on line 97:
+
+```perl
+return "IO::K8s::Api::$short";
+```
+
+That makes the `'KubeAggregator' => 'IO::K8s::KubeAggregator::Pkg::Apis::Apiregistration'`
+entry in `%_class_prefix` (line 41) dead code — it can never be reached. It is
+the only CamelCase key in the map, which is why this is the only namespace hit.
+
+## How it was found
+
+Scanning all 744 shipped modules for attribute types whose target class is not
+loadable (script: `scratchpad/find-missing-classes.pl`). Same sweep that
+confirmed ticket #1's four missing classes; these five are the remainder.
+
+## Suggested direction
+
+Widen the prefix pattern to accept CamelCase (`^([A-Z]\w+?)::` with the map
+lookup deciding, or match the longest key in `%_class_prefix` instead of
+regex-guessing the prefix). Prefer a fix that cannot silently fall through:
+today an unknown prefix produces a plausible-but-wrong class name and the error
+only appears much later, at inflate time, as a missing file.
+
+A guard test belongs with this: walk `%IO::K8s::Resource::_attr_registry` after
+loading everything and assert every referenced class is loadable. That is a
+cheap check that would have caught this, ticket #1 and the `StorageVersionSpec`
+issue at build time.
+Fixed in bb813ea on fix/kubeaggregator-and-storageversion.
+Fixed in 4199904 on fix/kubeaggregator-and-storageversion.
