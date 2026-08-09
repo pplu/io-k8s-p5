@@ -2,6 +2,24 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Added the four apiextensions.k8s.io/v1 types the distribution declared
+    but never shipped: JSON, JSONSchemaPropsOrArray, JSONSchemaPropsOrBool
+    and JSONSchemaPropsOrStringArray. Without them, inflating any
+    CustomResourceDefinition whose schema used `items`, `additionalItems`,
+    `additionalProperties`, `dependencies`, `default`, `example` or `enum`
+    died with "Can't locate IO/K8s/.../JSONSchemaPropsOrArray.pm in @INC" --
+    in practice nearly every real CRD, since a single array field is enough
+    to hit it. All four are Kubernetes union types that serialize as the
+    bare alternative rather than as a tagged wrapper, so which arm was used
+    now survives a round trip: `additionalProperties: false` stays false
+    instead of collapsing into an empty schema object, and a single `items`
+    schema does not turn into a one-element array.
+  - Added a FROM_STRUCT inflation hook to struct_to_object. A class that
+    provides this class method takes over its own inflation completely and
+    owns its TO_JSON in return, instead of being built field by field from
+    a hashref. This is what makes the union types above representable; it
+    is the general mechanism for any type that serializes as a bare value.
+
 1.105     2026-08-08 18:51:44Z
 
   - Removed the 76 individual *List classes (PodList, ServiceList,

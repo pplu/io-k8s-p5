@@ -409,6 +409,12 @@ sub struct_to_object {
     return $params if Scalar::Util::blessed($params) && $params->isa($class);
 
     $self->load_class($class);
+
+    # Self-inflating classes (union types like the apiextensions JSONSchemaProps*
+    # alternatives) take over completely: they serialize as a bare value, not as
+    # a hashref of attributes, so the generic path below would lose the data.
+    return $class->FROM_STRUCT($params, $self) if $class->can('FROM_STRUCT');
+
     my $inflated = $self->_inflate_struct($class, $params);
     return $class->new(%$inflated);
 }
@@ -1035,6 +1041,17 @@ from C<kind>. With two arguments, uses the specified class.
 
 Convert a Perl hashref to an IO::K8s object. With one argument, auto-detects
 the class from C<kind>. With two arguments, uses the specified class.
+
+If the target class provides a C<FROM_STRUCT> class method, it is called as
+C<< $class->FROM_STRUCT($struct, $k8s) >> and its return value is used as-is,
+bypassing the generic field-by-field inflation. This is the hook for union
+types that serialize as a bare alternative rather than as a hashref of
+attributes -- see
+L<IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaPropsOrBool>
+and its siblings, where C<additionalProperties: false> has to stay a boolean
+instead of collapsing into an empty object. A class implementing
+C<FROM_STRUCT> is responsible for its own C<TO_JSON> as well, so that the two
+directions stay symmetric.
 
 =head2 object_to_json
 
