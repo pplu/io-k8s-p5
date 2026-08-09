@@ -8,6 +8,18 @@ Build and test: `dzil build`, `dzil test`, `dzil clean`. While iterating: `prove
 (**`-r` is required** — plain `prove -l t/` is not recursive). Never `dzil release` without
 explicit permission; this distribution is co-maintained (`authority = cpan:JLMARTIN`).
 
+## Checking coverage against upstream
+
+`maint/spec-drift-check.pl` diffs a real Kubernetes `swagger.json` against what `lib/IO/K8s/`
+actually ships (the `k8s()` attribute registry) and reports missing Kinds/types/fields —
+the repeatable version of the manual sweep behind karr #4-#8. Run with no arguments for a
+coverage report against the latest stable release, or `--from TAG --to TAG` to diff two
+upstream releases directly (the "is upgrading worth it" question). It never edits `lib/` and
+never creates karr tickets — deciding what a reported gap is worth is a human/agent call, not
+the script's. Settled non-gaps (dropped `*List` kinds, old back-compat API tracks, apimachinery
+scalar barewords) are filtered via the maintained `maint/spec-drift-exceptions.yaml`, not
+hardcoded. `maint/spec-drift-check.pl --help` for the full flag list.
+
 ## Delegation
 
 Delegate behavior-relevant code to the right agent instead of touching it yourself — the

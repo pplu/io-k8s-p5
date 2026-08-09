@@ -102,6 +102,15 @@ Revision history for IO-K8s
     shipped V1 sibling. Despite not being a Kind, it carries a real
     upstream `metadata: ObjectMeta` field; without APIObject the metadata
     attribute was never registered and silently dropped on serialization.
+  - Added maint/spec-drift-check.pl, a repeatable coverage checker that
+    diffs a real upstream swagger.json against what lib/IO/K8s/ actually
+    ships and reports missing Kinds/types/fields (the tool behind karr
+    #4-#8's discovery), plus a --from/--to mode that diffs two upstream
+    releases directly to gauge whether a version bump is worth doing.
+    Settled non-gaps (dropped *List kinds, old back-compat API tracks,
+    apimachinery scalar/opaque types) are filtered via the maintained
+    maint/spec-drift-exceptions.yaml. Report-only: never edits lib/ or
+    the karr board.
 
 1.105     2026-08-08 18:51:44Z
 

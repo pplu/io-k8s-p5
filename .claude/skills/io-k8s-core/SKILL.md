@@ -133,6 +133,21 @@ a new *core* kind is not reachable by short name until it is listed there.
 6. `dzil test`. `t/02_compile_all.t` walks `lib/` itself, so a new module is compile-tested
    automatically — but nothing asserts its *shape* until you write that test.
 
+## Finding coverage gaps against upstream
+
+`maint/spec-drift-check.pl` is the repeatable version of the manual sweep that found karr
+#4-#8 (the v1.36 sync gaps): it loads a real upstream `swagger.json`, loads the shipped
+attribute registry the same way `t/34_registry_guard.t` does, maps each upstream definition
+key to the Perl class name the conventions above imply, and diffs kind-by-kind, field-by-field.
+It weights a missing top-level Kind above a missing field whose target type is *also*
+unshipped — the gap class `t/34` structurally cannot see, since it only walks classes that
+were already declared. `--from TAG --to TAG` instead diffs two upstream releases against each
+other with no reference to `lib/`, for "is upgrading worth it." Settled non-gaps (the dropped
+`*List` kinds, old back-compat API tracks like `flowcontrol/v1beta3`, the apimachinery
+scalar/opaque barewords) live in `maint/spec-drift-exceptions.yaml`, not in the script, so a
+maintainer can silence a made decision without touching code. It only ever prints a report —
+no karr tickets, no lib/ edits.
+
 ## Removing API surface is a breaking change
 
 The 1.105 removal of the 76 `*List` classes is the worked example: names that disappear must
