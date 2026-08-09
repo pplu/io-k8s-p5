@@ -1,0 +1,34 @@
+---
+claimed_at: 2026-08-09T22:26:31Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T14:43:30Z
+id: 7
+priority: medium
+started: 2026-08-09
+status: done
+tags:
+- coverage
+- fields
+title: Verstreute fehlende Felder auf ~10 bestehenden Klassen (v1.36-Delta)
+updated: 2026-08-09T22:26:31Z
+---
+
+Kleinere Feld-Luecken aus dem systematischen Abgleich gegen swagger.json v1.36.3
+(gleiche Methode wie im DRA/Core-Ticket). Kein neuer Typ notwendig -- reine Str/Int/Bool
+bzw. bereits vorhandene Typen:
+
+  - Core::V1::ContainerStatus / Core::V1::Lifecycle: `stopSignal` (Str)
+  - Core::V1::PodCondition: `observedGeneration` (Int)
+  - Core::V1::PodSecurityContext: `seLinuxChangePolicy` (Str)
+  - Core::V1::ResourceHealth: `message` (Str)
+  - Storage::V1::VolumeError: `errorCode` (Str)
+  - ApiextensionsApiserver::...::V1::CustomResourceDefinitionCondition: `observedGeneration` (Int)
+  - ApiextensionsApiserver::...::V1::CustomResourceDefinitionStatus: `observedGeneration` (Int)
+  - Apimachinery::...Meta::V1::DeleteOptions: `ignoreStoreReadErrorWithClusterBreakingPotential` (Bool)
+  - Apimachinery::...Meta::V1::ListMeta: `shardInfo` (neuer Typ Meta::V1::ShardInfo -- pruefen ob als
+    echte Klasse oder als HashRef modelliert werden soll, analog zu Quantity/Time/IntOrStr)
+  - Apimachinery::Pkg::Version::Info: `emulationMajor`, `emulationMinor`,
+    `minCompatibilityMajor`, `minCompatibilityMinor` (alle Str, Emulationsversion-Feature)
+Done: added all 14 fields plus the new ShardInfo struct. ContainerStatus.stopSignal, Lifecycle.stopSignal (Str); PodCondition.observedGeneration, CustomResourceDefinitionCondition.observedGeneration, CustomResourceDefinitionStatus.observedGeneration (Int); PodSecurityContext.seLinuxChangePolicy (Str); ResourceHealth.message (Str); VolumeError.errorCode (Int -- confirmed 'integer' in spec, not Str as the ticket body said); DeleteOptions.ignoreStoreReadErrorWithClusterBreakingPotential (Bool); Info.emulationMajor/emulationMinor/minCompatibilityMajor/minCompatibilityMinor (Str). Shipped new IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ShardInfo (real class, not a hashref -- matches the Quantity/Time/IntOrStr precedent of typed rather than opaque) and wired ListMeta.shardInfo to it. All fields inserted alphabetically per existing file convention; attr blocks added everywhere a spec description exists (Info.pm's existing fields have none upstream, so its 4 new ones follow suit only where upstream actually has text -- all 4 do). Verified via new t/38_v1_36_field_and_kind_gaps.t and maint/spec-drift-check.pl --tag v1.36.3 --verbose (Tier 3 MISSING FIELD: 0).
