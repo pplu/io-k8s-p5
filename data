@@ -1,0 +1,38 @@
+---
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T22:16:28Z
+id: 12
+priority: low
+status: done
+tags:
+- coverage
+- apimachinery
+title: meta.v1.Patch missing (Tier 2, opaque marker type)
+updated: 2026-08-09T22:26:49Z
+---
+
+Found by maint/spec-drift-check.pl --tag v1.36.3 --verbose while closing #7/#8/#10 -
+NOT part of any of those three tickets, logging separately per house rule (no scope
+creep mid-change).
+
+io.k8s.apimachinery.pkg.apis.meta.v1.Patch is a Tier 2 MISSING TYPE (standalone):
+
+  "Patch is provided to give a concrete name and type to the Kubernetes PATCH
+  request body." -- type: object, no properties at all.
+
+This is structurally identical to the already-recognised opaque_types in
+maint/spec-drift-exceptions.yaml (FieldsV1, RawExtension): a marker/placeholder
+type with no fields, never round-tripped as a structured Perl object since real
+PATCH bodies are raw JSON Patch / Merge Patch / Strategic Merge Patch payloads,
+not a "Patch" object.
+
+Likely resolution: add
+  io.k8s.apimachinery.pkg.apis.meta.v1.Patch
+to the opaque_types list in maint/spec-drift-exceptions.yaml (maintainer call,
+not something to auto-silence from inside an unrelated ticket) - or, if a
+consumer-facing use case exists for constructing one, ship it as a trivial
+class the way ShardInfo was shipped for #7. Needs a maintainer decision either
+way, not a mechanical fix.
+
+Repro: maint/spec-drift-check.pl --tag v1.36.3 --verbose  ->  Tier 2 MISSING TYPE.
