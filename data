@@ -1,0 +1,32 @@
+---
+claimed_at: 2026-08-09T22:26:43Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T15:43:11Z
+id: 10
+priority: low
+started: 2026-08-09
+status: done
+tags:
+- coverage
+- apimachinery
+title: meta.v1 Discovery-Typen APIGroupList und APIResourceList fehlen komplett
+updated: 2026-08-09T22:26:43Z
+---
+
+Vom neuen maint/spec-drift-check.pl gefunden (nicht Teil des urspruenglichen
+manuellen Abgleichs #4-#8): io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList
+und ...APIResourceList sind beide Top-Level-Kinds (haben x-kubernetes-group-
+version-kind) und fehlen komplett in lib/IO/K8s/Apimachinery/Pkg/Apis/Meta/V1/.
+
+Beide sind Wrapper um die Discovery-API (/apis, /apis/<group>) -- APIGroupList
+buendelt mehrere APIGroup, APIResourceList mehrere APIResource. Das sind KEINE
+der bewusst 1.105 entfernten generischen *List-Wrapper (die haben ein
+`items`-Feld mit ObjectMeta+Items-Form; diese hier sind eigenstaendige,
+handgeschriebene Discovery-Typen mit eigenen Feldern), daher greift die
+list_kinds_dropped-Ausnahme in maint/spec-drift-exceptions.yaml korrekterweise
+nicht.
+
+Reproduzieren: `maint/spec-drift-check.pl --tag v1.36.3` -> Tier 1 MISSING KIND.
+Done: shipped IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::APIGroupList and ::APIResourceList, formatted 1:1 on APIGroup.pm (explicit apiVersion/kind Str fields, use IO::K8s::Resource, no APIObject/Namespaced, no =description/=seealso). groups (['Meta::V1::APIGroup'], required) and resources (['Meta::V1::APIResource'], required)/groupVersion (Str, required) reference the already-shipped sibling classes, nothing new needed there. Confirmed neither sibling type (APIGroup/APIVersions/Status/DeleteOptions) is registered in %DEFAULT_RESOURCE_MAP, so the two new Lists aren't either -- matches existing pattern. Verified via new t/38_v1_36_field_and_kind_gaps.t (load + required-field pass-through) and maint/spec-drift-check.pl (Tier 1 MISSING KIND: 0). Also found and logged as a separate ticket (karr #12, not fixed here -- out of scope for #10): io.k8s.apimachinery.pkg.apis.meta.v1.Patch is a Tier 2 MISSING TYPE, an opaque type: object marker with no fields, structurally like the already-recognised opaque_types (FieldsV1, RawExtension) -- needs a maintainer call on exceptions.yaml vs. shipping a trivial class.
