@@ -84,12 +84,16 @@ sub _expand_class {
     # Already fully qualified?
     return $short if $short =~ /^IO::K8s::/;
 
-    # Check for prefix match (e.g., Core::V1::Pod)
-    if ($short =~ /^([A-Z][a-z]+)::/) {
-        my $prefix = $1;
-        if (my $expansion = $_class_prefix{$prefix}) {
-            $short =~ s/^$prefix/$expansion/;
-            return $short;
+    # Prefix match against %_class_prefix: try the longest key first so that
+    # CamelCase prefixes like KubeAggregator win over a hypothetical shorter
+    # substring. Anything in the map is canonical — the lookup IS the source
+    # of truth, the regex is not. Unknown short names still fall through to
+    # the IO::K8s::Api default so this stays backwards compatible.
+    if ($short =~ /^([A-Z]\w*)::/) {
+        for my $prefix (sort { length($b) <=> length($a) } keys %_class_prefix) {
+            next unless $short =~ /^\Q$prefix\E::/;
+            $short =~ s/^\Q$prefix\E:://;
+            return $_class_prefix{$prefix} . '::' . $short;
         }
     }
 

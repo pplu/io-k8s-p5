@@ -2,6 +2,43 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Fixed _expand_class in IO::K8s::Resource to handle CamelCase prefixes
+    (KubeAggregator, AdmissionRegistration, ...). The single-word
+    `[A-Z][a-z]+` regex could not match a prefix that has an internal
+    capital, so any declared class name whose first segment was CamelCase
+    silently fell through to the IO::K8s::Api default. In practice this
+    meant KubeAggregator's APIService, APIServiceSpec, APIServiceStatus,
+    APIServiceCondition and ServiceReference could not be inflated --
+    spec/status resolved to nonexistent IO::K8s::Api::KubeAggregator::V1
+    classes instead of the shipped IO::K8s::KubeAggregator::Pkg::Apis::
+    Apiregistration::V1 ones. The lookup now walks %_class_prefix in
+    longest-key-first order so CamelCase wins over a hypothetical shorter
+    substring, and uses \Q ... \E so the prefix is matched as a literal
+    rather than as a regex. Backwards-compatible: unknown short names still
+    fall through to the IO::K8s::Api default.
+  - Shipped IO::K8s::Api::Apiserverinternal::V1alpha1::StorageVersionSpec.
+    Upstream declares it as an empty struct ("StorageVersionSpec is an
+    empty spec"), but the class was never authored, so every StorageVersion
+    inflate died with "Can't locate .../StorageVersionSpec.pm in @INC".
+    There was no working path through the class. This is the empty class
+    upstream asked for; the failure mode that mattered was on the
+    serialisation side, where an empty class round-tripped through TO_JSON
+    could collapse to an empty hash or disappear altogether.
+  - Added t/34_registry_guard.t: after every shipped class is loaded,
+    walks the global attribute registry and asserts every referenced
+    target class is loadable. This is the regression net that would have
+    caught the apiextensions.k8s.io/v1 union types, the KubeAggregator
+    prefix mismatch and the missing StorageVersionSpec together, rather
+    than one at a time on the consumer side. Inline-generated structs
+    (packages with no .pm file) are recognised via the `k8s` symbol in
+    the target's stash.
+  - Added t/32_kubeaggregator_apiservice.t and t/33_apiserverinternal_
+    storage_version.t covering the two regression cases above: that
+    APIService and StorageVersion inflate, that every spec/status/
+    condition class resolves to the namespace shipped (not the wrong
+    IO::K8s::Api fallback), and that the full object round-trips
+    byte-for-byte through inflate -> TO_JSON -> inflate -> TO_JSON.
+
   - Added the four apiextensions.k8s.io/v1 types the distribution declared
     but never shipped: JSON, JSONSchemaPropsOrArray, JSONSchemaPropsOrBool
     and JSONSchemaPropsOrStringArray. Without them, inflating any
