@@ -111,6 +111,56 @@ Revision history for IO-K8s
     apimachinery scalar/opaque types) are filtered via the maintained
     maint/spec-drift-exceptions.yaml. Report-only: never edits lib/ or
     the karr board.
+  - Shipped storagemigration.k8s.io/v1beta1 (IO::K8s::Api::Storagemigration::
+    V1beta1::StorageVersionMigration, ::StorageVersionMigrationSpec and
+    ::StorageVersionMigrationStatus), the version v1.36 clusters actually
+    serve now that v1alpha1 has been dropped from the upstream spec. The
+    existing V1alpha1 classes are untouched and stay shipped for old-cluster
+    back-compat. Also added IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::
+    GroupResource, which StorageVersionMigrationSpec.resource needs and
+    which did not exist under any group.
+  - Added five Core::V1 classes that existing structs gained a new $ref
+    field for in v1.36, but whose target type was never shipped, silently
+    swallowing the field on inflate: FileKeySelector (EnvVarSource.
+    fileKeyRef -- read an env var's value from a file in the container),
+    NodeSwapStatus (NodeSystemInfo.swap), PodCertificateProjection
+    (VolumeProjection.podCertificate), and VolumeStatus + ImageVolumeStatus
+    (VolumeMountStatus.volumeStatus).
+  - Added t/38_storagemigration_v1beta1_and_core_v136_fields.t covering the
+    two fixes above: a full StorageVersionMigration inflate -> TO_JSON ->
+    inflate round-trip through GroupResource, plus round-trips for
+    EnvVarSource.fileKeyRef, VolumeMountStatus.volumeStatus, NodeSystemInfo.
+    swap and VolumeProjection.podCertificate.
+  - Added 14 fields the v1.36 sync had missed on otherwise-shipped classes:
+    Core::V1::ContainerStatus.stopSignal, Core::V1::Lifecycle.stopSignal,
+    Core::V1::PodCondition.observedGeneration, Core::V1::
+    PodSecurityContext.seLinuxChangePolicy, Core::V1::ResourceHealth.message,
+    Storage::V1::VolumeError.errorCode, ApiextensionsApiserver::...::V1::
+    CustomResourceDefinitionCondition.observedGeneration and ::
+    CustomResourceDefinitionStatus.observedGeneration, Apimachinery::...::
+    Meta::V1::DeleteOptions.ignoreStoreReadErrorWithClusterBreakingPotential,
+    and Apimachinery::Pkg::Version::Info.emulationMajor/emulationMinor/
+    minCompatibilityMajor/minCompatibilityMinor. Also shipped the new
+    IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ShardInfo struct and wired it
+    up as ListMeta.shardInfo, which previously had no target type at all.
+  - Shipped coordination.k8s.io/v1alpha2 (IO::K8s::Api::Coordination::
+    V1alpha2::LeaseCandidate and ::LeaseCandidateSpec), which had no
+    directory at all despite V1, V1alpha1 and V1beta1 all being shipped.
+    Also added IO::K8s::Api::Scheduling::V1alpha2::TypedLocalObjectReference,
+    a distinct upstream schema that WorkloadSpec.controllerRef previously
+    pointed at Core::V1::TypedLocalObjectReference for instead -- the two
+    happen to share the same three fields today, but they are different
+    schemas and were drifting apart silently.
+  - Added the meta.v1 discovery Kinds APIGroupList and APIResourceList
+    (IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::), used by the /apis and
+    /apis/<group> discovery endpoints. Modelled like their already-shipped
+    siblings APIGroup/APIVersions/Status/DeleteOptions: explicit apiVersion/
+    kind Str fields, not IO::K8s::APIObject.
+  - Added t/39_v1_36_field_and_kind_gaps.t covering all of the above: field
+    round-trips for a representative sample of the 14 additions, a full
+    LeaseCandidate inflate -> TO_JSON -> inflate round-trip, the corrected
+    WorkloadSpec.controllerRef target class, and APIGroupList/
+    APIResourceList loading with their required fields passed through.
 
 1.105     2026-08-08 18:51:44Z
 

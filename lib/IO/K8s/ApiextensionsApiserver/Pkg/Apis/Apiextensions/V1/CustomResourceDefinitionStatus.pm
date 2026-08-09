@@ -19,6 +19,14 @@ conditions indicate state for particular aspects of a CustomResourceDefinition
 
 =cut
 
+k8s observedGeneration => Int;
+
+=attr observedGeneration
+
+The generation observed by the CRD controller.
+
+=cut
+
 k8s storedVersions => [Str];
 
 =attr storedVersions

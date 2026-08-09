@@ -19,4 +19,12 @@ PreStop is called immediately before a container is terminated due to an API req
 
 =cut
 
+k8s stopSignal => Str;
+
+=attr stopSignal
+
+StopSignal defines which signal will be sent to a container when it is being stopped. If not specified, the default is defined by the container runtime in use. StopSignal can only be set for Pods with a non-empty .spec.os.name
+
+=cut
+
 1;

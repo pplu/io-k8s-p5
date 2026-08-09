@@ -75,6 +75,14 @@ OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (whe
 
 =cut
 
+k8s swap => 'Core::V1::NodeSwapStatus';
+
+=attr swap
+
+Swap Info reported by the node.
+
+=cut
+
 k8s systemUUID => Str, 'required';
 
 =attr systemUUID

@@ -3,6 +3,16 @@ package IO::K8s::Api::Storage::V1::VolumeError;
 our $VERSION = '1.106';
 use IO::K8s::Resource;
 
+k8s errorCode => Int;
+
+=attr errorCode
+
+errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
+
+This field requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+
+=cut
+
 k8s message => Str;
 
 =attr message

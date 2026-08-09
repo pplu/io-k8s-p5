@@ -35,4 +35,12 @@ RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-read
 
 =cut
 
+k8s volumeStatus => 'Core::V1::VolumeStatus';
+
+=attr volumeStatus
+
+volumeStatus represents volume-type-specific status about the mounted volume.
+
+=cut
+
 1;

@@ -3,7 +3,7 @@ package IO::K8s::Api::Scheduling::V1alpha2::WorkloadSpec;
 our $VERSION = '1.106';
 use IO::K8s::Resource;
 
-k8s controllerRef => 'Core::V1::TypedLocalObjectReference';
+k8s controllerRef => 'Scheduling::V1alpha2::TypedLocalObjectReference';
 
 =attr controllerRef
 

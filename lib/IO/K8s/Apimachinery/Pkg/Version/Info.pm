@@ -7,6 +7,22 @@ k8s buildDate => Str, 'required';
 
 k8s compiler => Str, 'required';
 
+k8s emulationMajor => Str;
+
+=attr emulationMajor
+
+EmulationMajor is the major version of the emulation version
+
+=cut
+
+k8s emulationMinor => Str;
+
+=attr emulationMinor
+
+EmulationMinor is the minor version of the emulation version
+
+=cut
+
 k8s gitCommit => Str, 'required';
 
 k8s gitTreeState => Str, 'required';
@@ -16,6 +32,22 @@ k8s gitVersion => Str, 'required';
 k8s goVersion => Str, 'required';
 
 k8s major => Str, 'required';
+
+k8s minCompatibilityMajor => Str;
+
+=attr minCompatibilityMajor
+
+MinCompatibilityMajor is the major version of the minimum compatibility version
+
+=cut
+
+k8s minCompatibilityMinor => Str;
+
+=attr minCompatibilityMinor
+
+MinCompatibilityMinor is the minor version of the minimum compatibility version
+
+=cut
 
 k8s minor => Str, 'required';
 

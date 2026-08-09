@@ -37,6 +37,12 @@ scalar_types:
 opaque_types:
   - io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
   - io.k8s.apimachinery.pkg.runtime.RawExtension
+  # karr #12: a marker type with zero properties, used only to give the
+  # PATCH request body a name in the spec/docs. Never referenced by any
+  # other definition's properties (checked against spec/v1.36.3.json) -
+  # real PATCH bodies are raw JSON Patch / Merge Patch / Strategic Merge
+  # Patch payloads, not a "Patch" struct, so there is nothing to model.
+  - io.k8s.apimachinery.pkg.apis.meta.v1.Patch
 
 # Perl classes that intentionally have no matching definition key in the
 # *current* spec: old API tracks kept on purpose for clusters still running

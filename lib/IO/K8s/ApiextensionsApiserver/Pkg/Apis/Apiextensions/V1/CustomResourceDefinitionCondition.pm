@@ -19,6 +19,14 @@ message is a human-readable message indicating details about last transition.
 
 =cut
 
+k8s observedGeneration => Int;
+
+=attr observedGeneration
+
+observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+
+=cut
+
 k8s reason => Str;
 
 =attr reason

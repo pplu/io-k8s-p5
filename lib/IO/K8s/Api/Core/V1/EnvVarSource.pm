@@ -19,6 +19,14 @@ Selects a field of the pod: supports metadata.name, metadata.namespace, `metadat
 
 =cut
 
+k8s fileKeyRef => 'Core::V1::FileKeySelector';
+
+=attr fileKeyRef
+
+FileKeyRef selects a key of the env file. Requires the EnvFiles feature gate to be enabled.
+
+=cut
+
 k8s resourceFieldRef => 'Core::V1::ResourceFieldSelector';
 
 =attr resourceFieldRef

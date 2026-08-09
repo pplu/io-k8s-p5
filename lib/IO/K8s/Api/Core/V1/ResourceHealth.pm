@@ -11,6 +11,14 @@ Health of the resource. can be one of:  - Healthy: operates as normal
 
 =cut
 
+k8s message => Str;
+
+=attr message
+
+Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold"). This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.
+
+=cut
+
 k8s resourceID => Str, 'required';
 
 =attr resourceID

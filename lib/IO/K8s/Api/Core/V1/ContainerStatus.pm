@@ -101,6 +101,14 @@ State holds details about the container's current condition.
 
 =cut
 
+k8s stopSignal => Str;
+
+=attr stopSignal
+
+StopSignal reports the effective stop signal for this container
+
+=cut
+
 k8s user => 'Core::V1::ContainerUser';
 
 =attr user

@@ -27,6 +27,14 @@ Human-readable message indicating details about last transition.
 
 =cut
 
+k8s observedGeneration => Int;
+
+=attr observedGeneration
+
+If set, this represents the .metadata.generation that the pod condition was set based upon.
+
+=cut
+
 k8s reason => Str;
 
 =attr reason
