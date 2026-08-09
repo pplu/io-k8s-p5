@@ -1,0 +1,29 @@
+---
+claimed_at: 2026-08-09T22:26:20Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T14:42:49Z
+id: 5
+priority: high
+started: 2026-08-09
+status: done
+tags:
+- coverage
+- storagemigration
+title: 'storagemigration.k8s.io: nur deprecated v1alpha1 geshippt, aktuelles v1beta1
+  fehlt komplett'
+updated: 2026-08-09T22:26:20Z
+---
+
+Upstream v1.36.3 serviert storagemigration.k8s.io NUR noch unter v1beta1
+(StorageVersionMigration, StorageVersionMigrationSpec, StorageVersionMigrationStatus,
++List). v1alpha1 ist in der v1.36-Spec nicht mehr enthalten.
+
+lib/IO/K8s/Api/Storagemigration/ hat aber nur V1alpha1/ -- also exakt die
+Version, die kein aktueller Cluster mehr ausliefert. Die tatsaechlich servierte
+Version ist komplett unimplementiert (0 von 3 Definitionen + Kind).
+
+Damit ist diese API-Gruppe im Modul fuer jeden Consumer auf einem v1.36-Cluster
+faktisch nutzlos, obwohl der Namespace existiert.
+Implemented: lib/IO/K8s/Api/Storagemigration/V1beta1/{StorageVersionMigration,StorageVersionMigrationSpec,StorageVersionMigrationStatus}.pm added (cluster-scoped APIObject, matching V1alpha1 sibling pattern exactly, V1alpha1 untouched). Also added lib/IO/K8s/Apimachinery/Pkg/Apis/Meta/V1/GroupResource.pm (was missing entirely, needed by spec.resource). Note: spec/v1.36.3.json actually lists group+resource as REQUIRED on GroupResource (required: [group, resource]) -- contradicts the ticket body's 'both optional, keine required-Liste' claim, which I re-verified by reading the spec directly per house rules ('upstream is authority, not judgement, not the ticket paraphrase'); implemented as required. No resource-map/DEFAULT_RESOURCE_MAP entry added -- V1alpha1 StorageVersionMigration has none either, so the 'only if the existing pattern does it too' condition doesn't apply. *List stays dropped per the global 1.105 exceptions rule (verified in maint/spec-drift-exceptions.yaml). Round-trip test in t/38_storagemigration_v1beta1_and_core_v136_fields.t (staged, uncommitted). Drift found and filed separately as karr #13: api_version() computes 'storagemigration/v1beta1' instead of the upstream-correct 'storagemigration.k8s.io/v1beta1' (missing %API_GROUP_MAP entry, pre-existing, also affects V1alpha1) -- left unfixed, out of scope. dzil test / prove -lr t/ green (42 files incl. parallel agent's #7+#8+#10 work in the same tree), maint/spec-drift-check.pl --tag v1.36.3 --verbose confirms zero Tier1-3 gaps for storagemigration/GroupResource, only the expected list_kinds_dropped + perl_only(V1alpha1 back-compat) exceptions remain.
