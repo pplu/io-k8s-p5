@@ -1,0 +1,46 @@
+---
+claimed_at: 2026-08-09T22:26:26Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T14:43:24Z
+id: 6
+priority: high
+started: 2026-08-09
+status: done
+tags:
+- coverage
+- core
+- registry-gap
+title: 5 neue Core-v1-Felder verweisen auf nie geshippte Typen (fileKeyRef, swap,
+  podCertificate, volumeStatus)
+updated: 2026-08-09T22:26:26Z
+---
+
+Das ist exakt die Fehlerklasse, die t/34_registry_guard.t NICHT abdecken kann
+(siehe Testkommentar): der Guard prueft nur, ob deklarierte Attribut-Ziele ladbar
+sind. Wenn ein Feld nie deklariert wurde, existiert auch keine Referenz zum
+Pruefen. Genau das ist hier vier Mal passiert -- neue v1.36-Felder auf
+existierenden Klassen wurden gar nicht erst hinzugefuegt, und die Zielklasse
+dafuer wurde folglich auch nie geschrieben:
+
+  - IO::K8s::Api::Core::V1::EnvVarSource fehlt Feld `fileKeyRef` (Typ:
+    Core::V1::FileKeySelector -- Klasse existiert nicht). Neues Feature:
+    Env-Var-Werte aus einer Datei im Container lesen.
+  - IO::K8s::Api::Core::V1::NodeSystemInfo fehlt Feld `swap` (Typ:
+    Core::V1::NodeSwapStatus -- Klasse existiert nicht). Node-Swap-Accounting.
+  - IO::K8s::Api::Core::V1::VolumeProjection fehlt Feld `podCertificate` (Typ:
+    Core::V1::PodCertificateProjection -- Klasse existiert nicht).
+  - IO::K8s::Api::Core::V1::VolumeMountStatus fehlt Feld `volumeStatus` (Typ:
+    Core::V1::VolumeStatus -- Klasse existiert nicht; VolumeStatus wiederum
+    referenziert ImageVolumeStatus, die also mit dazu muss).
+
+Reproduziert per Abgleich der Attribut-Registry (%IO::K8s::Resource::_attr_registry
+nach Laden aller Module) gegen die properties in swagger.json v1.36.3 fuer jede
+gemappte Definition -- nicht nur gegen bereits referenzierte Klassen wie t/34.
+
+Nach dem Fix: t/34 laeuft automatisch mit, da die neuen Klassen dann referenziert
+werden. Zusaetzlich je einen Rundreise-Test (inflate -> TO_JSON -> inflate) fuer
+mindestens EnvVarSource.fileKeyRef und VolumeMountStatus.volumeStatus, analog zu
+t/32/t/33.
+Implemented: 5 new Core::V1 classes added -- FileKeySelector.pm, NodeSwapStatus.pm, PodCertificateProjection.pm, VolumeStatus.pm, ImageVolumeStatus.pm (all under lib/IO/K8s/Api/Core/V1/), field descriptions/required-flags taken verbatim from spec/v1.36.3.json. Wired the 4 new fields into their existing classes, inserted alphabetically per file convention: EnvVarSource.fileKeyRef, NodeSystemInfo.swap, VolumeProjection.podCertificate, VolumeMountStatus.volumeStatus. t/34_registry_guard.t passes automatically now that these fields are declared and their targets shipped (previously invisible to it, exactly per the ticket's own diagnosis). Round-trip tests for fileKeyRef and volumeStatus (plus swap and podCertificate for full coverage) in t/38_storagemigration_v1beta1_and_core_v136_fields.t (staged, uncommitted), analogous to t/32/t/33. dzil test / prove -lr t/ green (42 files incl. parallel agent's #7+#8+#10 work in the same tree). maint/spec-drift-check.pl --tag v1.36.3 --verbose confirms zero remaining gaps for fileKeyRef/swap/podCertificate/volumeStatus and their target classes.
