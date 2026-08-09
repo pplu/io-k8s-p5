@@ -38,6 +38,13 @@ Revision history for IO-K8s
     condition class resolves to the namespace shipped (not the wrong
     IO::K8s::Api fallback), and that the full object round-trips
     byte-for-byte through inflate -> TO_JSON -> inflate -> TO_JSON.
+  - Added t/35_expand_class.t and t/36_storage_version_spec_unit.t for
+    direct unit coverage of the bugfix targets: every branch of
+    Resource::_expand_class (+FullClassName, already-qualified,
+    longest-key-first prefix walk, default fallback) and the full
+    prefix map; and StorageVersionSpec on its own (DOES Resource,
+    ->new, TO_JSON as an empty hash, no api_version/kind since the
+    class intentionally does not consume IO::K8s::APIObject).
 
   - Added the four apiextensions.k8s.io/v1 types the distribution declared
     but never shipped: JSON, JSONSchemaPropsOrArray, JSONSchemaPropsOrBool
