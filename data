@@ -1,0 +1,67 @@
+---
+claimed_at: 2026-08-09T02:21:04Z
+claimed_by: claude
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T00:21:35Z
+id: 3
+priority: high
+started: 2026-08-09
+status: done
+tags:
+- bug
+- missing-class
+- apiserverinternal
+title: StorageVersionSpec class is missing, making Apiserverinternal V1alpha1 StorageVersion
+  unusable
+updated: 2026-08-09T02:37:35Z
+---
+
+## Symptom
+
+IO::K8s::Api::Apiserverinternal::V1alpha1::StorageVersion cannot be inflated at all:
+
+    Cannot locate IO/K8s/Api/Apiserverinternal/V1alpha1/StorageVersionSpec.pm in @INC
+
+StorageVersion.pm:16 declares:
+
+    k8s spec => "Apiserverinternal::V1alpha1::StorageVersionSpec", "required";
+
+The class is not shipped. lib/IO/K8s/Api/Apiserverinternal/V1alpha1/ contains only
+ServerStorageVersion.pm, StorageVersion.pm, StorageVersionCondition.pm and
+StorageVersionStatus.pm.
+
+Unlike ticket #1, the expansion here is correct: Apiserverinternal is not in
+%_class_prefix and the default IO::K8s::Api::$short produces exactly the right
+path. The file is simply missing.
+
+## Why this one is unconditional
+
+The attribute is marked "required". The four missing Apiextensions classes only
+fail when a CRD happens to use that field; this one fires on every single
+StorageVersion, because spec must be present and must be an instance of a class
+that does not exist. There is no working path through this class.
+
+That also means it has never worked and is not a regression, so no consumer can
+have depended on it.
+
+## Upstream shape
+
+apiserverinternal/v1alpha1.StorageVersionSpec is an empty struct upstream
+("StorageVersionSpec is an empty spec"). So the class is trivial: no attributes,
+just the package, ABSTRACT, $VERSION and use IO::K8s::Resource. Worth confirming
+against the v1.36 spec first, in case a field was added since.
+
+## How it was found
+
+Registry sweep across all shipped modules for unloadable attribute target
+classes, alongside ticket #1 and the KubeAggregator expansion bug (ticket #2).
+
+## Suggested direction
+
+Add the class, plus a round-trip test for StorageVersion. An empty spec is
+exactly the kind of thing that silently serializes to {} or disappears, so the
+test should assert spec survives both directions, not merely that the object
+constructs.
+Fixed in bb813ea on fix/kubeaggregator-and-storageversion.
+Fixed in 4199904 on fix/kubeaggregator-and-storageversion.
