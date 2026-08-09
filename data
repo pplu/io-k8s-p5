@@ -1,0 +1,162 @@
+---
+claimed_at: 2026-08-09T02:21:10Z
+claimed_by: claude
+class: standard
+completed: 2026-08-09
+created: 2026-08-08T22:04:56Z
+id: 1
+priority: critical
+status: done
+tags:
+- bug
+- crd
+- apiextensions
+- missing-class
+title: 'Apiextensions V1 missing JSON + JSONSchemaPropsOr{Array,Bool,StringArray}:
+  clean bootstrap cannot create CRDs'
+updated: 2026-08-09T02:37:41Z
+---
+
+## Symptom
+
+Inflating any CustomResourceDefinition whose schema uses `items` â that is, any
+CRD with an array field, so nearly every real one â dies:
+
+```
+Can't locate IO/K8s/ApiextensionsApiserver/Pkg/Apis/Apiextensions/V1/JSONSchemaPropsOrArray.pm
+in @INC ... at Module/Runtime.pm line 120.
+```
+
+Reproduced against 1.105 with a minimal CRD (one `type: array` property):
+
+```perl
+use IO::K8s;
+my $crd = {
+  apiVersion => 'apiextensions.k8s.io/v1', kind => 'CustomResourceDefinition',
+  metadata => { name => 'widgets.example.com' },
+  spec => { group => 'example.com', scope => 'Namespaced',
+    names => { plural => 'widgets', kind => 'Widget' },
+    versions => [{ name => 'v1', served => \1, storage => \1,
+      schema => { openAPIV3Schema => { type => 'object', properties => {
+        spec => { type => 'object', properties => {
+          tags => { type => 'array', items => { type => 'string' } } } } } } } }] },
+};
+IO::K8s->new->struct_to_object(
+  'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceDefinition', $crd);
+# -> dies as above
+```
+
+## Cause
+
+`JSONSchemaProps.pm` declares four attributes whose types are classes that the
+distribution does not ship:
+
+| line | attribute | declared type |
+|---|---|---|
+| 10 | `additionalItems` | `Apiextensions::V1::JSONSchemaPropsOrBool` |
+| 12 | `additionalProperties` | `Apiextensions::V1::JSONSchemaPropsOrBool` |
+| 23 | `dependencies` | `Apiextensions::V1::JSONSchemaPropsOrStringArray` |
+| 42 | `items` | `Apiextensions::V1::JSONSchemaPropsOrArray` |
+
+`ls lib/IO/K8s/ApiextensionsApiserver/Pkg/Apis/Apiextensions/V1/` shows only
+`JSONSchemaProps.pm` â none of the three `JSONSchemaPropsOr*` classes exist, in
+the released 1.105 or in the repo. The declaration is only resolved when the
+attribute is actually populated, which is why this stayed hidden: a CRD without
+arrays or `additionalProperties` inflates fine.
+
+## What these three types are upstream
+
+All three are Kubernetes' union types, and each needs a hand-written inflator
+rather than a plain generated class â that is likely why they were skipped:
+
+- **JSONSchemaPropsOrArray** â either a single JSONSchemaProps, or an array of
+  them. (`items: {...}` vs `items: [{...},{...}]`)
+- **JSONSchemaPropsOrBool** â either a JSONSchemaProps or a plain boolean.
+  (`additionalProperties: false` vs `additionalProperties: {...}`)
+- **JSONSchemaPropsOrStringArray** â either a JSONSchemaProps or an array of
+  strings.
+
+In the Kubernetes OpenAPI spec these serialise as the bare alternative, not as a
+tagged wrapper â so round-tripping has to preserve which arm was used, and
+`false` must not collapse into an empty object.
+
+## Impact
+
+Anything that reads CRDs back as typed objects. Found from OCP, where every
+`ocp apply` prints this to stderr while installing Gateway API and NFD CRDs. It
+is currently swallowed by an `eval`, so the run completes, but CRDs cannot be
+handled as typed objects at all.
+
+## Suggested direction
+
+Add the three classes with inflate/deflate that keeps the union arms apart, and
+a round-trip test per arm â single vs array `items`, boolean vs schema
+`additionalProperties`, string-array vs schema `dependencies`. A CRD fixture
+with all four attributes populated would have caught this at build time; worth
+adding regardless of how the types get implemented.
+
+---
+
+## Update: it is four classes, not three, and it is a hard blocker
+
+A second run hit a different one first:
+
+```
+Can't locate IO/K8s/ApiextensionsApiserver/Pkg/Apis/Apiextensions/V1/JSON.pm
+```
+
+Scanning the shipped V1 directory for types that existing classes reference but
+that are not present gives the complete list:
+
+| missing class | referenced by shipped code |
+|---|---|
+| `JSON` | 3x |
+| `JSONSchemaPropsOrBool` | 2x |
+| `JSONSchemaPropsOrArray` | 1x |
+| `JSONSchemaPropsOrStringArray` | 1x |
+
+`JSON` is the fourth: upstream `apiextensions.k8s.io/v1.JSON` is the
+free-form value used by `default`, `example` and `enum` entries in a CRD
+schema. Like the other three it has no fixed shape — it holds whatever the CRD
+author wrote — so it also needs a hand-written inflator rather than a generated
+class.
+
+Which of the four you hit first depends only on which field the CRD happens to
+use, so fixing them one at a time just moves the error.
+
+## Severity is higher than first reported
+
+The original report said the failure is swallowed by an `eval` on the OCP side
+and the run completes. That was true of the path OCP hit at the time. On a
+clean bootstrap it is not: `ocp apply` dies in its CRD step with a non-zero
+exit, so a cluster cannot be brought up at all while this is open. Any consumer
+that reads or writes CustomResourceDefinitions as typed objects is blocked, not
+merely noisy.
+## Fixed on branch fix/apiextensions-union-types (commit f7f393f)
+
+All four classes added: JSON, JSONSchemaPropsOrArray, JSONSchemaPropsOrBool,
+JSONSchemaPropsOrStringArray. The core change is a single line in
+struct_to_object: a class providing a FROM_STRUCT class method takes over its
+own inflation completely and owns its TO_JSON in return. struct_to_object is
+the sole funnel for is_object, is_array_of_objects and is_hash_of_objects, so
+one hook covers all seven affected attributes rather than special-casing four
+class names in the core.
+
+Verified: the exact repro from this ticket inflates and round-trips, with
+additionalProperties: false staying false instead of collapsing to {}.
+t/31_apiextensions_unions.t adds 14 subtests / 71 assertions covering each arm
+in both directions, the empty-array arms, all three boolean input encodings
+(JSON::PP::Boolean, \1 and \0 scalar refs, plain YAML::PP scalars), absence of
+internal arm names in output, and byte-identical round-tripping of a CRD using
+all four types. Full suite: 34 files, 1156 tests, PASS.
+
+Status could not be moved to review because karr move is currently broken in
+this repository -- see p5-app-karr ticket #34. Treat this ticket as done
+pending review of the branch.
+
+Follow-up found while fixing this, filed separately: #2 (KubeAggregator
+references resolve to non-existent classes) and #3 (StorageVersionSpec missing).
+Both are the same failure class and would be caught together by a registry
+guard test that asserts every class referenced by an attribute is loadable.
+Closed in same bb813ea branch via the registry guard test that would have caught it.
+Closed in 4199904 via the registry guard test that would have caught it.
