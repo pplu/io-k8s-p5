@@ -1,0 +1,164 @@
+---
+claimed_at: 2026-08-09T22:27:26Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T21:02:12Z
+id: 11
+priority: medium
+started: 2026-08-09
+status: done
+tags:
+- resource
+- dra
+- architecture
+title: Multi-version DRA kinds not resolvable via expand_class()/inflate() by api_version
+updated: 2026-08-09T23:27:07Z
+---
+
+Found while closing karr #4 (shipping resource.k8s.io v1beta1/v1beta2).
+
+%DEFAULT_RESOURCE_MAP in lib/IO/K8s.pm maps each short Kind name (DeviceClass,
+ResourceClaim, ResourceClaimTemplate, ResourceSlice, ...) to exactly ONE class
+path -- currently always the V1 (GA) version. expand_class() accepts an
+api_version parameter for disambiguation (used by inflate(), which passes
+struct->{apiVersion}), but only domain-qualified map entries
+("$api_version/$kind") are consulted for that, and those are only ever
+populated by add() when merging an EXTERNAL provider that collides with an
+existing short name. The built-in %DEFAULT_RESOURCE_MAP itself never gets
+domain-qualified keys.
+
+Consequence, reproduced against DeviceClass:
+
+  IO::K8s->new->inflate({
+    apiVersion => "resource.k8s.io/v1beta1",
+    kind       => "DeviceClass",
+    metadata   => { name => "x" },
+    spec       => { selectors => [] },
+  });
+  # silently returns a IO::K8s::Api::Resource::V1::DeviceClass instance,
+  # NOT V1beta1::DeviceClass -- wrong schema version, no error.
+
+And for a Kind never added to the short-name map at all (DeviceTaintRule,
+ResourcePoolStatusRequest -- both already shipped, v1beta2/v1alpha3
+respectively):
+
+  IO::K8s->new->inflate({ apiVersion => "resource.k8s.io/v1beta2",
+    kind => "DeviceTaintRule", ... });
+  # dies: Cant locate IO/K8s/DeviceTaintRule.pm in @INC
+  # (falls through to the bare IO::K8s::$kind fallback, which does not exist)
+
+This is pre-existing and not introduced by karr #4 -- it already affected the
+already-shipped V1alpha3 "classic DRA" DeviceClass/ResourceClaim/etc. and the
+V1beta2 DeviceTaintRule family the same way. karr #4 only adds more classes
+that hit the identical gap (v1beta1 DeviceClass/ResourceClaim/
+ResourceClaimTemplate/ResourceSlice, v1beta2 same four). Today the only
+reliable way to get a specific non-GA version is to reference the fully
+qualified class directly (IO::K8s::Api::Resource::V1beta1::DeviceClass->new
+or ->struct_to_object with the full class name), bypassing inflate()s
+apiVersion-based dispatch entirely.
+
+Two independent fixes worth considering separately:
+  1. Populate domain-qualified keys for every entry in %DEFAULT_RESOURCE_MAP
+     itself (not just via add()), so inflate() disambiguates GA vs beta/alpha
+     versions of the same Kind correctly.
+  2. Add the short-name-less Kinds (DeviceTaintRule, ResourcePoolStatusRequest,
+     and now the new v1beta1/v1beta2 quartets) to the map under
+     domain-qualified keys at minimum, so inflate() does not die outright.
+
+Repro path: grep expand_class in lib/IO/K8s.pm (~line 232) and
+%DEFAULT_RESOURCE_MAP (~line 17).
+## Decision: Approach 1 (extend default map with domain-qualified keys)
+
+Picked Approach 1 because:
+- Approach 2 alone leaves the GA-vs-beta mis-dispatch bug unfixed
+  (DeviceClass v1beta1 silently returns V1::DeviceClass). Approach 1
+  fixes both bugs at once.
+- Same logic that add() already runs on collision can be reused on
+  every default-map entry, so the default and external maps become
+  symmetric. add() currently only registers the qualified key for the
+  LOSING entry in a collision; with Approach 1, every default entry
+  gets a qualified key at instance build time regardless.
+
+Implementation sketch:
+- Extract the collision-time 'compute qualified key' logic from add()
+  into a helper (e.g. _qualify_default_entry).
+- Run it in BUILD over %DEFAULT_RESOURCE_MAP entries.
+- expand_class() needs no changes: the new '/' keys
+  feed the same code path it already handles for external merges.
+
+Decision logged before coding per house rule 'Surface conflicts, don't
+average them'. See _expand_class / BUILD changes in commit.
+## Implementation plan (concrete)
+
+1. Extract _qualify_class_path helper in IO::K8s.pm from the existing
+   inline logic in add() that, given (map, kind, class_path), adds the
+   domain-qualified key '/' to map if the class can
+   be loaded and reports an api_version.
+
+2. In BUILD, walk %DEFAULT_RESOURCE_MAP and run the helper for every
+   entry, populating qualified keys at instance build time.
+
+3. Refactor add() to call the same helper (no behavior change, just
+   dedup).
+
+4. Add qualified-only entries to %DEFAULT_RESOURCE_MAP for the
+   short-name-less kinds (DeviceTaintRule, ResourcePoolStatusRequest,
+   plus any future short-name-less Kinds under resource.k8s.io that
+   ship qualified only).
+
+5. t/40_karr_11_multi_version_dispatch.t added BEFORE the fix as a
+   failing regression test, covering:
+   - 4 dispatch tests (V1/V1beta1/V1beta2/V1alpha3 DeviceClass)
+   - 12 dispatch tests (ResourceClaim/Template/Slice across 3 versions)
+   - 2 short-name-less kind tests (DeviceTaintRule, ResourcePoolStatusRequest)
+   - 2 domain-qualified expansion tests
+   - 2 inflate tests with assertion 'not silently V1'
+   - 2 inflate tests for short-name-less Kinds (used to die)
+   - 1 round-trip preservation test
+   - 2 negative/sanity tests
+   - 1 isolation test
+
+After fix: dzil test must stay green, no regressions in t/06
+(resource_map), t/07 (cilium), t/11 (gatewayapi), t/26_build_verify,
+t/25_real_world, t/02_compile_all.
+## Implementation done
+
+Files changed:
+- lib/IO/K8s.pm (modified):
+  - %DEFAULT_RESOURCE_MAP gained 14 new qualified-only entries:
+    - resource.k8s.io/v1beta2/DeviceTaintRule
+    - resource.k8s.io/v1alpha3/ResourcePoolStatusRequest
+    - resource.k8s.io/v{1beta1,1beta2,1alpha3}/DeviceClass
+    - resource.k8s.io/v{1beta1,1beta2,1alpha3}/ResourceClaim
+    - resource.k8s.io/v{1beta1,1beta2,1alpha3}/ResourceClaimTemplate
+    - resource.k8s.io/v{1beta1,1beta2,1alpha3}/ResourceSlice
+  - BUILD calls new _qualify_defaults which walks every short-name
+    entry in the per-instance resource_map and runs _qualify_class_path
+    on it.
+  - _qualify_class_path extracted from the inline collision logic in
+    add(); add() now uses it for both the no-collision and collision
+    branches (refactor only - existing t/06_resource_map.t stays green).
+- t/40_karr_11_multi_version_dispatch.t (new): 25 subtests across
+  DeviceClass dispatch (4), multi-kind dispatch matrix (12),
+  short-name-less kinds (2), domain-qualified expansion (2),
+  inflate() end-to-end (4), round-trip (1), negatives (1), sanity
+  (1), per-instance isolation (1).
+- Changes: bullet under {{}}.
+
+Verification:
+- prove -lr t/ -> 2169 tests, all green (was 2144 + 25 new).
+- dzil build clean.
+- dzil test -> 2991 tests, all green (was 2966 + 25 new).
+- t/06_resource_map.t, t/07_cilium.t, t/11_gatewayapi.t,
+  t/25_real_world.t, t/26_build_verify.t, t/02_compile_all.t all
+  still pass (the existing add() behaviour is unchanged because
+  _qualify_class_path is the same algorithm, just extracted).
+
+Design choice log: picked Approach 1 (qualified keys for every default
+entry) plus a minimal Approach 2 (qualified-only entries for the
+multi-version Kinds). Approach 1 alone only qualifies the EXISTING
+short-name mapping (V1 GA), so multi-version dispatch still needs the
+additional v1beta1/v1beta2/v1alpha3 entries. The combined fix is
+strictly more powerful than either alone and addresses both failure
+modes the ticket opened with.
