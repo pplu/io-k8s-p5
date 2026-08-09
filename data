@@ -1,0 +1,44 @@
+---
+claimed_at: 2026-08-09T21:05:54Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T14:42:43Z
+id: 4
+priority: high
+started: 2026-08-09
+status: done
+tags:
+- coverage
+- resource
+- dra
+title: 'resource.k8s.io DRA: v1beta1 komplett fehlt, v1beta2 zu 90% fehlt'
+updated: 2026-08-09T21:05:54Z
+---
+
+Abgleich lib/IO/K8s gegen Upstream-OpenAPI-Spec v1.36.3
+(raw.githubusercontent.com/kubernetes/kubernetes/v1.36.3/api/openapi-spec/swagger.json).
+
+resource.k8s.io/v1beta1 (DRA): 0 von ~34 Definitionen geshippt. Die gesamte
+API-Version fehlt -- Kinds DeviceClass, ResourceClaim, ResourceClaimTemplate,
+ResourceSlice eingeschlossen. lib/IO/K8s/Api/Resource/ hat kein V1beta1/ Verzeichnis.
+
+resource.k8s.io/v1beta2: nur 4 von ~30 Definitionen geshippt (DeviceTaintRule,
+DeviceTaintRuleSpec, DeviceTaintRuleStatus, DeviceTaintSelector -- offenbar aus
+einem fruheren Ticket). Es fehlen DeviceClass, ResourceClaim, ResourceClaimTemplate,
+ResourceSlice und die komplette Device/AllocationResult/DeviceRequest-Familie.
+
+resource.k8s.io/v1alpha3 (die bewusst als Legacy-Struktur beibehaltene "classic
+DRA"-Version, siehe Changes zu 1.100/1.105): fehlen die NEUEN v1.36-Typen
+DeviceTaint, DeviceTaintRule(+List), DeviceTaintRuleSpec, DeviceTaintRuleStatus,
+DeviceTaintSelector, PoolStatus, ResourcePoolStatusRequest(+List),
+ResourcePoolStatusRequestSpec/Status -- diese existieren zwar in v1beta2 (teilweise),
+wurden aber nicht auch fuer v1alpha3 nachgezogen.
+
+v1beta1 ist die in der Praxis am weitesten verbreitete DRA-Serverversion; jeder
+Consumer, der DeviceClass/ResourceClaim auf einem noch nicht auf v1 migrierten
+Cluster anspricht, bekommt "Can't locate ... in @INC".
+
+Repro: swagger.json definitions mit Praefix "io.k8s.api.resource.v1beta1." bzw.
+"v1beta2." gegen 'find lib/IO/K8s/Api/Resource -name *.pm' abgleichen.
+Shipped resource.k8s.io/v1beta1 (39 classes, new V1beta1/ dir) and filled v1beta2 (39 more, on top of the existing DeviceTaintRule quartet). Added the 5 v1alpha3 additions that were genuinely missing (DeviceTaint, DeviceTaintRule+Spec+Status, DeviceTaintSelector) -- PoolStatus and ResourcePoolStatusRequest+Spec+Status were already shipped despite the ticket text, left untouched after an accidental overwrite+restore. Verified all 87 files field-by-field/required-by-required against the real v1.36.3 swagger.json (scripted diff, zero real mismatches). Verified DeviceClass/ResourceSlice cluster-scoped vs ResourceClaim/ResourceClaimTemplate namespaced against actual swagger paths, not just pattern match. Fixed a real bug surfaced by DeviceAttribute.bools ([Bool] array): IO::K8s::Resource/Role::Resource lacked is_array_of_bool handling, so TO_JSON emitted [1,0,1] instead of [true,false,true] and FROM_HASH died on real JSON booleans -- this also affected the already-shipped V1::DeviceAttribute. Applied a coordinator-flagged fix (overlap with ticket #9's independent audit): ResourceClaimTemplateSpec (v1beta1+v1beta2) needed IO::K8s::APIObject not IO::K8s::Resource to register its real upstream metadata field, matching the shipped V1 sibling -- was already fixed once I got to it, confirmed via test. No resource-map/Manifest.pm/List.pm registration needed (matches existing precedent for V1alpha3/V1beta2 DRA kinds not in %DEFAULT_RESOURCE_MAP); filed karr #11 for the pre-existing multi-version dispatch gap this exposed. Added t/37_dra_v1beta1_v1beta2.t (9 subtests). Full suite: 40 files/2104 tests green (prove -lr t/). dzil build clean. Nothing committed -- left staged for review.
