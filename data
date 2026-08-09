@@ -1,0 +1,61 @@
+---
+claimed_at: 2026-08-09T22:27:32Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T22:18:26Z
+id: 13
+priority: medium
+started: 2026-08-09
+status: done
+tags:
+- coverage
+- serialization
+- drift
+title: api_version() derives wrong short group for storagemigration and apiserverinternal
+  (missing %API_GROUP_MAP entries)
+updated: 2026-08-09T23:23:40Z
+---
+
+Found while implementing karr #5 (storagemigration.k8s.io/v1beta1).
+
+IO::K8s::Role::APIObject::api_version() derives the wire apiVersion string
+from the class name via %API_GROUP_MAP in lib/IO/K8s/Role/APIObject.pm.
+For any Api::<Group>::<Version>::<Kind> class whose group is not a key in
+that map, it falls back to lc($group) . '/' . $version -- i.e. it assumes
+the upstream API group has no ".k8s.io" (or other) suffix. That assumption
+is wrong for at least two shipped groups:
+
+  - IO::K8s::Api::Storagemigration::* -> computes "storagemigration/v1beta1"
+    but the real upstream group (see x-kubernetes-group-version-kind in
+    spec/v1.36.3.json) is "storagemigration.k8s.io", i.e. apiVersion should
+    be "storagemigration.k8s.io/v1beta1". Affects both the pre-existing
+    V1alpha1 classes and the new V1beta1 ones added in #5.
+  - IO::K8s::Api::Apiserverinternal::* -> computes
+    "apiserverinternal/v1alpha1" but the real upstream group is
+    "internal.apiserver.k8s.io". t/33_apiserverinternal_storage_version.t
+    already hardcodes the wrong value and calls it "upstream normalises
+    apiVersion to the short form" -- that comment is itself describing the
+    bug, not an upstream behaviour.
+
+Because TO_JSON always calls $self->api_version (never trusts a stored
+apiVersion string, see lib/IO/K8s/Role/Resource.pm ~line 42), every
+serialised manifest for these two groups currently carries a syntactically
+plausible but wrong apiVersion. A real Kubernetes API server would reject
+it (unrecognized group/version).
+
+Fix is presumably: add 'storagemigration' => 'storagemigration.k8s.io' and
+'apiserverinternal' => 'internal.apiserver.k8s.io' to %API_GROUP_MAP, then
+update t/33's hardcoded expectations and t/38's new StorageVersionMigration
+round-trip (both currently assert against the class's own -- currently
+buggy -- api_version() output rather than a hardcoded literal, so they
+would need re-checking either way). Also worth auditing the rest of
+%_class_prefix's groups for the same short-form gap before fixing, since
+this is shared derivation logic touched by every APIObject class in these
+namespaces -- not a one-line change to make blind.
+
+Left unfixed here deliberately: out of scope for #5/#6 (which only add
+missing classes/fields), high blast radius (shared Role::APIObject code),
+and adjacent to the planned #11 multi-version-dispatch architecture pass --
+better decided together than as a drive-by.
+AUDIT (in-progress): walked every shipped CamelCase group under lib/IO/K8s/Api/ against the upstream swagger.json x-kubernetes-group-version-kind annotations (v1.36). Of the 20 CamelCase groups in %_class_prefix, only 2 were unhandled by %API_GROUP_MAP and produced a wrong wire apiVersion via the lc()-fallback: Storagemigration (->storagemigration.k8s.io) and Apiserverinternal (->internal.apiserver.k8s.io). The other 18 either already had a correct entry (13 of them) or fall through to the lc-fallback correctly because their CamelCase lc-form matches the upstream group exactly: apps, batch, autoscaling, policy. Core short-circuits to bare 'v1' so it's never affected. No other shipped group has an upstream name with a .k8s.io/.apiserver.k8s.io/etc suffix that the lc-fallback would misrender. Fix: added the two missing entries to %API_GROUP_MAP (lib/IO/K8s/Role/APIObject.pm). Regression test: t/39_api_group_short_form.t asserts api_version() for 21 representative top-level kinds (one per shipped CamelCase group + the two specifically fixed groups) and round-trips the serialised apiVersion key for the two fixed groups. t/33's hardcoded 'apiserverinternal/v1alpha1' value + 'upstream normalises to short form' comment fixed in place (the comment was the bug indicator).
