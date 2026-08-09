@@ -1,0 +1,26 @@
+---
+claimed_at: 2026-08-09T22:26:37Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-08-09
+created: 2026-08-09T14:43:36Z
+id: 8
+priority: low
+started: 2026-08-09
+status: done
+tags:
+- coverage
+- alpha
+title: coordination.k8s.io/v1alpha2 und scheduling.k8s.io/v1alpha2.TypedLocalObjectReference
+  fehlen
+updated: 2026-08-09T22:26:37Z
+---
+
+Kleinere Luecken, niedrige Prioritaet (Alpha-Features):
+
+  - coordination.k8s.io/v1alpha2: LeaseCandidate, LeaseCandidateSpec (+List) fehlen
+    komplett. lib/IO/K8s/Api/Coordination/ hat V1, V1alpha1, V1beta1 -- v1alpha2
+    wurde beim Versions-Sync uebersprungen.
+  - scheduling.k8s.io/v1alpha2.TypedLocalObjectReference fehlt (referenziert von
+    PodGroup).
+Done: shipped lib/IO/K8s/Api/Coordination/V1alpha2/ (LeaseCandidate + LeaseCandidateSpec), formatted 1:1 on the v1beta1 sibling. Confirmed via swagger paths (/apis/coordination.k8s.io/v1alpha2/namespaces/{namespace}/leasecandidates) that it is namespaced like v1beta1, so 'with IO::K8s::Role::Namespaced' applies; neither v1beta1 nor v1alpha2 LeaseCandidate is registered in %DEFAULT_RESOURCE_MAP, so no map change needed (matches existing pattern). Also shipped Scheduling::V1alpha2::TypedLocalObjectReference as its own class (distinct upstream schema from Core::V1::TypedLocalObjectReference, even though both currently have the same 3 fields) and fixed WorkloadSpec.controllerRef, which was wrongly pointing at Core::V1::TypedLocalObjectReference instead of the scheduling-namespace type the upstream spec actually references -- a drift bug found while shipping the new class, fixed as part of this ticket since the new type would otherwise sit unused. Verified via new t/38_v1_36_field_and_kind_gaps.t (LeaseCandidate round-trip + controllerRef class check) and maint/spec-drift-check.pl.
