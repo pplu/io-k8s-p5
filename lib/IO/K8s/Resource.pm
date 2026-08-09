@@ -171,6 +171,8 @@ sub _k8s {
                 $info{is_array_of_str} = 1;
             } elsif ($type_name eq 'Int') {
                 $info{is_array_of_int} = 1;
+            } elsif ($type_name eq 'Bool') {
+                $info{is_array_of_bool} = 1;
             }
             $isa = $required ? ArrayRef[$inner] : Maybe[ArrayRef[$inner]];
         } elsif ($inner eq 'Str') {
@@ -230,6 +232,13 @@ sub _k8s {
     # Bool attributes: coerce \0/\1 refs and JSON booleans to plain 0/1
     if ($info{is_bool}) {
         @coerce = (coerce => sub { ref $_[0] ? (${$_[0]} ? 1 : 0) : ($_[0] ? 1 : 0) });
+    }
+    # Array of bool: same \0/\1 and JSON::PP::Boolean normalization, per element
+    elsif ($info{is_array_of_bool}) {
+        @coerce = (coerce => sub {
+            return $_[0] unless ref $_[0] eq 'ARRAY';
+            return [ map { ref $_ ? ($$_ ? 1 : 0) : ($_ ? 1 : 0) } @{$_[0]} ];
+        });
     }
     # Inline struct: coerce plain hashref to inner class instance
     elsif ($info{is_inline_struct}) {

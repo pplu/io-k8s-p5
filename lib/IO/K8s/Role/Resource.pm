@@ -69,6 +69,8 @@ sub TO_JSON {
             $data{$key} = { map { $_ => $value->{$_}->TO_JSON } keys %$value };
         } elsif ($attr_info->{is_array_of_int}) {
             $data{$key} = [ map { int($_) } @$value ];
+        } elsif ($attr_info->{is_array_of_bool}) {
+            $data{$key} = [ map { $_ ? JSON::MaybeXS::true : JSON::MaybeXS::false } @$value ];
         } elsif (ref $value eq 'ARRAY') {
             $data{$key} = $value;
         } elsif (ref $value eq 'HASH') {
@@ -177,6 +179,7 @@ sub _describe_local_type {
     return 'boolean'        if $info->{is_bool};
     return 'array<string>'  if $info->{is_array_of_str};
     return 'array<integer>' if $info->{is_array_of_int};
+    return 'array<boolean>' if $info->{is_array_of_bool};
     return 'array<object>'  if $info->{is_array_of_objects};
     return 'hash<string>'   if $info->{is_hash_of_str};
     return 'hash<object>'   if $info->{is_hash_of_objects};

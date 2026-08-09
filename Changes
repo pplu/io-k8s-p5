@@ -64,6 +64,45 @@ Revision history for IO-K8s
     a hashref. This is what makes the union types above representable; it
     is the general mechanism for any type that serializes as a bare value.
 
+  - Shipped resource.k8s.io/v1beta1 (39 classes, entirely missing --
+    lib/IO/K8s/Api/Resource/ had no V1beta1/ directory at all) and filled
+    in resource.k8s.io/v1beta2 (39 more classes; only the DeviceTaintRule/
+    DeviceTaintRuleSpec/DeviceTaintRuleStatus/DeviceTaintSelector quartet
+    from an earlier fix was shipped there). Both versions now carry the
+    full DRA surface: DeviceClass, ResourceClaim, ResourceClaimTemplate and
+    ResourceSlice (DeviceClass/ResourceSlice cluster scoped, ResourceClaim/
+    ResourceClaimTemplate namespaced -- verified against the real swagger
+    paths, not just pattern-matched from V1) plus the whole Device/
+    AllocationResult/DeviceRequest/Counter/CapacityRequestPolicy family.
+    v1beta1 is the most widely deployed DRA server version; any consumer
+    talking to a cluster that had not migrated to v1 got "Can't locate
+    .../DeviceClass.pm in @INC" for every one of these Kinds.
+  - Added the 9 v1.36 DRA additions to resource.k8s.io/v1alpha3 that had
+    not been backported to the legacy "classic DRA" version also serving
+    them: DeviceTaint, DeviceTaintRule (+ Spec/Status), DeviceTaintSelector,
+    PoolStatus, and ResourcePoolStatusRequest (+ Spec/Status) -- the latter
+    three were already present from a previous pass; only the
+    DeviceTaint(Rule) family was actually missing. The 24 already-shipped
+    "classic DRA" structural types (DeviceClass, ResourceClaim, Device,
+    AllocationResult, etc.) are untouched, per the 1.100/1.105 decision to
+    keep them as legacy backward compatibility.
+  - Fixed ArrayRef[Bool] fields (DeviceAttribute.bools, present in the V1,
+    V1beta1 and V1beta2 DRA APIs) to serialize as JSON booleans instead of
+    plain 0/1, and to accept real decoded JSON booleans on the way back in.
+    Previously TO_JSON emitted [1,0,1] instead of [true,false,true], and
+    FROM_HASH on a real cluster response died with a Moo type constraint
+    violation because JSON::PP::Boolean objects don't satisfy Types::
+    Standard's Bool -- this affected the already-shipped
+    IO::K8s::Api::Resource::V1::DeviceAttribute too, not just the new
+    v1beta1/v1beta2 copies. IO::K8s::Resource now tracks an
+    is_array_of_bool flag with element-wise coercion, mirroring the
+    existing scalar Bool handling.
+  - Fixed ResourceClaimTemplateSpec (v1beta1 and v1beta2) to be built on
+    IO::K8s::APIObject instead of IO::K8s::Resource, matching the already-
+    shipped V1 sibling. Despite not being a Kind, it carries a real
+    upstream `metadata: ObjectMeta` field; without APIObject the metadata
+    attribute was never registered and silently dropped on serialization.
+
 1.105     2026-08-08 18:51:44Z
 
   - Removed the 76 individual *List classes (PodList, ServiceList,
