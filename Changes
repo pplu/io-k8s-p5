@@ -2,6 +2,23 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Fixed inflate()/expand_class() to dispatch by apiVersion to the correct
+    multi-version Kind. Pre-fix, %DEFAULT_RESOURCE_MAP mapped each short
+    Kind name (DeviceClass, ResourceClaim, ResourceClaimTemplate,
+    ResourceSlice, ...) to exactly one class path (always the GA v1), and
+    only entries added externally via add() ever got domain-qualified
+    ('$apiVersion/$Kind') entries. Two visible consequences:
+    inflate({apiVersion=>'resource.k8s.io/v1beta1', kind=>'DeviceClass',
+    ...}) silently returned IO::K8s::Api::Resource::V1::DeviceClass (the
+    GA class, wrong schema), and inflate of a short-name-less Kind
+    (DeviceTaintRule, ResourcePoolStatusRequest) died with 'Cant locate
+    IO/K8s/DeviceTaintRule.pm in @INC' because the bare IO::K8s::$Kind
+    fallback does not exist. %DEFAULT_RESOURCE_MAP now carries qualified
+    entries for every shipped version of every multi-version Kind, plus
+    the short-name-less ones, and IO::K8s::BUILD populates
+    '$apiVersion/$Kind' keys for every default entry so the apiVersion
+    dispatch path treats shipped Kinds the same way it already treated
+    externally merged ones. See karr #11.
   - Fixed _expand_class in IO::K8s::Resource to handle CamelCase prefixes
     (KubeAggregator, AdmissionRegistration, ...). The single-word
     `[A-Z][a-z]+` regex could not match a prefix that has an internal

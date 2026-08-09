@@ -60,6 +60,36 @@ my %DEFAULT_RESOURCE_MAP = (
     ResourceClaim => 'Api::Resource::V1::ResourceClaim',
     ResourceClaimTemplate => 'Api::Resource::V1::ResourceClaimTemplate',
     ResourceSlice => 'Api::Resource::V1::ResourceSlice',
+    # Resource - qualified-only entries for Kinds that exist only in
+    # non-GA versions (no shared short-name conflict). These are not
+    # reachable by a bare short-name lookup, only by api_version (in
+    # expand_class) or by their full '$api_version/$Kind' string.
+    # see karr #11 for the dispatch gap this fixes.
+    'resource.k8s.io/v1beta2/DeviceTaintRule' => 'Api::Resource::V1beta2::DeviceTaintRule',
+    'resource.k8s.io/v1alpha3/ResourcePoolStatusRequest' => 'Api::Resource::V1alpha3::ResourcePoolStatusRequest',
+
+    # Resource - the four DRA Kinds that have multiple shipped versions
+    # (DeviceClass, ResourceClaim, ResourceClaimTemplate, ResourceSlice).
+    # The short-name entries above point at the GA v1; these qualified
+    # entries expose the v1beta1, v1beta2 and v1alpha3 variants so that
+    # expand_class()'s api_version-based dispatch and domain-qualified
+    # lookup both resolve to the correct schema version. They are
+    # qualified-only on purpose: an entry of the form 'DeviceClass => ...'
+    # would collide with the existing short name, and the "first-registered
+    # wins" rule in add() (carried over here) means the GA class would
+    # shadow any later addition. See karr #11.
+    'resource.k8s.io/v1beta1/DeviceClass' => 'Api::Resource::V1beta1::DeviceClass',
+    'resource.k8s.io/v1beta2/DeviceClass' => 'Api::Resource::V1beta2::DeviceClass',
+    'resource.k8s.io/v1alpha3/DeviceClass' => 'Api::Resource::V1alpha3::DeviceClass',
+    'resource.k8s.io/v1beta1/ResourceClaim' => 'Api::Resource::V1beta1::ResourceClaim',
+    'resource.k8s.io/v1beta2/ResourceClaim' => 'Api::Resource::V1beta2::ResourceClaim',
+    'resource.k8s.io/v1alpha3/ResourceClaim' => 'Api::Resource::V1alpha3::ResourceClaim',
+    'resource.k8s.io/v1beta1/ResourceClaimTemplate' => 'Api::Resource::V1beta1::ResourceClaimTemplate',
+    'resource.k8s.io/v1beta2/ResourceClaimTemplate' => 'Api::Resource::V1beta2::ResourceClaimTemplate',
+    'resource.k8s.io/v1alpha3/ResourceClaimTemplate' => 'Api::Resource::V1alpha3::ResourceClaimTemplate',
+    'resource.k8s.io/v1beta1/ResourceSlice' => 'Api::Resource::V1beta1::ResourceSlice',
+    'resource.k8s.io/v1beta2/ResourceSlice' => 'Api::Resource::V1beta2::ResourceSlice',
+    'resource.k8s.io/v1alpha3/ResourceSlice' => 'Api::Resource::V1alpha3::ResourceSlice',
     # Authorization
     LocalSubjectAccessReview => 'Api::Authorization::V1::LocalSubjectAccessReview',
     SelfSubjectAccessReview => 'Api::Authorization::V1::SelfSubjectAccessReview',
@@ -156,7 +186,54 @@ sub default_resource_map { \%DEFAULT_RESOURCE_MAP }
 
 sub BUILD {
     my ($self) = @_;
+
+    # Populate domain-qualified keys for every entry in the built-in
+    # %DEFAULT_RESOURCE_MAP so that expand_class()'s api_version-based
+    # disambiguation works for shipped kinds as well as for externally
+    # merged providers. Pre-fix, only entries added via add() (and only
+    # when there was a short-name collision at that) ever got qualified
+    # keys, which meant inflate() silently downgraded multi-version
+    # Kinds (e.g. DeviceClass resource.k8s.io/v1beta1 -> V1 GA) and
+    # short-name-less Kinds (DeviceTaintRule) died with 'Cant locate'.
+    # See karr #11.
+    $self->_qualify_defaults;
+
     $self->add(@{$self->with}) if @{$self->with};
+}
+
+# Walk %DEFAULT_RESOURCE_MAP and add a '$api_version/$kind' key for
+# every entry whose target class can be loaded and reports an
+# api_version. Idempotent: existing qualified keys are left alone.
+sub _qualify_defaults {
+    my ($self) = @_;
+    my $map = $self->resource_map;
+    for my $kind (keys %$map) {
+        # Skip already-qualified entries - their key already contains
+        # a '/', and re-introspecting would only ever produce the same
+        # qualified key.
+        next if $kind =~ m{/};
+        my $class_path = $map->{$kind};
+        _qualify_class_path($map, $kind, $class_path);
+    }
+}
+
+# Add a '$api_version/$kind' qualified entry to $map if the target class
+# can be loaded and reports an api_version. No-op if the qualified key
+# already exists. Shared between the default-map BUILD step and the
+# add() external-merge path so the two stay symmetric.
+sub _qualify_class_path {
+    my ($map, $kind, $class_path) = @_;
+
+    my $full_class = $class_path =~ /^\+/
+        ? substr($class_path, 1) : "IO::K8s::$class_path";
+
+    return unless _class_exists($full_class) && $full_class->can('api_version');
+    my $api_version = $full_class->api_version;
+    return unless $api_version;
+
+    my $qkey = "$api_version/$kind";
+    return if exists $map->{$qkey};
+    $map->{$qkey} = $class_path;
 }
 
 # Merge external resource maps into this instance
@@ -179,39 +256,16 @@ sub add {
         for my $kind (keys %$ext_map) {
             my $class_path = $ext_map->{$kind};
 
-            # Resolve full class name for api_version lookup
-            my $full_class = $class_path =~ /^\+/
-                ? substr($class_path, 1) : "IO::K8s::$class_path";
-
-            # Try to load the class and get its api_version
-            my $api_version;
-            if (_class_exists($full_class) && $full_class->can('api_version')) {
-                $api_version = $full_class->api_version;
-            }
-
             if (exists $map->{$kind}) {
                 # COLLISION: short name already taken
                 # Ensure the original entry also has a domain-qualified key
-                my $orig_path = $map->{$kind};
-                my $orig_class = $orig_path =~ /^\+/
-                    ? substr($orig_path, 1) : "IO::K8s::$orig_path";
-                if (_class_exists($orig_class) && $orig_class->can('api_version')) {
-                    my $orig_av = $orig_class->api_version;
-                    if ($orig_av && !exists $map->{"$orig_av/$kind"}) {
-                        $map->{"$orig_av/$kind"} = $orig_path;
-                    }
-                }
+                _qualify_class_path($map, $kind, $map->{$kind});
                 # New entry: domain-qualified only (no short name)
-                if ($api_version) {
-                    $map->{"$api_version/$kind"} = $class_path;
-                }
+                _qualify_class_path($map, $kind, $class_path);
             } else {
-                # No collision: register short name
+                # No collision: register short name + domain-qualified
                 $map->{$kind} = $class_path;
-                # Also register domain-qualified
-                if ($api_version) {
-                    $map->{"$api_version/$kind"} = $class_path;
-                }
+                _qualify_class_path($map, $kind, $class_path);
             }
         }
     }
