@@ -2,6 +2,23 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Made built-in Kubernetes resource dispatch exact for every addressable
+    apiVersion/kind pair in the pinned v1.36.3 OpenAPI spec. This adds the
+    missing events.k8s.io/v1 Event and autoscaling/v1
+    HorizontalPodAutoscaler routes while preserving the historical bare-name
+    defaults (Core v1 Event and Autoscaling v2 HPA). Explicit unknown,
+    malformed, empty, or mismatched apiVersions now fail closed:
+    expand_class() returns undef and inflate()/new_object() report the
+    requested Kind and apiVersion instead of silently selecting a different
+    bare-name schema. Newly exposed compatibility aliases are
+    ClusterTrustBundle, DeviceTaintRule, LeaseCandidate, PodGroup,
+    ResourcePoolStatusRequest, StorageVersion, StorageVersionMigration and
+    Workload; all existing aliases and targets remain pinned. An offline,
+    SHA-256-pinned v1.36.3 fixture now exhaustively checks 98 addressable GVKs,
+    all 14 multi-version Kind collisions, namespace scope, maintained
+    non-dispatchable exceptions, real inflation and provider first-wins
+    behavior.
+
   - Fixed inflate()/expand_class() to dispatch by apiVersion to the correct
     multi-version Kind. Pre-fix, %DEFAULT_RESOURCE_MAP mapped each short
     Kind name (DeviceClass, ResourceClaim, ResourceClaimTemplate,
@@ -13,12 +30,12 @@ Revision history for IO-K8s
     GA class, wrong schema), and inflate of a short-name-less Kind
     (DeviceTaintRule, ResourcePoolStatusRequest) died with 'Cant locate
     IO/K8s/DeviceTaintRule.pm in @INC' because the bare IO::K8s::$Kind
-    fallback does not exist. %DEFAULT_RESOURCE_MAP now carries qualified
-    entries for every shipped version of every multi-version Kind, plus
-    the short-name-less ones, and IO::K8s::BUILD populates
-    '$apiVersion/$Kind' keys for every default entry so the apiVersion
-    dispatch path treats shipped Kinds the same way it already treated
-    externally merged ones. See karr #11.
+    fallback does not exist. %DEFAULT_RESOURCE_MAP now carries literal
+    qualified entries for every shipped version of every addressable Kind,
+    including the short-name-less ones. Class-method and instance dispatch
+    therefore share the same complete static map without BUILD eagerly
+    loading every target class; add() still derives qualified keys for
+    externally merged providers. See karr #11.
   - Fixed api_version() in IO::K8s::Role::APIObject for the
     Storagemigration and Apiserverinternal groups. The fallback
     `lc($group) . '/' . $version` only produces the correct wire
