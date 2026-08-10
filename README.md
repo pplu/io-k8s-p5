@@ -70,7 +70,7 @@ my $k8s = IO::K8s->new(with => [
 ]);
 ```
 
-### Cilium (22 CRDs)
+### Cilium (30 CRDs)
 
 `IO::K8s::Cilium` covers `cilium.io/v2` and `cilium.io/v2alpha1` (upstream v1.20.0):
 
@@ -130,7 +130,7 @@ my $gw = $k8s->new_object('Gateway',
 );
 ```
 
-### AgentSandbox (4 CRDs)
+### AgentSandbox (4 CRDs in 8 modules: v1alpha1 + v1beta1)
 
 `IO::K8s::AgentSandbox` covers `agents.x-k8s.io/{v1alpha1,v1beta1}` and `extensions.agents.x-k8s.io/{v1alpha1,v1beta1}` (upstream v0.5.4; v1beta1 is the storage version, v1alpha1 remains served):
 
@@ -300,18 +300,17 @@ See the full POD documentation for details on the class architecture and CRD sup
 
 ## Authors
 
-- Torsten Raudssus <torsten@raudssus.de>
-- Jose Luis Martinez <jlmartin@cpan.org> (original author, inactive)
+- Torsten Raudssus <getty@cpan.org>
+- Jose Luis Martinez Torres <jlmartin@cpan.org> (original author, inactive)
 
 ## License
 
-Copyright (c) 2018 by Jose Luis Martinez
+Copyright (c) 2018-2026 by Jose Luis Martinez Torres
 
 This code is distributed under the Apache 2 License. The full text of the license can be found in the LICENSE file included with this module.
 
 ## Support
 
-- IRC: #kubernetes on irc.perl.org
 - Issues: https://github.com/pplu/io-k8s-p5/issues
 
 ## See Also

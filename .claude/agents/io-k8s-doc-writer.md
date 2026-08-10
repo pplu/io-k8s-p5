@@ -19,7 +19,7 @@ report the mismatch instead.
 ## Two surfaces, two shapes
 
 **1. The API classes** (`lib/IO/K8s/Api/`, `Apimachinery/`, `ApiextensionsApiserver/`,
-`KubeAggregator/`) follow one uniform pattern — 605 of 606 already do. Match it exactly:
+`KubeAggregator/`) follow one uniform pattern — the great majority already do. Match it exactly:
 
 ```perl
 package IO::K8s::Api::Core::V1::Binding;
@@ -57,10 +57,14 @@ L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#binding-v
   Kubernetes' own words, not composing your own.
 - `=description` and `=seealso` are for **top-level** API objects. Embedded resources
   (`…Spec`, `…Status`, `Container`, …) carry `# ABSTRACT` plus their `=attr` blocks only.
-- **Known drift:** 79 `=seealso` links still point at `kubernetes-api/v1.31` while the
-  distribution tracks **v1.36** (22 already updated). When you touch a class for any
-  reason, correct its link. A sweep of all of them is its own task — say so rather than
-  silently widening scope.
+- **Known drift:** 20 `=seealso` links still point at `kubernetes-api/v1.31` (or
+  v1.36 URLs whose upstream anker has moved since the class was written). The
+  v1.31 cases are special: most are v1alpha1/v1beta1/v1beta3 Kinds whose
+  upstream docs are no longer at the v1.36 path-segment, so they stay at v1.31
+  intentionally — verified case-by-case in commit `bfafbc7`. When you touch a
+  class for any other reason, correct its link if the upstream URL has moved.
+  A full sweep of all of them is its own task — say so rather than silently
+  widening scope.
 
 **2. The hand-written core** is where real prose belongs, and where `=method` blocks live:
 

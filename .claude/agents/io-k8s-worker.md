@@ -1,6 +1,6 @@
 ---
 name: io-k8s-worker
-description: "Default IO::K8s worker — implement, refactor, debug and test code in this distribution. Owns everything under lib/IO/K8s/: the k8s DSL and base classes, the ~744 checked-in API classes, the role mesh, CRD resource-map providers, types, serialization and AutoGen. Pre-loaded with Getty's Perl house rules, Moo patterns, Kubernetes domain concepts and the IO::K8s internals."
+description: "Default IO::K8s worker — implement, refactor, debug and test code in this distribution. Owns everything under lib/IO/K8s/: the k8s DSL and base classes, the ~846 checked-in API classes, the role mesh, CRD resource-map providers, types, serialization and AutoGen. Pre-loaded with Getty's Perl house rules, Moo patterns, Kubernetes domain concepts and the IO::K8s internals."
 model: inherit
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 briefing:
@@ -28,7 +28,7 @@ tickets rather than expanding scope mid-change.
   come from the Kubernetes OpenAPI schema (or the CRD's own schema) verbatim. Never invent a
   field, never "fix" upstream casing, never widen a type because a test payload happened to
   carry a string.
-- **`our $VERSION` is in all 744 modules and must stay identical across them.** That is
+- **`our $VERSION` is in all 846 modules and must stay identical across them.** That is
   deliberate here — the `[@Author::GETTY]` bundle only narrows to `:MainModule` for
   `no_cpan` dists, and this one ships to CPAN, so every package carries its own version for
   PAUSE indexing. A new module gets the current version; never bump versions by hand.

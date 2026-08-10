@@ -83,7 +83,7 @@ Every write publishes under the maintainer's account.
 - **`prove -l t/` is not recursive** and silently skips subdirectory tests, exiting 0. Use
   `dzil test` or `prove -lr t/` (~16s for the full suite). Reserve non-`-r` for a single
   named file.
-- **`our $VERSION` in all 744 modules is correct here** — do not "clean it up" to the main
+- **`our $VERSION` in all 846 modules is correct here** — do not "clean it up" to the main
   module only. The `[@Author::GETTY]` bundle narrows `version_finder` to `:MainModule` only
   for `no_cpan` dists; this one ships to CPAN, so every package needs its own version for
   PAUSE indexing. The trap: the usual house rule says the opposite, and a grep "confirms" it.
@@ -91,7 +91,7 @@ Every write publishes under the maintainer's account.
   no generator to re-run. `IO::K8s::AutoGen` builds classes in memory at runtime and only
   when the caller passed an `openapi_spec` — it never writes files and never fills a gap in
   the shipped surface.
-- **A mass edit across `lib/` hits 744 files at once.** Upstream API syncs legitimately work
+- **A mass edit across `lib/` hits 846 files at once.** Upstream API syncs legitimately work
   that way, but one wrong pattern lands everywhere and `t/02_compile_all.t` only proves the
   files still load. Always follow a sweep with the full suite plus
   `t/26_build_verify.t` / `t/25_real_world.t`, which check both serialization directions.

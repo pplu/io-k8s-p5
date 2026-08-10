@@ -13,7 +13,7 @@ Consumer-facing usage (`new_object`, `inflate`, `to_json`, short names) lives in
 
 ## There is no codegen step
 
-The ~744 classes under `lib/IO/K8s/` are **checked in and hand-maintained**. No generator
+The ~846 classes under `lib/IO/K8s/` are **checked in and hand-maintained**. No generator
 runs at build time — edit the `.pm` files directly, then `dzil test`.
 
 `IO::K8s::AutoGen` is the *runtime* fallback for types the distribution does not ship
@@ -123,7 +123,7 @@ a new *core* kind is not reachable by short name until it is listed there.
 ## Adding API surface — checklist
 
 1. Create the `.pm` under the right namespace; `# ABSTRACT:` line and `our $VERSION` matching
-   every other module (see the release skill — all 744 carry the same version, by design).
+   every other module (see the release skill — all 846 carry the same version, by design).
 2. Choose `IO::K8s::Resource` (embedded) or `IO::K8s::APIObject` (top-level).
 3. Declare every wire field with `k8s`, matching the upstream OpenAPI schema — types and
    required-ness verbatim, no invented fields, no guessed casing.
