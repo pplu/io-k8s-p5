@@ -1,0 +1,28 @@
+---
+claimed_at: 2026-08-10T01:15:19Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-10
+created: 2026-08-10T01:05:27Z
+id: 16
+priority: low
+started: 2026-08-10
+status: done
+tags:
+- docs
+- maintenance
+title: 'Doc drift: briefing claims, hard-coded module counts, Deprecated wording,
+  dead .gitignore line'
+updated: 2026-08-10T01:18:16Z
+---
+
+Four small documentation/config drifts found in the 2026-08-10 structure review, none behavior-breaking:
+
+1. .claude/rules/io-k8s-rules.md says perl-core, perl-moo, io-k8s-core and perl-release-author-getty are "force-loaded for io-k8s-* agents". Actual briefing.skills lists are deliberately per-lane: worker lacks perl-release-author-getty, test-writer lacks perl-moo, doc-writer lacks perl-core, release-checker lacks io-k8s-core. Fix the sentence (e.g. "force-loaded per lane, see .claude/agents/"), do not fatten the briefings.
+
+2. Hard-coded count "846" appears in io-k8s-rules.md, io-k8s-worker.md and CLAUDE.md; lib/ currently has 847 .pm files and the number moves with every upstream sync. Replace with "every module under lib/" / "~850" where the exact number is not the point. Also: the workspace-level dev/perl/CLAUDE.md (outside this repo) still says "~700 API and CRD classes" and needs the same treatment there.
+
+3. io-k8s-rules.md and io-k8s-worker.md phrase the removal protocol as "the old name goes into IO::K8s::Deprecated" — that is a SEPARATE CPAN distribution (see IO::K8s.pm POD), not a module in this repo. An agent following the current wording could plausibly create lib/IO/K8s/Deprecated.pm here. Clarify: "the redirect stub ships in the separate IO::K8s::Deprecated distribution".
+
+4. .gitignore line "!.claude/settings.local.json" is dead: it is overridden by the later ".claude/*.local.*" (last match wins), and the header comment correctly says local overrides stay ignored. Net effect is right; remove the dead negation line to stop it from misleading readers.
+All four drifts fixed, plus same-class finds during execution: (1) rules force-loaded sentence now says per-lane via briefing.skills; (2) hard counts replaced — 'every module' for identity claims (rules, worker, release-checker had ~846 too, io-k8s-core SKILL), '~850' for scale (worker desc, CLAUDE.md, io-k8s-core SKILL), stale '~600' dropped from doc-writer desc, workspace dev/perl/CLAUDE.md ~700 -> ~850; (3) Deprecated wording in rules + worker now states it is a separate CPAN distribution, not a module in this repo; (4) dead !.claude/settings.local.json negation removed from .gitignore — file remains ignored via .claude/*.local.* (verified with git check-ignore). All edited files have linkcount 1 (Edit-safe); the relinked perl-release-author-getty chain untouched (still 80/269840604). Nothing under lib/ or t/ touched; changes left uncommitted.
