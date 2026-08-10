@@ -24,7 +24,6 @@ From source:
 cpanm --installdeps .
 dzil build
 dzil test
-dzil install
 ```
 
 ## Usage
@@ -54,6 +53,43 @@ my $obj = $k8s->inflate({ kind => 'Pod', metadata => { name => 'test' } });
 my $json = $k8s->object_to_json($svc);
 my $struct = $k8s->object_to_struct($pod);
 ```
+
+### Multi-version dispatch
+
+`inflate()` resolves a `kind` to the right class by inspecting the
+incoming `apiVersion`. For Kubernetes Kinds that ship at more than one
+API version (e.g. `DeviceClass`, `ResourceClaim`,
+`ResourceClaimTemplate`, `ResourceSlice` under `resource.k8s.io` across
+`v1`, `v1beta1`, `v1beta2`), every shipped version is registered so a
+manifest is inflated as the schema version that produced it:
+
+```perl
+my $v1beta1 = $k8s->inflate({
+    apiVersion => 'resource.k8s.io/v1beta1',
+    kind       => 'DeviceClass',
+    metadata   => { name => 'gold' },
+    spec       => { selectors => [] },
+});
+# $v1beta1 is IO::K8s::Api::Resource::V1beta1::DeviceClass,
+# not IO::K8s::Api::Resource::V1::DeviceClass. Round-trip preserves
+# the apiVersion.
+
+my $ga = $k8s->inflate({
+    apiVersion => 'resource.k8s.io/v1',
+    kind       => 'DeviceClass',
+    metadata   => { name => 'silver' },
+    spec       => { selectors => [] },
+});
+# $ga is IO::K8s::Api::Resource::V1::DeviceClass (GA).
+```
+
+The wire `apiVersion` emitted by `TO_JSON` is derived from each
+class's package name via `IO::K8s::Role::APIObject` and an explicit
+group map covering the 15 groups whose CamelCase lc-form is not the
+upstream group name (e.g. `storagemigration` →
+`storagemigration.k8s.io`, `apiserverinternal` →
+`internal.apiserver.k8s.io`). Serialised manifests therefore carry the
+apiVersion a real cluster expects.
 
 ## Bundled CRD Providers
 
@@ -274,6 +310,44 @@ Or generate them dynamically from an OpenAPI schema using `IO::K8s::AutoGen`.
 
 See the full POD documentation for details on the class architecture and CRD support.
 
+## Removed classes
+
+Several class names that existed in the pre-1.000 series are no longer
+shipped. The list lives in `IO::K8s::Deprecated`'s POD (install it from
+CPAN — it provides a redirect message pointing at the modern
+replacement). Highlights:
+
+- The 76 `*List` classes (`PodList`, `ServiceList`, `DeploymentList`,
+  ...) have not been real classes since the 1.00 Moose-to-Moo rewrite.
+  Use `IO::K8s::List` to inflate any List-shaped payload.
+- Four namespaces held nothing but a `*List` stub and were removed
+  entirely in 1.105: `IO::K8s::ApiExtensionsApiServer`,
+  `IO::K8s::Api::Auditregistration`, `IO::K8s::Api::Extensions`,
+  `IO::K8s::Api::Settings`.
+
+The full old-name list and the redirect target for each is in
+`IO::K8s::Deprecated`.
+
+## Migration notes
+
+If you are upgrading from a pre-1.100 release:
+
+- **1.000 → 1.105 (2026-08-08):** Kubernetes core moved from v1.31 to
+  v1.36, the bundled CRD providers moved to their current upstream
+  versions (Cilium v1.20.0, K3s v1.36.3+k3s1, Traefik v3.7.10,
+  cert-manager v1.21.1, Gateway API v1.6.1, Agent Sandbox v0.5.4).
+  The 76 `*List` classes were removed; the four stub-only namespaces
+  above were dropped.
+- **1.105 → current:** `inflate()` now honours `apiVersion` for every
+  shipped multi-version Kind (karr #11). `api_version()` now produces
+  the correct wire `apiVersion` for `storagemigration.k8s.io` and
+  `internal.apiserver.k8s.io` (karr #13); before the fix, manifests
+  serialised for these two groups were rejected by the API server.
+
+Code that still references one of the 76 removed `*List` class names
+will fail to install; install `IO::K8s::Deprecated` from CPAN for a
+clear redirect message.
+
 ## Features
 
 - Support for Kubernetes v1.36 API objects
@@ -317,3 +391,8 @@ This code is distributed under the Apache 2 License. The full text of the licens
 
 - [Kubernetes::REST](https://metacpan.org/pod/Kubernetes::REST) - Kubernetes REST API client
 - [IO::K8s::Resource](https://metacpan.org/pod/IO::K8s::Resource) - Base class for all Kubernetes resources
+- [IO::K8s::APIObject](https://metacpan.org/pod/IO::K8s::APIObject) - The `k8s` DSL for declaring API classes
+- [IO::K8s::List](https://metacpan.org/pod/IO::K8s::List) - List-typed inflation (`PodList`, `ServiceList`, ...)
+- [IO::K8s::AutoGen](https://metacpan.org/pod/IO::K8s::AutoGen) - Generate classes at runtime from an OpenAPI schema
+- [IO::K8s::Deprecated](https://metacpan.org/pod/IO::K8s::Deprecated) - Redirects for class names removed in 1.000+
+- [IO::K8s::Types::Net](https://metacpan.org/pod/IO::K8s::Types::Net) - Net::IP-backed type constraints
