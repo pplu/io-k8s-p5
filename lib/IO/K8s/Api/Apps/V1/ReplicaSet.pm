@@ -33,7 +33,7 @@ Status is the most recently observed status of the ReplicaSet. This data may be 
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#replicaset-v1-apps>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#replicaset-v1-apps>
 
 
 =cut

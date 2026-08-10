@@ -33,7 +33,7 @@ status is the current status of the scale. More info: https://git.k8s.io/communi
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#scale-v1-autoscaling.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#scale-v1-autoscaling.k8s.io>
 
 
 =cut

@@ -33,7 +33,7 @@ Status is the current status of Pods in this StatefulSet. This data may be out o
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#statefulset-v1-apps>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#statefulset-v1-apps>
 
 
 =cut

@@ -24,7 +24,7 @@ Spec defines the limits enforced. More info: https://git.k8s.io/community/contri
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#limitrange-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#limitrange-v1-core>
 
 
 =cut

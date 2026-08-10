@@ -23,7 +23,7 @@ Webhooks is a list of webhooks and the affected resources and operations.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#mutatingwebhookconfiguration-v1-admissionregistration.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#mutatingwebhookconfiguration-v1-admissionregistration.k8s.io>
 
 
 =cut

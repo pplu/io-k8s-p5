@@ -27,7 +27,7 @@ Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#validatingadmissionpolicybinding-v1-admissionregistration.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#validatingadmissionpolicybinding-v1-admissionregistration.k8s.io>
 
 
 =cut

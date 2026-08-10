@@ -34,7 +34,7 @@ status represents status of the VolumeAttachment request. Populated by the entit
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#volumeattachment-v1-storage.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#volumeattachment-v1-storage.k8s.io>
 
 
 =cut

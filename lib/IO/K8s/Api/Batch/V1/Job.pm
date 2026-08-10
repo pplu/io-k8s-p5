@@ -33,7 +33,7 @@ Current status of a job. More info: https://git.k8s.io/community/contributors/de
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#job-v1-batch>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#job-v1-batch>
 
 
 =cut

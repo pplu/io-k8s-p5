@@ -33,7 +33,7 @@ The current status of this daemon set. This data may be out of date by some wind
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#daemonset-v1-apps>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#daemonset-v1-apps>
 
 
 =cut

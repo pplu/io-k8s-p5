@@ -30,7 +30,7 @@ Status is the most recently observed status of the replication controller. This 
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#replicationcontroller-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#replicationcontroller-v1-core>
 
 =cut
 1;

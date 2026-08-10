@@ -33,7 +33,7 @@ Most recently observed status of the PodDisruptionBudget.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#poddisruptionbudget-v1-policy.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#poddisruptionbudget-v1-policy.k8s.io>
 
 
 =cut

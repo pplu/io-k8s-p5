@@ -50,7 +50,7 @@ value represents the integer value of this priority class. This is the actual pr
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#priorityclass-v1-scheduling.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#priorityclass-v1-scheduling.k8s.io>
 
 
 =cut

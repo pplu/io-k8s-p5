@@ -79,7 +79,7 @@ volumeBindingMode indicates how PersistentVolumeClaims should be provisioned and
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#storageclass-v1-storage.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#storageclass-v1-storage.k8s.io>
 
 
 =cut

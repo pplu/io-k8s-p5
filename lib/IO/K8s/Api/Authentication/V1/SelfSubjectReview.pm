@@ -23,7 +23,7 @@ Status is filled in by the server with the user attributes.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#selfsubjectreview-v1-authentication.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#selfsubjectreview-v1-authentication.k8s.io>
 
 
 =cut

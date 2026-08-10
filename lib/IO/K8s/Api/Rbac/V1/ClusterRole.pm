@@ -32,7 +32,7 @@ Rules holds all the PolicyRules for this ClusterRole
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#clusterrole-v1-rbac.authorization.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#clusterrole-v1-rbac.authorization.k8s.io>
 
 
 =cut

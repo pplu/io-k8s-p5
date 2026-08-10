@@ -23,7 +23,7 @@ spec represents the specification of the CSI Driver.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#csidriver-v1-storage.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#csidriver-v1-storage.k8s.io>
 
 
 =cut

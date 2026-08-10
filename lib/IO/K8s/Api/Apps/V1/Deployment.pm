@@ -31,7 +31,7 @@ Most recently observed status of the Deployment.
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#deployment-v1-apps>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#deployment-v1-apps>
 
 =cut
 

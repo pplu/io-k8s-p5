@@ -141,7 +141,7 @@ Type of this event (Normal, Warning), new types could be added in the future
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#event-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#event-v1-core>
 
 
 =cut

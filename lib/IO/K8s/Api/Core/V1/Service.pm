@@ -34,7 +34,7 @@ Most recently observed status of the service. Populated by the system. Read-only
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#service-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#service-v1-core>
 
 
 =cut

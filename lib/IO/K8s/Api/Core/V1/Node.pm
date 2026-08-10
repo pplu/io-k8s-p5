@@ -32,7 +32,7 @@ Most recently observed status of the node. Populated by the system. Read-only. M
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#node-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#node-v1-core>
 
 
 =cut

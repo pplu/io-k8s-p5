@@ -32,7 +32,7 @@ Status is filled in by the server and indicates whether the request can be authe
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#tokenreview-v1-authentication.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#tokenreview-v1-authentication.k8s.io>
 
 
 =cut

@@ -141,7 +141,7 @@ type is the type of this event (Normal, Warning), new types could be added in th
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#event-v1-events.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#event-v1-events.k8s.io>
 
 
 =cut

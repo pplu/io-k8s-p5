@@ -24,7 +24,7 @@ spec contains the specification of the Lease. More info: https://git.k8s.io/comm
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#lease-v1-coordination.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#lease-v1-coordination.k8s.io>
 
 
 =cut

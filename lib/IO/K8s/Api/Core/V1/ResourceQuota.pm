@@ -30,7 +30,7 @@ Status defines the actual enforced quota and its current usage. https://git.k8s.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/#resourcequota-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#resourcequota-v1-core>
 
 =cut
 1;
