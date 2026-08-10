@@ -83,7 +83,7 @@ Every write publishes under the maintainer's account.
 - **`prove -l t/` is not recursive** and silently skips subdirectory tests, exiting 0. Use
   `dzil test` or `prove -lr t/` (~16s for the full suite). Reserve non-`-r` for a single
   named file.
-- **`our $VERSION` in all 846 modules is correct here** — do not "clean it up" to the main
+- **`our $VERSION` in every module is correct here** — do not "clean it up" to the main
   module only. The `[@Author::GETTY]` bundle narrows `version_finder` to `:MainModule` only
   for `no_cpan` dists; this one ships to CPAN, so every package needs its own version for
   PAUSE indexing. The trap: the usual house rule says the opposite, and a grep "confirms" it.
@@ -91,16 +91,18 @@ Every write publishes under the maintainer's account.
   no generator to re-run. `IO::K8s::AutoGen` builds classes in memory at runtime and only
   when the caller passed an `openapi_spec` — it never writes files and never fills a gap in
   the shipped surface.
-- **A mass edit across `lib/` hits 846 files at once.** Upstream API syncs legitimately work
+- **A mass edit across `lib/` hits ~850 files at once.** Upstream API syncs legitimately work
   that way, but one wrong pattern lands everywhere and `t/02_compile_all.t` only proves the
   files still load. Always follow a sweep with the full suite plus
   `t/26_build_verify.t` / `t/25_real_world.t`, which check both serialization directions.
-- **Removing public API is a breaking change with a protocol**: the old name goes into
-  `IO::K8s::Deprecated` with a redirect, and `Changes` states the changed failure mode. See
-  the 1.105 `*List` removal.
+- **Removing public API is a breaking change with a protocol**: the old name gets a
+  redirect stub in the separate `IO::K8s::Deprecated` distribution (its own CPAN dist, not
+  a module in this repo), and `Changes` states the changed failure mode. See the 1.105
+  `*List` removal.
 
 ## Perl conventions — reference, don't restate
 
 Module loading, Moo patterns, dependency pinning and house style live in skills `perl-core`,
-`perl-moo`, `io-k8s-core` and `perl-release-author-getty` (force-loaded for `io-k8s-*`
-agents). Do not duplicate that content here.
+`perl-moo`, `io-k8s-core` and `perl-release-author-getty` (force-loaded per lane via
+`briefing.skills` — `.claude/agents/` defines which agent briefs which). Do not duplicate
+that content here.

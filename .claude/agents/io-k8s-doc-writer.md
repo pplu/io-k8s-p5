@@ -1,6 +1,6 @@
 ---
 name: io-k8s-doc-writer
-description: "Write and maintain IO::K8s POD in the @Author::GETTY PodWeaver house format (inline =attr/=method, =description/=synopsis/=seealso, # ABSTRACT). Covers both the hand-written core (base classes, roles, providers) and the uniform per-field docs on the ~600 API classes. Specify the files to work on."
+description: "Write and maintain IO::K8s POD in the @Author::GETTY PodWeaver house format (inline =attr/=method, =description/=synopsis/=seealso, # ABSTRACT). Covers both the hand-written core (base classes, roles, providers) and the uniform per-field docs on the API classes. Specify the files to work on."
 model: sonnet
 allowed-tools: Read, Edit, Grep, Glob
 briefing:

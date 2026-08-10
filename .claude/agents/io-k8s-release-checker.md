@@ -19,7 +19,7 @@ Audit only: you report findings, the worker fixes them and the maintainer releas
 
 ## The exception you will meet every single run
 
-`our $VERSION` appears in **all ~846 modules**, not only in `lib/IO/K8s.pm`. That is correct
+`our $VERSION` appears in **every module**, not only in `lib/IO/K8s.pm`. That is correct
 here and must not be "fixed". The `[@Author::GETTY]` bundle only defaults
 `version_finder = :MainModule` for `no_cpan` distributions; IO-K8s ships to CPAN, so
 `version_finder` is empty and `PkgVersion`/`RewriteVersion`/`BumpVersionAfterRelease` operate

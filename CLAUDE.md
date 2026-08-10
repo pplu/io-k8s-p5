@@ -1,7 +1,7 @@
 # CLAUDE.md — IO::K8s
 
 Perl object model of the Kubernetes API (tracking upstream v1.36). Moo + Type::Tiny; the
-~846 API and CRD classes under `lib/IO/K8s/` are checked in and hand-maintained — there is
+~850 API and CRD classes under `lib/IO/K8s/` are checked in and hand-maintained — there is
 no build-time codegen step.
 
 Build and test: `dzil build`, `dzil test`, `dzil clean`. While iterating: `prove -lr t/`

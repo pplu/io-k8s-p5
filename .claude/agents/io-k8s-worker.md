@@ -1,6 +1,6 @@
 ---
 name: io-k8s-worker
-description: "Default IO::K8s worker — implement, refactor, debug and test code in this distribution. Owns everything under lib/IO/K8s/: the k8s DSL and base classes, the ~846 checked-in API classes, the role mesh, CRD resource-map providers, types, serialization and AutoGen. Pre-loaded with Getty's Perl house rules, Moo patterns, Kubernetes domain concepts and the IO::K8s internals."
+description: "Default IO::K8s worker — implement, refactor, debug and test code in this distribution. Owns everything under lib/IO/K8s/: the k8s DSL and base classes, the ~850 checked-in API classes, the role mesh, CRD resource-map providers, types, serialization and AutoGen. Pre-loaded with Getty's Perl house rules, Moo patterns, Kubernetes domain concepts and the IO::K8s internals."
 model: inherit
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 briefing:
@@ -28,7 +28,7 @@ tickets rather than expanding scope mid-change.
   come from the Kubernetes OpenAPI schema (or the CRD's own schema) verbatim. Never invent a
   field, never "fix" upstream casing, never widen a type because a test payload happened to
   carry a string.
-- **`our $VERSION` is in all 846 modules and must stay identical across them.** That is
+- **`our $VERSION` is in every module and must stay identical across them.** That is
   deliberate here — the `[@Author::GETTY]` bundle only narrows to `:MainModule` for
   `no_cpan` dists, and this one ships to CPAN, so every package carries its own version for
   PAUSE indexing. A new module gets the current version; never bump versions by hand.
@@ -36,9 +36,10 @@ tickets rather than expanding scope mid-change.
 - **This is a shared repo** (`github.com/pplu/io-k8s-p5`, authority `cpan:JLMARTIN`).
   Getty is a co-maintainer, not the sole owner. Removing or renaming public API is a
   coordination decision, not a cleanup — surface it, don't do it unasked.
-- **Removals need a deprecation path**: the name goes into `IO::K8s::Deprecated` with a
-  redirect message and `Changes` states the changed failure mode. See the 1.105 `*List`
-  removal as the worked example.
+- **Removals need a deprecation path**: the redirect stub ships in the separate
+  `IO::K8s::Deprecated` distribution (its own CPAN dist, not a module in this repo) and
+  `Changes` states the changed failure mode. See the 1.105 `*List` removal as the worked
+  example.
 - User-facing change → a bullet under `{{$NEXT}}` in `Changes`.
 
 ## Verification
