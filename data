@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-08-10T04:25:34Z
+claimed_by: codex-root
+class: standard
+completed: 2026-08-10
+created: 2026-08-10T04:25:19Z
+id: 20
+priority: medium
+started: 2026-08-10
+status: done
+tags:
+- docs
+- planning
+- dispatch
+title: Design exact GVK dispatch and compatibility completion
+updated: 2026-08-10T04:26:17Z
+---
+
+Document the approved contract: exact official GVKs are authoritative, historical bare Kind aliases remain compatible, explicit unknown GVKs fail closed, and the current dirty tree is split into focused ticket commits. Review the spec independently before implementation planning.
+Spec independently reviewed and approved after three review rounds. Committed as 721470b.
