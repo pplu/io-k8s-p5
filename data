@@ -1,0 +1,19 @@
+---
+claimed_at: 2026-08-10T01:13:58Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-10
+created: 2026-08-10T01:04:57Z
+id: 14
+priority: low
+started: 2026-08-10
+status: done
+tags:
+- maintenance
+- git
+title: Remove three stale agent worktrees under .claude/worktrees/
+updated: 2026-08-10T01:14:27Z
+---
+
+Three leftover agent worktrees exist: agent-a02b56ad7819c8e88 (dirty: Changes, lib/IO/K8s/Role/APIObject.pm, t/33, untracked t/39_api_group_short_form.t), agent-a336f8e8319e39b7f and agent-a4b4eed353baa7c86 (clean). Verified 2026-08-10: all content is patch-equivalent in master (git cherry shows "-" for both branch commits; the dirty files in a02b match master byte-for-byte, t/39 there == t/41 on master). Safe to run: git worktree remove --force for each, then git branch -D worktree-agent-a02b56ad7819c8e88 worktree-agent-a336f8e8319e39b7f worktree-agent-a4b4eed353baa7c86. Re-verify git cherry before deleting in case master moved.
+Removed all three worktrees (a02b forced, dirty files verified byte-identical to master pre-removal; git cherry re-checked clean at master 94d699e) and deleted the three worktree-agent-* branches. Empty .claude/worktrees/ removed. git worktree list shows only the main checkout.
