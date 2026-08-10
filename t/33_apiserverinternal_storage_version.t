@@ -31,8 +31,12 @@ my $STATUS = 'IO::K8s::Api::Apiserverinternal::V1alpha1::StorageVersionStatus';
 my $COND   = 'IO::K8s::Api::Apiserverinternal::V1alpha1::StorageVersionCondition';
 my $SERVER = 'IO::K8s::Api::Apiserverinternal::V1alpha1::ServerStorageVersion';
 
-# Upstream normalises apiVersion to the short form on serialisation.
-my $API_VERSION = 'apiserverinternal/v1alpha1';
+# Upstream wire apiVersion for this group. The class derives this from its
+# own package name via %API_GROUP_MAP (see IO::K8s::Role::APIObject); if
+# the map is missing an entry, TO_JSON emits a syntactically plausible
+# but rejected-by-the-API-server string instead. Regression coverage for
+# the map lives in t/39_api_group_short_form.t.
+my $API_VERSION = 'internal.apiserver.k8s.io/v1alpha1';
 
 subtest 'StorageVersionSpec class is shipped and loadable' => sub {
     ok( eval { $k8s->load_class($SPEC); 1 }, 'StorageVersionSpec loads without dying' );

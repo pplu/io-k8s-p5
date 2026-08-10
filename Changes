@@ -19,6 +19,22 @@ Revision history for IO-K8s
     '$apiVersion/$Kind' keys for every default entry so the apiVersion
     dispatch path treats shipped Kinds the same way it already treated
     externally merged ones. See karr #11.
+  - Fixed api_version() in IO::K8s::Role::APIObject for the
+    Storagemigration and Apiserverinternal groups. The fallback
+    `lc($group) . '/' . $version` only produces the correct wire
+    apiVersion for groups whose CamelCase lc-form equals the upstream
+    group name (apps, batch, autoscaling, policy) -- for groups whose
+    upstream name has a `.k8s.io` suffix, it produced a syntactically
+    plausible but rejected-by-the-API-server string. In particular,
+    every serialised StorageVersionMigration manifested as
+    `apiVersion: storagemigration/v1beta1` (upstream:
+    `storagemigration.k8s.io/v1beta1`) and every StorageVersion as
+    `apiVersion: apiserverinternal/v1alpha1` (upstream:
+    `internal.apiserver.k8s.io/v1alpha1`). Both groups are now in
+    %API_GROUP_MAP, alongside the 13 already-mapped groups. The other
+    18 groups covered by %_class_prefix were audited and verified to
+    either already map correctly or to fall through to the lc-fallback
+    correctly (the upstream group name equals the lc form).
   - Fixed _expand_class in IO::K8s::Resource to handle CamelCase prefixes
     (KubeAggregator, AdmissionRegistration, ...). The single-word
     `[A-Z][a-z]+` regex could not match a prefix that has an internal

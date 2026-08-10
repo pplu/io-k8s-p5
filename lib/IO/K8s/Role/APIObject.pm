@@ -32,6 +32,8 @@ my %API_GROUP_MAP = (
     discovery             => 'discovery.k8s.io',
     flowcontrol           => 'flowcontrol.apiserver.k8s.io',
     resource              => 'resource.k8s.io',
+    apiserverinternal     => 'internal.apiserver.k8s.io',
+    storagemigration      => 'storagemigration.k8s.io',
 );
 
 # Derive apiVersion from class name
