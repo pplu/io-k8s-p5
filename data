@@ -1,0 +1,19 @@
+---
+claimed_at: 2026-08-10T01:14:48Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-10
+created: 2026-08-10T01:05:10Z
+id: 15
+priority: medium
+started: 2026-08-10
+status: done
+tags:
+- maintenance
+- skills
+title: Relink perl-release-author-getty SKILL.md to the shared hardlink chain
+updated: 2026-08-10T01:15:13Z
+---
+
+The .claude/skills/perl-release-author-getty/SKILL.md in this repo is detached from the manage-skills hardlink chain: linkcount 1, inode 273842369, while the shared chain (dev/perl/shared-skills + dev/perl/.claude/skills and ~77 more links) sits on inode 269840604 with linkcount 79. Content is currently byte-identical (verified 2026-08-10), so this is the harmless missed-link case from manage-skills-drift-triage — but every future edit on either side now drifts silently. Fix: relink per manage-skills (e.g. manage-skills sync, or ln -f from the shared copy), then confirm with stat -c "%h %i" that the inode matches the chain. Likely cause: the skill was rewritten with Edit/Write during the karr #2/#3 worktree work (commit d87e761 "Document additional [@Author::GETTY] dist.ini options in the bundled skill") instead of via shell redirect.
+Re-verified content identical to the chain, then manage-skills sync relinked it: inode now 269840604, linkcount 80 (chain grew from 79 as expected). manage-skills check reports 8/8 linked, git sees no content change.
