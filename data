@@ -1,0 +1,17 @@
+---
+class: standard
+completed: 2026-08-10
+created: 2026-08-10T04:31:13Z
+id: 27
+priority: medium
+started: 2026-08-10
+status: done
+tags:
+- planning
+- dispatch
+title: Plan exact GVK compatibility completion
+updated: 2026-08-10T14:52:09Z
+---
+
+Write and independently review the implementation plan for Karr #17-#19 and the follow-up correctness, packaging, documentation, and Changes tickets. Preserve the dirty-tree path ownership and TDD commit boundaries.
+Plan committed as db12c2e after three independent chunk reviews approved; implementation is now unblocked.
