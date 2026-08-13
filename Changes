@@ -2,6 +2,17 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Make the k8s attribute lookups class_namespaces-aware via @ISA.
+    _k8s_attr_info and _k8s_attributes in IO::K8s::Role::Resource now walk
+    the inheritance chain, so a consumer subclass registered through
+    class_namespaces (e.g. `use parent 'IO::K8s::Api::Core::V1::Pod'`)
+    inflates with typed fields and serializes its parents' attributes
+    instead of seeing an empty registry. Attribute info merges nearest-wins
+    (a class's own declaration overrides an inherited one, in deterministic
+    @ISA order); the attribute list is a deduplicated union of own and
+    inherited declarations. Both merged views are cached per class and
+    invalidated when a new k8s attribute is registered.
+
   - Made AutoGen dispatch apiVersion-aware and deterministic.
     expand_class()/inflate() with an explicit apiVersion now fall through to
     the openapi_spec AutoGen lookup when the resource map has no qualified

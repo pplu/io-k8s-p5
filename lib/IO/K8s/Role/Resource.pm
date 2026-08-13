@@ -16,19 +16,81 @@ sub _build_json {
     return JSON::MaybeXS->new(utf8 => 1, canonical => 1);
 }
 
-# Get attribute info from the global registry in IO::K8s::Resource
+# The registry lookup is the hot path (every inflate / TO_JSON), so the
+# merged views are cached per class. IO::K8s::Resource::_k8s() invalidates
+# the affected entries whenever it registers a new attribute.
+my %_attr_info_cache;
+my %_attributes_cache;
+
+# Get merged attribute info from the global registry in IO::K8s::Resource,
+# walking @ISA so a consumer subclass registered via class_namespaces sees
+# its parents' attributes. Nearest wins: a class's own entry for a name
+# beats any inherited one; @ISA order (depth-first, left to right) is
+# deterministic, so diamond shapes resolve to the first declarer.
 sub _k8s_attr_info {
     my ($class) = @_;
     $class = ref($class) if ref($class);
-    return $IO::K8s::Resource::_attr_registry{$class} // {};
+    return $_attr_info_cache{$class} //= _merged_attr_info($class);
 }
 
-# Get attribute list (stored as per-class package variable)
+sub _merged_attr_info {
+    my ($class) = @_;
+    my %info = %{ $IO::K8s::Resource::_attr_registry{$class} // {} };
+    no strict 'refs';
+    for my $parent (@{"${class}::ISA"}) {
+        my $parent_info = _merged_attr_info($parent);
+        for my $attr (keys %$parent_info) {
+            $info{$attr} //= $parent_info->{$attr};
+        }
+    }
+    return \%info;
+}
+
+# Get attribute list (stored as per-class package variables), merged with
+# ancestors as a UNION: a class's own declarations first, then each parent's
+# in @ISA order, deduplicated so an overridden name appears once.
 sub _k8s_attributes {
     my ($self) = @_;
     my $class = ref($self) || $self;
+    return $_attributes_cache{$class} //= _collect_attributes($class);
+}
+
+sub _collect_attributes {
+    my ($class) = @_;
+    my (@attrs, %seen);
+    _append_attributes($class, \@attrs, \%seen);
+    return \@attrs;
+}
+
+sub _append_attributes {
+    my ($class, $attrs, $seen) = @_;
     no strict 'refs';
-    return \@{"${class}::_k8s_attributes"};
+    for my $attr (@{"${class}::_k8s_attributes"}) {
+        next if $seen->{$attr}++;
+        push @$attrs, $attr;
+    }
+    for my $parent (@{"${class}::ISA"}) {
+        _append_attributes($parent, $attrs, $seen);
+    }
+}
+
+# Invalidate the merged-view caches for a class and every cached descendant
+# after IO::K8s::Resource::_k8s() registers a new attribute. The direct hit
+# covers the registering class; the descendant sweep covers a class whose
+# merged view was already computed before its parent gained the attribute
+# (the same subclass drift this module exists to fix).
+sub _invalidate_k8s_attr_cache {
+    my ($class) = @_;
+    delete $_attr_info_cache{$class};
+    delete $_attributes_cache{$class};
+    my %sweep;
+    @sweep{keys %_attr_info_cache, keys %_attributes_cache} = ();
+    for my $cached_class (keys %sweep) {
+        next if $cached_class eq $class;
+        next unless $cached_class->isa($class);
+        delete $_attr_info_cache{$cached_class};
+        delete $_attributes_cache{$cached_class};
+    }
 }
 
 sub TO_JSON {

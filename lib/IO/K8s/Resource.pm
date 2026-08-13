@@ -8,6 +8,7 @@ use Import::Into;
 use Package::Stash;
 use Types::Standard qw( ArrayRef Bool HashRef InstanceOf Int Maybe Str );
 use IO::K8s::Types qw( IntOrStr Quantity Time );
+use IO::K8s::Role::Resource ();
 use Scalar::Util qw(blessed);
 
 # Registry: class -> attr -> { type, class, is_array, is_hash, is_bool, is_int }
@@ -222,6 +223,10 @@ sub _k8s {
     $_attr_registry{$caller}{$attr_name} = { %info };
     no strict 'refs';
     push @{"${caller}::_k8s_attributes"}, $attr_name;
+
+    # The merged @ISA views in IO::K8s::Role::Resource are cached; a new
+    # registration must not leave a stale merged view behind.
+    IO::K8s::Role::Resource::_invalidate_k8s_attr_cache($caller);
 
     # Only create the attribute if it doesn't already exist (e.g., from a role)
     return if $caller->can($attr_name);
