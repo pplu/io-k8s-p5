@@ -1,0 +1,17 @@
+---
+class: standard
+completed: 2026-08-13T02:14:21Z
+created: 2026-08-10T04:30:34Z
+id: 23
+priority: high
+started: 2026-08-13T02:14:21Z
+status: done
+tags:
+- autogen
+- dispatch
+title: Make AutoGen dispatch apiVersion-aware and deterministic
+updated: 2026-08-13T02:14:21Z
+---
+
+Pass explicit apiVersion through AutoGen lookup, select exact GVK metadata deterministically, fail on exact ambiguities, and make generated cache/package identity GVK-specific. Preserve a deterministic versionless compatibility fallback. Add red/green tests and Changes.
+Resolved in 7fd54d8. expand_class/inflate fall through to AutoGen only for an exact GVK match (fail closed otherwise); _find_definition_for_kind is deterministic (sorted versionless, exact filter + croak on ambiguity); AutoGen _select_gvk_entry picks exact api_version or sorted-first, GVK-specific package identity for multi-GVK definitions (no half-generated cache stub on croak). t/45_autogen_dispatch.t: 10 subtests, red first (9/10), non-determinism reproduced across 8 PERL_HASH_SEED values pre-fix, sorted-first under all seeds post-fix. Full suite PASS (48 files, 3915 tests). Follow-up: AutoGen POD get_or_generate does not document the api_version opt (doc-writer lane).
