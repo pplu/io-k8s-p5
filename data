@@ -1,0 +1,48 @@
+---
+claimed_at: 2026-08-10T15:32:39Z
+claimed_by: codex-root
+class: standard
+completed: 2026-08-13T01:50:30Z
+created: 2026-08-10T03:03:37Z
+id: 17
+priority: medium
+started: 2026-08-10
+status: done
+tags:
+- dispatch
+- resource-map
+title: inflate() resolves Event and HorizontalPodAutoscaler to the wrong class for
+  two apiVersions
+updated: 2026-08-13T01:50:30Z
+---
+
+Found while fixing the karr #11 follow-ups (static %DEFAULT_RESOURCE_MAP + class_namespaces in the qualified branch). Deliberately NOT fixed there, because both were flagged as pre-existing intentional decisions.
+
+Both Kinds ship a class for a second api_version that has no qualified key in %DEFAULT_RESOURCE_MAP, so inflate() silently hands back the wrong schema version:
+
+  events.k8s.io/v1        Event                   -> IO::K8s::Api::Core::V1::Event
+                                                     (shipped: IO::K8s::Api::Events::V1::Event)
+  autoscaling/v1          HorizontalPodAutoscaler -> IO::K8s::Api::Autoscaling::V2::HorizontalPodAutoscaler
+                                                     (shipped: IO::K8s::Api::Autoscaling::V1::HorizontalPodAutoscaler)
+
+The HPA one has teeth: autoscaling/v1 HPAs are common, and v1 spec carries
+targetCPUUtilizationPercentage, which the V2 class does not declare -- so a real
+autoscaling/v1 payload either loses that field or fails the constructor.
+
+The decision to make is only about the QUALIFIED keys. Adding
+
+  \x27events.k8s.io/v1/Event\x27                 => \x27Api::Events::V1::Event\x27,
+  \x27autoscaling/v1/HorizontalPodAutoscaler\x27 => \x27Api::Autoscaling::V1::HorizontalPodAutoscaler\x27,
+
+leaves both SHORT names exactly where they are (Event -> Core::V1, HPA -> V2), which
+is the part that was called a settled decision. It only changes what
+inflate()/expand_class($kind, $api_version) return when the caller explicitly
+names that apiVersion.
+
+Counter-argument for leaving it: it is a behaviour change for two widely used
+Kinds in a release that already changes dispatch, and someone may be relying on
+"an autoscaling/v1 HPA comes back as the V2 class".
+
+Every other shipped core Kind now has a qualified key for every shipped version;
+these two are the only remaining exceptions.
+Resolved in 853a4c0: added events.k8s.io/v1/Event and autoscaling/v1/HorizontalPodAutoscaler qualified routes, bare-name defaults preserved (Core v1 Event, Autoscaling v2 HPA). Covered by t/43_spec_kind_dispatch.t (98 GVKs, all 14 collisions).
