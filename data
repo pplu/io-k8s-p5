@@ -1,0 +1,17 @@
+---
+class: standard
+completed: 2026-08-13T02:53:51Z
+created: 2026-08-13T02:47:45Z
+id: 28
+priority: low
+started: 2026-08-13T02:53:51Z
+status: done
+tags:
+- architecture
+- registry
+title: Design a complete k8s registry contract
+updated: 2026-08-13T02:53:51Z
+---
+
+Follow-up to #26 (tracking). Requiredness and some complex Type::Tiny array element metadata live OUTSIDE the k8s attribute registry, so tests must inspect Moo internals (e.g. t/42, t/45 look at generated attribute type constraints) instead of the registry. Goal of the future work: design a complete registry contract that carries required/optional and element-level type metadata per attribute, so tests and tooling can read everything from the registry. Deliberately NOT part of the exact-GVK completion batch (#22/#23/#18).
+Design delivered as docs/registry-contract.md: specifies the required and element_type registry fields, the migration path (additive, non-breaking) and the consumers (t/42, compare_to_schema). Implementation stays future work per the ticket; the document is the contract design it asked for.
