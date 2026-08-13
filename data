@@ -1,0 +1,17 @@
+---
+class: standard
+completed: 2026-08-13T01:58:10Z
+created: 2026-08-10T04:30:54Z
+id: 25
+priority: medium
+started: 2026-08-13T01:58:10Z
+status: done
+tags:
+- docs
+- security
+title: Document that pk8s manifests require trusted input
+updated: 2026-08-13T01:58:10Z
+---
+
+The pk8s loader evals Perl code in-process. Add explicit trust-boundary warnings to public POD and README while keeping load_yaml documented as the data-only path. Update Changes.
+Resolved in 8133e95: trust-boundary warning added to IO::K8s::load POD (B<Trust boundary:> note), README pk8s DSL section note pointing at load_yaml as the data-only path, Changes bullet under {{NEXT}}. No code change -- docs only.
