@@ -229,8 +229,8 @@ subtest 'per-instance isolation: add() does not share state between instances' =
     my $k1 = IO::K8s->new;
     my $k2 = IO::K8s->new;
 
-    # Both instances get a default copy of the built-in qualified keys
-    # via BUILD/_qualify_defaults - that's the karr #11 fix and must
+    # Both instances get a default copy of the literal qualified entries
+    # in %DEFAULT_RESOURCE_MAP - that's the karr #11 mechanism and must
     # hold for every instance, not just the first one.
     ok( exists $k1->resource_map->{'v1/Pod'},
         'k1 has the built-in v1/Pod qualified key' );
