@@ -40,3 +40,7 @@ spec/
 *~
 *.swp
 *.bak
+
+# karr materialized task view -- never commit
+tasks/
+config.yml
