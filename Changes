@@ -2,6 +2,15 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Fix IO::K8s::List::api_version for empty lists with an item_class.
+    The local class-name regex derived shortened, invalid wire versions
+    for groups with a ".k8s.io" suffix (rbac/v1, storage/v1, events/v1)
+    and serialised them into manifests. The wire version is now derived
+    from the item_class's own api_version class method, which knows the
+    full group (rbac.authorization.k8s.io/v1, storage.k8s.io/v1,
+    events.k8s.io/v1); unloadable or non-API item_classes yield undef and
+    serialised empty lists omit apiVersion again.
+
   - Document that .pk8s manifests are Perl code executed in-process via
     eval and therefore must only be loaded from trusted sources, with
     load_yaml documented as the data-only path without code execution.

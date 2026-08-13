@@ -3,6 +3,7 @@ package IO::K8s::List;
 our $VERSION = '1.106';
 use v5.10;
 use Moo;
+use Module::Runtime qw(require_module);
 use Types::Standard qw( ArrayRef InstanceOf Maybe Str );
 use JSON::MaybeXS ();
 use Scalar::Util qw(blessed);
@@ -68,20 +69,24 @@ the first item. Used for empty lists where the type can't be inferred.
 =cut
 
 sub api_version {
-    my $self = shift;
+    my ($self) = @_;
 
     # Try to get from first item
     if (@{$self->items} && blessed($self->items->[0]) && $self->items->[0]->can('api_version')) {
         return $self->items->[0]->api_version;
     }
 
-    # Fall back to deriving from item_class
+    # Fall back to the item_class's own api_version class method, which
+    # knows the full wire group (rbac.authorization.k8s.io, storage.k8s.io,
+    # apiextensions.k8s.io, ...). undef unless the class loads, has an
+    # api_version method and answers without error.
     if (my $class = $self->_item_class) {
-        if ($class =~ /^IO::K8s::Api::(\w+)::(\w+)::/) {
-            my ($group, $version) = ($1, $2);
-            $version = lc($version);
-            return $group eq 'Core' ? $version : lc($group) . '/' . $version;
-        }
+        eval { require_module($class) };
+        return undef if $@;
+        return undef unless $class->can('api_version');
+        my $api_version = eval { $class->api_version };
+        return undef if $@;
+        return $api_version;
     }
 
     return undef;
