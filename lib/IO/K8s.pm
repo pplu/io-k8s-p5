@@ -3,9 +3,11 @@ package IO::K8s;
 
 use v5.10;
 use Moo;
+use Carp qw(croak);
 use Module::Runtime qw(require_module);
 use JSON::MaybeXS;
 use Scalar::Util ();
+use IO::K8s::AutoGen;
 use namespace::clean;
 
 our $VERSION = '1.106';
@@ -417,12 +419,18 @@ sub expand_class {
 
     # An explicitly supplied apiVersion is an exact GVK request, including
     # undef or an empty string. It must never fall through to a bare Kind or
-    # class-name fallback. Exact AutoGen lookup is added separately.
+    # class-name fallback. AutoGen joins in only for an exact group/version
+    # match in the openapi_spec's x-kubernetes-group-version-kind metadata
+    # and fails closed otherwise (no silent fallback to another version).
     if ($api_version_supplied) {
         return undef unless defined $api_version;
         my $qualified = "$api_version/$class";
         if (exists $map->{$qualified}) {
             return $self->_resolve_mapped($map->{$qualified}, $class);
+        }
+        if (ref($self) && $self->has_openapi_spec) {
+            my $autogen = $self->_autogen_class_for($class, $api_version);
+            return $autogen if $autogen;
         }
         return undef;
     }
@@ -522,8 +530,17 @@ sub _class_exists {
 }
 
 # Auto-generate a class from OpenAPI spec for unknown type
+#
+# $api_version is optional. When given, this is an exact GVK request: the
+# definition must carry a matching x-kubernetes-group-version-kind entry
+# (handled by _find_definition_for_kind) and the generated class gets that
+# apiVersion. When omitted, the versionless compatibility fallback picks a
+# deterministic default definition and version.
+#
+# The cache key is GVK-specific so the same definition requested under two
+# apiVersions (a definition with several GVK entries) yields two classes.
 sub _autogen_class_for {
-    my ($self, $kind) = @_;
+    my ($self, $kind, $api_version) = @_;
 
     return unless $self->has_openapi_spec;
 
@@ -531,48 +548,89 @@ sub _autogen_class_for {
     my $defs = $spec->{definitions} // {};
 
     # Find the definition for this kind
-    my $def_name = $self->_find_definition_for_kind($kind, $defs);
+    my $def_name = $self->_find_definition_for_kind($kind, $api_version, $defs);
     return unless $def_name;
 
-    # Check cache first
+    # Cache key is GVK-specific
     my $cache_key = $self->_autogen_namespace . '::' . $def_name;
+    $cache_key .= "::$api_version" if defined $api_version;
     return $_autogen_cache{$cache_key} if $_autogen_cache{$cache_key};
 
     # Generate the class
-    require IO::K8s::AutoGen;
+    my %autogen_opts;
+    $autogen_opts{api_version} = $api_version if defined $api_version;
     my $class = IO::K8s::AutoGen::get_or_generate(
         $def_name,
         $defs->{$def_name},
         $defs,
         $self->_autogen_namespace,
+        %autogen_opts,
     );
 
     $_autogen_cache{$cache_key} = $class;
     return $class;
 }
 
-# Find OpenAPI definition name for a given kind
+# Find OpenAPI definition name for a given kind.
+#
+# With an $api_version this is an EXACT GVK request: only definitions whose
+# x-kubernetes-group-version-kind metadata carries that exact group/version
+# count as candidates (a def_name suffix match cannot verify the version and
+# is ignored). Exactly one candidate is returned; several are an ambiguity
+# error (the defs are listed sorted, so the error is deterministic); none is
+# undef (fail closed).
+#
+# Without an $api_version this is the deterministic versionless
+# compatibility fallback: every def that matches the kind -- by GVK metadata
+# or by def_name suffix -- is a candidate, and the lexicographically first
+# def_name wins. Hash iteration order never influences the pick.
 sub _find_definition_for_kind {
-    my ($self, $kind, $defs) = @_;
+    my ($self, $kind, $api_version, $defs) = @_;
 
-    # Direct match by kind name at end of definition
+    my %candidates;
     for my $def_name (keys %$defs) {
         my $def = $defs->{$def_name};
-        # Check x-kubernetes-group-version-kind
-        if (my $gvk_list = $def->{'x-kubernetes-group-version-kind'}) {
+        my $gvk_list = $def->{'x-kubernetes-group-version-kind'};
+
+        if ($gvk_list) {
             for my $gvk (@$gvk_list) {
-                if ($gvk->{kind} eq $kind) {
-                    return $def_name;
+                next unless $gvk->{kind} eq $kind;
+                if (defined $api_version) {
+                    my $av = _gvk_api_version($gvk);
+                    $candidates{$def_name} = 1 if $av eq $api_version;
+                } else {
+                    $candidates{$def_name} = 1;
                 }
             }
         }
-        # Also check if definition name ends with the kind
-        if ($def_name =~ /\.\Q$kind\E$/) {
-            return $def_name;
+
+        # Versionless only: a def_name ending in the kind is a candidate too
+        if (!defined $api_version && $def_name =~ /\.\Q$kind\E$/) {
+            $candidates{$def_name} = 1;
         }
     }
 
-    return undef;
+    my @candidates = sort keys %candidates;
+
+    if (defined $api_version) {
+        if (@candidates > 1) {
+            croak "GVK ambiguity for kind '$kind', apiVersion '$api_version': "
+                . 'multiple definitions match ('
+                . join(', ', @candidates) . ')';
+        }
+        return $candidates[0];
+    }
+
+    return $candidates[0];
+}
+
+# Wire apiVersion a GVK entry represents: group/version, or bare version
+# when the group is empty (core group).
+sub _gvk_api_version {
+    my ($entry) = @_;
+    my $group = $entry->{group} // '';
+    my $version = $entry->{version} // '';
+    return $group ? "$group/$version" : $version;
 }
 
 sub load_class {

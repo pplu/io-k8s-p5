@@ -2,6 +2,22 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Made AutoGen dispatch apiVersion-aware and deterministic.
+    expand_class()/inflate() with an explicit apiVersion now fall through to
+    the openapi_spec AutoGen lookup when the resource map has no qualified
+    key, but only for an exact group/version match in the spec's
+    x-kubernetes-group-version-kind metadata; unknown or non-matching
+    apiVersions fail closed (expand_class returns undef, inflate dies)
+    instead of silently selecting a different version. Definition lookup no
+    longer depends on hash order: versionless lookups sort candidate
+    definitions lexicographically, exact lookups filter by group/version
+    and croak on ambiguity. AutoGen picks a multi-GVK definition's entry by
+    exact api_version (croak on ambiguity or no match) and deterministically
+    sorted first otherwise, and a definition serving several versions now
+    gets a GVK-specific package identity so two apiVersions of one
+    definition yield distinct classes with the correct api_version method
+    and wire serialization.
+
   - Fix IO::K8s::List::api_version for empty lists with an item_class.
     The local class-name regex derived shortened, invalid wire versions
     for groups with a ".k8s.io" suffix (rbac/v1, storage/v1, events/v1)
