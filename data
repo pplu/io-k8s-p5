@@ -1,0 +1,16 @@
+---
+class: standard
+completed: 2026-08-13T02:53:09Z
+created: 2026-08-13T02:48:31Z
+id: 30
+priority: low
+started: 2026-08-13T02:53:09Z
+status: done
+tags:
+- registry
+- class-namespaces
+title: compare_to_schema should be inheritance-aware
+updated: 2026-08-13T02:53:09Z
+---
+
+Drift found by the #18 worker (83d066a): IO::K8s::Role::Resource::compare_to_schema (lib/IO/K8s/Role/Resource.pm:~180) reads the attribute registry directly ($IO::K8s::Resource::_attr_registry{$class}), not the merged @ISA view that _k8s_attr_info provides since the class_namespaces fix. For a subclass, missing_locally / missing_in_schema / type_mismatch would be computed against an empty or partial registry. Fix direction: have compare_to_schema use _k8s_attr_info($class) (the merged view) instead of the raw registry lookup.
