@@ -33,7 +33,6 @@ use IO::K8s;
 {
     package My::K8s::Api::Core::V1::Pod;
     use parent qw(IO::K8s::Api::Core::V1::Pod);
-    sub api_version { 'v1' }
     $INC{'My/K8s/Api/Core/V1/Pod.pm'} = __FILE__;
 }
 
@@ -106,7 +105,7 @@ subtest 'class_namespaces subclass inflates with typed fields' => sub {
     ok($obj && ref($obj), 'inflate succeeded') or diag($@);
 
     SKIP: {
-        skip 'inflate failed, cannot assert typed fields', 10 unless $obj && ref($obj);
+        skip 'inflate failed, cannot assert typed fields', 11 unless $obj && ref($obj);
 
         isa_ok($obj, 'My::K8s::Api::Core::V1::Pod', 'inflated object is the subclass');
         isa_ok($obj->metadata, 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta',
@@ -117,6 +116,7 @@ subtest 'class_namespaces subclass inflates with typed fields' => sub {
         is($obj->metadata->labels->{app}, 'web', 'metadata.labels survive inflate');
         is($obj->spec->containers->[0]->name, 'app', 'spec.containers[0].name survives inflate');
         is($obj->status->phase, 'Running', 'status.phase survives inflate');
+        is($obj->api_version, 'v1', 'api_version derives through inheritance');
 
         my $json1 = $obj->to_json;
         like($json1, qr/"apiVersion":"v1"/, 'apiVersion emitted');

@@ -2,6 +2,19 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Derive api_version through @ISA for class_namespaces subclasses.
+    IO::K8s::Role::APIObject::api_version now falls back to walking the
+    inheritance chain when the class name itself is not in a known
+    namespace, so a consumer subclass (e.g. `use parent
+    'IO::K8s::Api::Core::V1::Pod'`) serializes apiVersion instead of
+    silently omitting it.
+
+  - Make compare_to_schema inheritance-aware. The schema comparison in
+    IO::K8s::Role::Resource now reads the merged @ISA attribute view
+    (_k8s_attr_info) instead of the raw registry entry, so a
+    class_namespaces-style subclass compares its inherited attributes
+    instead of an empty or partial set.
+
   - Make the k8s attribute lookups class_namespaces-aware via @ISA.
     _k8s_attr_info and _k8s_attributes in IO::K8s::Role::Resource now walk
     the inheritance chain, so a consumer subclass registered through
