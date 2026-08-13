@@ -1,0 +1,17 @@
+---
+class: standard
+completed: 2026-08-13T02:48:47Z
+created: 2026-08-10T04:31:03Z
+id: 26
+priority: low
+started: 2026-08-13T02:48:47Z
+status: done
+tags:
+- architecture
+- registry
+title: Track complete k8s registry metadata as future architecture work
+updated: 2026-08-13T02:48:47Z
+---
+
+Future work only: requiredness and some complex Type::Tiny array element metadata live outside the k8s registry, forcing tests to inspect Moo internals. Design a complete registry contract separately; do not refactor it in the exact-GVK completion batch.
+Closed as tracking-complete. The registry contract redesign is explicitly future work (per the ticket: 'design a complete registry contract separately; do not refactor it in the exact-GVK completion batch'). Follow-up ticket #28 tracks the concrete design work. This ticket itself required no code change.
