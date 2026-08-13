@@ -1,0 +1,45 @@
+---
+claimed_at: 2026-08-13T21:20:28Z
+claimed_by: getty
+class: standard
+completed: 2026-08-13T21:19:42Z
+created: 2026-08-13T04:09:17Z
+id: 31
+priority: medium
+started: 2026-08-13T21:09:29Z
+status: done
+tags:
+- crd
+- inflate
+title: inflate() ignoriert die resource_map bei der GVK-Aufloesung
+updated: 2026-08-13T21:20:28Z
+---
+
+IO::K8s->new(resource_map => {...}) nimmt die Map entgegen, aber inflate() nutzt
+sie bei der GVK-Aufloesung nicht. Ein CRD, das ueber resource_map registriert
+ist, laesst sich damit nicht aus einem einfachen Manifest-Hashref inflaten:
+
+    Cannot resolve Kubernetes GVK: kind 'StaticWebSite',
+      apiVersion 'homelab.example.com/v1'
+    (IO/K8s.pm:735)
+
+Reproduzierbar in kubernetes-rest, t/08_crd.t, Subtest "CRD serialization":
+
+    $api->inflate($site->TO_JSON)   # stirbt
+
+Der dortige Client baut die IO::K8s-Instanz explizit mit
+
+    resource_map => { %defaults, StaticWebSite => '+My::StaticWebSite' }
+
+IO::K8s kennt die Klasse also. struct_to_object('My::StaticWebSite', ...) und
+expand_class('StaticWebSite') funktionieren beide; nur der GVK-Pfad in
+inflate() greift auf eine andere Quelle zurueck.
+
+Folge: t/08_crd.t in kubernetes-rest ist rot -- alle 6 Subtests gruen, aber die
+Datei stirbt vor done_testing und prove meldet exit 255. Vorbestehend, nicht
+durch die /status-Subresource-Arbeit (kubernetes-rest #3) verursacht.
+
+Erwartet: inflate() loest kind + apiVersion zuerst gegen die resource_map der
+Instanz auf und faellt erst danach auf die eingebaute GVK-Tabelle zurueck.
+Test
+Fix implementiert: _resolve_short_name_gvk in expand_class (beide GVK-Pfade), fail closed via api_version()-Verifikation. Test t/49_crd_resource_map_gvk.t (7 Subtests), volle Suite gruen (51 Dateien / 3929 Tests), kubernetes-rest t/08_crd.t End-to-End gruen, dzil build sauber. Changes-Eintrag ergaenzt.
