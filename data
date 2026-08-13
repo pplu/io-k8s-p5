@@ -1,0 +1,28 @@
+---
+claimed_at: 2026-08-10T16:44:42Z
+claimed_by: codex-root
+class: standard
+completed: 2026-08-13T01:50:45Z
+created: 2026-08-10T03:04:01Z
+id: 19
+priority: low
+started: 2026-08-10
+status: done
+tags:
+- tests
+- docs
+title: 't/40: stale comment references removed _qualify_defaults'
+updated: 2026-08-13T01:50:45Z
+---
+
+t/40_karr_11_multi_version_dispatch.t line 233 says:
+
+    # via BUILD/_qualify_defaults - that's the karr #11 fix and must
+
+_qualify_defaults no longer exists: %DEFAULT_RESOURCE_MAP now carries its
+domain-qualified keys as literals and BUILD only merges external providers.
+The assertions themselves are still correct and still pass -- only the comment
+names a gone mechanism.
+
+Left alone on purpose: t/ belongs to the test lane.
+Resolved in 3967226: comment now references the literal qualified entries in %DEFAULT_RESOURCE_MAP.
