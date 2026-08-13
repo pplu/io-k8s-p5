@@ -2,6 +2,10 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Document that .pk8s manifests are Perl code executed in-process via
+    eval and therefore must only be loaded from trusted sources, with
+    load_yaml documented as the data-only path without code execution.
+
   - Declared Module::Runtime as a direct runtime prerequisite. IO::K8s has
     always loaded it in IO::K8s (for require_module) but cpanfile and the
     built META omitted it, so dependency installers that resolve strictly

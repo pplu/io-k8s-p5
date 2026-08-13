@@ -1149,6 +1149,12 @@ Returns C<$self> for chaining.
 
 Load a C<.pk8s> manifest file and return an ArrayRef of IO::K8s objects.
 
+B<Trust boundary:> A C<.pk8s> manifest is Perl code, not data. The loader
+C<eval>s the file content in-process, so a C<.pk8s> file can execute
+arbitrary code with the full privileges of the running program. Only load
+C<.pk8s> files from sources you trust. For data-only manifests (YAML or
+JSON), use C<load_yaml>, which parses without executing any code.
+
 The C<.pk8s> file format is Perl code with a DSL for defining Kubernetes
 resources:
 

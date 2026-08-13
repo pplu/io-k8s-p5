@@ -290,6 +290,11 @@ CiliumNode {
 };
 ```
 
+Note: `.pk8s` manifests are Perl code, not data — they are executed
+in-process via `eval` when loaded, so only load them from sources you
+trust. For data-only manifests (YAML/JSON), use `load_yaml`, which parses
+without executing code.
+
 ## Custom Resource Definitions (CRDs)
 
 Write your own CRD classes using `IO::K8s::APIObject`:
