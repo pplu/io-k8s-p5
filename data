@@ -1,0 +1,16 @@
+---
+class: standard
+completed: 2026-08-13T02:53:04Z
+created: 2026-08-13T02:48:23Z
+id: 29
+priority: medium
+started: 2026-08-13T02:53:04Z
+status: done
+tags:
+- class-namespaces
+- serialization
+title: APIObject::api_version for class_namespaces subclasses
+updated: 2026-08-13T02:53:04Z
+---
+
+Drift found by the #18 worker (83d066a): IO::K8s::Role::APIObject::api_version derives the wire version only for namespaces matching /^IO::K8s::Api::/, IO::K8s::ApiextensionsApiserver, IO::K8s::KubeAggregator. A class_namespaces subclass such as My::K8s::Api::Core::V1::Pod returns undef, so TO_JSON would silently omit apiVersion from a real manifest (t/46 currently works around this by declaring sub api_version { "v1" }). Fix direction: when the class itself is not a known namespace, walk @ISA and derive from the first base class that is one — same shape as the _k8s_attr_info @ISA walk.
