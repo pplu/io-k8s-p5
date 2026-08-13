@@ -1,0 +1,44 @@
+---
+class: standard
+completed: 2026-08-13T02:47:14Z
+created: 2026-08-10T03:03:56Z
+id: 18
+priority: medium
+started: 2026-08-13T02:47:14Z
+status: done
+tags:
+- class-namespaces
+- serialization
+title: 'class_namespaces subclasses inflate as empty: _k8s_attr_info does not walk
+  @ISA'
+updated: 2026-08-13T02:47:14Z
+---
+
+Noticed while verifying the class_namespaces fix in expand_class (karr #11 follow-up).
+
+IO::K8s::Role::Resource::_k8s_attr_info does an exact-class lookup:
+
+    return $IO::K8s::Resource::_attr_registry{$class} // {};
+
+No @ISA walk. So a consumer class registered via class_namespaces that merely
+subclasses a shipped class:
+
+    package My::K8s::Api::Core::V1::Pod;
+    use parent \x27IO::K8s::Api::Core::V1::Pod\x27;
+
+resolves correctly through expand_class now, but _inflate_struct() sees an empty
+attribute registry for it: every nested field is passed through raw, and the
+first typed attribute (metadata) fails its type constraint.
+
+Workaround today is to re-declare the attributes with the k8s DSL in the
+subclass, which works and is what the POD example implies -- but nothing says so,
+and "subclass a shipped class to add a helper method" is the obvious reading of
+the class_namespaces feature.
+
+Decide between:
+  (a) make _k8s_attr_info walk @ISA and merge (nearest wins),
+  (b) document that a class_namespaces class must declare its own k8s attributes.
+
+(a) is the smaller surprise but touches the hot inflate path for every attribute
+lookup, so it wants a cache. Pre-existing, not a regression.
+Resolved in 83d066a (option a, confirmed with user). _k8s_attr_info + _k8s_attributes walk @ISA: nearest-wins info merge, deduplicated attribute union, per-class caches invalidated (direct + descendant sweep) on k8s registration. t/46_class_namespaces_inflate.t: 5 subtests, 4 red pre-fix (inflate collapsed metadata, TO_JSON empty, missing inherited attrs), full suite PASS (49 files, 3920 tests). Drift noted for follow-up: (1) APIObject::api_version derives wire version only for IO::K8s::Api/*/ApiextensionsApiserver/KubeAggregator namespaces - a class_namespaces subclass returns undef and TO_JSON omits apiVersion (test subclass declares sub api_version); (2) Moo MI constructor aggregates only first @ISA chain (documented in test, not our bug); (3) compare_to_schema still reads registry directly.
