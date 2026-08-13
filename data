@@ -1,0 +1,17 @@
+---
+class: standard
+completed: 2026-08-13T02:00:26Z
+created: 2026-08-10T04:30:24Z
+id: 22
+priority: high
+started: 2026-08-13T02:00:26Z
+status: done
+tags:
+- list
+- serialization
+title: Fix empty IO::K8s::List wire apiVersion derivation
+updated: 2026-08-13T02:00:26Z
+---
+
+Empty generic lists using item_class emit shortened, invalid groups such as rbac/v1 and storage/v1. Add failing tests and derive the wire version from the item class api_version method, preserving undef for invalid/non-API classes. Update Changes.
+Resolved in 56a2d74: api_version() now derives the wire version from the item_class's own api_version class method (IO::K8s::Role::APIObject, consults %API_GROUP_MAP) instead of the local lc()-regex. undef for unloadable/non-API classes. t/44_list_api_version.t: 35 tests (wire versions incl. rbac/storage/events/networking/apiextensions/kubeaggregator, serialization, undef paths, kind regression). Full suite PASS (47 files, 3905 tests).
