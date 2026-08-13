@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1beta1::DeviceClassSpec;
 # ABSTRACT: DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use IO::K8s::Resource;
 
 k8s config => ['Resource::V1beta1::DeviceClassConfiguration'];

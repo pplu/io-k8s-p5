@@ -1,6 +1,6 @@
 package IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::APIGroupList;
 # ABSTRACT: APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use IO::K8s::Resource;
 
 k8s apiVersion => Str;

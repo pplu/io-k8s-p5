@@ -1,5 +1,7 @@
 Revision history for IO-K8s
 
+{{$NEXT}}
+
 1.106     2026-08-13 02:59:43Z
 
   - Derive api_version through @ISA for class_namespaces subclasses.

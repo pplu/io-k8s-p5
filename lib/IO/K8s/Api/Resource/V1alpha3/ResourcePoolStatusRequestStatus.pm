@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::ResourcePoolStatusRequestStatus;
 # ABSTRACT: ResourcePoolStatusRequestStatus contains the calculated pool status information.
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use IO::K8s::Resource;
 
 k8s conditions => ['Meta::V1::Condition'];

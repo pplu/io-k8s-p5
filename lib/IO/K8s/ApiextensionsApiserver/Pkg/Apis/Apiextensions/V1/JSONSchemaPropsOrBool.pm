@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaPropsOrBool;
 # ABSTRACT: JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value. Defaults to true for the boolean property.
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use v5.10;
 use Moo;
 use Types::Standard qw( Bool InstanceOf Maybe );

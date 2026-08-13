@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PodExtendedResourceClaimStatus;
 # ABSTRACT: PodExtendedResourceClaimStatus is stored in the PodStatus for the extended resources backed by DRA. It stores the generated name for the corresponding special ResourceClaim created by the scheduler.
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use IO::K8s::Resource;
 
 k8s requestMappings => ['Core::V1::ContainerExtendedResourceRequest'], 'required';

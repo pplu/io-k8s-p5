@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1beta2::DeviceRequestAllocationResult;
 # ABSTRACT: DeviceRequestAllocationResult contains the allocation result for one request.
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use IO::K8s::Resource;
 
 k8s adminAccess => Bool;

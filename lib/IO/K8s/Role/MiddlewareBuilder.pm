@@ -1,6 +1,6 @@
 package IO::K8s::Role::MiddlewareBuilder;
 # ABSTRACT: Role for building Traefik middleware configuration
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use Moo::Role;
 
 sub rate_limit {

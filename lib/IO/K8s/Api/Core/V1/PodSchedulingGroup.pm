@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PodSchedulingGroup;
 # ABSTRACT: PodSchedulingGroup is used to associate a Pod with the PodGroup runtime instance it belongs to for gang-scheduling purposes.
-our $VERSION = '1.106';
+our $VERSION = '1.107';
 use IO::K8s::Resource;
 
 k8s podGroupName => Str, 'required';
