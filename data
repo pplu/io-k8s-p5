@@ -1,0 +1,19 @@
+---
+claimed_at: 2026-08-10T14:52:44Z
+claimed_by: codex-root
+class: standard
+completed: 2026-08-13T01:50:56Z
+created: 2026-08-10T04:30:15Z
+id: 21
+priority: medium
+started: 2026-08-10
+status: done
+tags:
+- tests
+- registry
+title: Commit registry-driven synthesis roundtrip coverage
+updated: 2026-08-13T01:50:56Z
+---
+
+Review and finish the existing untracked t/42_registry_synthesis_roundtrip.t as an independent test-only change. It must exercise every registry class through required/full synthetic JSON roundtrips and remain separate from the GVK fixture work.
+Resolved in a5a78af: t/42_registry_synthesis_roundtrip.t committed; exercises every registry class through required/full synthetic JSON roundtrips.
