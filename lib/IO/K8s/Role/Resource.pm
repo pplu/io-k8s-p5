@@ -181,7 +181,10 @@ sub compare_to_schema {
     my ($class, $schema) = @_;
     $class = ref($class) if ref($class);
 
-    my $local_attrs = $IO::K8s::Resource::_attr_registry{$class} // {};
+    # Use the merged @ISA view (same structure as the raw registry entry:
+    # json_key plus type flags) so a class_namespaces-style subclass sees its
+    # inherited attributes instead of an empty or partial registry entry.
+    my $local_attrs = _k8s_attr_info($class);
     my $schema_props = $schema->{properties} // {};
 
     # Build json_key -> attr_name mapping for lookup
