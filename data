@@ -1,0 +1,17 @@
+---
+class: standard
+completed: 2026-08-13T01:54:27Z
+created: 2026-08-10T04:30:44Z
+id: 24
+priority: high
+started: 2026-08-13T01:54:27Z
+status: done
+tags:
+- packaging
+- dependencies
+title: Declare Module::Runtime as a runtime prerequisite
+updated: 2026-08-13T01:54:27Z
+---
+
+IO::K8s uses Module::Runtime directly but cpanfile and dzil listdeps omit it. Add the direct prerequisite, verify listdeps and built META, and update Changes.
+Resolved in 8fa00bd: cpanfile requires 'Module::Runtime'; dzil listdeps --author picks it up; built META.json lists it under runtime requires; Changes bullet added.
