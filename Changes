@@ -2,6 +2,18 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Resolve resource_map short-name keys on the explicit-apiVersion path
+    (karr #31). expand_class('Kind', $api_version) and the qualified-string
+    form now fall back to the resource_map's bare short-name key when no
+    '$api_version/Kind' key exists, but only if the mapped class itself
+    confirms the requested version via api_version() — a CRD registered as
+    'StaticWebSite => "+My::StaticWebSite"' inflates again from a manifest
+    hashref instead of dying with "Cannot resolve Kubernetes GVK". The
+    fail-closed semantics from karr #17 are preserved: a class that cannot
+    verify the requested version (mismatch, or no api_version() method) is
+    never substituted. The fallback runs before openapi_spec AutoGen, since
+    the user explicitly registered the class.
+
 1.106     2026-08-13 02:59:43Z
 
   - Derive api_version through @ISA for class_namespaces subclasses.
