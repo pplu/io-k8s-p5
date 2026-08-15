@@ -1,0 +1,55 @@
+---
+claimed_at: 2026-08-15T03:25:44Z
+claimed_by: getty
+class: standard
+completed: 2026-08-15T03:25:44Z
+created: 2026-08-15T02:12:21Z
+id: 32
+priority: medium
+started: 2026-08-15T02:12:46Z
+status: done
+tags:
+- crd
+- expand-class
+title: _resolve_short_name_gvk verifiziert api_version() ungeschuetzt
+updated: 2026-08-15T03:25:44Z
+---
+
+Nachfolgebefund aus dem Review von 4bdf5a1 (karr #31).
+
+lib/IO/K8s.pm:559 in _resolve_short_name_gvk:
+
+    return unless $full_class->api_version eq $api_version;
+
+Der Aufruf ist weder gegen undef noch gegen einen sterbenden
+Klassenmethoden-Aufruf abgesichert. Zwei reproduzierte Faelle:
+
+1. api_version() liefert undef
+   -> "Use of uninitialized value in string eq at lib/IO/K8s.pm line 559."
+      Ergebnis ist korrekt (undef), aber Warn-Noise.
+
+2. api_version ist ein Moo-Instanz-Attribut statt einer Konstante
+   -> DIED: Class::XSAccessor: invalid instance method invocant:
+      no hash ref supplied at lib/IO/K8s.pm line 559.
+      expand_class stirbt, statt fail closed undef zu liefern.
+
+Fall 2 trifft genau die Zielgruppe von #31: eine fremde, per resource_map
+registrierte CRD-Klasse, die nicht ueber IO::K8s::APIObject gebaut wurde.
+Der Fix von #31 verspricht fail closed -- eine Exception ist das nicht.
+
+Das Repo kennt das richtige Muster bereits: IO::K8s::List::api_version
+(lib/IO/K8s/List.pm:82-88) kapselt denselben Aufruf in
+eval { $class->api_version } mit dem Kommentar "answers without error".
+_qualify_class_path:357 hat wenigstens den return-unless-$api_version-Guard,
+den _resolve_short_name_gvk nicht uebernommen hat.
+
+Erwartet: expand_class liefert in beiden Faellen undef -- ohne Warnung,
+ohne Exception. Guard analog List.pm.
+
+Zweiter Teil (t/49_crd_resource_map_gvk.t): der Test traegt noch seine
+Red-Phase. Der Header dokumentiert, welche Subtests "RED gegen die CURRENT
+lib" sind, und die SKIP-Blocke (unless defined $obj) sind tote Zweige,
+seit der Fix im selben Commit liegt. Bei einer Regression wuerde nur
+lives_ok fehlschlagen, die folgenden Assertions wuerden skippen statt
+mitzufehlen. Aufraeumen und um die zwei neuen Faelle erweitern.
+Fix implementiert: eval-Guard um den api_version()-Klassenmethodenaufruf in _resolve_short_name_gvk UND _qualify_class_path, nach dem Muster von IO::K8s::List::api_version. Zusatzbefund: _qualify_class_path ist seit 1.106 released, der add()/with-Pfad starb dort fatal - mitgefixt, eigener Changes-Bullet. t/49 um 4 Subtests erweitert (undef-Rueckgabe und Moo-Instanzattribut, je ueber expand_class und add()/with()), Red-Phase-Header und alle SKIP-Bloecke entfernt. Regressionskraft gegengeprueft: gegen HEAD-lib fallen Subtests 6, 8, 9. Volle Suite 51 Dateien / 3933 Tests gruen, dzil build sauber.
