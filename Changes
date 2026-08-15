@@ -2,6 +2,19 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Stop bare Kind short names from resolving to an identically-named
+    installed CPAN module (GH #7, GH #8). expand_class() probed for a
+    loaded-or-loadable class of exactly the given name before consulting
+    the resource_map, and that probe loads rather than merely tests -- so on
+    a machine that happened to have the CPAN distributions Event or Role
+    installed, expand_class('Event') returned Event instead of
+    IO::K8s::Api::Core::V1::Event and the caller then died in
+    _k8s_attr_info. The probe now runs after the resource_map and after
+    class_namespaces, so a registered Kind always wins over a same-named
+    package; '+Full::Class' still forces an exact class, and a CRD class
+    named in full is still loaded on demand. All 78 short names in the
+    default resource_map were exposed; reported from CPAN smokers.
+
 1.107     2026-08-15 15:37:52Z
 
   - Resolve resource_map short-name keys on the explicit-apiVersion path

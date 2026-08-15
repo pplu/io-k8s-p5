@@ -410,10 +410,15 @@ sub add {
 #   'IO::K8s::...'           -> returned as-is
 #   '+MyApp::K8s::Resource'  -> MyApp::K8s::Resource (+ prefix = full class name)
 #
-# Search order:
-#   1. User's class_namespaces (if class exists)
-#   2. IO::K8s built-in (resource_map or relative path)
-#   3. Auto-generate from openapi_spec (if available)
+# Search order (versionless path; an explicitly supplied apiVersion takes the
+# exact-GVK path above and never falls through to these):
+#   1. '+Full::Class' / 'IO::K8s::...'  - verbatim
+#   2. resource_map, domain-qualified key then short name (via _resolve_mapped,
+#      which checks class_namespaces first)
+#   3. User's class_namespaces
+#   4. A loaded or loadable class of exactly that name
+#   5. IO::K8s relative path
+#   6. Auto-generate from openapi_spec (if available)
 sub expand_class {
     my $api_version_supplied = @_ >= 3;
     my ($self, $class, $api_version) = @_;
@@ -454,9 +459,6 @@ sub expand_class {
     # Already a full IO::K8s class name - return as-is
     return $class if $class =~ /^IO::K8s::/;
 
-    # Already a loaded class (e.g. CRD class passed by ref) - return as-is
-    return $class if _class_exists($class);
-
     # Domain-qualified string: 'cilium.io/v2/NetworkPolicy'
     if ($class =~ m{/}) {
         if (exists $map->{$class}) {
@@ -484,11 +486,27 @@ sub expand_class {
         }
     }
 
-    # 2. Check IO::K8s relative path
+    # 2. A class of exactly this name that is loaded, or loadable from @INC.
+    #    Serves a CRD class named in full ('My::StaticWebSite'), and the
+    #    re-expansion struct_to_object() performs on an already-expanded name.
+    #    It has to load, not just test: _resolve_mapped() returns a '+'-prefixed
+    #    resource_map value without loading it, so on that second pass the class
+    #    is typically not in memory yet.
+    #
+    #    Must stay *below* the resource_map lookup (karr #34, GH #7/#8). A bare
+    #    Kind is a Kubernetes Kind first and a package name second: with this
+    #    ahead of the map, smokers that had the CPAN distributions Event or Role
+    #    installed got those back from expand_class('Event')/('Role') instead of
+    #    IO::K8s::Api::Core::V1::Event / IO::K8s::Api::Rbac::V1::Role. Below the
+    #    map, only names the model does not know can reach a foreign package,
+    #    and '+Name' still forces an exact class.
+    return $class if _class_exists($class);
+
+    # 3. Check IO::K8s relative path
     my $builtin_class = 'IO::K8s::' . $class;
     return $builtin_class if _class_exists($builtin_class);
 
-    # 3. Try auto-generation for unknown types
+    # 4. Try auto-generation for unknown types
     if (ref($self) && $self->has_openapi_spec) {
         my $autogen = $self->_autogen_class_for($class);
         return $autogen if $autogen;
