@@ -1,0 +1,63 @@
+---
+claimed_at: 2026-08-15T23:20:05Z
+claimed_by: getty
+class: standard
+completed: 2026-08-15T23:19:35Z
+created: 2026-08-15T22:07:49Z
+id: 33
+priority: medium
+started: 2026-08-15T22:58:21Z
+status: done
+tags:
+- feature
+- api
+title: resource_plural is undef for every shipped class — consumers cannot resolve
+  RBAC plurals
+updated: 2026-08-15T23:20:05Z
+---
+
+IO::K8s::Role::APIObject::resource_plural defaults to undef, and no shipped class overrides it. Only IO::K8s::AutoGen sets one, and only when a provider passed resource_plural explicitly in its resource_map entry (AutoGen.pm:184). fetch_resource_map in Kubernetes::REST maps Kind -> class path and never supplies a plural.
+
+Measured against 1.107 (resource_map_from_cluster => 0):
+
+    Pod           -> IO::K8s::Api::Core::V1::Pod            resource_plural=(undef)
+    Deployment    -> IO::K8s::Api::Apps::V1::Deployment     resource_plural=(undef)
+    Ingress       -> IO::K8s::Api::Networking::V1::Ingress  resource_plural=(undef)
+    NetworkPolicy -> ...::Networking::V1::NetworkPolicy     resource_plural=(undef)
+    Endpoints     -> IO::K8s::Api::Core::V1::Endpoints      resource_plural=(undef)
+
+Why it matters: RBAC speaks plurals (pods, deployments), the API speaks Kinds (Pod, Deployment). Anything doing authorization work needs Kind -> plural. MCP::K8s asks IO::K8s first and gets undef every time, so it falls back to its own /api/v1 + /apis discovery plus an lc+s heuristic — and a wrong plural there is indistinguishable from a denied permission.
+
+The plural is not derivable (Endpoints -> endpoints, NetworkPolicy -> networkpolicies, Ingress -> ingresses) but it IS statically known for every built-in, the same way %DEFAULT_RESOURCE_MAP is written out.
+
+Options: a resource_plural class method on generated/shipped classes, or a plural lookup alongside expand_class. Either kills the heuristic in every downstream consumer.
+
+Reported from: p5-mcp-k8s (_resource_plural tier 2).
+Plurals are not being guessed: extracted from the upstream REST paths in
+spec/v1.36.3.json (operations with x-kubernetes-group-version-kind and
+x-kubernetes-action list|post, last non-parameterised path segment, subresource
+segments filtered). 95 group|version|Kind pairs, zero ambiguity.
+
+Coverage vs. the default resource_map: 75 of 78 short names. The 3 misses are
+correct, not gaps - Eviction, Scale and TokenRequest are subresources
+(pods/eviction, deployments/scale, serviceaccounts/token) and have no plural of
+their own upstream. They must keep returning undef.
+
+Delegated to io-k8s-worker with the requirement that the table be regenerable
+via a maint/ script, so the next upstream sync re-derives it instead of the
+table rotting in place.
+Verified independently by the orchestrating agent:
+
+- hard cases correct: networkpolicies, ingresses, endpoints, priorityclasses,
+  storageclasses; Pod/Deployment/Node as expected
+- the 3 subresources (Eviction, Scale, TokenRequest) return undef, not a guess
+- core/v1 Event and events.k8s.io/v1 Event resolve independently
+- explicit CRD override still wins (CiliumPodIPPool -> ciliumpodippools)
+- maint/spec-resource-plural-gen.pl re-run against spec/v1.36.3.json is
+  byte-identical -> idempotent, 95 plurals
+- prove -lr t/ 3949 tests PASS, and PASS again with the karr #34 shadow stubs
+  on \@INC (that regression still holds)
+- dzil test 55 files / 4796 tests PASS
+
+Committed as c0026952 on master (local, not pushed). Changes entry written.
+Pushed to origin/master as c0026952.
