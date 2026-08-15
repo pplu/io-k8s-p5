@@ -1,0 +1,85 @@
+---
+claimed_at: 2026-08-15T23:20:01Z
+claimed_by: getty
+class: standard
+completed: 2026-08-15T23:19:30Z
+created: 2026-08-15T22:33:32Z
+id: 34
+priority: high
+started: 2026-08-15T22:33:46Z
+status: done
+tags:
+- bug
+- dsl
+- resolution
+title: 'expand_class: bare Kind name shadowed by installed top-level CPAN module'
+updated: 2026-08-15T23:20:01Z
+---
+
+GitHub pplu/io-k8s-p5#8 (and #7, same root cause), reported by eserte from CPAN smokers.
+
+SYMPTOM
+  Smoker with the CPAN distributions Event or Role installed:
+    t/26_build_verify.t:385  "Role and RoleBinding"   -> Cant locate object method "_k8s_attr_info" via package "Role"
+    t/43_spec_kind_dispatch.t:490 "bare Event ..."    -> Cant locate Event/_k8s_attr_info.pm in @INC (Event.pm AUTOLOAD)
+  Reproduced against HEAD (1.107) by putting a stub Role.pm / Event.pm in @INC:
+    expand_class("Role")  -> "Role"   (expected IO::K8s::Api::Rbac::V1::Role)
+    expand_class("Event") -> "Event"  (expected IO::K8s::Api::Core::V1::Event)
+
+ROOT CAUSE
+  lib/IO/K8s.pm, expand_class, the versionless path:
+    # Already a loaded class (e.g. CRD class passed by ref) - return as-is
+    return $class if _class_exists($class);
+  runs BEFORE the resource_map short-name lookup, and _class_exists (lib/IO/K8s.pm:578)
+  does not merely test - it require_module()s the name. So a bare Kind that happens to
+  collide with an installed top-level CPAN module loads that foreign module and returns it.
+  Two defects in one: precedence (known Kinds must win over arbitrary package names) and
+  the comment/code mismatch ("already loaded" vs. actively loading).
+
+  78 short names in the resource_map are exposed; Event, Role, Job, Node, Binding, Scale,
+  Secret, Service are realistic collisions. Never seen locally because none are installed
+  here - it only shows on smokers.
+
+SCOPE NOTE
+  The CRD-class-passed-by-ref behaviour that line is there for must survive. Check whether
+  the second, similar block further down expand_class has the same problem.
+FIXED in the working tree (not committed), 2026-08-15.
+
+  lib/IO/K8s.pm - the versionless path of expand_class no longer probes for a class
+  of the bare name before consulting the resource_map. The "already a loaded class"
+  check moved down to step 2 of the not-in-resource_map fallback chain (after
+  class_namespaces, before the IO::K8s:: relative path), and its comment now says what
+  it actually does: it loads, deliberately, because _resolve_mapped() hands back a
+  '+My::CRD' map value unloaded and struct_to_object() re-expands that name.
+
+  New versionless order: +Full / IO::K8s:: verbatim -> resource_map (qualified key,
+  then short name) -> class_namespaces -> loaded-or-loadable class of that exact name
+  -> IO::K8s:: relative path -> autogen.
+
+  The other five _class_exists() call sites are unchanged: each builds a prefixed name
+  ('IO::K8s::X', '$ns::X', or a resource_map value), so no top-level CPAN module can
+  shadow them, and eager loading is correct there.
+
+  Regression test t/50_shadowed_kind_names.t (untracked - needs git add before dzil
+  gathers it). Builds the shadowing condition itself: stub modules in a File::Temp dir
+  unshifted onto @INC plus one package installed straight into the symbol table.
+  Covers the plain (Role), AUTOLOAD (Event) and already-loaded (Node) flavours, all 8
+  realistic collisions on both the instance and class-method call paths, and the
+  CRD-named-in-full behaviour the moved check exists for. Verified RED against the
+  pre-fix lib/IO/K8s.pm, reproducing both original GitHub messages.
+
+  prove -lr t/ green with and without a shadowing dir on PERL5LIB (3939 tests);
+  dzil test green (t/50 not in the build until it is tracked).
+Verified by the orchestrating agent, independently of the worker's report:
+
+- diff reviewed: one block moved in expand_class + comments corrected, no logic added
+- prove -lr t/ clean PERL5LIB          -> 3939 tests, PASS
+- prove -lr t/ with shadow stubs @INC  -> 3939 tests, PASS
+- t/50 stashed against the pre-fix lib -> subtests 2-5 RED (the shadowing cases),
+  1 (harness control) and 6 (preserved CRD-by-ref behaviour) stay green, so the
+  test fails for the right reason and is not vacuous
+- dzil test after git add t/50 -> 54 files, 4786 tests, PASS (was 53/4780)
+
+Changes entry written. Not committed yet - awaiting go-ahead on branch/commit.
+GH #7 closed as duplicate; GH #8 to be updated once this lands.
+Pushed to origin/master as bd544ca8. GH #8 closed with the write-up, GH #7 closed as duplicate.
