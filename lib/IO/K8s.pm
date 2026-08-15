@@ -1056,7 +1056,9 @@ This adds:
 
 =item * C<kind()> - derived from the last segment of the class name
 
-=item * C<resource_plural()> - returns C<undef> (auto-pluralize) by default, override for CRDs
+=item * C<resource_plural()> - the plural Kubernetes addresses the Kind by
+(C<pods>, C<networkpolicies>, C<ingresses>), from a table generated off the
+upstream spec for built-in types; CRDs declare their own
 
 =item * C<to_yaml()> - serialize to YAML suitable for C<kubectl apply -f>
 
@@ -1114,10 +1116,16 @@ don't follow the C<IO::K8s::Api::*> convention.
 
 =item C<resource_plural> (recommended for CRDs)
 
-The plural resource name for URL building, e.g. C<'staticwebsites'>. Must
-match the CRD's C<spec.names.plural>. If omitted, L<Kubernetes::REST>
-auto-pluralizes the kind name (C<StaticWebSite> -> C<staticwebsites>), but
-this heuristic doesn't work for all names.
+The plural resource name for URL building and RBAC C<resources:> rules,
+e.g. C<'staticwebsites'>. Must match the CRD's C<spec.names.plural>. An
+explicit value always wins over anything IO::K8s knows.
+
+Built-in Kinds do not need this: their plurals come from a table generated
+off the upstream OpenAPI spec's REST paths. CRDs do, because there is no
+spec to read them from. If omitted, C<resource_plural()> returns C<undef>
+and the caller is left to pluralize the kind name itself
+(C<StaticWebSite> -E<gt> C<staticwebsites>) -- that heuristic does not work
+for all names, which is exactly why declaring it is recommended.
 
 =back
 

@@ -43,7 +43,8 @@ Automatically applies L<IO::K8s::Role::APIObject> which provides:
 
 =item * C<kind()> method (derived from class name)
 
-=item * C<resource_plural()> method (returns undef = auto-pluralize)
+=item * C<resource_plural()> method (from a generated table for built-in
+Kinds; C<undef> when there is no plural, e.g. a subresource)
 
 =item * Label, annotation, condition, and owner convenience methods
 

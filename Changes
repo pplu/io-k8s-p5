@@ -2,6 +2,23 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Give the shipped Kinds a real resource_plural (karr #33).
+    IO::K8s::Role::APIObject::resource_plural returned undef for every
+    built-in class, so consumers needing Kind -> plural -- RBAC speaks
+    plurals, the API speaks Kinds -- had to fall back to an lc+s guess,
+    where a wrong plural is indistinguishable from a denied permission.
+    The role now carries a table keyed "$api_version/Kind", so
+    core/v1 Event and events.k8s.io/v1 Event stay distinct, and
+    class_namespaces subclasses inherit through @ISA exactly as they do
+    for api_version. The values are generated from the collection REST
+    paths of the upstream OpenAPI spec, not derived -- Endpoints is
+    endpoints, NetworkPolicy is networkpolicies, Ingress is ingresses --
+    and maint/spec-resource-plural-gen.pl regenerates the block at the
+    next upstream sync. An explicit resource_plural on a CRD or from
+    IO::K8s::AutoGen still wins. There is deliberately no heuristic
+    fallback: Kinds with no collection endpoint of their own, such as the
+    Eviction, Scale and TokenRequest subresources, keep returning undef.
+
   - Stop bare Kind short names from resolving to an identically-named
     installed CPAN module (GH #7, GH #8). expand_class() probed for a
     loaded-or-loadable class of exactly the given name before consulting

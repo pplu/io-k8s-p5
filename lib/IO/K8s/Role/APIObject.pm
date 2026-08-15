@@ -67,6 +67,178 @@ sub _api_version_from_class {
     return undef;
 }
 
+# Kind -> plural resource name, keyed "$api_version/$Kind" -- the same
+# domain-qualified key shape as %DEFAULT_RESOURCE_MAP's qualified keys in
+# IO::K8s, and exactly what api_version() below returns joined to kind().
+# The group is folded into the api_version, so core/v1 Event and
+# events.k8s.io/v1 Event stay distinct entries.
+#
+# Generated, not hand-written: the plural is not derivable from the Kind
+# (Endpoints -> endpoints, NetworkPolicy -> networkpolicies, Ingress ->
+# ingresses, PriorityClass -> priorityclasses), but it is authoritative in
+# the upstream spec's REST paths. maint/spec-resource-plural-gen.pl reads it
+# off there and rewrites the block below; do not edit it by hand.
+#
+# Central rather than per-class for the same reason api_version is: one
+# table beats writing a literal into ~75 shipped classes, and the @ISA
+# fallback then gives class_namespaces subclasses the plural for free. An
+# explicit per-class resource_plural -- a CRD's
+# `use IO::K8s::APIObject resource_plural => ...`, or IO::K8s::AutoGen's
+# option -- is installed into the package *before* this role is composed,
+# so it still wins over everything here.
+#
+# Absent on purpose, and staying undef: subresources (Eviction, Scale,
+# TokenRequest -- addressed as pods/eviction, deployments/scale,
+# serviceaccounts/token, never as a resource of their own), and any GVK the
+# spec has no collection endpoint for. Nothing falls back to a guess: a
+# wrong plural is indistinguishable from a denied permission at the RBAC
+# layer, which is the whole reason this table exists (karr #33).
+# --- BEGIN GENERATED resource plural table (v1.36.3) ---
+# Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.36.3.json
+my %RESOURCE_PLURAL = (
+    # core
+    'v1/Binding'               => 'bindings',
+    'v1/ComponentStatus'       => 'componentstatuses',
+    'v1/ConfigMap'             => 'configmaps',
+    'v1/Endpoints'             => 'endpoints',
+    'v1/Event'                 => 'events',
+    'v1/LimitRange'            => 'limitranges',
+    'v1/Namespace'             => 'namespaces',
+    'v1/Node'                  => 'nodes',
+    'v1/PersistentVolume'      => 'persistentvolumes',
+    'v1/PersistentVolumeClaim' => 'persistentvolumeclaims',
+    'v1/Pod'                   => 'pods',
+    'v1/PodTemplate'           => 'podtemplates',
+    'v1/ReplicationController' => 'replicationcontrollers',
+    'v1/ResourceQuota'         => 'resourcequotas',
+    'v1/Secret'                => 'secrets',
+    'v1/Service'               => 'services',
+    'v1/ServiceAccount'        => 'serviceaccounts',
+
+    # admissionregistration.k8s.io
+    'admissionregistration.k8s.io/v1/MutatingAdmissionPolicy'              => 'mutatingadmissionpolicies',
+    'admissionregistration.k8s.io/v1/MutatingAdmissionPolicyBinding'       => 'mutatingadmissionpolicybindings',
+    'admissionregistration.k8s.io/v1/MutatingWebhookConfiguration'         => 'mutatingwebhookconfigurations',
+    'admissionregistration.k8s.io/v1/ValidatingAdmissionPolicy'            => 'validatingadmissionpolicies',
+    'admissionregistration.k8s.io/v1/ValidatingAdmissionPolicyBinding'     => 'validatingadmissionpolicybindings',
+    'admissionregistration.k8s.io/v1/ValidatingWebhookConfiguration'       => 'validatingwebhookconfigurations',
+    'admissionregistration.k8s.io/v1alpha1/MutatingAdmissionPolicy'        => 'mutatingadmissionpolicies',
+    'admissionregistration.k8s.io/v1alpha1/MutatingAdmissionPolicyBinding' => 'mutatingadmissionpolicybindings',
+    'admissionregistration.k8s.io/v1beta1/MutatingAdmissionPolicy'         => 'mutatingadmissionpolicies',
+    'admissionregistration.k8s.io/v1beta1/MutatingAdmissionPolicyBinding'  => 'mutatingadmissionpolicybindings',
+
+    # apiextensions.k8s.io
+    'apiextensions.k8s.io/v1/CustomResourceDefinition' => 'customresourcedefinitions',
+
+    # apiregistration.k8s.io
+    'apiregistration.k8s.io/v1/APIService' => 'apiservices',
+
+    # apps
+    'apps/v1/ControllerRevision' => 'controllerrevisions',
+    'apps/v1/DaemonSet'          => 'daemonsets',
+    'apps/v1/Deployment'         => 'deployments',
+    'apps/v1/ReplicaSet'         => 'replicasets',
+    'apps/v1/StatefulSet'        => 'statefulsets',
+
+    # authentication.k8s.io
+    'authentication.k8s.io/v1/SelfSubjectReview' => 'selfsubjectreviews',
+    'authentication.k8s.io/v1/TokenReview'       => 'tokenreviews',
+
+    # authorization.k8s.io
+    'authorization.k8s.io/v1/LocalSubjectAccessReview' => 'localsubjectaccessreviews',
+    'authorization.k8s.io/v1/SelfSubjectAccessReview'  => 'selfsubjectaccessreviews',
+    'authorization.k8s.io/v1/SelfSubjectRulesReview'   => 'selfsubjectrulesreviews',
+    'authorization.k8s.io/v1/SubjectAccessReview'      => 'subjectaccessreviews',
+
+    # autoscaling
+    'autoscaling/v1/HorizontalPodAutoscaler' => 'horizontalpodautoscalers',
+    'autoscaling/v2/HorizontalPodAutoscaler' => 'horizontalpodautoscalers',
+
+    # batch
+    'batch/v1/CronJob' => 'cronjobs',
+    'batch/v1/Job'     => 'jobs',
+
+    # certificates.k8s.io
+    'certificates.k8s.io/v1/CertificateSigningRequest'  => 'certificatesigningrequests',
+    'certificates.k8s.io/v1alpha1/ClusterTrustBundle'   => 'clustertrustbundles',
+    'certificates.k8s.io/v1beta1/ClusterTrustBundle'    => 'clustertrustbundles',
+    'certificates.k8s.io/v1beta1/PodCertificateRequest' => 'podcertificaterequests',
+
+    # coordination.k8s.io
+    'coordination.k8s.io/v1/Lease'                => 'leases',
+    'coordination.k8s.io/v1alpha2/LeaseCandidate' => 'leasecandidates',
+    'coordination.k8s.io/v1beta1/LeaseCandidate'  => 'leasecandidates',
+
+    # discovery.k8s.io
+    'discovery.k8s.io/v1/EndpointSlice' => 'endpointslices',
+
+    # events.k8s.io
+    'events.k8s.io/v1/Event' => 'events',
+
+    # flowcontrol.apiserver.k8s.io
+    'flowcontrol.apiserver.k8s.io/v1/FlowSchema'                 => 'flowschemas',
+    'flowcontrol.apiserver.k8s.io/v1/PriorityLevelConfiguration' => 'prioritylevelconfigurations',
+
+    # internal.apiserver.k8s.io
+    'internal.apiserver.k8s.io/v1alpha1/StorageVersion' => 'storageversions',
+
+    # networking.k8s.io
+    'networking.k8s.io/v1/IPAddress'        => 'ipaddresses',
+    'networking.k8s.io/v1/Ingress'          => 'ingresses',
+    'networking.k8s.io/v1/IngressClass'     => 'ingressclasses',
+    'networking.k8s.io/v1/NetworkPolicy'    => 'networkpolicies',
+    'networking.k8s.io/v1/ServiceCIDR'      => 'servicecidrs',
+    'networking.k8s.io/v1beta1/IPAddress'   => 'ipaddresses',
+    'networking.k8s.io/v1beta1/ServiceCIDR' => 'servicecidrs',
+
+    # node.k8s.io
+    'node.k8s.io/v1/RuntimeClass' => 'runtimeclasses',
+
+    # policy
+    'policy/v1/PodDisruptionBudget' => 'poddisruptionbudgets',
+
+    # rbac.authorization.k8s.io
+    'rbac.authorization.k8s.io/v1/ClusterRole'        => 'clusterroles',
+    'rbac.authorization.k8s.io/v1/ClusterRoleBinding' => 'clusterrolebindings',
+    'rbac.authorization.k8s.io/v1/Role'               => 'roles',
+    'rbac.authorization.k8s.io/v1/RoleBinding'        => 'rolebindings',
+
+    # resource.k8s.io
+    'resource.k8s.io/v1/DeviceClass'                     => 'deviceclasses',
+    'resource.k8s.io/v1/ResourceClaim'                   => 'resourceclaims',
+    'resource.k8s.io/v1/ResourceClaimTemplate'           => 'resourceclaimtemplates',
+    'resource.k8s.io/v1/ResourceSlice'                   => 'resourceslices',
+    'resource.k8s.io/v1alpha3/DeviceTaintRule'           => 'devicetaintrules',
+    'resource.k8s.io/v1alpha3/ResourcePoolStatusRequest' => 'resourcepoolstatusrequests',
+    'resource.k8s.io/v1beta1/DeviceClass'                => 'deviceclasses',
+    'resource.k8s.io/v1beta1/ResourceClaim'              => 'resourceclaims',
+    'resource.k8s.io/v1beta1/ResourceClaimTemplate'      => 'resourceclaimtemplates',
+    'resource.k8s.io/v1beta1/ResourceSlice'              => 'resourceslices',
+    'resource.k8s.io/v1beta2/DeviceClass'                => 'deviceclasses',
+    'resource.k8s.io/v1beta2/DeviceTaintRule'            => 'devicetaintrules',
+    'resource.k8s.io/v1beta2/ResourceClaim'              => 'resourceclaims',
+    'resource.k8s.io/v1beta2/ResourceClaimTemplate'      => 'resourceclaimtemplates',
+    'resource.k8s.io/v1beta2/ResourceSlice'              => 'resourceslices',
+
+    # scheduling.k8s.io
+    'scheduling.k8s.io/v1/PriorityClass'  => 'priorityclasses',
+    'scheduling.k8s.io/v1alpha2/PodGroup' => 'podgroups',
+    'scheduling.k8s.io/v1alpha2/Workload' => 'workloads',
+
+    # storage.k8s.io
+    'storage.k8s.io/v1/CSIDriver'                  => 'csidrivers',
+    'storage.k8s.io/v1/CSINode'                    => 'csinodes',
+    'storage.k8s.io/v1/CSIStorageCapacity'         => 'csistoragecapacities',
+    'storage.k8s.io/v1/StorageClass'               => 'storageclasses',
+    'storage.k8s.io/v1/VolumeAttachment'           => 'volumeattachments',
+    'storage.k8s.io/v1/VolumeAttributesClass'      => 'volumeattributesclasses',
+    'storage.k8s.io/v1beta1/VolumeAttributesClass' => 'volumeattributesclasses',
+
+    # storagemigration.k8s.io
+    'storagemigration.k8s.io/v1beta1/StorageVersionMigration' => 'storageversionmigrations',
+);
+# --- END GENERATED resource plural table ---
+
 # Walk @ISA depth-first, left to right (same shape as
 # IO::K8s::Role::Resource::_merged_attr_info) so a consumer subclass
 # registered via class_namespaces derives the apiVersion from the first
@@ -91,6 +263,39 @@ sub api_version {
     return $version if defined $version;
 
     return _api_version_from_isa($class);
+}
+
+# Look the plural up under the same "$api_version/$Kind" key the generated
+# table is written with. Both halves come from the class name, so this is
+# only ever a hit for a class in one of the known namespaces -- a CRD class
+# with an explicitly installed api_version() never reaches here at all
+# (its own resource_plural, if it declared one, shadows this role's).
+sub _resource_plural_from_class {
+    my ($class) = @_;
+
+    my $version = _api_version_from_class($class);
+    return undef unless defined $version;
+
+    my ($kind) = $class =~ /::(\w+)\z/;
+    return undef unless defined $kind;
+
+    return $RESOURCE_PLURAL{"$version/$kind"};
+}
+
+# Same depth-first, left-to-right @ISA walk as _api_version_from_isa, for
+# the same reason: a consumer subclass registered via class_namespaces
+# ('My::K8s::Api::Core::V1::Pod' -> IO::K8s::Api::Core::V1::Pod) inherits
+# the plural from the first ancestor in a known namespace.
+sub _resource_plural_from_isa {
+    my ($class) = @_;
+    no strict 'refs';
+    for my $parent (@{"${class}::ISA"}) {
+        my $plural = _resource_plural_from_class($parent);
+        return $plural if defined $plural;
+        $plural = _resource_plural_from_isa($parent);
+        return $plural if defined $plural;
+    }
+    return undef;
 }
 
 =method api_version
@@ -123,15 +328,43 @@ Returns the Kubernetes kind derived from the class name.
 
 =cut
 
-sub resource_plural { undef }
+sub resource_plural {
+    my ($self) = @_;
+    my $class = ref($self) || $self;
+
+    my $plural = _resource_plural_from_class($class);
+    return $plural if defined $plural;
+
+    return _resource_plural_from_isa($class);
+}
 
 =method resource_plural
 
-Returns the plural resource name for URL building, or C<undef> to use
-automatic pluralization. Override this in CRD classes where the plural
-name is not simply the lowercased kind with an "s" appended:
+Returns the plural resource name Kubernetes addresses this Kind by in REST
+paths and in RBAC C<resources:> rules, or C<undef> when there is none.
 
-    sub resource_plural { 'staticwebsites' }
+    $pod->resource_plural;            # "pods"
+    $endpoints->resource_plural;      # "endpoints"
+    $network_policy->resource_plural; # "networkpolicies"
+    $ingress->resource_plural;        # "ingresses"
+
+For built-in Kinds the value comes from a table generated from the upstream
+OpenAPI spec's REST paths, keyed by API version and kind, so C<Event> in the
+core group and C<Event> in C<events.k8s.io> resolve independently. A
+consumer subclass registered via L<IO::K8s/class_namespaces> inherits the
+plural from its first ancestor in a known namespace, the same way
+C<api_version> does.
+
+C<undef> means "not a top-level resource, or not known" and should never be
+turned into a guess: C<Eviction>, C<Scale> and C<TokenRequest> are
+subresources (C<pods/eviction>, C<deployments/scale>,
+C<serviceaccounts/token>) and have no plural of their own.
+
+CRD classes declare their own, which always wins over the built-in table:
+
+    use IO::K8s::APIObject
+        api_version     => 'homelab.example.com/v1',
+        resource_plural => 'staticwebsites';
 
 =cut
 
