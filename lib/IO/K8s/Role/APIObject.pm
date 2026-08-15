@@ -67,32 +67,53 @@ sub _api_version_from_class {
     return undef;
 }
 
-# Kind -> plural resource name, keyed "$api_version/$Kind" -- the same
-# domain-qualified key shape as %DEFAULT_RESOURCE_MAP's qualified keys in
-# IO::K8s, and exactly what api_version() below returns joined to kind().
-# The group is folded into the api_version, so core/v1 Event and
-# events.k8s.io/v1 Event stay distinct entries.
+# Kind -> plural resource name. Two generated tables, looked up in this
+# order by _resource_plural_from_class() below:
+#
+#   1. %RESOURCE_PLURAL           keyed "$api_version/$Kind"
+#   2. %RESOURCE_PLURAL_BY_GROUP  keyed "$group|$Kind"
+#
+# Tier 1 is the exact GVK: the same domain-qualified key shape as
+# %DEFAULT_RESOURCE_MAP's qualified keys in IO::K8s, and exactly what
+# api_version() below returns joined to kind(). The group is folded into the
+# api_version, so core/v1 Event and events.k8s.io/v1 Event stay distinct
+# entries. It is consulted first because it is the more specific fact and
+# keeps the exact-GVK answer authoritative.
+#
+# Tier 2 is the GroupResource, and it is the *correct* key for the consumer
+# this exists for rather than a loosening of tier 1: RBAC addresses
+# resources by apiGroups + resources, with no version in the rule at all, so
+# the plural is a property of the group and the Kind. It covers the shipped
+# classes that sit on API tracks upstream no longer serves
+# (resource.k8s.io/v1alpha3, flowcontrol.apiserver.k8s.io/v1beta3,
+# storage.k8s.io/v1alpha1, ...), which have no tier-1 key of their own but
+# whose served siblings do. Core is a group of its own (the empty group), so
+# core Event and events.k8s.io Event stay distinct here too -- this is
+# group+Kind, never a bare Kind, and the generator only emits an entry when
+# every version of that group in the spec agrees on the plural (karr #36).
 #
 # Generated, not hand-written: the plural is not derivable from the Kind
 # (Endpoints -> endpoints, NetworkPolicy -> networkpolicies, Ingress ->
 # ingresses, PriorityClass -> priorityclasses), but it is authoritative in
 # the upstream spec's REST paths. maint/spec-resource-plural-gen.pl reads it
-# off there and rewrites the block below; do not edit it by hand.
+# off there and rewrites both blocks below; do not edit them by hand.
 #
 # Central rather than per-class for the same reason api_version is: one
-# table beats writing a literal into ~75 shipped classes, and the @ISA
+# table beats writing a literal into ~180 shipped classes, and the @ISA
 # fallback then gives class_namespaces subclasses the plural for free. An
 # explicit per-class resource_plural -- a CRD's
 # `use IO::K8s::APIObject resource_plural => ...`, or IO::K8s::AutoGen's
 # option -- is installed into the package *before* this role is composed,
 # so it still wins over everything here.
 #
-# Absent on purpose, and staying undef: subresources (Eviction, Scale,
-# TokenRequest -- addressed as pods/eviction, deployments/scale,
-# serviceaccounts/token, never as a resource of their own), and any GVK the
-# spec has no collection endpoint for. Nothing falls back to a guess: a
-# wrong plural is indistinguishable from a denied permission at the RBAC
-# layer, which is the whole reason this table exists (karr #33).
+# Absent on purpose from both tables, and staying undef: subresources
+# (Eviction, Scale, TokenRequest -- addressed as pods/eviction,
+# deployments/scale, serviceaccounts/token, never as a resource of their
+# own), the embedded *Template / *TemplateSpec types that have no GVK at
+# all, and any Kind the spec has no collection endpoint for anywhere in its
+# group. A miss in both tiers returns undef; nothing falls back to a guess,
+# because a wrong plural is indistinguishable from a denied permission at
+# the RBAC layer, which is the whole reason these tables exist (karr #33).
 # --- BEGIN GENERATED resource plural table (v1.36.3) ---
 # Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.36.3.json
 my %RESOURCE_PLURAL = (
@@ -239,6 +260,133 @@ my %RESOURCE_PLURAL = (
 );
 # --- END GENERATED resource plural table ---
 
+# --- BEGIN GENERATED group resource plural table (v1.36.3) ---
+# Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.36.3.json
+my %RESOURCE_PLURAL_BY_GROUP = (
+    # core
+    '|Binding'               => 'bindings',
+    '|ComponentStatus'       => 'componentstatuses',
+    '|ConfigMap'             => 'configmaps',
+    '|Endpoints'             => 'endpoints',
+    '|Event'                 => 'events',
+    '|LimitRange'            => 'limitranges',
+    '|Namespace'             => 'namespaces',
+    '|Node'                  => 'nodes',
+    '|PersistentVolume'      => 'persistentvolumes',
+    '|PersistentVolumeClaim' => 'persistentvolumeclaims',
+    '|Pod'                   => 'pods',
+    '|PodTemplate'           => 'podtemplates',
+    '|ReplicationController' => 'replicationcontrollers',
+    '|ResourceQuota'         => 'resourcequotas',
+    '|Secret'                => 'secrets',
+    '|Service'               => 'services',
+    '|ServiceAccount'        => 'serviceaccounts',
+
+    # admissionregistration.k8s.io
+    'admissionregistration.k8s.io|MutatingAdmissionPolicy'          => 'mutatingadmissionpolicies',
+    'admissionregistration.k8s.io|MutatingAdmissionPolicyBinding'   => 'mutatingadmissionpolicybindings',
+    'admissionregistration.k8s.io|MutatingWebhookConfiguration'     => 'mutatingwebhookconfigurations',
+    'admissionregistration.k8s.io|ValidatingAdmissionPolicy'        => 'validatingadmissionpolicies',
+    'admissionregistration.k8s.io|ValidatingAdmissionPolicyBinding' => 'validatingadmissionpolicybindings',
+    'admissionregistration.k8s.io|ValidatingWebhookConfiguration'   => 'validatingwebhookconfigurations',
+
+    # apiextensions.k8s.io
+    'apiextensions.k8s.io|CustomResourceDefinition' => 'customresourcedefinitions',
+
+    # apiregistration.k8s.io
+    'apiregistration.k8s.io|APIService' => 'apiservices',
+
+    # apps
+    'apps|ControllerRevision' => 'controllerrevisions',
+    'apps|DaemonSet'          => 'daemonsets',
+    'apps|Deployment'         => 'deployments',
+    'apps|ReplicaSet'         => 'replicasets',
+    'apps|StatefulSet'        => 'statefulsets',
+
+    # authentication.k8s.io
+    'authentication.k8s.io|SelfSubjectReview' => 'selfsubjectreviews',
+    'authentication.k8s.io|TokenReview'       => 'tokenreviews',
+
+    # authorization.k8s.io
+    'authorization.k8s.io|LocalSubjectAccessReview' => 'localsubjectaccessreviews',
+    'authorization.k8s.io|SelfSubjectAccessReview'  => 'selfsubjectaccessreviews',
+    'authorization.k8s.io|SelfSubjectRulesReview'   => 'selfsubjectrulesreviews',
+    'authorization.k8s.io|SubjectAccessReview'      => 'subjectaccessreviews',
+
+    # autoscaling
+    'autoscaling|HorizontalPodAutoscaler' => 'horizontalpodautoscalers',
+
+    # batch
+    'batch|CronJob' => 'cronjobs',
+    'batch|Job'     => 'jobs',
+
+    # certificates.k8s.io
+    'certificates.k8s.io|CertificateSigningRequest' => 'certificatesigningrequests',
+    'certificates.k8s.io|ClusterTrustBundle'        => 'clustertrustbundles',
+    'certificates.k8s.io|PodCertificateRequest'     => 'podcertificaterequests',
+
+    # coordination.k8s.io
+    'coordination.k8s.io|Lease'          => 'leases',
+    'coordination.k8s.io|LeaseCandidate' => 'leasecandidates',
+
+    # discovery.k8s.io
+    'discovery.k8s.io|EndpointSlice' => 'endpointslices',
+
+    # events.k8s.io
+    'events.k8s.io|Event' => 'events',
+
+    # flowcontrol.apiserver.k8s.io
+    'flowcontrol.apiserver.k8s.io|FlowSchema'                 => 'flowschemas',
+    'flowcontrol.apiserver.k8s.io|PriorityLevelConfiguration' => 'prioritylevelconfigurations',
+
+    # internal.apiserver.k8s.io
+    'internal.apiserver.k8s.io|StorageVersion' => 'storageversions',
+
+    # networking.k8s.io
+    'networking.k8s.io|IPAddress'     => 'ipaddresses',
+    'networking.k8s.io|Ingress'       => 'ingresses',
+    'networking.k8s.io|IngressClass'  => 'ingressclasses',
+    'networking.k8s.io|NetworkPolicy' => 'networkpolicies',
+    'networking.k8s.io|ServiceCIDR'   => 'servicecidrs',
+
+    # node.k8s.io
+    'node.k8s.io|RuntimeClass' => 'runtimeclasses',
+
+    # policy
+    'policy|PodDisruptionBudget' => 'poddisruptionbudgets',
+
+    # rbac.authorization.k8s.io
+    'rbac.authorization.k8s.io|ClusterRole'        => 'clusterroles',
+    'rbac.authorization.k8s.io|ClusterRoleBinding' => 'clusterrolebindings',
+    'rbac.authorization.k8s.io|Role'               => 'roles',
+    'rbac.authorization.k8s.io|RoleBinding'        => 'rolebindings',
+
+    # resource.k8s.io
+    'resource.k8s.io|DeviceClass'               => 'deviceclasses',
+    'resource.k8s.io|DeviceTaintRule'           => 'devicetaintrules',
+    'resource.k8s.io|ResourceClaim'             => 'resourceclaims',
+    'resource.k8s.io|ResourceClaimTemplate'     => 'resourceclaimtemplates',
+    'resource.k8s.io|ResourcePoolStatusRequest' => 'resourcepoolstatusrequests',
+    'resource.k8s.io|ResourceSlice'             => 'resourceslices',
+
+    # scheduling.k8s.io
+    'scheduling.k8s.io|PodGroup'      => 'podgroups',
+    'scheduling.k8s.io|PriorityClass' => 'priorityclasses',
+    'scheduling.k8s.io|Workload'      => 'workloads',
+
+    # storage.k8s.io
+    'storage.k8s.io|CSIDriver'             => 'csidrivers',
+    'storage.k8s.io|CSINode'               => 'csinodes',
+    'storage.k8s.io|CSIStorageCapacity'    => 'csistoragecapacities',
+    'storage.k8s.io|StorageClass'          => 'storageclasses',
+    'storage.k8s.io|VolumeAttachment'      => 'volumeattachments',
+    'storage.k8s.io|VolumeAttributesClass' => 'volumeattributesclasses',
+
+    # storagemigration.k8s.io
+    'storagemigration.k8s.io|StorageVersionMigration' => 'storageversionmigrations',
+);
+# --- END GENERATED group resource plural table ---
+
 # Walk @ISA depth-first, left to right (same shape as
 # IO::K8s::Role::Resource::_merged_attr_info) so a consumer subclass
 # registered via class_namespaces derives the apiVersion from the first
@@ -266,10 +414,16 @@ sub api_version {
 }
 
 # Look the plural up under the same "$api_version/$Kind" key the generated
-# table is written with. Both halves come from the class name, so this is
-# only ever a hit for a class in one of the known namespaces -- a CRD class
-# with an explicitly installed api_version() never reaches here at all
-# (its own resource_plural, if it declared one, shadows this role's).
+# table is written with, then fall back to "$group|$Kind". Both halves come
+# from the class name, so this is only ever a hit for a class in one of the
+# known namespaces -- a CRD class with an explicitly installed api_version()
+# never reaches here at all (its own resource_plural, if it declared one,
+# shadows this role's).
+#
+# The group is recovered from the api_version the same way the generator
+# folded it in: everything before the last '/', and the empty string for a
+# core-group version like "v1". A miss in both tiers is undef, never a
+# guess.
 sub _resource_plural_from_class {
     my ($class) = @_;
 
@@ -279,7 +433,13 @@ sub _resource_plural_from_class {
     my ($kind) = $class =~ /::(\w+)\z/;
     return undef unless defined $kind;
 
-    return $RESOURCE_PLURAL{"$version/$kind"};
+    my $plural = $RESOURCE_PLURAL{"$version/$kind"};
+    return $plural if defined $plural;
+
+    my ($group) = $version =~ m{\A(.*)/[^/]+\z};
+    $group = '' unless defined $group;
+
+    return $RESOURCE_PLURAL_BY_GROUP{"$group|$kind"};
 }
 
 # Same depth-first, left-to-right @ISA walk as _api_version_from_isa, for
@@ -348,17 +508,26 @@ paths and in RBAC C<resources:> rules, or C<undef> when there is none.
     $network_policy->resource_plural; # "networkpolicies"
     $ingress->resource_plural;        # "ingresses"
 
-For built-in Kinds the value comes from a table generated from the upstream
-OpenAPI spec's REST paths, keyed by API version and kind, so C<Event> in the
-core group and C<Event> in C<events.k8s.io> resolve independently. A
-consumer subclass registered via L<IO::K8s/class_namespaces> inherits the
+For built-in Kinds the value comes from two tables generated from the
+upstream OpenAPI spec's REST paths. The exact API version and kind are
+looked up first, so C<Event> in the core group and C<Event> in
+C<events.k8s.io> resolve independently. A Kind on an API track upstream no
+longer serves then falls back to its API group and kind: the plural is a
+property of the GroupResource, which is what RBAC C<apiGroups>/C<resources>
+rules address, and the fallback is only generated where every version of
+that group agrees on the plural. It is still group and kind, never a bare
+kind, so the two C<Event>s stay distinct on that path too.
+
+A consumer subclass registered via L<IO::K8s/class_namespaces> inherits the
 plural from its first ancestor in a known namespace, the same way
 C<api_version> does.
 
 C<undef> means "not a top-level resource, or not known" and should never be
 turned into a guess: C<Eviction>, C<Scale> and C<TokenRequest> are
 subresources (C<pods/eviction>, C<deployments/scale>,
-C<serviceaccounts/token>) and have no plural of their own.
+C<serviceaccounts/token>) and have no plural of their own, and the embedded
+C<PodTemplateSpec>-style types never appear as a C<kind:> on the wire at
+all.
 
 CRD classes declare their own, which always wins over the built-in table:
 

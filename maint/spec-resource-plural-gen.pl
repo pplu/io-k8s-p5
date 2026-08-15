@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
-# Derives the Kind -> plural resource-name table from a Kubernetes upstream
-# swagger.json and rewrites the generated block inside
+# Derives the Kind -> plural resource-name tables from a Kubernetes upstream
+# swagger.json and rewrites the generated blocks inside
 # lib/IO/K8s/Role/APIObject.pm, which is what
 # IO::K8s::Role::APIObject::resource_plural() looks up.
 #
@@ -34,14 +34,35 @@
 #   {namespace}/bindings -> "bindings") and keeps its plural; only the
 #   pods/{name}/binding path is dropped.
 #
-# The result is written keyed as "$api_version/$Kind" -- the same
-# domain-qualified key shape as %DEFAULT_RESOURCE_MAP's qualified keys in
-# lib/IO/K8s.pm, and exactly what IO::K8s::Role::APIObject::api_version()
-# returns joined to kind(). Group is folded into the api_version, so
-# core/v1 Event and events.k8s.io/v1 Event stay distinct entries.
+# Two tables come out of the one run, both written into their own delimited
+# generated block in the target module:
 #
-# This script never guesses and never merges: if two paths claim different
-# plurals for one GVK it dies rather than pick one.
+#   %RESOURCE_PLURAL           keyed "$api_version/$Kind"
+#   %RESOURCE_PLURAL_BY_GROUP  keyed "$group|$Kind"  ($group is '' for core)
+#
+# The first is the same domain-qualified key shape as %DEFAULT_RESOURCE_MAP's
+# qualified keys in lib/IO/K8s.pm, and exactly what
+# IO::K8s::Role::APIObject::api_version() returns joined to kind(). Group is
+# folded into the api_version, so core/v1 Event and events.k8s.io/v1 Event
+# stay distinct entries. It is consulted first because an exact GVK is the
+# most specific fact the spec has.
+#
+# The second exists because the plural is a property of the GroupResource,
+# not of the version: RBAC addresses resources by apiGroups + resources with
+# no version in the rule at all, and that is the consumer karr #33 was
+# written for. It gives the shipped classes that sit on API tracks upstream
+# has since dropped (resource.k8s.io/v1alpha3, flowcontrol/v1beta3,
+# storage.k8s.io/v1alpha1, ...) the plural their served siblings already
+# have, without inventing anything: every value in it is still read off a
+# real collection path in this spec. Core stays a group of its own (the
+# empty group), so core Event and events.k8s.io Event remain distinct here
+# too -- this is group+Kind, never a bare Kind.
+#
+# This script never guesses and never merges. It dies rather than pick a
+# winner when two paths claim different plurals for one GVK, and dies the
+# same way when two versions of one group claim different plurals for one
+# Kind -- upstream varying a plural across versions of a group is a signal
+# to a human, not something to resolve silently.
 #
 # Like maint/spec-kind-fixture-gen.pl this is maint/-only tooling. It is
 # never run by the test suite; the tests consume the checked-in table.
@@ -80,8 +101,15 @@ use JSON::PP;
 my $DIST_ROOT = File::Spec->rel2abs(File::Spec->catdir($FindBin::Bin, '..'));
 my $UA_STRING = 'io-k8s-p5-spec-resource-plural-gen (+https://github.com/pplu/io-k8s-p5)';
 
+# Two independently delimited regions, one per table. The markers are
+# prefix-matched at column 0, and "group resource plural table" is not a
+# prefix of "resource plural table", so the two regions never capture each
+# other.
 my $BEGIN_MARKER = '# --- BEGIN GENERATED resource plural table';
 my $END_MARKER   = '# --- END GENERATED resource plural table ---';
+
+my $GROUP_BEGIN_MARKER = '# --- BEGIN GENERATED group resource plural table';
+my $GROUP_END_MARKER   = '# --- END GENERATED group resource plural table ---';
 
 # Trailing path segments that name a subresource rather than a resource.
 # See the header comment: only reachable for the few subresources that are
@@ -104,18 +132,26 @@ Options:
   --tag TAG             Upstream Kubernetes tag, e.g. v1.36.3 (default: latest
                         stable release from the kubernetes/kubernetes tag list)
   --spec PATH           Local swagger.json instead of downloading
-  --output PATH         Module whose generated block is rewritten (default:
+  --output PATH         Module whose generated blocks are rewritten (default:
                         DIST/lib/IO/K8s/Role/APIObject.pm). "-" prints the
-                        generated block to stdout and writes nothing.
+                        generated blocks to stdout and writes nothing.
   --cache-dir PATH      Downloaded-spec cache directory (default: DIST/spec)
   --no-cache            Force re-download even if a cached copy exists
   --help                This message
 
-Rewrites the "$BEGIN_MARKER ... $END_MARKER"
-region of the target module with the Kind -> plural table read off the
-spec's REST paths (collection endpoints of the list/post actions). Keys are
-"\$api_version/\$Kind"; subresource-only Kinds (Eviction, Scale,
-TokenRequest) are absent on purpose and keep returning undef.
+Rewrites two delimited regions of the target module with the Kind -> plural
+tables read off the spec's REST paths (collection endpoints of the list/post
+actions):
+
+  "$BEGIN_MARKER ... $END_MARKER"
+      keys "\$api_version/\$Kind" -- the exact-GVK table, consulted first
+
+  "$GROUP_BEGIN_MARKER ... $GROUP_END_MARKER"
+      keys "\$group|\$Kind" -- the GroupResource fallback, emitted only where
+      every version of the group agrees on the plural
+
+Subresource-only Kinds (Eviction, Scale, TokenRequest) are absent from both
+on purpose and keep returning undef.
 USAGE
     exit($exit_code // 0);
 }
@@ -222,14 +258,22 @@ sub load_spec_arg {
 # Extraction
 # ---------------------------------------------------------------------------
 
-# "$api_version/$Kind" => plural, read off the collection REST paths.
-# Dies on a same-key conflict rather than picking a winner.
+# Both tables in one pass over the collection REST paths:
+#
+#   "$api_version/$Kind" => plural   (exact GVK)
+#   "$group|$Kind"       => plural   (GroupResource, '' group for core)
+#
+# Dies on a same-key conflict in either table rather than picking a winner.
+# For the group table that means: two versions of one group claiming
+# different plurals for one Kind is a hard stop, not something to average.
+# Every pair that survives is a pair every version of the spec agrees on,
+# which is the only condition under which a group-keyed entry is emitted.
 sub build_plural_table {
     my ($spec) = @_;
     my $paths = $spec->{paths}
         or die "spec-resource-plural-gen: no 'paths' key in spec\n";
 
-    my (%plural, %source);
+    my (%plural, %source, %group_plural, %group_source);
     for my $path (sort keys %$paths) {
         my $item = $paths->{$path};
         next unless ref $item eq 'HASH';
@@ -260,73 +304,101 @@ sub build_plural_table {
             }
             $plural{$key} = $last;
             $source{$key} = $path;
+
+            my $group_key = "$group|$kind";
+            if (exists $group_plural{$group_key} && $group_plural{$group_key} ne $last) {
+                die sprintf(
+                    "spec-resource-plural-gen: upstream disagrees across versions of one group "
+                  . "for '%s': '%s' (%s) vs '%s' (%s from %s). The plural is supposed to be a "
+                  . "property of the GroupResource; a human has to decide what this means before "
+                  . "the group-keyed table can be regenerated.\n",
+                    $group_key, $group_plural{$group_key}, $group_source{$group_key},
+                    $last, $api_version, $path);
+            }
+            $group_plural{$group_key} = $last;
+            $group_source{$group_key} = "$api_version from $path";
         }
     }
-    return \%plural;
+    return (\%plural, \%group_plural);
 }
 
-# Sort key: group first (core group last -- its keys have no group at all and
-# reading them as a block at the end matches how %DEFAULT_RESOURCE_MAP opens
-# with core), then Kind, then version. Stable across regenerations so an
-# upstream sync produces a readable diff.
+# Sort key: group first (core first -- its keys carry no group at all), then
+# the rest of the key. Stable across regenerations so an upstream sync
+# produces a readable diff.
 sub _group_of {
     my ($key) = @_;
     return $key =~ m{\A([^/]+)/[^/]+/[^/]+\z} ? $1 : '';
 }
 
+# Same idea for the "$group|$Kind" keys: everything before the '|', which is
+# the empty string for the core group.
+sub _group_of_pair {
+    my ($key) = @_;
+    return $key =~ m{\A([^|]*)\|} ? $1 : '';
+}
+
 sub render_block {
-    my ($plural, $label) = @_;
+    my ($table, $label, $spec) = @_;
+    my $group_of = $spec->{group_of};
 
     my @keys = sort {
-        _group_of($a) cmp _group_of($b) || $a cmp $b
-    } keys %$plural;
+        $group_of->($a) cmp $group_of->($b) || $a cmp $b
+    } keys %$table;
 
     # Aligned per group block, not across the whole table: one long
     # flowcontrol.apiserver.k8s.io key would otherwise pad every core entry
     # out by 50 columns.
     my %width;
     for my $k (@keys) {
-        my $group = _group_of($k);
+        my $group = $group_of->($k);
         my $len   = length($k) + 2;    # quotes
         $width{$group} = $len if $len > ($width{$group} // 0);
     }
 
     my @lines;
-    push @lines, "$BEGIN_MARKER ($label) ---";
+    push @lines, "$spec->{begin} ($label) ---";
     push @lines, '# Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/' . $label . '.json';
-    push @lines, 'my %RESOURCE_PLURAL = (';
+    push @lines, "my \%$spec->{var} = (";
     my $prev_group;
     for my $k (@keys) {
-        my $group = _group_of($k);
+        my $group = $group_of->($k);
         if (!defined $prev_group || $group ne $prev_group) {
             push @lines, '' if defined $prev_group;
             push @lines, sprintf('    # %s', length($group) ? $group : 'core');
             $prev_group = $group;
         }
-        push @lines, sprintf(q{    %-*s => '%s',}, $width{$group}, "'$k'", $plural->{$k});
+        push @lines, sprintf(q{    %-*s => '%s',}, $width{$group}, "'$k'", $table->{$k});
     }
     push @lines, ');';
-    push @lines, $END_MARKER;
+    push @lines, $spec->{end};
     return join("\n", @lines) . "\n";
 }
 
+# Each region is [ $begin_marker, $end_marker, $block ]. Regions are spliced
+# back as real lines, not as one fat string, so a later region's marker scan
+# sees the same line array shape as the first one did.
 sub rewrite_module {
-    my ($path, $block) = @_;
+    my ($path, @regions) = @_;
     open my $in, '<:encoding(UTF-8)', $path
         or die "spec-resource-plural-gen: cannot read $path: $!\n";
     my @lines = <$in>;
     close $in;
 
-    my ($begin, $end);
-    for my $i (0 .. $#lines) {
-        $begin = $i if !defined $begin && index($lines[$i], $BEGIN_MARKER) == 0;
-        $end   = $i if defined $begin && index($lines[$i], $END_MARKER) == 0;
-        last if defined $end;
-    }
-    die "spec-resource-plural-gen: no '$BEGIN_MARKER ... ---' / '$END_MARKER' region in $path\n"
-        unless defined $begin && defined $end;
+    for my $region (@regions) {
+        my ($begin_marker, $end_marker, $block) = @$region;
 
-    splice @lines, $begin, $end - $begin + 1, $block;
+        my ($begin, $end);
+        for my $i (0 .. $#lines) {
+            $begin = $i if !defined $begin && index($lines[$i], $begin_marker) == 0;
+            $end   = $i if defined $begin && index($lines[$i], $end_marker) == 0;
+            last if defined $end;
+        }
+        die "spec-resource-plural-gen: no '$begin_marker ... ---' / '$end_marker' region in $path\n"
+            unless defined $begin && defined $end;
+
+        splice @lines, $begin, $end - $begin + 1, map { "$_\n" } split /\n/, $block;
+    }
+
     open my $out, '>:encoding(UTF-8)', $path
         or die "spec-resource-plural-gen: cannot write $path: $!\n";
     print $out @lines;
@@ -346,14 +418,30 @@ my ($spec, $label) = load_spec_arg($opt->{spec} // $opt->{tag},
 # same generated header.
 my ($generated_from) = $label =~ /(v\d+\.\d+\.\d+)/ ? $1 : $label;
 
-my $plural = build_plural_table($spec);
-my $block  = render_block($plural, $generated_from);
+my ($plural, $group_plural) = build_plural_table($spec);
+
+my $block = render_block($plural, $generated_from, {
+    var      => 'RESOURCE_PLURAL',
+    begin    => $BEGIN_MARKER,
+    end      => $END_MARKER,
+    group_of => \&_group_of,
+});
+my $group_block = render_block($group_plural, $generated_from, {
+    var      => 'RESOURCE_PLURAL_BY_GROUP',
+    begin    => $GROUP_BEGIN_MARKER,
+    end      => $GROUP_END_MARKER,
+    group_of => \&_group_of_pair,
+});
 
 if ($opt->{output} eq '-') {
-    print $block;
+    print $block, "\n", $group_block;
 }
 else {
-    rewrite_module($opt->{output}, $block);
+    rewrite_module($opt->{output},
+        [ $BEGIN_MARKER,       $END_MARKER,       $block ],
+        [ $GROUP_BEGIN_MARKER, $GROUP_END_MARKER, $group_block ],
+    );
     print STDERR "spec-resource-plural-gen: wrote $opt->{output} ("
-        . scalar(keys %$plural) . " plurals from $label)\n";
+        . scalar(keys %$plural) . " plurals, "
+        . scalar(keys %$group_plural) . " group plurals from $label)\n";
 }

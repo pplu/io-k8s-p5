@@ -2,6 +2,22 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Resolve resource_plural for Kinds on API tracks upstream no longer
+    serves (karr #36). The generated table from the previous entry is keyed
+    by exact GVK, so the 15 shipped classes on dropped tracks
+    (resource.k8s.io/v1alpha3, flowcontrol/v1beta3,
+    storage.k8s.io/v1alpha1 and others) still had no plural. A second
+    generated tier keyed "group|Kind" now answers those, consulted only
+    after the exact-GVK lookup misses. This is upstream data, not a
+    heuristic: RBAC addresses resources by apiGroups plus resources with no
+    version at all, so the plural is a property of the GroupResource, and
+    the generator emits a group-level entry only where every version in the
+    spec agrees on it -- dying otherwise rather than picking one. Kinds
+    carrying a plural rose from 95 to 110 of the 120 shipped API classes.
+    Still no bare-Kind fallback and still no guessing: core/v1 Event and
+    events.k8s.io/v1 Event remain distinct, and the subresources plus the
+    embedded *TemplateSpec types keep returning undef.
+
   - Give the shipped Kinds a real resource_plural (karr #33).
     IO::K8s::Role::APIObject::resource_plural returned undef for every
     built-in class, so consumers needing Kind -> plural -- RBAC speaks
