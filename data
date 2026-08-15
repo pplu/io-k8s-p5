@@ -1,0 +1,71 @@
+---
+claimed_at: 2026-08-15T23:38:33Z
+claimed_by: getty
+class: standard
+completed: 2026-08-15T23:38:33Z
+created: 2026-08-15T23:08:48Z
+id: 36
+priority: low
+started: 2026-08-15T23:19:48Z
+status: done
+tags:
+- api
+- followup
+title: resource_plural is undef for 15 shipped classes on API tracks upstream v1.36
+  no longer serves
+updated: 2026-08-15T23:38:33Z
+---
+
+Follow-up to karr #33, which landed the generated Kind -> plural table in IO::K8s::Role::APIObject (maint/spec-resource-plural-gen.pl, keyed "$api_version/$Kind").
+
+The table is generated from the collection REST paths of spec/v1.36.3.json, so it only contains GVKs upstream v1.36 actually serves. 15 shipped classes sit on older tracks that upstream has since dropped, so they get no key and resource_plural() returns undef:
+
+    admissionregistration.k8s.io/v1alpha1  ValidatingAdmissionPolicy, ValidatingAdmissionPolicyBinding
+    admissionregistration.k8s.io/v1beta1   ValidatingAdmissionPolicy, ValidatingAdmissionPolicyBinding
+    authentication.k8s.io/v1alpha1         SelfSubjectReview
+    authentication.k8s.io/v1beta1          SelfSubjectReview
+    coordination.k8s.io/v1alpha1           LeaseCandidate
+    flowcontrol.apiserver.k8s.io/v1beta3   FlowSchema, PriorityLevelConfiguration
+    resource.k8s.io/v1alpha3               DeviceClass, ResourceClaim, ResourceClaimTemplate, ResourceSlice
+    storage.k8s.io/v1alpha1                VolumeAttributesClass
+    storagemigration.k8s.io/v1alpha1       StorageVersionMigration
+
+Every one of them has a same-group sibling in a served version whose plural IS in the table (validatingadmissionpolicies, selfsubjectreviews, leasecandidates, flowschemas, resourceclaims, volumeattributesclasses, storageversionmigrations, ...).
+
+Not fixed in #33 on purpose: the exact-GVK key is fail-closed, matching the karr #17/#31 precedent that expand_class never substitutes a class that cannot confirm the requested version. Downstream is no worse off than before #33 (it was undef for everything).
+
+Possible fix, if wanted: a second generated tier keyed "$group|$Kind", emitted only for group+Kind pairs where every version in the spec agrees on the plural. That is still upstream data, not a heuristic -- the plural is a property of the GroupResource, which is what RBAC addresses, and the version never varies it. The generator would assert the agreement and die otherwise (it already dies on same-key conflicts). Cost: ~78 extra table entries plus one fallback lookup.
+
+Note the design constraint in #33 was explicitly "group+version+Kind, not the bare Kind"; a group+Kind tier meets the disambiguation intent (core Event vs events.k8s.io Event stay distinct) but is a deliberate widening and needs a call from the maintainer.
+
+Also undef, and correctly so (not part of this ticket): the 3 subresources (Eviction, Scale, TokenRequest) and the 7 embedded *TemplateSpec / *Template types, which have no GVK and never appear as a "kind:" on the wire.
+Implemented, uncommitted, left in the tree for the maintainer's lane (Changes + commit not touched).
+
+Second tier landed as %RESOURCE_PLURAL_BY_GROUP in lib/IO/K8s/Role/APIObject.pm, keyed "$group|$Kind" ('' group for core), consulted only when the exact "$api_version/$Kind" lookup misses. maint/spec-resource-plural-gen.pl emits both tables from one run into two separately delimited generated blocks and dies if two versions of one group claim different plurals for one Kind.
+
+Numbers against spec/v1.36.3.json: 95 tier-1 entries (unchanged), 76 tier-2 entries. Shipped upstream APIObject classes 120: 110 now carry a plural, up from 95. The agreement assertion never fired on the real spec (0 disagreements); verified it is live by running the generator against a synthetic spec with a deliberate v1/v1beta1 plural mismatch, which dies as intended.
+
+Still undef, by design: the 3 subresources (Eviction, Scale, TokenRequest, filtered out by trailing path segment so neither tier can reach them) and the 7 embedded template types (PodTemplateSpec, PersistentVolumeClaimTemplate, JobTemplateSpec, ResourceClaimTemplateSpec x4 - no GVK at all).
+
+t/51_resource_plural.t extended to 12 subtests: the 15 classes resolving, each against its served sibling; core Event vs events.k8s.io Event still distinct; a synthetic IO::K8s::Api::Batch::V1alpha9::Ingress tripwire that must stay undef (a bare-Kind fallback would hand it 'ingresses'); the full 120-class coverage guard with the exact 10-item miss list. The old #33 assertion 'resource.k8s.io/v1alpha3 ResourceClaim -> undef' was the one claim replaced, deliberately.
+
+prove -lr t/ 3951 tests PASS; dzil test 4798 tests PASS; generator re-run byte-identical.
+Verified independently by the orchestrating agent, then pushed as d8aa8f49:
+
+- all 15 previously-undef classes now resolve (resourceclaims, resourceslices,
+  flowschemas, volumeattributesclasses, leasecandidates, selfsubjectreviews, ...)
+- core/v1 Event and events.k8s.io/v1 Event still distinct
+- subresources and *TemplateSpec types still undef; the near miss holds -
+  ResourceClaimTemplate resolves, ResourceClaimTemplateSpec does not
+- cross-version agreement assertion re-tested with my own synthetic conflicting
+  spec: dies with exit 255 and a message naming both source paths. Live, not
+  dead code.
+- generator idempotent after all edits (byte-identical second run):
+  95 plurals, 76 group plurals
+- prove -lr t/ 3951 PASS, and PASS again with the karr #34 shadow stubs on \@INC
+- dzil test 55 files / 4798 tests PASS
+
+The replaced karr #33 test claim was reviewed and is correct to replace: it
+asserted fail-closed undef for unserved GVKs, which is exactly what this ticket
+supersedes. Rewritten to guard the boundary that still holds (group-qualified,
+never bare Kind) rather than deleted.
