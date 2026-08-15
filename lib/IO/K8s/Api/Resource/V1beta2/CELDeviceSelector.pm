@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1beta2::CELDeviceSelector;
 # ABSTRACT: CELDeviceSelector contains a CEL expression for selecting a device.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s expression => Str, 'required';

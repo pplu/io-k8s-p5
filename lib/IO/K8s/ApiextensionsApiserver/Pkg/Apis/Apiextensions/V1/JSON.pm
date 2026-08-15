@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSON;
 # ABSTRACT: JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use v5.10;
 use Moo;
 use JSON::MaybeXS ();

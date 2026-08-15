@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1alpha2::WorkloadPodGroupTemplateReference;
 # ABSTRACT: WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s podGroupTemplateName => Str, 'required';

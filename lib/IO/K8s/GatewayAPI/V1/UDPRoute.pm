@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::UDPRoute;
 # ABSTRACT: Gateway API raw UDP routing rules
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1',
     resource_plural => 'udproutes';

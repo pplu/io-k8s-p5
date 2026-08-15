@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1::ExactDeviceRequest;
 # ABSTRACT: ExactDeviceRequest is a request for one or more identical devices.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s adminAccess => Bool;

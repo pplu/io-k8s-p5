@@ -10,7 +10,7 @@ use Scalar::Util ();
 use IO::K8s::AutoGen;
 use namespace::clean;
 
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 
 # Track which classes we've auto-generated
 my %_autogen_cache;

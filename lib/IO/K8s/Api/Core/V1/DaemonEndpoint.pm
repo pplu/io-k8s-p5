@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::DaemonEndpoint;
 # ABSTRACT: DaemonEndpoint contains information about a single Daemon endpoint.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s Port => Int, 'required';

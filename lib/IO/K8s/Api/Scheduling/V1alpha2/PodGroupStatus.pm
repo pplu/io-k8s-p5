@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1alpha2::PodGroupStatus;
 # ABSTRACT: PodGroupStatus represents information about the status of a pod group.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s conditions => ['Meta::V1::Condition'];

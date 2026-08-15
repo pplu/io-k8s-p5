@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V1::ScaleStatus;
 # ABSTRACT: ScaleStatus represents the current status of a scale subresource.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s replicas => Int, 'required';

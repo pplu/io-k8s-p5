@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumBGPNodeConfigOverride;
 # ABSTRACT: Cilium BGP per-node configuration override
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumbgpnodeconfigoverrides';

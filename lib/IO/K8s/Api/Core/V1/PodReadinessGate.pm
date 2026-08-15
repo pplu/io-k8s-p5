@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PodReadinessGate;
 # ABSTRACT: PodReadinessGate contains the reference to a pod condition
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s conditionType => Str, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::Toleration;
 # ABSTRACT: The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s effect => Str;

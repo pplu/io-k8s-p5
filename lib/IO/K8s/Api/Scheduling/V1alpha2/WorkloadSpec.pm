@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1alpha2::WorkloadSpec;
 # ABSTRACT: WorkloadSpec defines the desired state of a Workload.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s controllerRef => 'Scheduling::V1alpha2::TypedLocalObjectReference';

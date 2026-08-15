@@ -1,6 +1,6 @@
 package IO::K8s::Api::Batch::V1::JobStatus;
 # ABSTRACT: JobStatus represents the current state of a Job.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s active => Int;

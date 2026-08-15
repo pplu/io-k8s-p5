@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::EventSource;
 # ABSTRACT: EventSource contains information for an event.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s component => Str;

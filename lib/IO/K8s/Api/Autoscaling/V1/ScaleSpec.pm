@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V1::ScaleSpec;
 # ABSTRACT: ScaleSpec describes the attributes of a scale subresource.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s replicas => Int;

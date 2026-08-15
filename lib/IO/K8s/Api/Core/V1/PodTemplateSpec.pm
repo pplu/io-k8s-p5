@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PodTemplateSpec;
 # ABSTRACT: PodTemplateSpec describes the data a pod should have when created from a template
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use IO::K8s::APIObject;
 
 =description

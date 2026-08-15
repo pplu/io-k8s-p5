@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaPropsOrStringArray;
 # ABSTRACT: JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use v5.10;
 use Moo;
 use Types::Standard qw( ArrayRef InstanceOf Maybe Str );

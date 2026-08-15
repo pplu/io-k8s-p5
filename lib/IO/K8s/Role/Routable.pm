@@ -1,6 +1,6 @@
 package IO::K8s::Role::Routable;
 # ABSTRACT: Role for building HTTP/gRPC routing rules
-our $VERSION = '1.107';
+our $VERSION = '1.108';
 use Moo::Role;
 
 requires '_route_format';
