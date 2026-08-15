@@ -10,9 +10,21 @@ Revision history for IO-K8s
     'StaticWebSite => "+My::StaticWebSite"' inflates again from a manifest
     hashref instead of dying with "Cannot resolve Kubernetes GVK". The
     fail-closed semantics from karr #17 are preserved: a class that cannot
-    verify the requested version (mismatch, or no api_version() method) is
-    never substituted. The fallback runs before openapi_spec AutoGen, since
+    verify the requested version is never substituted — whether it reports
+    a different version, has no api_version() method, returns undef from it,
+    or implements api_version as an instance attribute so that the class
+    method call dies. The fallback runs before openapi_spec AutoGen, since
     the user explicitly registered the class.
+
+  - Stop add() from dying on a provider class whose api_version is an
+    instance attribute (karr #32). Merging a resource_map — via
+    IO::K8s->new(with => [...]) or ->add(...) — asks each mapped class for
+    its api_version() to build the domain-qualified key. A class that
+    implements api_version as a Moo attribute rather than a constant made
+    that class-method call die, taking the whole merge with it. Such a
+    class is now registered under its short name and simply skipped for
+    the qualified key, which is the only correct answer: no qualified key
+    can be derived for it.
 
 1.106     2026-08-13 02:59:43Z
 

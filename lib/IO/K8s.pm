@@ -353,7 +353,13 @@ sub _qualify_class_path {
         ? substr($class_path, 1) : "IO::K8s::$class_path";
 
     return unless _class_exists($full_class) && $full_class->can('api_version');
-    my $api_version = $full_class->api_version;
+    # Ask as a class method, but only accept an answer that comes back without
+    # error (same guard as IO::K8s::List::api_version). An external provider's
+    # class may implement api_version as an instance attribute rather than a
+    # constant, in which case the class-method call dies -- skip qualifying it
+    # instead of letting add() blow up.
+    my $api_version = eval { $full_class->api_version };
+    return if $@;
     return unless $api_version;
 
     my $qkey = "$api_version/$kind";
@@ -556,7 +562,14 @@ sub _resolve_short_name_gvk {
         ? substr($mapped, 1) : "IO::K8s::$mapped";
 
     return unless _class_exists($full_class) && $full_class->can('api_version');
-    return unless $full_class->api_version eq $api_version;
+    # Ask as a class method, but only accept an answer that comes back without
+    # error (same guard as IO::K8s::List::api_version). A class registered via
+    # resource_map need not be an IO::K8s::APIObject: api_version may be an
+    # instance attribute (class-method call dies) or simply return undef. Both
+    # fail closed here rather than dying or warning.
+    my $class_api_version = eval { $full_class->api_version };
+    return if $@;
+    return unless defined $class_api_version && $class_api_version eq $api_version;
 
     return $self->_resolve_mapped($mapped, $kind);
 }
