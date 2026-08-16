@@ -739,7 +739,7 @@ sub json_to_object {
     }
 
     # Two arguments: class and JSON
-    my $class = $self->expand_class($class_or_json);
+    my $class = $self->_expand_class_or_die($class_or_json);
     my $struct = $self->json->decode($json);
     return $self->_struct_to_object_expanded($class, $struct);
 }
@@ -758,7 +758,7 @@ sub struct_to_object {
     # '+' full class). Callers that already hold a resolved class name must
     # use _struct_to_object_expanded() instead — see karr #35.
     return $self->_struct_to_object_expanded(
-        $self->expand_class($class_or_struct), $params);
+        $self->_expand_class_or_die($class_or_struct), $params);
 }
 
 # struct_to_object() minus the name resolution: $class is already the final
@@ -803,7 +803,7 @@ sub inflate {
 
     my $class = $api_version_supplied
         ? $self->expand_class($kind, $api_version)
-        : $self->expand_class($kind);
+        : $self->_expand_class_or_die($kind);
     _die_resolution_error($kind, $api_version)
         if $api_version_supplied && !defined $class;
     $self->load_class($class);
@@ -831,13 +831,32 @@ sub new_object {
 
     my $class = $api_version_supplied
         ? $self->expand_class($short_class, $api_version)
-        : $self->expand_class($short_class);
+        : $self->_expand_class_or_die($short_class);
     _die_resolution_error($short_class, $api_version)
         if $api_version_supplied && !defined $class;
-    if (!defined($class) && $short_class =~ m{\A(.*)/([^/]*)\z}) {
+    return $self->_struct_to_object_expanded($class, $params);
+}
+
+# expand_class() for a caller-supplied name that carries no separate
+# $api_version argument, failing closed the way the explicit-apiVersion path
+# already does.
+#
+# A name with its apiVersion inside the string ('cilium.io/v2/UnknownKind') is
+# an exact GVK request just like a separate argument, so an unresolvable one
+# comes back undef. That undef must become the GVK error here: passed on, it
+# reaches load_class() and dies out of Module::Runtime with 'argument is not a
+# module name', which names neither the kind nor the apiVersion (karr #39).
+#
+# A name WITHOUT a domain qualifier is not an undef case and must not become
+# one: expand_class() falls back to IO::K8s::<Name> there, so an unknown bare
+# Kind keeps failing on the missing module, not on GVK resolution.
+sub _expand_class_or_die {
+    my ($self, $name) = @_;
+    my $class = $self->expand_class($name);
+    if (!defined($class) && $name =~ m{\A(.*)/([^/]*)\z}) {
         _die_resolution_error($2, $1);
     }
-    return $self->_struct_to_object_expanded($class, $params);
+    return $class;
 }
 
 sub _die_resolution_error {

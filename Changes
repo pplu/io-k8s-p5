@@ -2,6 +2,21 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Fail closed on an unresolvable GVK in every entry point, not just
+    new_object (karr #39). A name carrying its apiVersion inside the string,
+    'nonexistent.io/v1/UnknownKind', is an exact GVK request and comes back
+    from expand_class as undef. Only new_object turned that into the
+    intended "Cannot resolve Kubernetes GVK: kind ..., apiVersion ...";
+    json_to_object, struct_to_object and inflate passed the undef on to
+    load_class and died out of Module::Runtime with "argument is not a
+    module name", which names neither the kind nor the apiVersion. inflate
+    had the guard on its explicit-apiVersion branch only, so the
+    single-argument forms and load_yaml, which all route through it,
+    inherited the hole. All four now share one check. A name without a
+    domain qualifier is deliberately not affected: expand_class still falls
+    back to IO::K8s::<Name> there, so an unknown bare Kind keeps failing on
+    the missing module rather than on GVK resolution.
+
   - Stop boolean fields reading an unblessed \0 as true (karr #37). The
     is_bool branch of struct_to_object/inflate tested the reference itself,
     and every reference is true in Perl, so the classic Perl false idiom

@@ -18,6 +18,10 @@
 #     on both call paths: _resolve_short_name_gvk (expand_class's GVK
 #     lookup) and _qualify_class_path (add()/with(), driven at
 #     IO::K8s->new(with => [...]) construction time).
+#   - karr #39: the undef expand_class() returns for an unresolvable
+#     domain-qualified name has to surface as that same GVK error on EVERY
+#     public entry point, not just new_object() — and a name without a
+#     domain qualifier must keep its IO::K8s::<Name> fallback instead.
 #
 # Pure local fixtures — no network, no cluster.
 
@@ -150,6 +154,60 @@ subtest 'version mismatch fails closed' => sub {
         });
     } qr/Cannot resolve Kubernetes GVK: kind 'StaticWebSite', apiVersion 'wrong\.example\.com\/v2'/,
         'inflate with mismatched apiVersion dies with GVK error';
+};
+
+subtest 'karr #39: unresolvable GVK string fails closed on every entry point' => sub {
+    # expand_class() returns undef for a domain-qualified name it cannot
+    # resolve. Every public entry point that forwards that result has to turn
+    # it into the GVK error; without the guard the undef reaches load_class()
+    # and Module::Runtime dies with 'argument is not a module name', which
+    # names neither the kind nor the apiVersion.
+    my $api = IO::K8s->new(resource_map => \%map);
+
+    my $unresolvable = 'nonexistent.io/v1/UnknownKind';
+    my $gvk_error = qr/\ACannot resolve Kubernetes GVK: kind 'UnknownKind', apiVersion 'nonexistent\.io\/v1'/;
+
+    is($api->expand_class($unresolvable), undef,
+        'expand_class returns undef for an unresolvable domain-qualified name');
+
+    throws_ok { $api->new_object($unresolvable, { metadata => { name => 'x' } }) }
+        $gvk_error, 'new_object dies with the GVK error';
+
+    throws_ok { $api->json_to_object($unresolvable, '{"metadata":{"name":"x"}}') }
+        $gvk_error, 'json_to_object dies with the GVK error, not Module::Runtime';
+
+    throws_ok { $api->struct_to_object($unresolvable, { metadata => { name => 'x' } }) }
+        $gvk_error, 'struct_to_object dies with the GVK error, not Module::Runtime';
+
+    # inflate()'s guard only covered the branch where apiVersion is present
+    # (see 'version mismatch fails closed' above). A kind that is itself
+    # domain-qualified, with no apiVersion alongside it, took the versionless
+    # branch and hit the same undef.
+    throws_ok { $api->inflate({ kind => $unresolvable }) }
+        $gvk_error, 'inflate with a domain-qualified kind and no apiVersion dies with the GVK error';
+};
+
+subtest 'karr #39: a name without a domain qualifier is not an undef case' => sub {
+    # The counterpart claim: expand_class() only fails closed for names that
+    # carry an apiVersion (explicitly or inside the string). A bare Kind falls
+    # back to IO::K8s::<Kind>, so the entry points must still fail on the
+    # missing module — that fallback must not be turned into a GVK error.
+    my $api = IO::K8s->new(resource_map => \%map);
+
+    my $bare = 'TotallyUnknownKind';
+    my $load_error = qr/Can't locate IO\/K8s\/TotallyUnknownKind\.pm/;
+
+    is($api->expand_class($bare), 'IO::K8s::TotallyUnknownKind',
+        'bare unresolvable name still falls back to IO::K8s::<Kind>');
+
+    throws_ok { $api->new_object($bare, {}) } $load_error,
+        'new_object keeps the module-load failure for a bare name';
+    throws_ok { $api->json_to_object($bare, '{}') } $load_error,
+        'json_to_object keeps the module-load failure for a bare name';
+    throws_ok { $api->struct_to_object($bare, {}) } $load_error,
+        'struct_to_object keeps the module-load failure for a bare name';
+    throws_ok { $api->inflate({ kind => $bare }) } $load_error,
+        'inflate keeps the module-load failure for a bare kind';
 };
 
 subtest 'mapped class without api_version() fails closed' => sub {
