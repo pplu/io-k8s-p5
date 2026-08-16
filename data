@@ -1,0 +1,36 @@
+---
+claimed_at: 2026-08-16T16:35:30Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-16T16:35:30Z
+created: 2026-08-16T05:35:46Z
+id: 39
+priority: low
+started: 2026-08-16T16:28:24Z
+status: done
+tags:
+- dsl
+- resolution
+title: json_to_object does not fail closed on an unresolvable class
+updated: 2026-08-16T16:35:30Z
+---
+
+new_object() guards the undef that expand_class() returns for an unresolvable
+domain-qualified name:
+
+    if (!defined($class) && $short_class =~ m{\A(.*)/([^/]*)\z}) {
+        _die_resolution_error($2, $1);
+    }
+
+json_to_object($class, $json) has no such guard, so
+
+    $k8s->json_to_object("nonexistent.io/v1/UnknownKind", $json)
+
+dies with "argument is not a module name" out of Module::Runtime instead of
+the intended "Cannot resolve Kubernetes GVK: kind ..., apiVersion ...".
+
+Pre-existing; karr #35 only changed the wording (before #35 the same call
+produced four "Use of uninitialized value" warnings and then "Can't call
+method \"can\" on an undefined value"). Fix is the same three lines new_object
+already has, plus a test.
+Geloest. Korrektur der Ticket-Annahme: nicht nur json_to_object, sondern VIER Einstiegspunkte hatten die Luecke. inflate() sah geguardet aus, war es aber nicht -- sein _die_resolution_error sitzt nur auf dem explicit-apiVersion-Zweig, ein slash-behafteter kind ohne apiVersion nahm den versionslosen Zweig; die Einargument-Formen von json_to_object/struct_to_object und load_yaml routen alle ueber inflate und erbten die Luecke. struct_to_object war der beim Review gefundene dritte Fall. Fix: gemeinsamer _expand_class_or_die (die drei Zeilen, die new_object schon inline hatte, hochgezogen; new_object-Kopie entfernt), genutzt von json_to_object, struct_to_object, inflate und new_object. Der explicit-apiVersion-Guard bleibt unangetastet -- andere Bedingung, Zusammenlegen waere Verhaltensaenderung. Nicht domain-qualifizierte Namen bleiben bewusst aussen vor (expand_class faellt dort auf IO::K8s::<Name> zurueck, nie undef) und das ist als eigener Gegentest festgehalten, damit ein spaeterer Umbau den Fallback nicht still in einen GVK-Fehler dreht. Tests in t/49_crd_resource_map_gvk.t erweitert statt neuer Datei (dort liegt die 'Cannot resolve Kubernetes GVK'-Behauptung aus karr #17/#31/#32); verifiziert rot gegen den Vor-Fix-Stand. Alle vier Einstiegspunkte empirisch nachgemessen. prove -lr t/: 55 Dateien / 3966 Tests PASS.
