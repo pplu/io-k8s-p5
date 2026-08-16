@@ -1,0 +1,36 @@
+---
+claimed_at: 2026-08-16T16:49:01Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-16T16:49:01Z
+created: 2026-08-16T05:35:35Z
+id: 38
+priority: low
+started: 2026-08-16T16:35:54Z
+status: done
+tags:
+- bug
+- crd
+title: kind() returns undef for a single-segment CRD class
+updated: 2026-08-16T16:49:01Z
+---
+
+IO::K8s::Role::APIObject::kind() derives the Kind from the last :: segment:
+
+    if ($class =~ /::(\w+)$/) { return $1 }
+    return undef;
+
+A CRD class registered as a top-level single-segment package -- resource_map
+value "+Widget", or new_object("+Widget", ...) -- therefore has no kind(), and
+TO_JSON serializes without a "kind:" field. api_version() is fine (it comes
+from the import parameter); only kind() is empty.
+
+Found while doing karr #35, which made single-segment "+" classes reliably
+reachable (they used to be re-expanded away). Not caused by #35 -- it just
+became observable. t/52_expand_class_shadow_window.t documents the gap in a
+comment instead of asserting it.
+
+Fix would be a one-line fallback to the bare class name when there is no "::".
+Needs a call: is a single-segment CRD class a shape we want to support at all,
+or should IO::K8s::APIObject warn on it?
+Geloest. Entscheidung zur offenen Designfrage: einsegmentige CRD-Klassen sind eine unterstuetzte Form -- '+Name' ist der dokumentierte Weg, ist ein unterstuetzter resource_map-Wert, wird in t/52 getestet, und karr #35 hat diese Namen gerade erst zuverlaessig erreichbar gemacht. Eine Klasse erreichbar zu machen und sie dann Output erzeugen zu lassen, den der Cluster ablehnt, ist dieselbe stille Fehlfunktion wie #35/#37/#39. Fix: zweite, voll verankerte /\A(\w+)\z/-Verzweigung in kind() (APIObject.pm:479-488). Nebenbefund: set_owner() war dort nicht nur still, sondern starb -- OwnerReference deklariert kind als required Str, undef faellt durch die Typpruefung; set_owner/is_owned_by rufen ->kind auf und sind mitgefixt. Rest des Role geprueft: api_version() parst den Klassennamen fuer CRDs gar nicht (kommt aus dem Import-Parameter), resource_plural() nutzt zwar /::(\w+)\z/, laeuft aber erst nach einem IO::K8s::-Praefixtreffer -- das '::' ist dort garantiert, ein Fallback waere toter Code. Beides gemessen, nicht gelesen. Regressionstest t/54_single_segment_kind.t prueft die Serialisierung (struct, JSON, YAML) plus Roundtrip -- vorher konnte inflate() das eigene Manifest nicht lesen ('missing kind field'); verifiziert rot gegen den Vor-Fix-Stand (4/4 Subtests). Platzhalter-Kommentar in t/52 in echte Assertion umgewandelt. Committet als 3fc626a1. Folgefund eine Datei weiter als #41 erfasst und ebenfalls geloest.
