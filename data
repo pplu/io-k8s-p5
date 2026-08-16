@@ -1,0 +1,47 @@
+---
+claimed_at: 2026-08-16T05:41:15Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-16T05:41:15Z
+created: 2026-08-15T22:47:49Z
+id: 35
+priority: low
+started: 2026-08-16T05:17:36Z
+status: done
+tags:
+- bug
+- dsl
+- resolution
+title: 'expand_class: residual shadow window for Kinds not in the resource_map'
+updated: 2026-08-16T05:41:15Z
+---
+
+Follow-up from karr #34 (GH pplu/io-k8s-p5#7/#8), recorded rather than fixed there
+to keep that change surgical.
+
+#34 put the resource_map ahead of the "is there a class of this exact name?" probe,
+so every registered Kind is now safe. Two things it deliberately did not change:
+
+1. RESIDUAL SHADOW WINDOW
+   A Kind that is NOT in the resource_map and not reachable via class_namespaces still
+   reaches the probe before the IO::K8s:: relative path and before AutoGen. So with an
+   openapi_spec that defines kind "Widget" AND an installed top-level Widget.pm,
+   expand_class("Widget") returns the CPAN module, not the generated class. Narrow
+   (unregistered kind + same-named top-level distribution + openapi_spec), and the
+   workaround is the documented one: "+My::Widget", class_namespaces, or registering
+   the kind. Tightening it would mean deciding that a single-segment bare name is
+   always a Kind and never a package name, which would break new_object("+Widget", ...)
+   on the struct_to_object re-expansion (see 2).
+
+2. struct_to_object() RE-EXPANDS AN ALREADY-EXPANDED NAME
+   new_object() calls expand_class(), then hands the resolved class to
+   struct_to_object(), which calls expand_class() on it again. That second pass is the
+   only reason the loadable-class probe has to stay in expand_class at all, and the
+   only reason it must load rather than merely test (a resource_map "+My::CRD" value
+   comes back from _resolve_mapped unloaded). Making struct_to_object skip re-expansion
+   for a value it was handed pre-expanded would let the probe be tightened, but
+   struct_to_object is also called directly with short names, so it cannot simply stop
+   expanding - it needs a way to tell the two callers apart.
+
+Not urgent: no reported failure. Revisit if another shadowing report comes in.
+Geloest: beide Teile. Teil 2 (struct_to_object re-expandiert nicht mehr) in lib/IO/K8s.pm via neuem privatem _struct_to_object_expanded, genutzt von new_object/json_to_object/_inflate_struct; struct_to_object bleibt oeffentlich unveraendert. Teil 1 (Shadow-Fenster) via 'return $class if $class =~ /::/ && _class_exists($class)' -- einsegmentige bare Namen sind Kinds und laufen zu IO::K8s::<Kind> und AutoGen weiter. Nebenbei ein echter Bug behoben: new_object('+Secret',...) lieferte IO::K8s::Api::Core::V1::Secret statt der Aufruferklasse, weil die Re-Expansion 'Secret' in der resource_map fand -- die '+'-Garantie ging bei jedem new_object/json_to_object verloren. Neuer Regressionstest t/52_expand_class_shadow_window.t (8 Subtests, lokale Fixtures, netzfrei); verifiziert rot gegen den Vor-Fix-Stand (4/8 Subtests). t/50 Positivkontrolle auf Not::AKubernetesKind umgestellt, einsegmentige Haelfte andersherum assertiert -- #35 ersetzt diese Behauptung, verschiebt sie nicht. prove -lr t/: 54 Dateien / 3959 Tests PASS. dzil test: 56 / 4806 PASS. Kein Restfenster: verschaerfter Zweig instrumentiert und ueber die volle Suite geprueft, nur die Shadow-Fixtures traten je auf. Changes-Eintraege gesetzt. Drift als #38 und #39 erfasst, beide vorbestehend. Nicht committet.
