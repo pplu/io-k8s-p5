@@ -1,0 +1,44 @@
+---
+claimed_at: 2026-08-16T16:49:10Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-16T16:49:10Z
+created: 2026-08-16T16:41:25Z
+id: 41
+priority: low
+started: 2026-08-16T16:42:48Z
+status: done
+tags:
+- bug
+- crd
+title: IO::K8s::List::kind() drops the kind for a single-segment item_class
+updated: 2026-08-16T16:49:10Z
+---
+
+Same defect class as karr #38, one file over and out of its scope.
+
+IO::K8s::List::kind() (lib/IO/K8s/List.pm:110-117) has two paths:
+
+  1. the first item's ->kind . "List"
+  2. a fallback deriving it from item_class: /::(\w+)$/ . "List"
+
+Path 1 is fixed for free by karr #38 (kind() now falls back to the bare
+class name). Path 2 still returns undef for a single-segment item_class,
+so TO_JSON emits apiVersion but no kind::
+
+  my $l = IO::K8s::List->new(items => [], item_class => "Bare");
+  $l->api_version;  # "vendor.example.com/v1"
+  $l->kind;         # undef   <-- should be "BareList"
+
+That fallback is exactly what item_class exists for -- the POD says
+"Used for empty lists where the type can't be inferred" -- so the gap only
+shows on an empty list of a single-segment CRD Kind, which is the case the
+attribute was added for.
+
+Fix is the same one-line shape as #38: no "::" means the whole name is the
+last segment. Wants a serialization assertion (the emitted list manifest
+carries kind:), not just an accessor read.
+
+Found while doing karr #38; left out deliberately because #38 was scoped to
+IO::K8s::Role::APIObject.
+Geloest. Derselbe Defekt wie #38 im item_class-Fallback von IO::K8s::List::kind() -- und das ist genau der Leerlisten-Fall, in dem es kein erstes Item zum Fragen gibt, also der Grund, warum item_class ueberhaupt existiert. Der nichtleere Pfad war durch #38 schon gefixt (er fragt das Item). Fix: gleiche voll verankerte Verzweigung wie APIObject.pm, bewusst gleiche Form. Keine weitere Stelle in List.pm teilt die Annahme -- Zeile 111 war die einzige Regex der Datei; api_version() delegiert seit karr #22 an $class->api_version und parst den Namen nie (daher im Ticket-Beispiel korrektes apiVersion neben undef kind), es gibt keine item_class-Ableitung und keine Inflation in dieser Klasse. Tests in t/44_list_api_version.t erweitert statt neuer Datei; beide Pfade festgenagelt (Leerliste ueber item_class als Fix, nichtleere Liste als Kontrolle). Verifiziert rot gegen den Vor-Fix-Stand: genau die zwei Leerlisten-Assertions (36, 38) fielen, die Kontrolle blieb gruen. Committet als 4887f658.
