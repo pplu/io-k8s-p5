@@ -2,6 +2,17 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Derive kind() for a single-segment class from the whole class name
+    (karr #38). A CRD registered as a top-level package -- reached as
+    '+Widget' or through a resource_map value of '+Widget' -- has no '::',
+    so kind() returned undef and TO_JSON emitted a manifest with no kind:
+    at all, which the API server rejects. karr #35 had just made those
+    names reliably reachable, so the class was usable and its output was
+    not. set_owner() was worse than silent there: OwnerReference declares
+    kind as a required Str, so an undef kind made it die outright.
+    api_version() and resource_plural() are unaffected -- both key off an
+    IO::K8s:: prefix, so the '::' is guaranteed by the time they parse.
+
   - Document the fail-closed guarantee of the GVK entry points (karr #40).
     new_object, inflate, json_to_object and struct_to_object all die on an
     unresolvable GVK request rather than substituting a different version or

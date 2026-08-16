@@ -476,12 +476,26 @@ sub kind {
     if ($class =~ /::(\w+)$/) {
         return $1;
     }
+
+    # No '::' at all: a CRD registered as a single-segment top-level package,
+    # reached as '+Widget' or through a resource_map value of '+Widget'. That
+    # is a supported shape -- '+Name' is the documented route to a
+    # single-segment class of your own, and karr #35 is what made those names
+    # reliably reachable -- so the whole name is the last segment. Without
+    # this the class is reachable but TO_JSON emits no kind: at all, which the
+    # API server rejects (karr #38).
+    if ($class =~ /\A(\w+)\z/) {
+        return $1;
+    }
+
     return undef;
 }
 
 =method kind
 
-Returns the Kubernetes kind derived from the class name.
+Returns the Kubernetes kind derived from the class name: the last C<::>
+segment, or the whole name for a single-segment class such as a CRD
+registered as C<+Widget>.
 
     $pod->kind;  # "Pod"
     $deployment->kind;  # "Deployment"

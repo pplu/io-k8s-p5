@@ -220,14 +220,15 @@ subtest "karr #35/2: '+Name' survives new_object, even when Name is a Kind" => s
         'Secret', "struct_to_object('+Secret')");
 
     SKIP: {
-        skip 'the +Secret object is not the CRD class', 2 unless _is_a($obj, 'Secret');
+        skip 'the +Secret object is not the CRD class', 3 unless _is_a($obj, 'Secret');
         my $wire = $io->object_to_struct($obj);
         is($wire->{apiVersion}, 'vendor.example.com/v1',
             'the CRD serializes its own apiVersion');
-        # Not asserting kind: IO::K8s::Role::APIObject::kind() derives it from
-        # the last '::' segment, so a single-segment package has none. Out of
-        # scope here — a single-segment class is reachable only via '+', which
-        # is what this subtest is about.
+        # karr #38: kind() falls back to the bare class name when there is no
+        # '::' to split on, so a single-segment package -- the shape this
+        # subtest makes reachable -- serializes a manifest the cluster accepts
+        # rather than one with no kind: at all. Details in t/54.
+        is($wire->{kind}, 'Secret', 'and its kind, from the bare package name');
         is($wire->{spec}{token}, 'abc', 'and the spec payload');
     }
 
