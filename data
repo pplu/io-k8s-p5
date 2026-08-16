@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-08-16T16:44:58Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-16T16:44:58Z
+created: 2026-08-16T16:36:37Z
+id: 40
+priority: low
+started: 2026-08-16T16:36:45Z
+status: done
+tags:
+- docs
+- api
+title: 'POD: fail-closed guarantee of the GVK entry points is undocumented'
+updated: 2026-08-16T16:44:58Z
+---
+
+Gefunden beim Fix von karr #39. new_object, json_to_object, struct_to_object und inflate sterben jetzt einheitlich mit "Cannot resolve Kubernetes GVK: kind ..., apiVersion ...", wenn ein domain-qualifizierter Name nicht aufloesbar ist -- und bewusst NICHT bei einem nicht-qualifizierten Namen, wo expand_class auf IO::K8s::<Name> zurueckfaellt und der Fehler aus dem Modulladen kommt.
+
+Die POD dieser Methoden (lib/IO/K8s.pm ~1463-1487) beschreibt derzeit gar kein Fehlerverhalten. Nichts davon ist falsch, aber die Garantie -- und die absichtliche Ausnahme -- steht nirgends, obwohl sie jetzt getestet ist (t/49_crd_resource_map_gvk.t) und Consumer darauf bauen sollen.
+
+Lane: io-k8s-doc-writer.
+Erledigt, POD-only. Die volle Regel steht jetzt bei new_object (was als GVK-Anfrage zaehlt, der woertliche Fehlertext, und warum ein blosser Kind ausgenommen ist und stattdessen am Modulladen scheitert); inflate, json_to_object und struct_to_object verweisen darauf statt zu wiederholen. Verifiziert: der Diff an lib/IO/K8s.pm ist reine Prosa, keine Code-Zeile. Anmerkung zum Ablauf: der Doc-Agent hielt die parallel laufende karr #38-Arbeit (APIObject.pm, t/52, t/54) faelschlich fuer eigene Scope-Creep und schlug vor, sie zu verwerfen -- er hatte keinen Kontext zum parallelen Auftrag. Nichts wurde verworfen, #38 ist unversehrt.
