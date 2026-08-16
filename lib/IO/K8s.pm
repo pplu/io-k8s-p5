@@ -1459,6 +1459,22 @@ single-segment class of your own, prefix it: C<< $k8s->new_object('+Widget',
 An optional third argument specifies the C<api_version> to disambiguate when
 multiple providers register the same kind name.
 
+If the name is domain-qualified (like C<cilium.io/v2/NetworkPolicy>) or an
+explicit C<api_version> argument is given, it is a GVK (Group/Version/Kind)
+request. When such a request cannot be resolved to a class, the call dies
+rather than silently falling back to a different version or a similarly-named
+class:
+
+    Cannot resolve Kubernetes GVK: kind 'UnknownKind', apiVersion 'nonexistent.io/v1'
+
+A bare unqualified name is not a GVK request and is exempt from this check --
+as described above, it falls back to C<IO::K8s::>E<lt>KindE<gt>, and if that
+class doesn't exist either, the failure is Perl's own module-loading error
+(C<Can't locate ... in @INC>), not the GVK error.
+
+This same fail-closed behaviour applies uniformly across C<new_object>,
+C<inflate>, C<json_to_object> and C<struct_to_object>.
+
 =head2 inflate
 
     my $obj = $k8s->inflate($json_string);
@@ -1469,6 +1485,10 @@ auto-detected from the C<kind> field in the data. When external resource maps
 have been added via C<add()>, the C<apiVersion> field is used to disambiguate
 colliding kind names.
 
+If C<kind>/C<apiVersion> amount to a GVK request that cannot be resolved, this
+dies with the same fail-closed error as L</new_object> -- see there for the
+exact message and the bare-Kind exemption.
+
 =head2 json_to_object
 
     my $obj = $k8s->json_to_object($json_with_kind);
@@ -1477,6 +1497,11 @@ colliding kind names.
 Convert JSON to an IO::K8s object. With one argument, auto-detects the class
 from C<kind>. With two arguments, uses the specified class.
 
+When the class argument is a GVK request (domain-qualified, or paired with an
+C<api_version>) that cannot be resolved, this dies with the same fail-closed
+error as L</new_object> -- see there for the exact message and the bare-Kind
+exemption.
+
 =head2 struct_to_object
 
     my $obj = $k8s->struct_to_object(\%hashref_with_kind);
@@ -1484,6 +1509,11 @@ from C<kind>. With two arguments, uses the specified class.
 
 Convert a Perl hashref to an IO::K8s object. With one argument, auto-detects
 the class from C<kind>. With two arguments, uses the specified class.
+
+When the class argument is a GVK request (domain-qualified, or paired with an
+C<api_version>) that cannot be resolved, this dies with the same fail-closed
+error as L</new_object> -- see there for the exact message and the bare-Kind
+exemption.
 
 If the target class provides a C<FROM_STRUCT> class method, it is called as
 C<< $class->FROM_STRUCT($struct, $k8s) >> and its return value is used as-is,

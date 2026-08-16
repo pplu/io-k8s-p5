@@ -2,6 +2,12 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Document the fail-closed guarantee of the GVK entry points (karr #40).
+    new_object, inflate, json_to_object and struct_to_object all die on an
+    unresolvable GVK request rather than substituting a different version or
+    a similarly-named class, and a bare unqualified name is deliberately
+    exempt -- behaviour that was tested but stated nowhere. POD only.
+
   - Fail closed on an unresolvable GVK in every entry point, not just
     new_object (karr #39). A name carrying its apiVersion inside the string,
     'nonexistent.io/v1/UnknownKind', is an exact GVK request and comes back
