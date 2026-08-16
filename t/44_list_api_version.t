@@ -98,4 +98,61 @@ for my $class (
     is( $pod->kind, 'PodList', 'kind still derived from first item' );
 }
 
+# ---------------------------------------------------------------------------
+# karr #41: the item_class fallback in kind() derived the Kind from the last
+# '::' segment and returned undef when the name had none, so an empty list of
+# a single-segment CRD Kind serialised apiVersion but no kind: at all -- a
+# manifest the API server rejects. That empty list is precisely what
+# item_class exists for ("Used for empty lists where the type can't be
+# inferred"), so the fallback failed in its only case. Same defect as karr
+# #38, which fixed the equivalent derivation in IO::K8s::Role::APIObject and
+# thereby the first-item path here.
+# ---------------------------------------------------------------------------
+
+{
+    package Bauble;
+    BEGIN { $INC{'Bauble.pm'} = __FILE__ }
+    use IO::K8s::APIObject
+        api_version     => 'vendor.example.com/v1',
+        resource_plural => 'baubles';
+    k8s spec => { Str => 1 };
+}
+
+# The fix: an EMPTY list with a single-segment item_class. There is no first
+# item to ask, so kind() must fall back to item_class -- with no '::' the
+# whole name is the last segment.
+{
+    my $list = IO::K8s::List->new( items => [], item_class => 'Bauble' );
+    is( $list->kind, 'BaubleList',
+        'empty list with single-segment item_class derives kind BaubleList' );
+    is( $list->api_version, 'vendor.example.com/v1',
+        'and still derives the item class api_version' );
+
+    my $wire = $json->decode($list->to_json);
+    is( $wire->{kind}, 'BaubleList',
+        'empty list with single-segment item_class serialises kind: -- the field whose absence the API server rejects' );
+    is( $wire->{apiVersion}, 'vendor.example.com/v1',
+        'alongside its apiVersion' );
+    is_deeply( $wire->{items}, [], 'and an empty items array' );
+}
+
+# The control: a NON-empty list of the same single-segment class goes through
+# the first-item path, which karr #38 already fixed. Asserted here so a later
+# rework of either path cannot silently drop the kind again.
+{
+    my $list = IO::K8s::List->new(
+        items => [ Bauble->new( spec => { size => 'l' } ) ],
+    );
+    is( $list->kind, 'BaubleList',
+        'non-empty list of a single-segment class derives kind from the first item' );
+
+    my $wire = $json->decode($list->to_json);
+    is( $wire->{kind}, 'BaubleList',
+        'non-empty list of a single-segment class serialises kind:' );
+    is( $wire->{apiVersion}, 'vendor.example.com/v1',
+        'and the first item api_version' );
+    is( $wire->{items}[0]{kind}, 'Bauble',
+        'the item itself carries its own kind (karr #38)' );
+}
+
 done_testing;

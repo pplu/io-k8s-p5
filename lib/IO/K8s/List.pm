@@ -111,6 +111,15 @@ sub kind {
         if ($class =~ /::(\w+)$/) {
             return $1 . 'List';
         }
+
+        # No '::' at all: a CRD registered as a single-segment top-level
+        # package, so the whole name is the last segment -- the same
+        # derivation IO::K8s::Role::APIObject::kind() makes (karr #38). This
+        # is the empty-list case item_class exists for, and without it
+        # TO_JSON emits apiVersion but no kind: (karr #41).
+        if ($class =~ /\A(\w+)\z/) {
+            return $1 . 'List';
+        }
     }
 
     return undef;
@@ -119,6 +128,8 @@ sub kind {
 =method kind
 
 Returns the Kubernetes kind (e.g., "PodList"), derived from items or item_class.
+For an C<item_class> the Kind is its last C<::> segment, or the whole name for
+a single-segment class such as a CRD registered as C<+Widget>.
 
 =cut
 

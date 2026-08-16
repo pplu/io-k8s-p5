@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Derive IO::K8s::List::kind() for a single-segment item_class too
+    (karr #41). The same missing '::' as the previous entry, in the
+    item_class fallback -- which is precisely the empty-list case, where
+    there is no first item to ask. An empty list of a single-segment Kind
+    therefore serialized apiVersion without kind:. The non-empty path was
+    already fixed by karr #38, since it asks the item.
+
   - Derive kind() for a single-segment class from the whole class name
     (karr #38). A CRD registered as a top-level package -- reached as
     '+Widget' or through a resource_map value of '+Widget' -- has no '::',
