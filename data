@@ -1,0 +1,34 @@
+---
+claimed_at: 2026-08-16T15:45:31Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-16T15:45:31Z
+created: 2026-08-16T01:51:52Z
+id: 37
+priority: low
+started: 2026-08-16T15:33:09Z
+status: done
+tags:
+- bug
+- robustness
+title: struct_to_object coerces any reference to true — \0 becomes true
+updated: 2026-08-16T15:45:31Z
+---
+
+Boolean coercion in struct_to_object treats every reference as true, so an unblessed \0 — the raw Perl false idiom — arrives as true. Measured on IO::K8s 1.107, Pod spec.containers[0].securityContext.privileged:
+
+    JSON::PP::false  -> false   (correct)
+    plain 0          -> false   (correct)
+    \1               -> true    (correct)
+    \0               -> true    <-- wrong, should be false
+
+All four come back blessed as JSON::PP::Boolean, so the wrong value is indistinguishable from a right one downstream.
+
+Scope, honestly assessed: the common paths are fine. JSON::PP/Cpanel::JSON::XS booleans are blessed and handled correctly, and YAML::PP's default (boolean => 'perl') yields plain 0/1, which also works — so load_yaml is not affected. What breaks is a caller passing the unblessed \0//\1 convention directly, as produced by some serializers and by hand-written code following the classic Perl idiom.
+
+Low priority because the trigger is narrow, but the failure mode is bad where it does hit: a field like privileged, allowPrivilegeEscalation or hostNetwork silently flips from false to true, and nothing downstream can tell.
+
+Likely fix: test for the dereferenced value rather than the reference itself, i.e. treat \0 as false the same way plain 0 is.
+
+Found while auditing p5-mcp-k8s (its k8s_get YAML path); not a bug in that distribution.
+Geloest. Ursache: zwei Boolean-Normalisierungen, die sich widersprachen, und die falsche lief zuerst. Der Bool-Coercer in IO::K8s::Resource dereferenzierte korrekt; der is_bool-Zweig in IO::K8s::_inflate_struct testete die Referenz selbst (jede Referenz ist in Perl wahr) und lief VOR $class->new(%args), reichte dem Coercer also eine plain 1 weiter -- nicht mehr rettbar. Zweiter Defekt in derselben Zeile, im Ticket nicht erfasst und beim Fixen gefunden: der String 'false' ist nicht leer und damit wahr, wurde also zu 1. Der lag auf BEIDEN Pfaden -- auch der Coercer behandelte Strings nie, SecurityContext->new(privileged => 'false') gab 1. Fix: eine gemeinsame IO::K8s::Resource::_normalize_bool (dereferenzieren, dann 'false' ausbuchstabieren, dann Truthiness), genutzt vom Bool-Coercer, vom [Bool]-Coercer und von _inflate_struct. Kein Zyklus, Resource.pm laedt IO::K8s nicht. is_array_of_bool hatte den \0-Bug nie (kein _inflate_struct-Zweig, faellt durch zum dereferenzierenden Array-Coercer), teilte aber den String-Defekt. Verhaltensaenderung, in Changes dokumentiert: ein Hash-/Arrayref auf einem Bool-Feld galt bisher als true und stirbt jetzt in der Dereferenzierung. Regressionstest t/53_bool_normalization.t: 13-Faelle-Matrix ueber struct_to_object, Konstruktor, FROM_HASH und json_to_object, in beiden Richtungen (Accessor UND TO_JSON) plus byte-identische Pod-Serialisierung; verifiziert rot gegen den Vor-Fix-Stand (4/5 Subtests). prove -lr t/: 55 Dateien / 3964 Tests PASS. Committet als 19b15b86, nicht gepusht.
