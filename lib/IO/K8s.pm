@@ -416,7 +416,9 @@ sub add {
 #   2. resource_map, domain-qualified key then short name (via _resolve_mapped,
 #      which checks class_namespaces first)
 #   3. User's class_namespaces
-#   4. A loaded or loadable class of exactly that name
+#   4. A loaded or loadable class of exactly that name -- multi-segment names
+#      only ('My::StaticWebSite'); a single-segment bare name is read as a
+#      Kubernetes Kind and skips this step (karr #35)
 #   5. IO::K8s relative path
 #   6. Auto-generate from openapi_spec (if available)
 sub expand_class {
@@ -486,21 +488,37 @@ sub expand_class {
         }
     }
 
-    # 2. A class of exactly this name that is loaded, or loadable from @INC.
-    #    Serves a CRD class named in full ('My::StaticWebSite'), and the
-    #    re-expansion struct_to_object() performs on an already-expanded name.
-    #    It has to load, not just test: _resolve_mapped() returns a '+'-prefixed
-    #    resource_map value without loading it, so on that second pass the class
-    #    is typically not in memory yet.
+    # 2. A MULTI-SEGMENT class name that is loaded, or loadable from @INC.
+    #    This is the documented CRD case: a class named in full, e.g.
+    #    'My::StaticWebSite'. It has to load, not just test — _resolve_mapped()
+    #    returns a '+'-prefixed resource_map value without loading it, and a
+    #    consumer may name their class here before anything has pulled it in.
     #
     #    Must stay *below* the resource_map lookup (karr #34, GH #7/#8). A bare
     #    Kind is a Kubernetes Kind first and a package name second: with this
     #    ahead of the map, smokers that had the CPAN distributions Event or Role
     #    installed got those back from expand_class('Event')/('Role') instead of
-    #    IO::K8s::Api::Core::V1::Event / IO::K8s::Api::Rbac::V1::Role. Below the
-    #    map, only names the model does not know can reach a foreign package,
-    #    and '+Name' still forces an exact class.
-    return $class if _class_exists($class);
+    #    IO::K8s::Api::Core::V1::Event / IO::K8s::Api::Rbac::V1::Role.
+    #
+    #    Single-segment names are excluded outright (karr #35). Below the map
+    #    they were only reachable for a Kind the model does not know, but that
+    #    still shadowed AutoGen: with an openapi_spec defining kind 'Widget'
+    #    and a top-level Widget.pm installed, expand_class('Widget') returned
+    #    the foreign distribution instead of the generated class. A one-segment
+    #    bare name carries no namespace to tell a Kind from a package, so it is
+    #    read as a Kind: it goes on to IO::K8s::<Kind> and then to AutoGen.
+    #    Multi-segment names are unambiguous and keep the probe.
+    #
+    #    What used to force this check to also catch single-segment names was
+    #    struct_to_object() re-expanding an already-resolved class. It no
+    #    longer does — new_object()/json_to_object()/_inflate_struct() hand
+    #    their resolved name to _struct_to_object_expanded() instead (karr
+    #    #35), so a resource_map value of '+Widget', or new_object('+Widget'),
+    #    never reaches expand_class() a second time.
+    #
+    #    Escape hatches for a single-segment class of your own, all documented:
+    #    '+Widget', class_namespaces, or a resource_map entry.
+    return $class if $class =~ /::/ && _class_exists($class);
 
     # 3. Check IO::K8s relative path
     my $builtin_class = 'IO::K8s::' . $class;
@@ -722,7 +740,7 @@ sub json_to_object {
     # Two arguments: class and JSON
     my $class = $self->expand_class($class_or_json);
     my $struct = $self->json->decode($json);
-    return $self->struct_to_object($class, $struct);
+    return $self->_struct_to_object_expanded($class, $struct);
 }
 
 sub struct_to_object {
@@ -733,8 +751,29 @@ sub struct_to_object {
         return $self->inflate($class_or_struct);
     }
 
-    # Two arguments: class and params
-    my $class = $self->expand_class($class_or_struct);
+    # Two arguments: a class name that still needs resolving, plus params.
+    # This is the public entry point, so the name may be anything
+    # expand_class() accepts (a short Kind, a domain-qualified GVK string, a
+    # '+' full class). Callers that already hold a resolved class name must
+    # use _struct_to_object_expanded() instead — see karr #35.
+    return $self->_struct_to_object_expanded(
+        $self->expand_class($class_or_struct), $params);
+}
+
+# struct_to_object() minus the name resolution: $class is already the final
+# class name.
+#
+# Split out for karr #35. new_object()/json_to_object() used to call
+# expand_class() and then hand the result to struct_to_object(), which
+# expanded it a second time. That second pass re-entered the full search
+# order, so an exactly-resolved name could be re-interpreted:
+# new_object('+Secret', ...) resolved to 'Secret', and the re-expansion found
+# 'Secret' in the resource_map and returned the core v1 Kind instead of the
+# caller's class. It also forced expand_class()'s loadable-class probe to
+# stay broad enough to catch already-resolved names, which is what kept the
+# shadow window open.
+sub _struct_to_object_expanded {
+    my ($self, $class, $params) = @_;
 
     # Already an object of the right class — pass through as-is
     return $params if Scalar::Util::blessed($params) && $params->isa($class);
@@ -797,7 +836,7 @@ sub new_object {
     if (!defined($class) && $short_class =~ m{\A(.*)/([^/]*)\z}) {
         _die_resolution_error($2, $1);
     }
-    return $self->struct_to_object($class, $params);
+    return $self->_struct_to_object_expanded($class, $params);
 }
 
 sub _die_resolution_error {
@@ -850,14 +889,20 @@ sub _inflate_struct {
         my $perl_name = $json_to_perl{$attr} // $attr;
         my $info = $attr_info->{$perl_name} // {};
 
+        # The registry's {class} is always a final class name: the k8s DSL
+        # runs every declared type through IO::K8s::Resource::_expand_class
+        # before storing it, and generated inline structs are named in full.
+        # So these go straight to the pre-expanded path — sending them back
+        # through expand_class() would re-interpret a name that is already
+        # resolved (karr #35).
         if ($info->{is_array_of_objects}) {
             my $inner_class = $info->{class};
-            $args{$attr} = [ map { $self->struct_to_object($inner_class, $_) } @$value ];
+            $args{$attr} = [ map { $self->_struct_to_object_expanded($inner_class, $_) } @$value ];
         } elsif ($info->{is_hash_of_objects}) {
             my $inner_class = $info->{class};
-            $args{$attr} = { map { $_ => $self->struct_to_object($inner_class, $value->{$_}) } keys %$value };
+            $args{$attr} = { map { $_ => $self->_struct_to_object_expanded($inner_class, $value->{$_}) } keys %$value };
         } elsif ($info->{is_object}) {
-            $args{$attr} = $self->struct_to_object($info->{class}, $value);
+            $args{$attr} = $self->_struct_to_object_expanded($info->{class}, $value);
         } elsif ($info->{is_bool}) {
             $args{$attr} = (ref($value) eq '' && lc($value) eq 'true') || $value ? 1 : 0;
         } else {
@@ -1378,7 +1423,14 @@ resources and C<errors> is an ArrayRef of error messages.
 
 Create a new Kubernetes object of the given type. The type can be a short name
 (like C<Pod>), a domain-qualified name (like C<cilium.io/v2/NetworkPolicy>),
-or a full class path.
+or a full class path (like C<My::StaticWebSite>).
+
+A bare one-word name is always read as a Kubernetes Kind, never as a package
+name, so it resolves through the resource map, C<class_namespaces>,
+C<IO::K8s::>E<lt>KindE<gt> and auto-generation -- a same-named top-level
+distribution that happens to be installed is not consulted. To name a
+single-segment class of your own, prefix it: C<< $k8s->new_object('+Widget',
+\%args) >>.
 
 An optional third argument specifies the C<api_version> to disambiguate when
 multiple providers register the same kind name.

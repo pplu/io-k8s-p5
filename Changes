@@ -2,6 +2,34 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Read a bare one-word class name as a Kubernetes Kind, never as a
+    package name (karr #35). karr #34 put the resource_map ahead of
+    expand_class's "is there a loadable class of exactly this name?" probe,
+    which made every registered Kind safe but left a window for Kinds the
+    model does not know: with an openapi_spec defining kind "Widget" and an
+    unrelated top-level Widget.pm installed, expand_class('Widget') returned
+    the foreign distribution instead of the generated class. Single-segment
+    names now skip that probe entirely and continue to IO::K8s::<Kind> and
+    then to auto-generation; multi-segment names ('My::StaticWebSite') keep
+    it, which is the documented CRD case. To name a single-segment class of
+    your own, prefix it -- '+Widget' -- or use class_namespaces or a
+    resource_map entry. The failure mode changes for one narrow case: a
+    consumer who relied on a bare 'Widget' resolving to an installed
+    top-level Widget now gets IO::K8s::Widget, which fails to load.
+
+  - Stop struct_to_object re-expanding a class name its caller had already
+    resolved (karr #35). new_object(), json_to_object() and the nested-object
+    inflation all called expand_class() and then handed the result to
+    struct_to_object(), which ran the full search order over it a second
+    time -- so an exactly-resolved name could be re-interpreted. Concretely,
+    new_object('+Secret', \%args) resolved to 'Secret' and the second pass
+    found 'Secret' in the resource_map, returning
+    IO::K8s::Api::Core::V1::Secret instead of the caller's class: the '+'
+    prefix's guarantee of an exact class was lost on every new_object and
+    json_to_object. These callers now use a pre-expanded internal path.
+    struct_to_object() itself is unchanged for consumers and still expands
+    the short names it is given.
+
   - Resolve resource_plural for Kinds on API tracks upstream no longer
     serves (karr #36). The generated table from the previous entry is keyed
     by exact GVK, so the 15 shipped classes on dropped tracks

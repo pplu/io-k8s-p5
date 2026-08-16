@@ -109,6 +109,21 @@ AUTOLOADED
 # Not a Kubernetes Kind: the positive control. Proves the temp dir really is
 # reachable through @INC, and pins the behaviour the moved check exists for —
 # a loadable class named in full still passes through expand_class untouched.
+#
+# Multi-segment on purpose. This control used to be the single-segment
+# 'NotAKubernetesKind'; karr #35 took single-segment names off the
+# loadable-class check entirely (a one-word bare name is a Kind, never a
+# distribution), so only a namespaced name still demonstrates the check.
+# The single-segment half of the old claim is now asserted the other way
+# round, below and in t/52_expand_class_shadow_window.t.
+_write_module('Not::AKubernetesKind', <<'PROBE');
+package Not::AKubernetesKind;
+our $VERSION = '0.01';
+sub new { bless {}, shift }
+1;
+PROBE
+
+# Single-segment counterpart, same shape, to show the difference directly.
 _write_module('NotAKubernetesKind', <<'PROBE');
 package NotAKubernetesKind;
 our $VERSION = '0.01';
@@ -153,10 +168,18 @@ subtest 'harness: the shadows are real and a non-Kind class still passes through
     # Positive control: this name is NOT in the resource_map, so it reaches the
     # loadable-class check, loads from the temp dir and is returned verbatim.
     # If this fails the shadow lib is not on @INC and the rest proves nothing.
-    is($io->expand_class('NotAKubernetesKind'), 'NotAKubernetesKind',
-        'a loadable non-Kind class name still resolves to itself');
-    ok(exists $INC{'NotAKubernetesKind.pm'},
+    is($io->expand_class('Not::AKubernetesKind'), 'Not::AKubernetesKind',
+        'a loadable multi-segment class name still resolves to itself');
+    ok(exists $INC{'Not/AKubernetesKind.pm'},
         'and it was actually loaded from the shadow lib');
+
+    # karr #35: the same module under a single-segment name does NOT. A bare
+    # one-word name is read as a Kind, so it goes to IO::K8s::<Kind> (and on
+    # to AutoGen when a spec is configured) and never touches @INC.
+    is($io->expand_class('NotAKubernetesKind'), 'IO::K8s::NotAKubernetesKind',
+        'a single-segment name is a Kind, not a distribution');
+    ok(!exists $INC{'NotAKubernetesKind.pm'},
+        'and resolving it never loaded the same-named module');
 };
 
 subtest 'plain shadow stub: Role resolves and builds as the RBAC class' => sub {
