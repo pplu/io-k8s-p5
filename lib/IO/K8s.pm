@@ -8,6 +8,7 @@ use Module::Runtime qw(require_module);
 use JSON::MaybeXS;
 use Scalar::Util ();
 use IO::K8s::AutoGen;
+use IO::K8s::Resource ();
 use namespace::clean;
 
 our $VERSION = '1.108';
@@ -904,7 +905,11 @@ sub _inflate_struct {
         } elsif ($info->{is_object}) {
             $args{$attr} = $self->_struct_to_object_expanded($info->{class}, $value);
         } elsif ($info->{is_bool}) {
-            $args{$attr} = (ref($value) eq '' && lc($value) eq 'true') || $value ? 1 : 0;
+            # Same normalization the Bool coercer in IO::K8s::Resource applies.
+            # It has to be the same one: this runs before $class->new(%args),
+            # so whatever it decides is all the coercer ever gets to see, and
+            # a wrong answer here cannot be rescued downstream (karr #37).
+            $args{$attr} = IO::K8s::Resource::_normalize_bool($value);
         } else {
             $args{$attr} = $value;
         }

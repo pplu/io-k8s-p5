@@ -117,6 +117,24 @@ sub _sanitize_attr_name {
     return $safe;
 }
 
+# The one boolean normalization in the distribution: everything that can
+# arrive on a Bool attribute, reduced to a plain 0/1. Used by the Bool and
+# [Bool] coercers below and, before the constructor even runs, by the is_bool
+# branch of IO::K8s::_inflate_struct -- those two used to disagree (karr #37).
+#
+# Two traps, both of which silently flip false into true:
+#   * every reference is true in Perl, so \0 (the bare false idiom) and a
+#     JSON::PP::Boolean (a blessed ref to 0) must be dereferenced, not tested;
+#   * 'false' is a non-empty string and therefore true, so the strings have to
+#     be spelled out rather than left to truthiness.
+sub _normalize_bool {
+    my ($value) = @_;
+    $value = $$value if ref $value;
+    return 0 unless defined $value;
+    return 0 if !ref($value) && lc($value) eq 'false';
+    return $value ? 1 : 0;
+}
+
 sub _generate_inline_struct {
     my ($class_name, $fields) = @_;
     __PACKAGE__->_setup_class($class_name);
@@ -234,15 +252,16 @@ sub _k8s {
     # Call Moo's has — use init_arg to map JSON key to Perl-safe attribute name
     my $has = $caller->can('has');
     my @coerce;
-    # Bool attributes: coerce \0/\1 refs and JSON booleans to plain 0/1
+    # Bool attributes: coerce \0/\1 refs, JSON booleans and 'true'/'false'
+    # strings to plain 0/1
     if ($info{is_bool}) {
-        @coerce = (coerce => sub { ref $_[0] ? (${$_[0]} ? 1 : 0) : ($_[0] ? 1 : 0) });
+        @coerce = (coerce => \&_normalize_bool);
     }
-    # Array of bool: same \0/\1 and JSON::PP::Boolean normalization, per element
+    # Array of bool: the same normalization, per element
     elsif ($info{is_array_of_bool}) {
         @coerce = (coerce => sub {
             return $_[0] unless ref $_[0] eq 'ARRAY';
-            return [ map { ref $_ ? ($$_ ? 1 : 0) : ($_ ? 1 : 0) } @{$_[0]} ];
+            return [ map { _normalize_bool($_) } @{$_[0]} ];
         });
     }
     # Inline struct: coerce plain hashref to inner class instance

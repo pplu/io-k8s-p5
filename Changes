@@ -2,6 +2,27 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Stop boolean fields reading an unblessed \0 as true (karr #37). The
+    is_bool branch of struct_to_object/inflate tested the reference itself,
+    and every reference is true in Perl, so the classic Perl false idiom
+    arrived as true -- and came back out blessed as a JSON::PP::Boolean,
+    indistinguishable downstream from a correct one. On a field like
+    privileged, allowPrivilegeEscalation or hostNetwork that is a silent
+    flip in the unsafe direction. Blessed JSON booleans and plain 0/1 were
+    never affected, nor was load_yaml, whose default yields plain 0/1.
+
+  - Stop boolean fields reading the string "false" as true (karr #37, found
+    while fixing the above). A non-empty string is truthy in Perl, so
+    "false" and "False" became 1 -- the same silent flip, and on both paths:
+    the inflation path and the constructor, where SecurityContext->new(
+    privileged => "false") returned 1. Behaviour change for callers who
+    passed the string and relied on the old answer. Both paths now share one
+    normalization in IO::K8s::Resource, which is what let the two disagree
+    in the first place. One narrow case changes from wrong-but-quiet to
+    loud: a hashref or arrayref on a boolean field used to be taken as true
+    and now dies, which is the same class of bad data this pair of entries
+    is about.
+
   - Read a bare one-word class name as a Kubernetes Kind, never as a
     package name (karr #35). karr #34 put the resource_map ahead of
     expand_class's "is there a loadable class of exactly this name?" probe,
