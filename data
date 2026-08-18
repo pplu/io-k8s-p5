@@ -1,0 +1,108 @@
+---
+claimed_at: 2026-08-18T17:38:55Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-18T17:38:55Z
+created: 2026-08-18T04:51:48Z
+id: 43
+priority: low
+started: 2026-08-18T17:33:55Z
+status: done
+tags:
+- maintenance
+- expand-class
+title: The JSONSchemaProps union classes still double-expand a resolved class name
+updated: 2026-08-18T17:38:55Z
+---
+
+karr #35 split _struct_to_object_expanded() out of struct_to_object() and
+established the rule, stated in the comment on lib/IO/K8s.pm:757-760:
+
+  "Callers that already hold a resolved class name must use
+   _struct_to_object_expanded() instead"
+
+new_object(), json_to_object() and _inflate_struct() were converted. Five
+call sites in the apiextensions union classes were not, and they are
+exactly the case the rule describes -- they pass a hard-coded, fully
+qualified class name:
+
+  lib/IO/K8s/ApiextensionsApiserver/Pkg/Apis/Apiextensions/V1/
+    JSON.pm:19
+    JSONSchemaPropsOrArray.pm:84, :87
+    JSONSchemaPropsOrBool.pm:87
+    JSONSchemaPropsOrStringArray.pm:88
+
+All five pass $PROPS =
+IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaProps
+(or the literal), so they hit expand_class()'s second line --
+`return $class if $class =~ /^IO::K8s::/`  -- and come straight back out.
+No bug today; verified by measurement, the full suite is green either way.
+
+Why it is still worth closing: this is the re-expansion karr #35 removed,
+left behind in the one place that was not on the karr #35 call path. It
+survives only because that early return sits above everything else in
+expand_class(). A future reordering of the search order -- and this file
+has been reordered twice now, karr #34 and karr #35 -- puts a second full
+lookup back on the FROM_STRUCT path for the union types, which is the
+hardest path in the distribution to reason about.
+
+Mechanical change: s/struct_to_object/_struct_to_object_expanded/ at the
+five sites. Test coverage already exists (t/31_apiextensions_unions.t);
+the change should not need new assertions, which is itself the check --
+if t/31 moves, the substitution was not what it looked like.
+
+Found reviewing cb0ab218 (karr #35).
+
+--- VERIFIED 2026-08-18 against 4887f658 (full suite green: 56 files, 3979 tests) ---
+
+The premise still holds. lib/IO/K8s.pm:756-760 carries the rule, and
+expand_class()'s early return is at :463:
+
+  return $class if $class =~ /^IO::K8s::/;
+
+with only the '+' strip (:430) and the explicit-apiVersion branch (:441-460)
+above it. A fully-qualified name handed to struct_to_object() therefore costs
+one regex and comes straight back -- no bug today, as the ticket says.
+
+CORRECTION: FOUR code call sites, not five.
+
+  lib/IO/K8s/ApiextensionsApiserver/Pkg/Apis/Apiextensions/V1/
+    JSONSchemaPropsOrArray.pm:84       map { $k8s->struct_to_object($PROPS, $_) }
+    JSONSchemaPropsOrArray.pm:87       $k8s->struct_to_object($PROPS, $struct)
+    JSONSchemaPropsOrBool.pm:87        $k8s->struct_to_object($PROPS, $struct)
+    JSONSchemaPropsOrStringArray.pm:88 $k8s->struct_to_object($PROPS, $struct)
+
+JSON.pm:19 is NOT a call site -- DO NOT TOUCH IT. It sits inside the
+=head1 DESCRIPTION block (a synopsis example, lines 15-26) and it passes the
+SHORT name 'Apiextensions::V1::JSONSchemaProps'. That is the correct,
+documented use of the public entry point; rewriting it would put a private
+method into user-facing POD. JSON.pm's real FROM_STRUCT (:52-55) wraps
+$struct verbatim and calls nothing.
+
+Also verified: `grep -rn struct_to_object lib/` outside IO/K8s.pm and these
+four files returns nothing. This is the complete remaining set -- there is no
+second cluster hiding elsewhere.
+
+$PROPS is a file-scoped `my` constant holding the fully-qualified
+JSONSchemaProps name, declared at JSONSchemaPropsOrArray.pm:9,
+JSONSchemaPropsOrBool.pm:10, JSONSchemaPropsOrStringArray.pm:9. It is also
+used in each file's isa constraints, so it must stay as it is -- only the
+method call changes.
+
+WHAT TO DO
+1. At those four lines only: s/->struct_to_object(/->_struct_to_object_expanded(/
+   Nothing else in the three files changes.
+2. Leave JSON.pm alone.
+3. No new assertions. t/31_apiextensions_unions.t already covers these
+   paths and must stay green WITHOUT being edited -- that is the check. If
+   t/31 has to move, the substitution was not what it looked like and the
+   change should stop and be re-reported here.
+4. Run the full suite (`prove -lr t/`, ~56s): 56 files / 3979 tests green
+   before and after, identical count.
+
+Note on privacy: calling another package's underscore method is the
+established pattern in this distribution for its own internals (IO::K8s.pm
+calls IO::K8s::Resource::_normalize_bool the same way), so this does not
+need a new public wrapper.
+
+Lane: io-k8s-worker.
