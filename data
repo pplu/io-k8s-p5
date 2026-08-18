@@ -1,0 +1,30 @@
+---
+class: standard
+created: 2026-08-18T17:47:47Z
+id: 56
+priority: medium
+status: backlog
+tags:
+- bug
+- autogen
+title: AutoGen silently drops properties whose $ref does not resolve
+updated: 2026-08-18T17:47:47Z
+---
+
+lib/IO/K8s/AutoGen.pm:249 (return undef) + :176 (next unless defined
+$type_spec) -- a property referencing a definition missing from all_defs
+is simply never turned into an attribute. Moo ignores unknown
+constructor arguments, so inflation ACCEPTS the data and TO_JSON never
+emits it again. No error, no warning: silent data loss on the roundtrip.
+
+Repro (measured): spec => { "\$ref" => "#/definitions/...MissingDef" },
+inflate with spec => { important => "data" } -- object builds,
+can("spec") is false, TO_JSON has no spec key.
+
+Fix sketch: fall back to an opaque { Str => 1 } attribute instead of
+skipping, or at minimum warn/croak naming class + field. Fail-closed is
+the house line (karr #37/#39): silent acceptance-then-loss is the worst
+of the options.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker, then io-k8s-test-writer (t/04_autogen.t).
