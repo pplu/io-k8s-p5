@@ -53,10 +53,11 @@ opaque_types:
 # entry that definition contributes is skipped, not just one. Consumed by
 # t/43_spec_kind_dispatch.t, which walks every upstream GVK entry and checks
 # IO::K8s->expand_class($kind, $apiVersion) resolves + loads; without this
-# list it would report ~125 false gaps every run (matches
-# maint/spec-drift-check.pl's coarser per-definition-key coverage check,
-# which never notices this because it only asks "does a class exist for
-# this key", not "is this exact apiVersion+kind pair dispatchable").
+# list it would report ~125 false gaps every run. Also consumed by
+# maint/spec-drift-check.pl's TYPEMETA DRIFT check (karr #50): these
+# definitions carry a GVK upstream but ship as plain Resource classes that
+# emit no apiVersion/kind -- the same settled call, so the checker
+# suppresses them here instead of re-reporting them every run.
 non_dispatchable_kinds:
   - key: io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions
     reason: "shared per-group delete-request-body type -- the SAME definition lists one GVK entry per API group (60 in v1.36.3) purely as a client-codegen convenience; there is one Perl class (Apimachinery::Pkg::Apis::Meta::V1::DeleteOptions) and it is constructed directly, never looked up by kind+apiVersion. Confirmed in karr #10."
@@ -123,6 +124,10 @@ perl_only:
 #     - class: "IO::K8s::Api::Foo::V1::Bar"
 #       field: "someField"
 #       reason: "..."
+#   ignore_typemeta:            # TypeMeta drift (karr #50): class prefix, like perl_only
+#     - prefix: "IO::K8s::Api::Foo::V1::Bar"
+#       reason: "..."
 ignore_missing_classes: []
 ignore_missing_fields: []
 ignore_extra_fields: []
+ignore_typemeta: []
