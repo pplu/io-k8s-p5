@@ -940,7 +940,15 @@ sub _inflate_struct {
             # It has to be the same one: this runs before $class->new(%args),
             # so whatever it decides is all the coercer ever gets to see, and
             # a wrong answer here cannot be rescued downstream (karr #37).
-            $args{$attr} = IO::K8s::Resource::_normalize_bool($value);
+            # On bad data it dies without naming the field; the constructor
+            # path gets that context for free from Moo's coercion wrapper,
+            # this path has to attach it itself (karr #42). $attr is the JSON
+            # key -- the name that appears in the caller's manifest.
+            $args{$attr} = eval { IO::K8s::Resource::_normalize_bool($value) };
+            if (my $err = $@) {
+                $err =~ s/\n\z//;
+                die "$err while inflating $class field $attr\n";
+            }
         } else {
             $args{$attr} = $value;
         }

@@ -9,7 +9,7 @@ use Package::Stash;
 use Types::Standard qw( ArrayRef Bool HashRef InstanceOf Int Maybe Str );
 use IO::K8s::Types qw( IntOrStr Quantity Time );
 use IO::K8s::Role::Resource ();
-use Scalar::Util qw(blessed);
+use Scalar::Util qw(blessed reftype);
 
 # Registry: class -> attr -> { type, class, is_array, is_hash, is_bool, is_int }
 # Use 'our' to make it a proper package variable accessible via symbol table
@@ -118,20 +118,40 @@ sub _sanitize_attr_name {
 }
 
 # The one boolean normalization in the distribution: everything that can
-# arrive on a Bool attribute, reduced to a plain 0/1. Used by the Bool and
-# [Bool] coercers below and, before the constructor even runs, by the is_bool
-# branch of IO::K8s::_inflate_struct -- those two used to disagree (karr #37).
+# arrive on a Bool attribute, reduced to a plain 0/1 -- or undef, meaning
+# "leave the field unset". Used by the Bool and [Bool] coercers below and,
+# before the constructor even runs, by the is_bool branch of
+# IO::K8s::_inflate_struct -- those two used to disagree (karr #37).
 #
 # Two traps, both of which silently flip false into true:
 #   * every reference is true in Perl, so \0 (the bare false idiom) and a
 #     JSON::PP::Boolean (a blessed ref to 0) must be dereferenced, not tested;
 #   * 'false' is a non-empty string and therefore true, so the strings have to
 #     be spelled out rather than left to truthiness.
+#
+# Anything that cannot mean true or false dies (karr #42): a non-scalar
+# reference, and a scalar ref that dereferences to yet another reference
+# (\\0 used to come out silently true). reftype, not ref, so that blessed
+# scalar refs -- JSON::PP::Boolean, boolean.pm, Types::Serialiser, any
+# bless \(my $x = 0) -- keep working. Messages end in \n deliberately:
+# they are diagnostics, and the callers (Moo's coercion wrapper, the
+# eval/rethrow in _inflate_struct) attach the attribute context.
 sub _normalize_bool {
     my ($value) = @_;
-    $value = $$value if ref $value;
-    return 0 unless defined $value;
-    return 0 if !ref($value) && lc($value) eq 'false';
+    if (ref $value) {
+        my $reftype = reftype($value);
+        die "Bool value must be a scalar or scalar ref, got $reftype\n"
+            unless $reftype eq 'SCALAR' || $reftype eq 'REF';
+        $value = $$value;
+        die 'Bool scalar ref dereferenced to another reference ('
+            . ref($value) . "), not a boolean\n" if ref $value;
+    }
+    # Explicit undef stays undef: the attribute is Maybe[Bool], TO_JSON
+    # omits undef, and "no value" must not turn into an explicit false on
+    # the wire (karr #48). `return undef`, not bare `return` -- in the
+    # [Bool] coercer's list context a bare return would drop the element.
+    return undef unless defined $value;
+    return 0 if lc($value) eq 'false';
     return $value ? 1 : 0;
 }
 
@@ -257,11 +277,21 @@ sub _k8s {
     if ($info{is_bool}) {
         @coerce = (coerce => \&_normalize_bool);
     }
-    # Array of bool: the same normalization, per element
+    # Array of bool: the same normalization, per element. A bad element's
+    # message gets the index appended so it can be found in the array.
     elsif ($info{is_array_of_bool}) {
         @coerce = (coerce => sub {
             return $_[0] unless ref $_[0] eq 'ARRAY';
-            return [ map { _normalize_bool($_) } @{$_[0]} ];
+            my $in = $_[0];
+            my @out;
+            for my $i (0 .. $#$in) {
+                push @out, eval { _normalize_bool($in->[$i]) };
+                if (my $err = $@) {
+                    $err =~ s/\n\z//;
+                    die "$err at element $i\n";
+                }
+            }
+            return \@out;
         });
     }
     # Inline struct: coerce plain hashref to inner class instance

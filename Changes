@@ -2,6 +2,29 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - A Bool attribute set explicitly to undef now stays unset instead of
+    becoming false (karr #48). SecurityContext->new(privileged => undef)
+    used to serialize as {"privileged":false} -- an explicit claim on the
+    wire that overrides cluster- or admission-controller-set values under
+    strategic-merge patch and server-side apply; now the field is simply
+    omitted, matching what the inflation path always did. \undef likewise
+    yields undef ("no value stays no value"). Behaviour change for callers
+    who passed undef and relied on reading 0 back from the accessor. For
+    the seven required Bool attributes (e.g. ContainerStatus ready) an
+    explicit undef now means the field is missing at the API server instead
+    of being sent as an invented false.
+
+  - Bad data on a Bool field now dies with a diagnostic message instead of
+    "Not a SCALAR reference at ... Resource.pm line NNN" (karr #42). A
+    hashref/arrayref/coderef where a boolean was expected reports the
+    reference type; the inflation path names the class and JSON field
+    ("... while inflating IO::K8s::Api::Core::V1::PodSpec field
+    hostNetwork"), the constructor path keeps Moo's attribute-naming
+    wrapper, and a bad array element reports its index. Also fixed: a
+    ref-to-a-ref (\\0) was silently true -- the exact bug karr #37 fixed,
+    one dereference deeper; it now dies too. Blessed scalar refs
+    (JSON::PP::Boolean and friends) keep working unchanged.
+
   - Internal: the apiextensions union classes (JSONSchemaPropsOrArray,
     JSONSchemaPropsOrBool, JSONSchemaPropsOrStringArray) now call
     _struct_to_object_expanded() for their hard-coded, fully-qualified
