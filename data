@@ -1,0 +1,31 @@
+---
+class: standard
+created: 2026-08-18T17:46:55Z
+id: 52
+priority: medium
+status: backlog
+tags:
+- bug
+- types
+title: Quantity type rejects valid n/u SI suffixes (100n dies on 30 fields)
+updated: 2026-08-18T17:46:55Z
+---
+
+lib/IO/K8s/Types.pm:16 -- the suffix class in the Quantity regex is
+[mkMGTPE]; upstream apimachinery (suffix.go) also allows n (nano) and
+u (micro) as decimal SI suffixes.
+
+Repro (measured): Quantity->check("100n") is rejected;
+IO::K8s::Api::Core::V1::EmptyDirVolumeSource->new(sizeLimit => "100n")
+dies with a type constraint error. Counter-check: 100m, 1Ki, 2e3 pass.
+
+Impact: inflating real cluster data fails -- metrics-server reports CPU
+as e.g. 100n, autoscaling/v2 MetricTarget/MetricValueStatus averageValue
+carries such values. Affects the 30 fields typed Quantity; fields typed
+{ Str => 1 } (e.g. ResourceRequirements requests/limits) are NOT affected.
+
+Fix sketch: widen the suffix class to [numkMGTPE]. Regression tests for
+100n/500u accept plus the existing matrix staying green.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker, then io-k8s-test-writer.
