@@ -1,0 +1,90 @@
+---
+claimed_at: 2026-08-18T17:48:40Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-18T17:48:40Z
+created: 2026-08-18T05:10:24Z
+id: 48
+priority: medium
+started: 2026-08-18T17:34:05Z
+status: done
+tags:
+- bug
+- serialization
+title: Bool coercer turns an explicit undef into false instead of leaving the field
+  unset
+updated: 2026-08-18T17:48:40Z
+---
+
+A Bool attribute set explicitly to undef comes back as 0 and serializes as
+`false`, so "I do not know / leave it unset" turns into an explicit false on
+the wire. Measured on 4887f658:
+
+  IO::K8s::Api::Core::V1::SecurityContext->new(privileged => undef)->TO_JSON
+  # {"privileged":false}          <-- expected {}
+
+  IO::K8s::Api::Core::V1::SecurityContext->new->TO_JSON
+  # {}                            correct
+
+  $k8s->struct_to_object('Api::Core::V1::SecurityContext',
+                         { privileged => undef })->TO_JSON
+  # {}                            correct
+
+The inflation path is fine -- _inflate_struct skips undef values outright
+(lib/IO/K8s.pm:898, `next unless defined $value`), so a JSON null never
+reaches the coercer and the attribute stays unset. Only the CONSTRUCTOR path
+is affected, via _normalize_bool's `return 0 unless defined $value`
+(lib/IO/K8s/Resource.pm:133).
+
+The attribute's isa is Maybe[Bool], so undef is a legal value that the
+coercer destroys before the type ever sees it. TO_JSON's `next unless
+defined $value` (lib/IO/K8s/Role/Resource.pm:113) would omit the field
+correctly if undef survived.
+
+NOT a regression from karr #37. The coercer it replaced --
+`sub { ref $_[0] ? (${$_[0]} ? 1 : 0) : ($_[0] ? 1 : 0) }` -- mapped undef
+to 0 as well. This is long-standing, and it is being written down now
+because karr #37 made _normalize_bool the single place where the answer is
+decided, which is also the single place where it can be changed.
+
+WHY IT MATTERS
+The idiom it breaks is ordinary Perl:
+
+  SecurityContext->new(privileged => $config->{privileged});
+
+With the key absent, the caller gets `privileged: false` in the manifest
+instead of an unset field. On a strategic-merge patch or a server-side
+apply, an explicit false is a claim of ownership over the field and
+overrides a value the cluster or an admission controller set; an omitted
+field is not. Same class of silent-wrong-answer as karr #37, opposite
+direction.
+
+WHAT TO DO -- decide first, then implement
+  * Change `return 0 unless defined $value` to `return undef unless
+    defined $value` in _normalize_bool. Check the deref case first: after
+    `$value = $$value if ref $value`, a \undef also lands here, and \undef
+    is not a false idiom -- decide whether it becomes undef or stays 0, and
+    say why.
+  * Confirm every Bool attribute really is Maybe[Bool] and not a required
+    Bool anywhere; a required one would start failing its type check on an
+    explicit undef, which may be the RIGHT answer but must be a deliberate
+    one. (Resource.pm:_k8s builds `$required ? $type_spec : Maybe[$type_spec]`,
+    so required Bools exist in principle -- count them before deciding.)
+  * is_array_of_bool: the array coercer maps _normalize_bool over elements
+    (Resource.pm:264). An undef ELEMENT becoming undef inside an ArrayRef
+    [Bool] is a different question from an undef attribute -- ArrayRef[Bool]
+    may reject it. Decide explicitly; do not let it fall out.
+  * Back-compat: callers who passed undef and relied on getting 0 back from
+    the accessor change behaviour. Changes entry states it.
+
+Test: t/53_bool_normalization.t owns the boolean matrix from karr #37 and is
+where this belongs -- add undef as a case across all four entry points the
+file already covers (struct_to_object, constructor, FROM_HASH,
+json_to_object), asserted in BOTH directions, since it is TO_JSON that
+reaches the cluster.
+
+Found reviewing 7309437e (karr #37).
+
+Cross-reference: karr #42 covers the reference cases of the same function
+(bad data dying without naming the field, and \\0 silently true). Same six
+lines, same test file.
