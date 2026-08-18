@@ -81,10 +81,10 @@ sub FROM_STRUCT {
     $k8s //= do { require IO::K8s; IO::K8s->new };
 
     return $class->new(
-        schemas => [ map { $k8s->struct_to_object($PROPS, $_) } @$struct ],
+        schemas => [ map { $k8s->_struct_to_object_expanded($PROPS, $_) } @$struct ],
     ) if ref $struct eq 'ARRAY';
 
-    return $class->new(schema => $k8s->struct_to_object($PROPS, $struct));
+    return $class->new(schema => $k8s->_struct_to_object_expanded($PROPS, $struct));
 }
 
 =method TO_JSON

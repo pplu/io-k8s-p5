@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Internal: the apiextensions union classes (JSONSchemaPropsOrArray,
+    JSONSchemaPropsOrBool, JSONSchemaPropsOrStringArray) now call
+    _struct_to_object_expanded() for their hard-coded, fully-qualified
+    JSONSchemaProps class name instead of the public struct_to_object()
+    (karr #43), per the rule established in karr #35: callers that already
+    hold a resolved class name skip re-expansion. No behaviour change.
+
   - Documentation: resource_plural's POD no longer promises a working REST
     path for every Kind (karr #44). For the fifteen Kinds on API tracks
     upstream no longer serves (e.g. Api::Resource::V1alpha3::DeviceClass),

@@ -84,7 +84,7 @@ sub FROM_STRUCT {
 
     if (ref $struct eq 'HASH' || (blessed($struct) && $struct->isa($PROPS))) {
         $k8s //= do { require IO::K8s; IO::K8s->new };
-        return $class->new(schema => $k8s->struct_to_object($PROPS, $struct));
+        return $class->new(schema => $k8s->_struct_to_object_expanded($PROPS, $struct));
     }
 
     # Booleans arrive as JSON::PP::Boolean, \1 / \0, or plain scalars.
