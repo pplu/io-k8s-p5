@@ -1,0 +1,124 @@
+---
+claimed_at: 2026-08-18T17:48:35Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-18T17:48:35Z
+created: 2026-08-18T04:51:32Z
+id: 42
+priority: low
+started: 2026-08-18T17:33:49Z
+status: done
+tags:
+- bug
+- serialization
+title: Bad data on a Bool field dies without naming the field
+updated: 2026-08-18T17:48:35Z
+---
+
+karr #37 made _normalize_bool die on a hashref/arrayref where a boolean
+was expected, deliberately: that is the same class of bad data #37 was
+about, and failing beats the old wrong-but-quiet "every reference is true".
+The Changes entry states it.
+
+What it does not do is say what went wrong:
+
+  $k8s->struct_to_object("Pod", { spec => { hostNetwork => {} } });
+  # Not a SCALAR reference at lib/IO/K8s/Resource.pm line 132.
+
+Neither the field nor the class appears. The consumer gets a line number
+inside IO::K8s and has to bisect their own manifest to find which boolean
+carried the bad value -- and on an inflated manifest that value came from
+JSON they may not have written.
+
+"Fail loud" is the house rule, and this is loud. It is not diagnostic,
+which is the other half of the same rule. The deref on
+lib/IO/K8s/Resource.pm:132 is the only place that can die here, so:
+
+  die "Bool value must be a scalar or scalar ref, got " . ref($value)
+      if ref($value) && ref($value) !~ /\A(SCALAR|REF)\z/ && !blessed(...)
+
+or the equivalent -- the exact shape is open. Blessed scalar refs
+(JSON::PP::Boolean, boolean.pm, Types::Serialiser) must keep working.
+
+Naming the attribute needs the caller to pass it: the Bool coercer knows
+the attribute name at _k8s() time, and IO::K8s::_inflate_struct knows
+$class and $attr. Worth deciding whether the message carries just the type
+or the field too -- the field is what actually helps, and _inflate_struct
+is where most bad data arrives.
+
+Wants a test asserting the message content, not just that it dies.
+
+Found reviewing 7309437e (karr #37).
+
+--- VERIFIED 2026-08-18 against 4887f658 (full suite green: 56 files, 3979 tests) ---
+
+Reproduced exactly as reported:
+
+  $k8s->struct_to_object('Pod', { spec => { hostNetwork => {} } });
+  # Not a SCALAR reference at lib/IO/K8s/Resource.pm line 132.
+
+Same message for an arrayref and for a coderef. Line 132 is still the only
+place that can die: _normalize_bool's `$value = $$value if ref $value`.
+
+CORRECTION to the ticket -- only the INFLATION path is anonymous. The
+constructor path already names the attribute, because Moo wraps a failing
+coercion:
+
+  IO::K8s::Api::Core::V1::SecurityContext->new(privileged => {});
+  # coercion for "privileged" failed: Not a SCALAR reference at
+  #   lib/IO/K8s/Resource.pm line 132.
+
+So the work is not "make _normalize_bool talk more" everywhere. It is:
+  (a) make the message itself say what kind of value was rejected, so both
+      paths read alike, and
+  (b) give the _inflate_struct caller (lib/IO/K8s.pm:931, the is_bool
+      branch) the class + JSON field name that Moo supplies for free on the
+      constructor path. That branch is where manifest data arrives, and it
+      is the one that currently says nothing.
+
+SECOND DEFECT, found while verifying, same function, same shape as karr #37
+-- a ref-to-ref is SILENTLY TRUE, it does not die:
+
+  IO::K8s::Resource::_normalize_bool(\0)     # 0   correct
+  IO::K8s::Resource::_normalize_bool(\\0)    # 1   WRONG, and quiet
+
+`$value = $$value if ref $value` dereferences exactly once; \\0 yields \0,
+which is still a reference and therefore truthy. This is karr #37's "every
+reference is true in Perl" one level deeper, and it is the silent half of
+this ticket rather than the loud half. Any check added here must classify
+the POST-deref value, not only the pre-deref one -- a fix that only inspects
+ref($value) before the deref leaves \\0 returning true.
+
+Must keep working (measured, all return 0/1 correctly today):
+  JSON::PP::Boolean / JSON::MaybeXS booleans, \0 and \1,
+  any blessed scalar ref -- bless \(my $x = 0), 'Whatever'  => 0
+
+WHAT TO DO
+1. lib/IO/K8s/Resource.pm:130-136 -- after the deref, reject a value that is
+   still a reference, and name the type in the message. Exact wording open;
+   it has to distinguish "not derefable at all" (HASH/ARRAY/CODE) from
+   "derefed to another reference" (\\0), because the second one is currently
+   wrong rather than merely undiagnostic. Blessed SCALAR/REF must pass.
+2. lib/IO/K8s.pm:931 -- the is_bool branch of _inflate_struct. It holds
+   $class and $attr; the message must carry them. Nothing else in
+   _inflate_struct dies with context today, so decide whether this is a
+   local eval/rethrow or a $context argument on _normalize_bool -- prefer
+   whichever leaves the coercer's own message unchanged for the constructor
+   path, since that one is already good.
+3. is_array_of_bool shares the function via the array coercer
+   (lib/IO/K8s/Resource.pm:264). A bad element dies there with the same
+   anonymous message. Decide whether the element index appears; at minimum
+   it must not regress.
+4. Tests into t/53_bool_normalization.t, which already owns the boolean
+   claims from karr #37. Assert the MESSAGE TEXT, not just that it dies, and
+   add \\0 as its own case in both directions (struct_to_object and the
+   constructor) -- it currently passes silently and would otherwise stay
+   uncovered.
+
+Lane: io-k8s-worker (lib/), then io-k8s-test-writer for t/53.
+
+Cross-reference: karr #48 is the other half of _normalize_bool's undefined/
+reference handling (explicit undef becoming false). Both touch
+lib/IO/K8s/Resource.pm:130-136 and both want cases in
+t/53_bool_normalization.t -- worth doing in one pass, but they are separate
+decisions and the Changes entries are separate.
