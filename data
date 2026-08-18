@@ -1,0 +1,63 @@
+---
+claimed_at: 2026-08-18T17:45:07Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-18T17:45:07Z
+created: 2026-08-18T05:11:20Z
+id: 50
+priority: low
+started: 2026-08-18T17:34:10Z
+status: done
+tags:
+- maintenance
+- tooling
+title: spec-drift-check cannot see a class that claims a GVK upstream does not have
+updated: 2026-08-18T17:45:07Z
+---
+
+maint/spec-drift-check.pl compares the k8s() attribute registry against the
+spec's `properties`. apiVersion and kind are not registry attributes -- they
+come from IO::K8s::Role::APIObject as methods and are written by
+Role::Resource::TO_JSON's `_is_resource` block. So the checker cannot see
+whether a class claims a GVK it does not have, or lacks one it should.
+
+Demonstrated by karr #45: seven shipped classes compose IO::K8s::APIObject
+for types the spec gives no x-kubernetes-group-version-kind, and the run is
+clean:
+
+  Info  EXTRA FIELD  0   Perl declares a field the current spec no longer has
+
+The fact needed to catch it is already in the spec and already read by the
+script -- x-kubernetes-group-version-kind is what the Kind tiers key off.
+It is simply not compared against the shipped class's TypeMeta behaviour.
+
+WHAT TO ADD
+A check, in whichever tier fits the script's existing severity model:
+
+  for a shipped class whose definition key resolves in the spec:
+    upstream has GVK, class does not emit TypeMeta  -> report
+    upstream has no GVK, class emits TypeMeta       -> report
+
+"emits TypeMeta" is `$class->can('_is_resource') && $class->_is_resource`,
+which the script can ask without loading anything it does not already load
+(it loads all 846 classes for the registry today).
+
+Expected output against the tree as it stands: exactly the seven classes in
+karr #45 and nothing else. That is the acceptance test -- verified by hand
+in that ticket, the same scan, so a first implementation can be checked
+against a known answer. Core::V1::PersistentVolumeClaim must NOT appear (it
+carries inline TypeMeta upstream and is embedded in StatefulSetSpec
+legitimately); if it does, the check is keying off "is embedded" rather than
+"has a GVK upstream".
+
+The 15 tier-2 classes (karr #44) resolve to no definition key at all in the
+current spec and are already covered by the perl_only exceptions -- make
+sure the new check does not re-report them from the other direction.
+
+Once it is in and karr #45 is fixed, the exception file gets no entries from
+this: a clean run is the goal, not a suppressed one.
+
+Do not touch lib/. maint/ only, plus a spec-drift-exceptions.yaml note if a
+deliberate keep-it-as-is case turns up.
+
+Found reviewing karr #45.
