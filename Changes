@@ -2,6 +2,14 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Documentation: resource_plural's POD no longer promises a working REST
+    path for every Kind (karr #44). For the fifteen Kinds on API tracks
+    upstream no longer serves (e.g. Api::Resource::V1alpha3::DeviceClass),
+    the group-fallback plural is correct for RBAC resources: rules -- and no
+    other value would be better -- but the REST path built from it and the
+    class's own api_version 404s against a current cluster because the track
+    itself is dead. POD only, no behaviour change.
+
   - IO::K8s::List can now inflate a List-shaped payload (karr #46), matching
     what the README already claimed: `$k8s->json_to_object($podlist_json)`
     and `struct_to_object()` route any `kind` ending in `List` (or the bare

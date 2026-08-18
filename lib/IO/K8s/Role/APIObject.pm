@@ -514,8 +514,9 @@ sub resource_plural {
 
 =method resource_plural
 
-Returns the plural resource name Kubernetes addresses this Kind by in REST
-paths and in RBAC C<resources:> rules, or C<undef> when there is none.
+Returns the plural resource name Kubernetes addresses this Kind by in RBAC
+C<resources:> rules, and in REST paths for a Kind on an API track upstream
+still serves, or C<undef> when there is none.
 
     $pod->resource_plural;            # "pods"
     $endpoints->resource_plural;      # "endpoints"
@@ -531,6 +532,12 @@ property of the GroupResource, which is what RBAC C<apiGroups>/C<resources>
 rules address, and the fallback is only generated where every version of
 that group agrees on the plural. It is still group and kind, never a bare
 kind, so the two C<Event>s stay distinct on that path too.
+
+That fallback value is right for RBAC, and no other plural would serve a
+Kind on such a track better -- do not "fix" it. It is not a promise that
+the REST path built from the plural and the class's own C<api_version>
+resolves: upstream has stopped serving that track entirely, so the path
+404s against a current cluster regardless of what the plural is.
 
 A consumer subclass registered via L<IO::K8s/class_namespaces> inherits the
 plural from its first ancestor in a known namespace, the same way
