@@ -1,0 +1,36 @@
+---
+class: standard
+created: 2026-08-18T17:47:05Z
+id: 54
+priority: medium
+status: backlog
+tags:
+- bug
+- serialization
+title: TO_JSON shares array/hash references with the object -- mutating the struct
+  mutates the object
+updated: 2026-08-18T17:47:05Z
+---
+
+lib/IO/K8s/Role/Resource.pm:136-139 -- the is_array_of_str /
+is_hash_of_str (and raw array/hash attribute) branches pass the
+attribute reference through uncopied. Post-processing the struct from
+TO_JSON/object_to_struct silently mutates the object, and the mutation
+shows up in every later serialization.
+
+Repro (measured): $cm->TO_JSON->{data}{key} = "MUTATED" changes
+$cm->data->{key}; push @{$container->TO_JSON->{command}}, "EXTRA"
+changes $container->command. The object branches (is_array_of_objects
+etc.) are clean via map; only the scalar containers alias.
+
+Fix sketch: shallow-copy in the ARRAY/HASH pass-through branches
+([@$value] / {%$value}). Note deep structures under raw hash attributes
+would still alias one level down -- decide and document the depth.
+
+Cross-reference: the symmetric input side exists in
+IO::K8s::_inflate_struct -- inflated objects share references with the
+input struct (measured: mutating the source struct changes the object).
+Same decision should cover both directions or explicitly scope to output.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker, then io-k8s-test-writer.
