@@ -1,0 +1,27 @@
+---
+class: standard
+created: 2026-08-18T17:47:10Z
+id: 55
+priority: low
+status: backlog
+tags:
+- bug
+- autogen
+title: 'AutoGen crashes on additionalProperties: true (boolean schema form)'
+updated: 2026-08-18T17:47:10Z
+---
+
+lib/IO/K8s/AutoGen.pm:285-286 -- OpenAPI/Swagger allows
+additionalProperties: true as a JSON boolean (common in CRD schemas).
+$addl->{q($ref)} on the blessed JSON::PP::Boolean dies with "Not a HASH
+reference at AutoGen.pm line 286" -- no class or field context.
+
+Repro (measured): spec with blob => { type => "object",
+additionalProperties => JSON::PP::true } kills class generation.
+
+Fix sketch: check ref $addl eq "HASH"; treat boolean
+additionalProperties like { Str => 1 } (opaque hash). While there, the
+die should name class + field (karr #42 diagnostic line).
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker, then io-k8s-test-writer (t/04_autogen.t).
