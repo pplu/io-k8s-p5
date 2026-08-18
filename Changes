@@ -2,6 +2,17 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - set_owner() no longer writes ownerReferences the API server rejects
+    (karr #47). Behaviour changes: an owner without a uid (anything built
+    locally rather than read back from the cluster) is refused with a
+    message naming the owner, instead of silently writing uid: "";
+    controller is now a parameter ($obj->set_owner($owner, controller =>
+    0|1), default 1 as before) and a second controller reference is
+    refused, since Kubernetes allows at most one; adding the same owner
+    (same uid) twice is an idempotent no-op instead of a duplicate entry;
+    a non-controller reference omits the controller field entirely.
+    blockOwnerDeletion stays unset (upstream defaults it to false).
+
   - A Bool attribute set explicitly to undef now stays unset instead of
     becoming false (karr #48). SecurityContext->new(privileged => undef)
     used to serialize as {"privileged":false} -- an explicit claim on the

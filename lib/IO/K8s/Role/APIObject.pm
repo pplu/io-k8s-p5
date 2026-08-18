@@ -879,24 +879,83 @@ sub condition_message {
 =method set_owner
 
     $pod->set_owner($deployment);
+    $pod->set_owner($configmap, controller => 0);
 
 Add an ownerReference pointing to another API object.
 Returns C<$self> for chaining.
 
+The owner must carry a C<metadata.uid> — the uid is assigned by the API
+server, so only an object read back from the cluster can be referenced.
+A locally built owner (no metadata, or no uid) makes set_owner die,
+naming the owner.
+
+C<< controller => 0|1 >> (default 1) marks the reference as the managing
+controller. Kubernetes allows at most one ownerReference with
+C<controller: true> per object: adding a second one dies, naming the
+existing controller reference — pass C<< controller => 0 >> for
+additional, non-controlling owners.
+
+Setting the same owner twice (same uid) is an idempotent no-op, even
+when the repeated call asks for C<controller> — the existing reference
+is left untouched.
+
+C<blockOwnerDeletion> is never set; upstream defaults it to false.
+
 =cut
 
 sub set_owner {
-    my ($self, $owner) = @_;
+    my ($self, $owner, %opts) = @_;
     require IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::OwnerReference;
+
+    my $controller = exists $opts{controller} ? ($opts{controller} ? 1 : 0) : 1;
+
+    my $owner_kind = $owner->kind;
+    my $owner_meta = $owner->metadata;
+    my $owner_name = $owner_meta ? $owner_meta->name : undef;
+    my $owner_desc = defined $owner_name ? "$owner_kind/$owner_name" : $owner_kind;
+
+    my $owner_uid = $owner_meta ? $owner_meta->uid : undef;
+    if (!defined $owner_uid || $owner_uid eq '') {
+        die "set_owner: cannot reference $owner_desc: owner has no uid;"
+          . " the uid is assigned by the API server, so only an object"
+          . " read back from the cluster can be referenced\n";
+    }
+
     my $meta = $self->_ensure_metadata;
     my $refs = $meta->ownerReferences // [];
 
+    my $existing_controller;
+    for my $ref (@$refs) {
+        my ($ruid, $rctl, $rkind, $rname);
+        if (blessed($ref) && $ref->can('uid')) {
+            ($ruid, $rctl, $rkind, $rname)
+                = ($ref->uid, $ref->controller, $ref->kind, $ref->name);
+        } elsif (ref $ref eq 'HASH') {
+            ($ruid, $rctl, $rkind, $rname) = @{$ref}{qw(uid controller kind name)};
+        }
+
+        # Same owner already referenced: idempotent no-op (checked before
+        # the controller conflict -- the reference exists, nothing changes).
+        return $self if defined $ruid && $ruid eq $owner_uid;
+
+        $existing_controller //= { kind => $rkind, name => $rname } if $rctl;
+    }
+
+    if ($controller && $existing_controller) {
+        my $have = join '/', grep { defined && length }
+            $existing_controller->{kind}, $existing_controller->{name};
+        $have = 'an existing ownerReference' unless length $have;
+        die "set_owner: cannot add $owner_desc as controller: $have is"
+          . " already the controller reference; Kubernetes allows at most"
+          . " one, pass controller => 0 to add a non-controlling owner\n";
+    }
+
     my $ref = IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::OwnerReference->new(
         apiVersion => $owner->api_version,
-        kind       => $owner->kind,
-        name       => $owner->metadata->name,
-        uid        => $owner->metadata->uid // '',
-        controller => 1,
+        kind       => $owner_kind,
+        name       => $owner_name,
+        uid        => $owner_uid,
+        ($controller ? (controller => 1) : ()),
     );
 
     $meta->ownerReferences([@$refs, $ref]);
