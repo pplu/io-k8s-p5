@@ -64,9 +64,27 @@ has _item_class => (
 =attr item_class
 
 Optional. The class of items in the list. If not provided, derived from
-the first item. Used for empty lists where the type can't be inferred.
+the first item. Used for empty lists where the type can't be inferred, or
+to override the item type L</FROM_STRUCT> would otherwise derive.
+
+Accepted only as a fully-qualified class name, exactly like every other
+class-name-taking parameter in this distribution: a leading C<+> is
+stripped before use ("this is already a full class name"), and a short or
+partially-qualified name is not guessed at -- L</kind> and L</api_version>
+simply have nothing to derive from it (karr #49).
 
 =cut
+
+# Strip the '+' convention this distribution uses everywhere else to mean
+# "this is already a full class name" (karr #49). Returns undef if there is
+# no item_class at all, same as _item_class itself.
+sub _resolved_item_class {
+    my ($self) = @_;
+    my $class = $self->_item_class;
+    return undef unless defined $class;
+    $class =~ s/\A\+//;
+    return $class;
+}
 
 sub api_version {
     my ($self) = @_;
@@ -80,7 +98,7 @@ sub api_version {
     # knows the full wire group (rbac.authorization.k8s.io, storage.k8s.io,
     # apiextensions.k8s.io, ...). undef unless the class loads, has an
     # api_version method and answers without error.
-    if (my $class = $self->_item_class) {
+    if (my $class = $self->_resolved_item_class) {
         eval { require_module($class) };
         return undef if $@;
         return undef unless $class->can('api_version');
@@ -106,8 +124,16 @@ sub kind {
         return $self->items->[0]->kind . 'List';
     }
 
-    # Fall back to deriving from item_class
-    if (my $class = $self->_item_class) {
+    # Fall back to deriving from item_class -- but only when api_version()
+    # can also answer for it. kind() and api_version() derive from the same
+    # item_class, and this class must never serialize a kind without an
+    # apiVersion alongside it (karr #49): a short or unloadable item_class
+    # (e.g. 'Pod' instead of 'IO::K8s::Api::Core::V1::Pod') would otherwise
+    # still produce a Kind by regex here while api_version() -- which
+    # actually has to load the class -- came back undef.
+    if (my $class = $self->_resolved_item_class) {
+        return undef unless defined $self->api_version;
+
         if ($class =~ /::(\w+)$/) {
             return $1 . 'List';
         }
@@ -129,9 +155,102 @@ sub kind {
 
 Returns the Kubernetes kind (e.g., "PodList"), derived from items or item_class.
 For an C<item_class> the Kind is its last C<::> segment, or the whole name for
-a single-segment class such as a CRD registered as C<+Widget>.
+a single-segment class such as a CRD registered as C<+Widget> -- but only when
+L</api_version> can also resolve for the same item_class; otherwise C<undef>,
+never a Kind with no apiVersion to go with it (karr #49).
 
 =cut
+
+=method FROM_STRUCT
+
+    my $list = IO::K8s::List->FROM_STRUCT($struct, $k8s);
+
+Inflation hook called by L<IO::K8s/inflate> (and so by C<json_to_object> and
+C<struct_to_object>) whenever the wire C<kind> is C<List> or ends in
+C<List> -- the shape every real Kubernetes API list response has, and the
+generic C<kind: List> wrapper besides. Upstream a list response carries no
+C<apiVersion>/C<kind> on the individual items (the API server omits them
+there), so the item type is derived from the LIST's own Kind and
+apiVersion: C<kind: PodList, apiVersion: v1> means items are C<v1/Pod>.
+
+C<item_class> travels as a sibling key of C<kind>/C<apiVersion>/C<items> in
+the struct to override the derived type -- the same "use this class, don't
+derive one" meaning it already has for an empty list built directly via
+C<new>. It is the only way to inflate a bare C<kind: List> payload, whose
+Kind minus its C<List> suffix is empty and so derives nothing on its own.
+
+Fails closed (karr #39/#46): an item Kind that cannot be resolved to a
+class dies with the same "Cannot resolve Kubernetes GVK" error every other
+entry point in this distribution uses, naming the ITEM's kind/apiVersion,
+never a silently empty or half-inflated list.
+
+=cut
+
+my $LIST_META = 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ListMeta';
+
+# Mirrors IO::K8s::_die_resolution_error()'s message format exactly, so a
+# caller can't tell whether a GVK failure came from a top-level entry point
+# or from inside a List's own item inflation. Kept local rather than
+# reaching into IO::K8s's private subs -- this class does not otherwise
+# depend on IO::K8s internals beyond the $k8s instance it is handed.
+sub _die_gvk {
+    my ($kind, $api_version) = @_;
+    my $display = !defined($api_version) ? '<undef>'
+        : length($api_version) ? $api_version
+        : '<empty>';
+    die "Cannot resolve Kubernetes GVK: kind '$kind', apiVersion '$display'\n";
+}
+
+sub FROM_STRUCT {
+    my ($class, $struct, $k8s) = @_;
+
+    $k8s //= do { require IO::K8s; IO::K8s->new };
+
+    my $kind        = $struct->{kind};
+    my $api_version = $struct->{apiVersion};
+
+    # item_class as an explicit override -- checked before any derivation,
+    # exactly like the empty-list case item_class already covers for a
+    # hand-built list. Same '+' handling as everywhere else (karr #49).
+    my $resolved_item_class;
+    if (defined(my $override = $struct->{item_class})) {
+        $override =~ s/\A\+//;
+        $resolved_item_class = $override;
+    }
+    elsif (defined $kind && $kind =~ /\A(.+)List\z/) {
+        my $item_kind = $1;
+        $resolved_item_class = $k8s->expand_class($item_kind, $api_version);
+        _die_gvk($item_kind, $api_version) unless defined $resolved_item_class;
+    }
+    # else: a bare 'kind: List' (or no kind at all) with no override -- items
+    # are only inflatable if the list turns out to be empty; see below.
+
+    my $metadata;
+    if (defined(my $meta_struct = $struct->{metadata})) {
+        # $LIST_META is already a final class name -- go straight to the
+        # pre-expanded path so it is not re-interpreted by expand_class()
+        # (karr #35), same reasoning IO::K8s::_inflate_struct applies to
+        # every nested object it inflates.
+        $metadata = $k8s->_struct_to_object_expanded($LIST_META, $meta_struct);
+    }
+
+    my @items;
+    for my $item_struct (@{ $struct->{items} // [] }) {
+        die "Cannot inflate item in List payload: kind '"
+            . (defined $kind ? $kind : '<undef>')
+            . "' has no derivable item type and no 'item_class' override was given\n"
+            unless defined $resolved_item_class;
+        # Already resolved above (via expand_class() or the override) --
+        # the pre-expanded path, for the same karr #35 reason as metadata.
+        push @items, $k8s->_struct_to_object_expanded($resolved_item_class, $item_struct);
+    }
+
+    return $class->new(
+        items => \@items,
+        (defined $metadata          ? (metadata   => $metadata)          : ()),
+        (defined $resolved_item_class ? (item_class => $resolved_item_class) : ()),
+    );
+}
 
 sub TO_JSON {
     my $self = shift;

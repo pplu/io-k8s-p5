@@ -2,6 +2,32 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::List can now inflate a List-shaped payload (karr #46), matching
+    what the README already claimed: `$k8s->json_to_object($podlist_json)`
+    and `struct_to_object()` route any `kind` ending in `List` (or the bare
+    `kind: List`) to a new `IO::K8s::List->FROM_STRUCT`, which derives the
+    item type from the list's own Kind-minus-'List' and apiVersion (a real
+    API list response carries neither on its items) and inflates each item
+    fully. `item_class` remains available, now also as a sibling key in the
+    struct, to override the derived type for a generic `kind: List` payload
+    that has nothing to derive from. An item Kind that cannot be resolved
+    dies with the same "Cannot resolve Kubernetes GVK" error every other
+    entry point uses -- never a silently empty or half-inflated list.
+    Previously this died with "Cannot resolve Kubernetes GVK: kind
+    'PodList', ..." (no *List classes have existed since 1.105) or, via a
+    direct `struct_to_object('+IO::K8s::List', ...)` call, with an unrelated
+    "Can't locate object method _k8s_attr_info" error.
+
+  - IO::K8s::List::item_class now only accepts a fully-qualified class name
+    (karr #49), matching the '+' convention used everywhere else in this
+    distribution: a leading `+` is stripped before the class is loaded, and
+    a short or partially-qualified name (e.g. `'Pod'` instead of
+    `'IO::K8s::Api::Core::V1::Pod'`) is not guessed at. Behaviour change:
+    `kind()` now returns `undef` for such a name instead of a guessed Kind
+    string (`'PodList'`) that `api_version()` could never confirm --
+    IO::K8s::List never serializes a `kind` without an `apiVersion`
+    alongside it, in either direction now.
+
   - Stop stamping apiVersion/kind into seven embedded template classes that
     the upstream schema carries no such keys for (karr #45): PodTemplateSpec,
     JobTemplateSpec, PersistentVolumeClaimTemplate, and ResourceClaimTemplateSpec

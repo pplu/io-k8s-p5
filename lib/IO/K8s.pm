@@ -798,6 +798,18 @@ sub inflate {
 
     my $kind = $struct->{kind}
         or die "Cannot inflate: missing 'kind' field in data";
+
+    # A List-shaped Kind ('List' itself, or any '...List') routes to the
+    # generic IO::K8s::List container rather than expand_class(): the
+    # per-Kind *List classes were removed in 1.105 in favour of it, so no
+    # resource_map entry -- qualified or bare -- will ever resolve one, and
+    # it owns its own inflation (deriving item types from its own
+    # kind/apiVersion; see IO::K8s::List::FROM_STRUCT, karr #46).
+    if ($kind =~ /List\z/) {
+        require IO::K8s::List;
+        return IO::K8s::List->FROM_STRUCT($struct, $self);
+    }
+
     my $api_version_supplied = exists $struct->{apiVersion};
     my $api_version = $struct->{apiVersion};
 
