@@ -1,0 +1,96 @@
+---
+claimed_at: 2026-08-18T16:22:35Z
+claimed_by: Torsten Raudssus
+class: standard
+completed: 2026-08-18T16:22:35Z
+created: 2026-08-18T05:09:20Z
+id: 46
+priority: high
+started: 2026-08-18T15:38:29Z
+status: done
+tags:
+- bug
+- inflation
+- docs
+title: IO::K8s::List cannot inflate a List payload, though the README says it can
+updated: 2026-08-18T16:22:35Z
+---
+
+README.md:327 says:
+
+  "The 76 *List classes ... have not been real classes since the 1.00
+   Moose-to-Moo rewrite. Use `IO::K8s::List` to inflate any List-shaped
+   payload."
+
+and README.md:400 lists IO::K8s::List as "List-typed inflation (PodList,
+ServiceList, ...)". There is no inflation. IO::K8s::List is write-only.
+
+Measured on 4887f658:
+
+  $k8s->json_to_object('{"kind":"PodList","apiVersion":"v1",
+                         "metadata":{...},"items":[{...}]}');
+  # Cannot resolve Kubernetes GVK: kind 'PodList', apiVersion 'v1'
+
+  $k8s->struct_to_object('+IO::K8s::List', $list_struct);
+  # Can't locate object method "_k8s_attr_info" via package
+  #   "IO::K8s::List" at lib/IO/K8s.pm line 887.
+
+Both are consistent with the code: IO::K8s::List is hand-written Moo, not
+IO::K8s::Resource, so it has no attribute registry for _inflate_struct to
+read; it has no FROM_STRUCT, so _struct_to_object_expanded's self-inflating
+branch does not fire either; and no *List Kind is in %DEFAULT_RESOURCE_MAP,
+so inflate() fails closed on it -- correctly, given karr #39, but there is
+nothing behind the failure.
+
+The class has: items (ro, required, untyped ArrayRef), metadata, item_class,
+api_version, kind, TO_JSON, to_json. Serialization only.
+
+WHO IS AFFECTED
+Not Kubernetes::REST -- verified against the installed 1.107: its
+_inflate_list (REST.pm:447-456) decodes the body itself, inflates each item
+through struct_to_object, and constructs IO::K8s::List from the results. It
+never asks IO::K8s to inflate a List payload, and list() resolves the class
+through expand_class first, so it hands a fully-qualified item_class.
+
+Affected is every standalone use: `kubectl get pods -o json` piped into
+json_to_object, a stored List-kind manifest, a multi-document apply file
+with a `kind: List` wrapper, or anyone following the README sentence above.
+That is the single most common response shape of the Kubernetes API and it
+cannot be read back.
+
+DECIDE FIRST -- this is a scope question, not a bug fix
+  (a) Implement it: give IO::K8s::List a FROM_STRUCT that inflates items by
+      their own apiVersion/kind (each item in a real API list response
+      carries neither -- the API server omits them inside items -- so the
+      item type has to come from the LIST's kind minus the 'List' suffix
+      plus its apiVersion, with item_class as an override). Then teach
+      inflate() to route a /List$/ kind to IO::K8s::List. Note this reopens
+      a resolution path karr #39 deliberately closed, so it must fail closed
+      the same way: an unresolvable item GVK is an error, never a silent
+      empty list.
+  (b) Decide it is out of scope and fix the README, which currently promises
+      a feature that does not exist. Then say where the inflation belongs
+      (Kubernetes::REST already does it) and add a
+      maint/spec-drift-exceptions.yaml note so the decision survives.
+
+(a) is the honest reading of the README and of "unified IO::K8s::List
+replaces the 76 classes". (b) is defensible only if the distribution's
+position is that it models objects and Kubernetes::REST owns transport.
+Whichever is chosen, README.md:327 and :400 must end up true.
+
+Blast radius if (a): touches inflate()'s dispatch, which karr #11/#17/#31/
+#32/#39 have all been through. Read t/49_crd_resource_map_gvk.t and
+t/40_karr_11_multi_version_dispatch.t before changing it.
+
+Test: t/44_list_api_version.t owns the List apiVersion/kind claims and is
+the place for a round-trip -- a real PodList payload in, TO_JSON out,
+structurally equal.
+
+Found reviewing the 1.105 *List removal against the current entry points.
+
+Cross-reference: karr #49 is the other IO::K8s::List gap (item_class
+resolution). If option (a) is chosen here, FROM_STRUCT will need the same
+name-resolution answer #49 has to settle -- decide #49 first or decide both
+together.
+Design entschieden: Option (a) - echte Inflation via FROM_STRUCT + inflate()-Routing fuer /List$/. Wird zusammen mit #49 umgesetzt.
+Implemented (option a): IO::K8s::List::FROM_STRUCT added -- derives item type from the list's own Kind-minus-'List' + apiVersion via expand_class(), with item_class as a sibling-struct-key override for a bare 'kind: List' payload. Unresolvable item GVK dies with the standard 'Cannot resolve Kubernetes GVK' error (never a partial list). IO::K8s::inflate() now routes any kind matching /List\z/ straight to IO::K8s::List before expand_class(). t/44_list_api_version.t #46 section green, incl. the item_class-override test case using the sibling-key mechanism the test already assumed -- no test redesign needed. Changes updated. Full suite: prove -lr t/ -> 57 files, 4023 tests, all green.
