@@ -1,0 +1,85 @@
+---
+claimed_at: 2026-08-18T16:22:35Z
+claimed_by: Torsten Raudssus
+class: standard
+completed: 2026-08-18T16:22:35Z
+created: 2026-08-18T05:10:55Z
+id: 49
+priority: low
+started: 2026-08-18T15:38:34Z
+status: done
+tags:
+- bug
+- list
+- expand-class
+title: List::item_class takes only fully-qualified names and half-fails on anything
+  else
+updated: 2026-08-18T16:22:35Z
+---
+
+IO::K8s::List's item_class is the only class-name-taking parameter in the
+distribution that does not go through expand_class(), and when it is given
+anything but a fully-qualified name the object half-works: kind() answers,
+api_version() does not, and TO_JSON emits a manifest with a kind and no
+apiVersion -- which the API server rejects.
+
+Measured on 4887f658:
+
+  item_class                      kind()      api_version()
+  'Pod'                           PodList     undef
+  'Api::Core::V1::Pod'            PodList     undef
+  'IO::K8s::Api::Core::V1::Pod'   PodList     v1
+  '+My::Thing'                    ThingList   undef
+
+The asymmetry is structural, not accidental: kind() derives from the class
+NAME by regex (List.pm:110-121), while api_version() asks the CLASS
+(List.pm:80-88, `require_module` then `$class->api_version`, undef on any
+failure -- karr #22). So a name that is not loadable still produces a Kind.
+The '+' prefix, documented everywhere else in the distribution as "this is a
+full class name", is not understood here either: it is not stripped, so
+require_module('+My::Thing') fails while the regex happily reads the last
+segment.
+
+TO_JSON (List.pm:139-141) gates each key on its own accessor, so the result
+is a payload with kind: PodList and no apiVersion: rather than an error.
+That is the karr #39/#40 fail-closed rule not applied to this class.
+
+NOT hit by Kubernetes::REST on its normal path -- verified against the
+installed 1.107: list() calls expand_class() before _inflate_list(), so
+item_class arrives fully qualified. Its public inflate_list() passthrough
+(REST.pm:552) takes whatever the caller supplies, and a standalone consumer
+constructing IO::K8s::List directly has nothing telling them the short names
+that work everywhere else do not work here. The attr POD (List.pm:63-66)
+just says "The class of items in the list".
+
+WHAT TO DO -- decide the contract
+  (a) Resolve it: run item_class through expand_class(). Needs an IO::K8s
+      instance, which IO::K8s::List does not have and deliberately does not
+      take (it is plain Moo with no dependency on the core object). Adding
+      one is a real design change -- check whether a class-method
+      expand_class call is enough (`IO::K8s->expand_class($name)` works
+      against %DEFAULT_RESOURCE_MAP but sees no resource_map and no
+      class_namespaces, so a consumer's own CRD would resolve differently
+      here than everywhere else -- that inconsistency may be worse than the
+      current state).
+  (b) Keep it fully-qualified-only, but make it fail closed and say so:
+      strip a leading '+', and make kind() refuse to answer for an
+      item_class api_version() could not resolve, so the pair is emitted
+      together or not at all. Plus a sentence in the attr POD.
+
+(b) is the smaller change and matches what the class already is. (a) buys
+consistency at the cost of giving List a dependency on the core object.
+Decide, do not blend.
+
+Whatever is chosen, the invariant to establish: IO::K8s::List never
+serializes a kind without an apiVersion.
+
+Test: t/44_list_api_version.t already owns exactly these claims -- it pins
+the loadable case, the unloadable case (item_class 'Bauble'), and both
+kind() paths from karr #41. Extend it there; the short-name and '+' cases
+are simply missing from its matrix.
+
+Found reviewing 4887f658 (karr #41).
+Design entschieden: Option (b) - fully-qualified-only, fail closed. '+' wird gestrippt, kind() verweigert Antwort ohne aufloesbare api_version(). Wird zusammen mit #46 umgesetzt.
+test
+Implemented (option b): List.pm strips a leading '+' via a shared _resolved_item_class() helper used by both api_version() and kind(). kind() now returns undef whenever api_version() can't resolve for the same item_class, so the pair is emitted together or not at all. Attr POD updated. t/44_list_api_version.t #49 matrix green (85 assertions total in the file).
