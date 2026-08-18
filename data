@@ -1,0 +1,31 @@
+---
+class: standard
+created: 2026-08-18T17:48:03Z
+id: 59
+priority: low
+status: backlog
+tags:
+- bug
+- serialization
+- docs
+title: FROM_HASH/from_json do not inflate nested objects -- asymmetric with to_json
+updated: 2026-08-18T17:48:03Z
+---
+
+lib/IO/K8s/Role/Resource.pm:164-173 -- FROM_HASH is $class->new(%$hash)
+with no inflation of nested objects. Every class has to_json, but
+Pod->from_json($pod->to_json) dies at the first object-typed field with
+a bare Moo type error on metadata that never points at the path that
+works ($k8s->json_to_object / inflate).
+
+Repro (measured): Pod JSON with metadata+spec dies with did not pass
+type constraint "Maybe[InstanceOf[...ObjectMeta]]".
+
+Loud, but an undocumented API asymmetry plus a diagnostics gap. Decide:
+either document "flat classes only; use $k8s->json_to_object for nested
+data" in POD, or route FROM_HASH through the registry inflation
+(behaviour change, Changes entry). Note karr #53 (from_json utf8) sits
+in the same method -- one pass can cover both.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: decision first, then io-k8s-worker or io-k8s-doc-writer.
