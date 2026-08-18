@@ -1,0 +1,28 @@
+---
+class: standard
+created: 2026-08-18T17:47:52Z
+id: 57
+priority: low
+status: backlog
+tags:
+- bug
+- autogen
+title: AutoGen maps boolean array items to ArrayRef[Str], rejecting schema-true payloads
+updated: 2026-08-18T17:47:52Z
+---
+
+lib/IO/K8s/AutoGen.pm:279-282 -- items: { type: boolean } falls into
+the default ["Str"]; JSON booleans (JSON::PP::Boolean refs) then fail
+ArrayRef[Str], so schema-conforming data is rejected with a type error
+that never names the real problem (wrongly generated attribute type).
+
+Repro (measured): flags => [JSON::PP::true, JSON::PP::false] dies with
+did not pass type constraint "Maybe[ArrayRef[Str]]".
+
+Fix sketch: return the [Bool] form for boolean items -- the DSL already
+has the array-of-bool path with per-element normalization
+(is_array_of_bool); only the AutoGen mapping misses it. Mind karr #51
+(undef element emission) when touching this area.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker, then io-k8s-test-writer (t/04_autogen.t).
