@@ -1,0 +1,145 @@
+---
+claimed_at: 2026-08-18T16:28:55Z
+claimed_by: Torsten Raudssus
+class: standard
+completed: 2026-08-18T16:28:50Z
+created: 2026-08-18T05:08:25Z
+id: 45
+priority: high
+started: 2026-08-18T15:38:17Z
+status: done
+tags:
+- bug
+- serialization
+- api-classes
+title: Embedded template classes stamp apiVersion/kind into fields the schema has
+  no such keys for
+updated: 2026-08-18T16:28:55Z
+---
+
+Seven classes compose IO::K8s::APIObject that upstream has no GVK for, so
+TO_JSON stamps apiVersion and kind into an embedded field that has no such
+keys in the Kubernetes schema. The most-used one is PodTemplateSpec, which
+means every Deployment, StatefulSet, DaemonSet, ReplicaSet, Job and CronJob
+this distribution serializes carries the extra pair.
+
+Measured on 4887f658:
+
+  $k8s->struct_to_object('Api::Apps::V1::Deployment', {...})->TO_JSON
+  {
+     "apiVersion" : "apps/v1",
+     "kind" : "Deployment",
+     "spec" : {
+        "template" : {
+           "apiVersion" : "v1",            <-- not in the schema
+           "kind" : "PodTemplateSpec",     <-- not in the schema
+           "metadata" : {...}, "spec" : {...}
+        }
+     }
+  }
+
+Checked against spec/v1.36.3.json, definitions block:
+
+  io.k8s.api.core.v1.PodTemplateSpec        no GVK, props: metadata,spec
+  io.k8s.api.batch.v1.JobTemplateSpec       no GVK, props: metadata,spec
+  io.k8s.api.core.v1.PersistentVolumeClaimTemplate  no GVK, props: metadata,spec
+  io.k8s.api.resource.v1.ResourceClaimTemplateSpec  no GVK, props: metadata,spec
+
+  # controls, for contrast -- these DO carry apiVersion/kind upstream and
+  # are correct as they are:
+  io.k8s.api.core.v1.PodTemplate            GVK, props: apiVersion,kind,metadata,template
+  io.k8s.api.core.v1.PersistentVolumeClaim  GVK, props: apiVersion,kind,metadata,spec,status
+  io.k8s.api.autoscaling.v1.Scale           GVK
+  io.k8s.api.policy.v1.Eviction             GVK
+  io.k8s.api.authentication.v1.TokenRequest GVK
+
+THE SEVEN CLASSES (all `use IO::K8s::APIObject;`, all should not)
+
+  lib/IO/K8s/Api/Core/V1/PodTemplateSpec.pm              embedded 7x
+  lib/IO/K8s/Api/Batch/V1/JobTemplateSpec.pm             embedded 1x
+  lib/IO/K8s/Api/Core/V1/PersistentVolumeClaimTemplate.pm  embedded 1x
+  lib/IO/K8s/Api/Resource/V1/ResourceClaimTemplateSpec.pm       embedded 1x
+  lib/IO/K8s/Api/Resource/V1alpha3/ResourceClaimTemplateSpec.pm embedded 1x
+  lib/IO/K8s/Api/Resource/V1beta1/ResourceClaimTemplateSpec.pm  embedded 1x
+  lib/IO/K8s/Api/Resource/V1beta2/ResourceClaimTemplateSpec.pm  embedded 1x
+
+Embedding sites for PodTemplateSpec, found by walking the attribute
+registry for is_object/is_array_of_objects/is_hash_of_objects targets whose
+class reports _is_resource:
+
+  Api::Apps::V1::DaemonSetSpec.template
+  Api::Apps::V1::DeploymentSpec.template
+  Api::Apps::V1::ReplicaSetSpec.template
+  Api::Apps::V1::StatefulSetSpec.template
+  Api::Batch::V1::JobSpec.template
+  Api::Core::V1::PodTemplate.template
+  Api::Core::V1::ReplicationControllerSpec.template
+  (JobTemplateSpec: Batch::V1::CronJobSpec.jobTemplate;
+   PersistentVolumeClaimTemplate: Core::V1::EphemeralVolumeSource.volumeClaimTemplate;
+   ResourceClaimTemplateSpec: Resource::V*::ResourceClaimTemplate.spec)
+
+The same scan finds exactly one other embedded class that emits the pair --
+Core::V1::PersistentVolumeClaim, in StatefulSetSpec.volumeClaimTemplates and
+three AgentSandbox specs. That one is CORRECT: PVC really does carry inline
+TypeMeta upstream. Do not "fix" it.
+
+WHY IT MATTERS
+kubectl's default field validation is strict, and the API server rejects
+unknown fields under fieldValidation=Strict rather than pruning them, so
+`kubectl apply -f` on to_yaml() output should fail with an unknown-field
+error on spec.template.apiVersion. NOT verified against a live cluster --
+verify that before writing the Changes entry, and say which way it went. In
+the lenient path the fields are pruned and the manifest merely carries
+noise.
+
+The distribution's own POD already states the rule this breaks --
+lib/IO/K8s/APIObject.pm:61: "Use C<IO::K8s::Resource> for embedded objects
+(PodSpec, Container, etc.)". These seven are embedded objects using the
+wrong base.
+
+WHY NO TEST CAUGHT IT
+t/25_real_world.t inflates real manifests and re-exports them, but every
+assertion is a per-field spot check; its 12 is_deeply calls all compare leaf
+arrays (policyTypes, verbs, hosts, ...), never a whole manifest against its
+input. t/26_build_verify.t has no is_deeply at all. So nothing in the suite
+notices seven extra keys. maint/spec-drift-check.pl does not see it either
+-- apiVersion/kind come from the role, not from the k8s() registry it reads,
+so its EXTRA FIELD tier reports 0. (Separate ticket for that blind spot.)
+
+WHAT TO DO -- design decision first, this is not a mechanical swap
+The classes genuinely need `metadata` (ObjectMeta), which today comes from
+IO::K8s::Role::APIObject together with the TypeMeta emission and the
+convenience methods. Options, pick one and say why:
+  (a) `use IO::K8s::Resource;` plus an explicit
+      `k8s metadata => 'Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta';`
+      -- smallest mechanism, but drops the label/annotation helpers from
+      these classes, which is a visible API removal for consumers who call
+      $deployment->spec->template->add_label(...). CHECK whether that is
+      used anywhere before choosing it.
+  (b) an embedded marker (e.g. `_is_resource` returning 0, or an import
+      parameter) that keeps metadata and the helpers but stops TO_JSON
+      writing apiVersion/kind. Role::Resource::TO_JSON:100 already gates the
+      TypeMeta block on `$self->can('_is_resource') && $self->_is_resource`,
+      so the hook exists.
+  (b) is the smaller behaviour change; (a) is the more honest model. The
+  resource_plural POD (Role/APIObject.pm:546-549) already calls these "the
+  embedded PodTemplateSpec-style types [that] never appear as a kind: on the
+  wire at all" -- the model already knows; only TO_JSON does not.
+
+Removing api_version()/kind() from a public class is a breaking change under
+the house protocol; state the changed failure mode in Changes either way.
+
+REGRESSION TEST (the actual point)
+Add a structural check, not another spot check: inflate a manifest and
+assert the re-exported structure has NO key the input did not have, at
+least for one Deployment and one CronJob. That is the assertion class that
+was missing, and it is what keeps this from coming back.
+
+Lane: io-k8s-worker for lib/, io-k8s-test-writer for the structural test.
+
+Cross-reference: the checker blind spot that let this through is karr #50.
+The structural round-trip assertion this ticket asks for would also have
+caught it -- see the WHY NO TEST CAUGHT IT section.
+Design entschieden: Option (a).
+Design entschieden: Option (a) - Wechsel auf IO::K8s::Resource mit explizitem k8s metadata => ObjectMeta fuer die 7 betroffenen Klassen. Breaking Change wird in Changes dokumentiert.
+Umgesetzt in Commit d519d4a6 (Option a: Wechsel auf IO::K8s::Resource, Breaking Change dokumentiert in Changes). Regressionstest t/55_karr_45_structural_roundtrip.t. Voller Testlauf: 4023 Tests grün.
