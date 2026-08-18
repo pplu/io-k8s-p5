@@ -1,14 +1,19 @@
 package IO::K8s::Api::Resource::V1::ResourceClaimTemplateSpec;
 # ABSTRACT: ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 our $VERSION = '1.108';
-use IO::K8s::APIObject;
+use IO::K8s::Resource;
 
 =description
 
 ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 
-This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
-C<metadata>, C<api_version()>, and C<kind()>.
+=cut
+
+k8s metadata => 'Meta::V1::ObjectMeta';
+
+=attr metadata
+
+Standard object's metadata. See L<IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta>.
 
 =cut
 

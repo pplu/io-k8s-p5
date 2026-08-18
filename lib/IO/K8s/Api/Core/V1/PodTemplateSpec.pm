@@ -1,14 +1,19 @@
 package IO::K8s::Api::Core::V1::PodTemplateSpec;
 # ABSTRACT: PodTemplateSpec describes the data a pod should have when created from a template
 our $VERSION = '1.108';
-use IO::K8s::APIObject;
+use IO::K8s::Resource;
 
 =description
 
 PodTemplateSpec describes the data a pod should have when created from a template
 
-This is a Kubernetes API object. See L<IO::K8s::Role::APIObject> for
-C<metadata>, C<api_version()>, and C<kind()>.
+=cut
+
+k8s metadata => 'Meta::V1::ObjectMeta';
+
+=attr metadata
+
+Standard object's metadata. See L<IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta>.
 
 =cut
 

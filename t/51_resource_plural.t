@@ -259,12 +259,13 @@ subtest 'subresources have no plural of their own' => sub {
 };
 
 subtest 'embedded template types have no plural' => sub {
-    # These carry metadata (so they compose Role::APIObject) but have no
-    # x-kubernetes-group-version-kind and never appear as a 'kind:' on the
-    # wire -- same reason they are absent from %DEFAULT_RESOURCE_MAP. Note
-    # resource.k8s.io does have a ResourceClaimTemplate GroupResource; the
-    # *Spec type next to it is a different Kind string and must not pick it
-    # up.
+    # karr #45: these carry metadata but compose IO::K8s::Resource, not
+    # IO::K8s::Role::APIObject -- upstream's OpenAPI schema for them has no
+    # apiVersion/kind, only metadata and spec, so TO_JSON must not stamp a
+    # GVK into them. Without Role::APIObject they have no resource_plural
+    # method at all (not one that resolves to undef). Note resource.k8s.io
+    # does have a ResourceClaimTemplate GroupResource; the *Spec type next
+    # to it is a different Kind string and must not pick it up.
     for my $class (qw(
         IO::K8s::Api::Core::V1::PodTemplateSpec
         IO::K8s::Api::Core::V1::PersistentVolumeClaimTemplate
@@ -275,7 +276,8 @@ subtest 'embedded template types have no plural' => sub {
         IO::K8s::Api::Resource::V1beta2::ResourceClaimTemplateSpec
     )) {
         IO::K8s->load_class($class);
-        is($class->resource_plural, undef, "$class -> undef");
+        ok(!$class->can('resource_plural'),
+            "$class -> no resource_plural method");
     }
 
     IO::K8s->load_class('IO::K8s::Api::Resource::V1::ResourceClaimTemplate');
@@ -372,6 +374,13 @@ subtest 'coverage over every shipped upstream API class' => sub {
     # generated tables are supposed to cover, not just the short names in
     # the default resource map. Anything in one of the three namespaces
     # _api_version_from_class() understands, composing Role::APIObject.
+    #
+    # karr #45: the seven embedded template types (PodTemplateSpec,
+    # JobTemplateSpec, PersistentVolumeClaimTemplate, and the four
+    # ResourceClaimTemplateSpec versions) now compose IO::K8s::Resource
+    # instead of Role::APIObject -- upstream's schema for them carries no
+    # apiVersion/kind -- so they no longer satisfy does('...Role::APIObject')
+    # and drop out of @api entirely, rather than landing in @without.
     my $lib = "$FindBin::Bin/../lib";
     my @classes;
     find(sub {
@@ -394,25 +403,18 @@ subtest 'coverage over every shipped upstream API class' => sub {
 
     my @without = grep { !defined $_->resource_plural } @api;
 
-    is(scalar @api, 120, '120 shipped upstream API object classes');
+    is(scalar @api, 113, '113 shipped upstream API object classes (120 before karr #45)');
     is(scalar(@api) - scalar(@without), 110,
         '110 of them carry an upstream plural (95 before karr #36)');
 
-    # The exact miss list: 3 subresources + 4 ResourceClaimTemplateSpec
-    # versions + 3 other embedded template types. Nothing else may be undef,
-    # and none of these may ever acquire a plural.
+    # The exact miss list: just the 3 subresources now. The 7 embedded
+    # template types are no longer Role::APIObject classes at all, so they
+    # never reach @api to be filtered into @without.
     is_deeply(\@without, [qw(
         IO::K8s::Api::Authentication::V1::TokenRequest
         IO::K8s::Api::Autoscaling::V1::Scale
-        IO::K8s::Api::Batch::V1::JobTemplateSpec
-        IO::K8s::Api::Core::V1::PersistentVolumeClaimTemplate
-        IO::K8s::Api::Core::V1::PodTemplateSpec
         IO::K8s::Api::Policy::V1::Eviction
-        IO::K8s::Api::Resource::V1::ResourceClaimTemplateSpec
-        IO::K8s::Api::Resource::V1alpha3::ResourceClaimTemplateSpec
-        IO::K8s::Api::Resource::V1beta1::ResourceClaimTemplateSpec
-        IO::K8s::Api::Resource::V1beta2::ResourceClaimTemplateSpec
-    )], 'exactly the subresources and the embedded template types stay undef');
+    )], 'exactly the subresources stay undef');
 };
 
 done_testing;

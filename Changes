@@ -2,6 +2,30 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Stop stamping apiVersion/kind into seven embedded template classes that
+    the upstream schema carries no such keys for (karr #45): PodTemplateSpec,
+    JobTemplateSpec, PersistentVolumeClaimTemplate, and ResourceClaimTemplateSpec
+    (v1, v1alpha3, v1beta1, v1beta2). Each composed IO::K8s::APIObject, so
+    TO_JSON emitted the pair on every embedded occurrence -- most visibly
+    spec.template on every Deployment, StatefulSet, DaemonSet, ReplicaSet,
+    Job and CronJob this distribution serializes. The upstream OpenAPI
+    definitions for these seven declare only metadata and spec, with no
+    x-kubernetes-group-version-kind, and kubectl's default strict field
+    validation rejects unrecognized fields rather than pruning them, so the
+    extra pair was liable to make `kubectl apply` reject otherwise-valid
+    output (not verified against a live cluster; this describes the
+    validation behaviour, not an observed failure). Contrast case, left
+    unchanged: Core::V1::PersistentVolumeClaim (embedded in
+    StatefulSetSpec.volumeClaimTemplates) genuinely carries inline TypeMeta
+    upstream and keeps emitting apiVersion/kind.
+    Breaking change: all seven now compose IO::K8s::Resource instead of
+    IO::K8s::APIObject, with an explicit C<k8s metadata> declaration in
+    place of the role-derived one. C<metadata> is unaffected, but
+    C<api_version()>, C<kind()>, C<add_label()>, C<add_annotation()> and the
+    other IO::K8s::Role::APIObject convenience methods are no longer public
+    methods on instances of these seven classes -- calling one now fails
+    with "Can't locate object method" instead of returning a value.
+
   - Derive IO::K8s::List::kind() for a single-segment item_class too
     (karr #41). The same missing '::' as the previous entry, in the
     item_class fallback -- which is precisely the empty-list case, where
