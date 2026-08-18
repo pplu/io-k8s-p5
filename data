@@ -1,0 +1,124 @@
+---
+claimed_at: 2026-08-18T17:39:00Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-18T17:39:00Z
+created: 2026-08-18T04:52:08Z
+id: 44
+priority: low
+started: 2026-08-18T17:34:00Z
+status: done
+tags:
+- docs
+- resource
+title: resource_plural POD promises REST paths for the group-fallback tier too
+updated: 2026-08-18T17:39:00Z
+---
+
+karr #36 added the tier-2 %RESOURCE_PLURAL_BY_GROUP fallback so Kinds on
+API tracks upstream no longer serves resolve a plural. The reasoning is
+explicitly RBAC: rules address resources by apiGroups + resources with no
+version at all, so the plural is a property of the GroupResource. That is
+correct, and the commit says so.
+
+The POD sentence above it (lib/IO/K8s/Role/APIObject.pm:517-518) predates
+tier 2 and was not narrowed when tier 2 landed:
+
+  "Returns the plural resource name Kubernetes addresses this Kind by in
+   REST paths and in RBAC C<resources:> rules"
+
+For tier 1 both halves hold. For tier 2 only the RBAC half does:
+
+  IO::K8s::Api::Resource::V1alpha3::DeviceClass->api_version
+  # resource.k8s.io/v1alpha3
+  IO::K8s::Api::Resource::V1alpha3::DeviceClass->resource_plural
+  # deviceclasses   <-- tier 2
+
+  # RBAC:  apiGroups: [resource.k8s.io], resources: [deviceclasses]   correct
+  # REST:  /apis/resource.k8s.io/v1alpha3/deviceclasses               404
+
+The 404 comes from the dead apiVersion, not from a wrong plural -- the
+plural is the right one for that GroupResource, and no other answer would
+be better. So this is a documentation gap, not a behaviour bug: the fifteen
+classes tier 2 exists for are precisely the ones whose REST path cannot
+work regardless of what resource_plural returns.
+
+Worth a half-sentence on the tier-2 paragraph, which already explains the
+GroupResource reasoning but presents it as a widening of coverage rather
+than as a narrowing of what the value is good for. Something to the effect
+of: for a Kind on a track upstream no longer serves, the plural is
+RBAC-usable but the REST path built from it and the class's own
+api_version will not resolve against a current cluster.
+
+No code change. POD only, in IO::K8s::Role::APIObject; check whether the
+IO::K8s.pm resource_plural mentions (the "This adds:" list and the CRD
+attribute docs, both touched by c0026952) need the same qualifier.
+
+Found reviewing d8aa8f49 (karr #36).
+
+--- VERIFIED 2026-08-18 against 4887f658 (full suite green: 56 files, 3979 tests) ---
+
+The count is right: EXACTLY 15 classes resolve their plural through tier 2.
+Checked the hard way -- loaded all 846 shipped classes, took api_version()
+and kind() from each _is_resource class, and classified its plural as
+tier-1 key hit / tier-2 key hit / explicitly declared per class:
+
+  tier 1 (%RESOURCE_PLURAL, 95 keys)              95 classes
+  tier 2 (%RESOURCE_PLURAL_BY_GROUP, 76 keys)     15 classes   <-- these
+  explicit `use IO::K8s::APIObject resource_plural`  69 classes
+  undef (subresources + embedded types)           10 classes
+
+Worth recording because the obvious measurement is wrong: "has a plural but
+no tier-1 key" counts 84, not 15. The extra 69 are the vendor CRDs (Cilium,
+Traefik, cert-manager, Gateway API, K3s, AgentSandbox), which declare their
+own plural and never reach either table. Those are on LIVE tracks and their
+REST paths work -- do not let the doc wording sweep them in.
+
+The 15, each cross-checked to have no definition key in spec/v1.36.3.json at
+all (which is the same fact from the other side -- upstream does not serve
+them, so there is no REST path to build):
+
+  Api::Admissionregistration::V1alpha1::ValidatingAdmissionPolicy
+  Api::Admissionregistration::V1alpha1::ValidatingAdmissionPolicyBinding
+  Api::Admissionregistration::V1beta1::ValidatingAdmissionPolicy
+  Api::Admissionregistration::V1beta1::ValidatingAdmissionPolicyBinding
+  Api::Authentication::V1alpha1::SelfSubjectReview
+  Api::Authentication::V1beta1::SelfSubjectReview
+  Api::Coordination::V1alpha1::LeaseCandidate
+  Api::Flowcontrol::V1beta3::FlowSchema
+  Api::Flowcontrol::V1beta3::PriorityLevelConfiguration
+  Api::Resource::V1alpha3::DeviceClass
+  Api::Resource::V1alpha3::ResourceClaim
+  Api::Resource::V1alpha3::ResourceClaimTemplate
+  Api::Resource::V1alpha3::ResourceSlice
+  Api::Storage::V1alpha1::VolumeAttributesClass
+  Api::Storagemigration::V1alpha1::StorageVersionMigration
+
+EXACT LOCATIONS
+  lib/IO/K8s/Role/APIObject.pm:517-518  the unqualified sentence
+  lib/IO/K8s/Role/APIObject.pm:525-533  the tier-2 paragraph, which already
+    carries the GroupResource reasoning and is the natural place for the
+    qualifier
+
+The other three places the ticket asks about were checked; NONE need the
+qualifier, so this is one file, one paragraph:
+  - lib/IO/K8s.pm:1128-1130 ("This adds:" list) -- says "the plural
+    Kubernetes addresses the Kind by ... from a table generated off the
+    upstream spec". Makes no REST-path promise. Leave it.
+  - lib/IO/K8s.pm:1186-1197 (the CRD import parameter) -- "for URL building
+    and RBAC resources: rules". This is about CRDs, which are on live
+    tracks, so both halves hold. Leave it.
+  - lib/IO/K8s/APIObject.pm:46-47 -- "from a generated table for built-in
+    Kinds; undef when there is no plural, e.g. a subresource". No REST
+    claim. Leave it.
+
+WHAT TO DO
+Narrow the :517-518 sentence and put the "good for RBAC, not for a REST path
+against a current cluster" half-sentence on the tier-2 paragraph. The value
+itself is not wrong and no alternative would be better -- say that, so a
+later reader does not try to "fix" the plural.
+
+No code change. No test change (t/51_resource_plural.t asserts values, not
+prose). POD only.
+
+Lane: io-k8s-doc-writer.
