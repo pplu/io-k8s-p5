@@ -1,0 +1,94 @@
+---
+claimed_at: 2026-08-18T17:54:10Z
+claimed_by: claude-main
+class: standard
+completed: 2026-08-18T17:54:10Z
+created: 2026-08-18T05:09:53Z
+id: 47
+priority: medium
+started: 2026-08-18T17:42:13Z
+status: done
+tags:
+- bug
+- api-object
+- serialization
+title: 'set_owner writes ownerReferences the API server rejects: empty uid, always
+  controller, duplicates'
+updated: 2026-08-18T17:54:10Z
+---
+
+set_owner() (lib/IO/K8s/Role/APIObject.pm:881-897) builds an OwnerReference
+that the API server rejects, and does it quietly. Three separate defects,
+all measured on 4887f658:
+
+  my $dep = $k8s->struct_to_object('Deployment', { metadata => { name => 'web' } });
+  my $pod = $k8s->struct_to_object('Pod',        { metadata => { name => 'p' } });
+  $pod->set_owner($dep);
+  $pod->set_owner($dep);
+  $pod->TO_JSON
+
+  "ownerReferences" : [
+     { "apiVersion":"apps/v1", "kind":"Deployment", "name":"web",
+       "controller":true, "uid":"" },
+     { "apiVersion":"apps/v1", "kind":"Deployment", "name":"web",
+       "controller":true, "uid":"" }
+  ]
+
+1. uid => $owner->metadata->uid // ''
+   An empty uid. OwnerReference declares uid as a required Str, so '' passes
+   the type check and fails at the cluster -- metadata.ownerReferences.uid
+   must not be empty. A locally built owner NEVER has a uid; you only get one
+   back from the server. So the common path -- build both objects, link them,
+   apply -- is exactly the path that produces the invalid reference. The
+   `// ''` is what turns "I cannot know this" into "here is a value".
+
+2. controller => 1, hardcoded.
+   Kubernetes permits at most one ownerReference with controller: true. The
+   POD says "Add an ownerReference" -- plural-capable, and the method does
+   append -- but every one it adds claims to be the controller, so two calls
+   produce an object the API server refuses. There is no way to add a
+   non-controller owner, which is the ordinary case for anything but the
+   single controlling parent.
+
+3. No duplicate check: the same owner twice yields two identical entries.
+
+4. A cryptic death when the owner has no metadata:
+     $pod->set_owner($k8s->struct_to_object('Deployment', {}));
+     # Can't call method "name" on an undefined value at
+     #   lib/IO/K8s/Role/APIObject.pm line 887.
+   Neither method nor argument named. Same diagnostic gap as karr #42, in a
+   different place. Note the asymmetry: is_owned_by() (:907) carefully
+   guards with `$owner->metadata ? ... : undef` and even falls back to
+   name+kind when uid is missing -- so the read side already knows uid may
+   be absent and metadata may be undef. Only the write side pretends
+   otherwise.
+
+Test coverage today is one lives_ok in t/54_single_segment_kind.t:130,
+which exists to check that a single-segment owner's kind is not undef. The
+value written is asserted nowhere.
+
+WHAT TO DO -- decide the contract before touching the code
+  * uid: refuse rather than invent. Either die naming the owner ("cannot
+    reference <Kind>/<name>: owner has no uid; the uid is assigned by the
+    API server"), or omit the field and let OwnerReference's required
+    constraint fail loudly. Do NOT keep writing ''. Which of the two is the
+    house answer follows karr #37/#39: fail closed, name what failed.
+  * controller: make it a parameter (default open -- decide whether the
+    default stays 1 for back-compat and is documented, or flips to 0 with a
+    Changes note). At minimum, refuse to add a second controller:true ref.
+  * duplicates: same owner twice should be a no-op or an error, not two
+    entries.
+  * missing metadata: guard and die with the object named, the way
+    is_owned_by already guards.
+  * blockOwnerDeletion is never set; check whether it should be (upstream
+    defaults it false, so leaving it out is fine -- confirm and say so).
+
+Every one of these is a behaviour change on a public method. Changes entry
+must state the changed failure mode per the house protocol.
+
+Tests: a new t/ file, or extend t/54. Assert the emitted ownerReferences
+structure, both directions, plus the two error messages. The existing
+lives_ok must keep passing -- karr #38's claim rides on it.
+
+Found reviewing the karr #38/#41 kind() work, which touched set_owner's
+inputs but not its output.
