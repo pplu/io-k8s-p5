@@ -5,10 +5,10 @@ model: sonnet
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 briefing:
   skills:
-    - perl-core
+    - getty-perl-core
     - io-k8s-core
-    - perl-kubernetes-classes
-    - karr
+    - getty-perl-kubernetes-classes
+    - kanban-issues-karr-cli
 ---
 
 You write tests for **IO::K8s**.

@@ -1,6 +1,6 @@
 ---
 name: io-k8s-core
-description: "IO::K8s distribution internals for contributors — Resource vs APIObject, the k8s DSL and its attribute registry, class-name expansion, the role mesh, CRD resource-map providers, runtime AutoGen, and how new API surface is added. Load before editing anything under lib/IO/K8s/."
+description: Load before editing anything under lib/IO/K8s/ — Resource vs APIObject, the k8s DSL and its attribute registry, class-name expansion, the role mesh, CRD providers.
 user-invocable: false
 allowed-tools: Read, Grep, Glob
 model: sonnet
@@ -9,7 +9,7 @@ model: sonnet
 # IO::K8s — Distribution Internals
 
 Consumer-facing usage (`new_object`, `inflate`, `to_json`, short names) lives in skill
-`perl-kubernetes-classes`. This skill is about *changing* the distribution.
+`getty-perl-kubernetes-classes`. This skill is about *changing* the distribution.
 
 ## There is no codegen step
 
