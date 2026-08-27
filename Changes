@@ -54,6 +54,14 @@ Revision history for IO-K8s
     ".") stay rejected although upstream parses them as 0; no component
     emits them and accepting them would swallow a typo.
 
+  - AgentSandbox v1alpha1 kinds are reachable by domain-qualified name
+    (karr #58). agents.x-k8s.io/v1alpha1/Sandbox and the three
+    extensions.agents.x-k8s.io/v1alpha1 kinds resolved to undef and died
+    with "Cannot resolve Kubernetes GVK" through new_object() and
+    inflate(), contradicting the module's own documentation. The short
+    names Sandbox, SandboxClaim, SandboxTemplate and SandboxWarmPool are
+    unchanged and still resolve to the v1beta1 storage version.
+
   - set_owner() no longer writes ownerReferences the API server rejects
     (karr #47). Behaviour changes: an owner without a uid (anything built
     locally rather than read back from the cluster) is refused with a

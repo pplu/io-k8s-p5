@@ -64,11 +64,25 @@ subtest 'IO::K8s::AgentSandbox resource_map' => sub {
     ok($provider->does('IO::K8s::Role::ResourceMap'), 'consumes ResourceMap role');
     is($provider->upstream_version, 'v0.5.4', 'upstream_version is v0.5.4');
     my $map = $provider->resource_map;
-    is(scalar keys %$map, 4, 'resource_map has 4 entries');
+
+    # 4 short names (each resolving to the v1beta1/storage class) plus 4
+    # domain-qualified v1alpha1 keys (karr #58) -- the v1alpha1 track is
+    # still served upstream but is no longer the storage version, so it does
+    # not get a short name of its own; it is reachable only by full class
+    # name or by its own domain-qualified key.
+    is(scalar keys %$map, 8, 'resource_map has 4 short names + 4 domain-qualified v1alpha1 keys');
     for my $kind (sort keys %all_classes) {
         ok(exists $map->{$kind}, "$kind in resource_map");
         is($map->{$kind}, "AgentSandbox::V1beta1::$kind", "$kind maps to the v1beta1 (storage) class");
     }
+    is($map->{'agents.x-k8s.io/v1alpha1/Sandbox'}, 'AgentSandbox::V1alpha1::Sandbox',
+        'domain-qualified v1alpha1 Sandbox key present');
+    is($map->{'extensions.agents.x-k8s.io/v1alpha1/SandboxClaim'}, 'AgentSandbox::V1alpha1::SandboxClaim',
+        'domain-qualified v1alpha1 SandboxClaim key present');
+    is($map->{'extensions.agents.x-k8s.io/v1alpha1/SandboxTemplate'}, 'AgentSandbox::V1alpha1::SandboxTemplate',
+        'domain-qualified v1alpha1 SandboxTemplate key present');
+    is($map->{'extensions.agents.x-k8s.io/v1alpha1/SandboxWarmPool'}, 'AgentSandbox::V1alpha1::SandboxWarmPool',
+        'domain-qualified v1alpha1 SandboxWarmPool key present');
 };
 
 # --- new(with => ['IO::K8s::AgentSandbox']) integration ---
@@ -82,19 +96,31 @@ subtest 'with constructor parameter' => sub {
             "expand_class('$kind') resolves to v1beta1");
     }
 
-    # Domain-qualified access reaches the storage version registered under the
-    # short name (v1beta1). The v1alpha1 track is not auto-registered under a
-    # domain-qualified key (same precedent as e.g. ValidatingAdmissionPolicy in
-    # IO::K8s.pm, which maps only to its GA class) — it stays reachable by its
-    # full class name instead.
-    is($k8s->expand_class('agents.x-k8s.io/v1beta1/Sandbox'),
-        'IO::K8s::AgentSandbox::V1beta1::Sandbox',
-        'domain-qualified v1beta1 Sandbox resolves');
-    is($k8s->expand_class('extensions.agents.x-k8s.io/v1beta1/SandboxClaim'),
-        'IO::K8s::AgentSandbox::V1beta1::SandboxClaim',
-        'domain-qualified v1beta1 SandboxClaim resolves');
-    ok(!defined($k8s->expand_class('agents.x-k8s.io/v1alpha1/Sandbox')),
-        'domain-qualified v1alpha1 Sandbox is not auto-registered (use the full class name instead)');
+    # Domain-qualified access reaches BOTH tracks (karr #58). v1beta1 is
+    # reachable via the qualified key add() derives from the short-name
+    # registration; v1alpha1 is reachable because the resource_map ships its
+    # own domain-qualified keys for it directly (see
+    # IO::K8s::AgentSandbox::resource_map). This does NOT follow the
+    # ValidatingAdmissionPolicy precedent in IO::K8s.pm (a bare short name
+    # maps only to its GA class, and the older v1beta1/v1alpha1 tracks
+    # fail-close under a domain-qualified lookup): that precedent applies
+    # where there IS a GA release to prefer. AgentSandbox has no GA version at
+    # all -- v1beta1 is only the current storage version, v1alpha1 is still
+    # actively served upstream, and IO::K8s::AgentSandbox's own POD has always
+    # promised this lookup ("via domain-qualified lookup (e.g.
+    # agents.x-k8s.io/v1alpha1/Sandbox)"). All eight GVK combinations (2
+    # tracks x 4 kinds) resolve; the four short names stay pinned to v1beta1
+    # regardless of track.
+    for my $kind (sort keys %all_classes) {
+        for my $ver (qw(v1alpha1 v1beta1)) {
+            my $api_version = $all_classes{$kind}{$ver}{api_version};
+            my $expected = "IO::K8s::AgentSandbox::" . ucfirst($ver) . "::$kind";
+            is($k8s->expand_class("$api_version/$kind"), $expected,
+                "domain-qualified '$api_version/$kind' resolves");
+            is($k8s->expand_class($kind, $api_version), $expected,
+                "expand_class('$kind', '$api_version') resolves");
+        }
+    }
 
     # Core resources are unaffected
     is($k8s->expand_class('Pod'), 'IO::K8s::Api::Core::V1::Pod',
