@@ -44,6 +44,16 @@ Revision history for IO-K8s
     DeviceAttribute bools, which upstream documents as a non-empty list
     of true/false values.
 
+  - Quantity now accepts the n (nano) and u (micro) decimal SI suffixes
+    (karr #52). "100n" was rejected, so inflating real cluster data failed
+    on the 30 Quantity-typed fields -- metrics-server reports CPU that way
+    and autoscaling/v2 averageValue carries such values. The suffix set
+    now matches the decimal table in upstream suffix.go exactly. Note the
+    BNF in the doc comment of upstream quantity.go is stale and omits
+    both suffixes. Quantities without a digit in the mantissa ("Ki", "m",
+    ".") stay rejected although upstream parses them as 0; no component
+    emits them and accepting them would swallow a typo.
+
   - set_owner() no longer writes ownerReferences the API server rejects
     (karr #47). Behaviour changes: an owner without a uid (anything built
     locally rather than read back from the cluster) is refused with a
