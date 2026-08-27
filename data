@@ -1,0 +1,36 @@
+---
+claimed_at: 2026-08-27T18:48:31Z
+claimed_by: sandbox-lane
+class: standard
+completed: 2026-08-27T18:48:31Z
+created: 2026-08-18T17:47:58Z
+id: 58
+priority: low
+started: 2026-08-27T04:00:30Z
+status: done
+tags:
+- bug
+- resource-map
+title: AgentSandbox POD promises v1alpha1 domain-qualified lookup that fail-closes
+updated: 2026-08-27T18:48:31Z
+---
+
+lib/IO/K8s/AgentSandbox.pm POD says lookup works "via domain-qualified
+lookup (e.g. agents.x-k8s.io/v1alpha1/Sandbox)", but add() only
+qualifies the v1beta1 classes present in the resource_map. The v1alpha1
+classes ship on disk but sit in no map.
+
+Repro (measured): expand_class("agents.x-k8s.io/v1alpha1/Sandbox")
+returns undef; new_object dies "Cannot resolve Kubernetes GVK: kind
+Sandbox, apiVersion agents.x-k8s.io/v1alpha1". v1beta1 works.
+
+Fix: either add the qualified map entries following the GatewayAPI
+ReferenceGrant pattern ("agents.x-k8s.io/v1alpha1/Sandbox" =>
+"AgentSandbox::V1alpha1::Sandbox", plus the extensions group), or narrow
+the POD to "by full class name". Decide which track the distribution
+means to support -- fail-closed is at least loud today.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker (map) or io-k8s-doc-writer (POD-only), per decision.
+
+Fixed: four domain-qualified v1alpha1 keys added, GatewayAPI ReferenceGrant pattern. Short names unchanged on v1beta1. v1beta1 qualified keys need no literal entry (add() derives them). POD unchanged -- it was already correct, the map was not. Replaced two deliberate assertions in t/28 that encoded the old state.
