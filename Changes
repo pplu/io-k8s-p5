@@ -62,6 +62,48 @@ Revision history for IO-K8s
     names Sandbox, SandboxClaim, SandboxTemplate and SandboxWarmPool are
     unchanged and still resolve to the v1beta1 storage version.
 
+  - AutoGen refuses a $ref it cannot resolve instead of dropping the
+    property (karr #56). A property referencing a definition missing from
+    the spec was never turned into an attribute; Moo ignores unknown
+    constructor arguments, so inflation accepted the data and TO_JSON
+    never emitted it again -- silent data loss on the round-trip.
+    Behaviour change: a partial spec that references definitions it does
+    not ship used to generate the class successfully, minus those fields,
+    and now dies at class-generation time naming class and field. An
+    opaque fallback was rejected because the DSL has no array-of-hash
+    form, so items: { $ref: <missing> } would have become ArrayRef[Str]
+    and rejected the very hashrefs the field carries -- karr #57's bug,
+    reintroduced by the fix for this one. Still works: a top-level CRD
+    schema whose metadata references the stock ObjectMeta without
+    shipping its definition, because metadata is skipped first.
+
+  - AutoGen handles additionalProperties given as a JSON boolean (karr
+    #55). The boolean schema form is common in CRDs and killed class
+    generation with "Not a HASH reference" and no class or field context.
+    Both polarities now yield the same opaque hash a schemaless object
+    gets; additionalProperties: false deliberately narrows nothing. An
+    additionalProperties that is neither a schema object nor a boolean is
+    a malformed schema and croaks naming class and field.
+
+  - AutoGen maps boolean array items to an array of Bool (karr #57).
+    items: { type: boolean } fell into the string default, so
+    schema-conforming JSON booleans were rejected with a type error that
+    never named the real problem. The generated attribute now reaches the
+    DSL's per-element normalization. Internally the item types are
+    Type::Tiny objects rather than barewords, because inside an arrayref
+    the DSL reads a plain string as a class name for everything except
+    'Str' and 'Int' -- ['Bool'] would have asked for an array of
+    IO::K8s::Api::Bool objects.
+
+  - AutoGen no longer generates apiVersion and kind as data attributes on
+    classes that get GVK class methods (karr #60). $obj->kind("Other")
+    was a silent no-op, and worse, apiVersion had no accessor collision
+    at all: it stayed writable and its value overwrote the role-supplied
+    one, so $obj->apiVersion("other/v9") produced a manifest claiming a
+    GVK the class does not have. Same line karr #45 drew for the
+    hand-written template classes. Classes without a GVK keep kind as an
+    ordinary writable attribute.
+
   - set_owner() no longer writes ownerReferences the API server rejects
     (karr #47). Behaviour changes: an owner without a uid (anything built
     locally rather than read back from the cluster) is refused with a

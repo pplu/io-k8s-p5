@@ -6,6 +6,8 @@ use strict;
 use warnings;
 use Carp qw(croak);
 use Package::Stash;
+use Scalar::Util qw(reftype);
+use Types::Standard qw( Bool Int Str );
 
 # Cache of generated classes
 my %_generated;
@@ -145,6 +147,14 @@ sub _generate_class {
         $api_ver = $group ? "$group/$version" : $version;
     }
 
+    # Explicit options override schema-derived values. Hoisted above the
+    # property loop because whether this class ends up with GVK class
+    # methods decides which properties must not become attributes.
+    $api_ver       = $opts{api_version}     if exists $opts{api_version};
+    $kind_val      = $opts{kind}            if exists $opts{kind};
+    $res_plural    = $opts{resource_plural} if exists $opts{resource_plural};
+    $is_namespaced = $opts{is_namespaced}   if exists $opts{is_namespaced};
+
     return if $_generated{$class};
     $_generated{$class} = 1;  # Mark early to prevent recursion
 
@@ -166,23 +176,44 @@ sub _generate_class {
 
     my $properties = $schema->{properties} // {};
 
+    # A class that gets the GVK class methods below also gets
+    # IO::K8s::Role::APIObject, and with it apiVersion, kind and metadata --
+    # exactly the three properties IO::K8s::Role::Resource::compare_to_schema
+    # already excuses a top-level object for not declaring, and the line
+    # karr #45 drew for the hand-written template classes. Declaring them a
+    # second time as schema properties is not merely redundant:
+    #
+    #   kind:       add_symbol('&kind') overwrites the generated accessor
+    #               afterwards, so the attribute is write-only-looking and
+    #               $obj->kind('Other') is a silent no-op (karr #60).
+    #   apiVersion: no such collision, which is worse -- the attribute stays
+    #               writable and TO_JSON emits it over the apiVersion the
+    #               class actually is.
+    #   metadata:   harmless but pure waste -- the role's own `has metadata`
+    #               and the explicit k8s registration further down both land
+    #               after the loop and overwrite whatever it built, having
+    #               generated a throwaway ObjectMeta class on the way. It is
+    #               skipped here so that a schema referencing the standard
+    #               ObjectMeta without carrying its definition (a very common
+    #               way to hand in a single CRD schema) does not trip the
+    #               unresolved-$ref refusal below over a field the role
+    #               supplies anyway.
+    my %role_supplied = (defined $api_ver && defined $kind_val)
+        ? (apiVersion => 1, kind => 1, metadata => 1)
+        : ();
+
     # Generate attributes using k8s DSL
     # Property names with special characters ($ref, x-kubernetes-*) are
     # automatically sanitized to valid Perl identifiers by _k8s(), with
     # init_arg mapping so constructors still accept the original JSON keys.
     for my $prop (sort keys %$properties) {
+        next if $role_supplied{$prop};
         my $prop_schema = $properties->{$prop};
-        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop);
+        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class);
         next unless defined $type_spec;  # Skip unsupported types
 
         $k8s->($prop, $type_spec);
     }
-
-    # Explicit options override schema-derived values
-    $api_ver       = $opts{api_version}     if exists $opts{api_version};
-    $kind_val      = $opts{kind}            if exists $opts{kind};
-    $res_plural    = $opts{resource_plural} if exists $opts{resource_plural};
-    $is_namespaced = $opts{is_namespaced}   if exists $opts{is_namespaced};
 
     # Install class methods if we have api_version/kind
     if (defined $api_ver && defined $kind_val) {
@@ -217,9 +248,41 @@ my %OPAQUE_TYPES = map { $_ => 1 } qw(
     io.k8s.apimachinery.pkg.runtime.RawExtension
 );
 
+# A $ref pointing at a definition the caller never supplied.
+#
+# Refusing is the fail-closed choice (karr #56). The property used to be
+# skipped outright: the generated class simply had no such attribute, Moo
+# dropped the constructor argument for it without a word, and TO_JSON never
+# emitted the data again -- an inflate/serialize round-trip that quietly
+# lost whatever sat under that key.
+#
+# The alternative considered was an opaque { Str => 1 } attribute. It was
+# rejected for two reasons. It cannot be applied at all three call sites:
+# the k8s DSL has no array-of-hash form, so `items: { $ref: <missing> }`
+# would have to become ArrayRef[Str] and then reject the very hashrefs the
+# field carries -- the karr #57 failure, reintroduced. And it guesses a
+# shape: a missing definition may just as well be a string or array alias,
+# in which case the Maybe[HashRef] attribute fails its type constraint
+# without ever naming the unresolved $ref that caused it. %OPAQUE_TYPES
+# above is a decision taken per named type, not a default for anything
+# unresolvable.
+sub _croak_unresolved_ref {
+    my ($ref, $where) = @_;
+    croak "Cannot resolve the \$ref '$ref' for $where: no such definition in "
+        . "the OpenAPI spec. Supply the definition or drop the property -- "
+        . "generating the class without it would silently drop that field on "
+        . "every round-trip";
+}
+
 # Convert OpenAPI schema to k8s() type spec
+#
+# $field_name and $class are diagnostic context only: everything this
+# function refuses has to name the class being generated and the field it
+# choked on, because the caller sees neither (the karr #42 diagnostic line).
 sub _schema_to_type_spec {
-    my ($schema, $all_defs, $namespace, $field_name) = @_;
+    my ($schema, $all_defs, $namespace, $field_name, $class) = @_;
+
+    my $where = "field '" . $field_name . "' of " . $class;
 
     # Handle $ref
     if (my $ref = $schema->{'$ref'}) {
@@ -246,7 +309,7 @@ sub _schema_to_type_spec {
             my $ref_class = get_or_generate($ref, $all_defs->{$ref}, $all_defs, $namespace);
             return "+$ref_class";  # + prefix for full class name
         }
-        return undef;  # Can't resolve reference
+        _croak_unresolved_ref($ref, $where);
     }
 
     my $type = $schema->{type} // '';
@@ -274,24 +337,43 @@ sub _schema_to_type_spec {
                 my $ref_class = get_or_generate($ref, $all_defs->{$ref}, $all_defs, $namespace);
                 return ["+$ref_class"];
             }
-            return undef;
+            _croak_unresolved_ref($ref, "the items of $where");
         }
+        # Type::Tiny objects rather than the barewords: inside an arrayref
+        # the DSL reads a plain string as a class name for everything except
+        # 'Str' and 'Int', so ['Bool'] would ask for an array of
+        # IO::K8s::Api::Bool objects. [Bool] is the form that reaches the
+        # is_array_of_bool branch and its per-element normalization, which is
+        # what an array of schema-true JSON booleans needs (karr #57).
         my $item_type = $items->{type} // 'string';
-        return ['Str'] if $item_type eq 'string';
-        return ['Int'] if $item_type eq 'integer';
-        return ['Str'];  # Default
+        return [ Int ]  if $item_type eq 'integer';
+        return [ Bool ] if $item_type eq 'boolean';
+        return [ Str ];  # string, and the default for anything unmodelled
     }
     elsif ($type eq 'object') {
-        if (my $addl = $schema->{additionalProperties}) {
+        my $addl = $schema->{additionalProperties};
+        if (ref $addl eq 'HASH') {
             if (my $ref = $addl->{'$ref'}) {
                 $ref =~ s{^#/definitions/}{};
                 if ($all_defs && $all_defs->{$ref}) {
                     my $ref_class = get_or_generate($ref, $all_defs->{$ref}, $all_defs, $namespace);
                     return { "+$ref_class" => 1 };
                 }
-                return undef;
+                _croak_unresolved_ref($ref, "the additionalProperties of $where");
             }
             return { Str => 1 };  # Hash of strings
+        }
+        # additionalProperties is allowed to be a JSON boolean instead of a
+        # schema -- true: any extra property, false: none. A JSON::PP::Boolean
+        # is a blessed scalar ref, so the $ref lookup above used to die "Not a
+        # HASH reference" naming neither class nor field (karr #55). Neither
+        # boolean says anything about the value types, so the field stays the
+        # same opaque hash a schemaless object gets.
+        if (defined $addl) {
+            my $reftype = reftype($addl);
+            croak "additionalProperties of $where is a " . $reftype
+                . " reference; expected a schema object or a boolean"
+                if defined $reftype && $reftype ne 'SCALAR';
         }
         return { Str => 1 };  # Generic object -> hash of strings
     }
