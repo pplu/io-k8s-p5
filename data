@@ -1,0 +1,37 @@
+---
+claimed_at: 2026-08-27T18:47:59Z
+claimed_by: serialization-lane
+class: standard
+completed: 2026-08-27T18:47:59Z
+created: 2026-08-18T17:48:03Z
+id: 59
+priority: low
+started: 2026-08-27T04:00:03Z
+status: done
+tags:
+- bug
+- serialization
+- docs
+title: FROM_HASH/from_json do not inflate nested objects -- asymmetric with to_json
+updated: 2026-08-27T18:47:59Z
+---
+
+lib/IO/K8s/Role/Resource.pm:164-173 -- FROM_HASH is $class->new(%$hash)
+with no inflation of nested objects. Every class has to_json, but
+Pod->from_json($pod->to_json) dies at the first object-typed field with
+a bare Moo type error on metadata that never points at the path that
+works ($k8s->json_to_object / inflate).
+
+Repro (measured): Pod JSON with metadata+spec dies with did not pass
+type constraint "Maybe[InstanceOf[...ObjectMeta]]".
+
+Loud, but an undocumented API asymmetry plus a diagnostics gap. Decide:
+either document "flat classes only; use $k8s->json_to_object for nested
+data" in POD, or route FROM_HASH through the registry inflation
+(behaviour change, Changes entry). Note karr #53 (from_json utf8) sits
+in the same method -- one pass can cover both.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: decision first, then io-k8s-worker or io-k8s-doc-writer.
+
+Fixed: FROM_HASH routes through the registry inflation via a memoized default IO::K8s instance (require, not use -- a compile-time use would close a load cycle). Sound because _struct_to_object_expanded only ever sees pre-expanded class names. FROM_HASH inherits the karr #42 diagnostics; an undef on a required Bool now dies with 'Missing required arguments', converging with struct_to_object. Replaced the deliberate dies_ok assertion in t/24. Follow-up: IO::K8s::List is now the only class outside this symmetry (karr #64).
