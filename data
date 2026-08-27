@@ -1,0 +1,34 @@
+---
+claimed_at: 2026-08-27T18:48:20Z
+claimed_by: autogen-lane
+class: standard
+completed: 2026-08-27T18:48:20Z
+created: 2026-08-18T17:48:08Z
+id: 60
+priority: low
+started: 2026-08-27T04:00:21Z
+status: done
+tags:
+- bug
+- autogen
+title: AutoGen kind()/apiVersion() setter is a silent no-op on generated classes
+updated: 2026-08-27T18:48:20Z
+---
+
+lib/IO/K8s/AutoGen.pm:192 -- top-level schemas carry a kind property,
+which becomes a rw Moo attribute; add_symbol("&kind", sub { $kind_val })
+then overwrites the accessor. $obj->kind("Other") silently returns the
+GVK constant and the write vanishes.
+
+Repro (measured): on a generated class, kind("Other") returns the
+original Kind, unchanged, no error.
+
+Output stays correct; only the write path lies. Fix sketch: skip
+kind/apiVersion when generating property attributes for classes that get
+GVK methods installed -- same line as karr #45 took for the hand-written
+template classes.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker, then io-k8s-test-writer (t/04_autogen.t).
+
+Fixed: apiVersion/kind/metadata properties are skipped for classes receiving GVK class methods (karr #45 line). Found the worse half in passing: apiVersion had no accessor collision, so it stayed writable and overwrote the role-supplied value -- a manifest could claim a foreign GVK. Tests: t/57_autogen_karr_55_60.t.
