@@ -52,6 +52,8 @@ use IO::K8s::Resource ();
 use IO::K8s::Api::Core::V1::SecurityContext ();
 use IO::K8s::Api::Core::V1::ContainerStatus ();
 use IO::K8s::Api::Resource::V1::DeviceAttribute ();
+use IO::K8s::Api::Resource::V1beta1::DeviceAttribute ();
+use IO::K8s::Api::Resource::V1beta2::DeviceAttribute ();
 
 my $k8s = IO::K8s->new;
 
@@ -112,7 +114,12 @@ subtest 'is_bool via the constructor (the Moo coercer path)' => sub {
         is($sc->to_json, '{"privileged":' . json_bool_name($want) . '}',
             "$desc: serializes to " . json_bool_name($want));
 
-        # FROM_HASH is the shallow entry point and hits the same coercer.
+        # Before karr #59, FROM_HASH was a bare ->new(%$hash) -- "the shallow
+        # entry point" this comment used to describe. It now routes through
+        # the same _inflate_struct pipeline struct_to_object uses, so a
+        # scalar Bool value passes through both the is_bool inflate branch
+        # and the constructor's coercer; for SecurityContext -- a flat class
+        # with no nested object fields -- the observable result is the same.
         my $from = IO::K8s::Api::Core::V1::SecurityContext->FROM_HASH({ privileged => $value });
         is($from->privileged, $want, "$desc: FROM_HASH accessor is $want");
     }
@@ -233,10 +240,13 @@ subtest 'karr #42: inflation path names class and field' => sub {
 };
 
 # karr #42, item 5: is_array_of_bool shares _normalize_bool via the array
-# coercer (Resource.pm:264), which appends "at element N" to whatever
-# _normalize_bool said. struct_to_object has no dedicated inflate branch for
-# arrays of bool (documented above), so the value falls through untouched and
-# only the array coercer ever sees it -- same message, either entry point.
+# coercer in lib/IO/K8s/Resource.pm (the `elsif ($info{is_array_of_bool})`
+# branch, around lines 282-296 -- not line 264, which is just the
+# _k8s_attributes bookkeeping push()), which appends "at element N" to
+# whatever _normalize_bool said. struct_to_object has no dedicated inflate
+# branch for arrays of bool (documented above), so the value falls through
+# untouched and only the array coercer ever sees it -- same message, either
+# entry point.
 subtest 'karr #42: array element errors report which element failed' => sub {
     throws_ok { IO::K8s::Api::Resource::V1::DeviceAttribute->new(bools => [1, {}, 0]) }
         qr/coercion for "bools" failed: .* at element 1/,
@@ -317,6 +327,52 @@ subtest 'karr #48: a required Bool accepts explicit undef; TO_JSON omits it' => 
 
     ok(!defined $cs->ready, 'accessor is undef');
     ok(!exists $cs->TO_JSON->{ready}, 'TO_JSON omits the required-but-undef field');
+};
+
+# karr #51: an undef ELEMENT of ArrayRef[Bool] is accepted at construction --
+# Types::Standard::Bool allows undef, and _normalize_bool's `return undef`
+# (not a bare `return`) keeps the array coercer from collapsing the element,
+# so the position is preserved -- but there is no honest wire representation
+# for it. The attribute-level answer from karr #48 (leave the field unset)
+# does not apply inside an array, where "omit" would shift every later
+# element. TO_JSON dies instead, naming the class, field and element index,
+# in the same style as the karr #42 messages. Covered on all three
+# DeviceAttribute API tracks that carry `bools` (V1alpha3 has no `bools`
+# field and is out of scope).
+subtest 'karr #51: undef array element accepted at construction, dies on serialization' => sub {
+    for my $class (qw(
+        IO::K8s::Api::Resource::V1::DeviceAttribute
+        IO::K8s::Api::Resource::V1beta1::DeviceAttribute
+        IO::K8s::Api::Resource::V1beta2::DeviceAttribute
+    )) {
+        my $obj;
+        lives_ok { $obj = $class->new(bools => [1, undef, 0]) }
+            "$class: constructor accepts an undef array element";
+        is_deeply($obj->bools, [1, undef, 0],
+            "$class: undef element keeps its position (not dropped, not coerced to false)");
+
+        throws_ok { $obj->TO_JSON }
+            qr/\QBool value must not be undef at element 1 while serializing $class field bools\E/,
+            "$class: TO_JSON dies naming class, field and element index";
+
+        throws_ok { $obj->to_json }
+            qr/\QBool value must not be undef at element 1 while serializing $class field bools\E/,
+            "$class: to_json dies the same way (goes through TO_JSON)";
+    }
+};
+
+# karr #51: the index in the message is the actual position, not hardcoded --
+# pin that against undef at the first and last positions too.
+subtest 'karr #51: the reported element index matches the actual position' => sub {
+    my $class = 'IO::K8s::Api::Resource::V1::DeviceAttribute';
+
+    throws_ok { $class->new(bools => [undef, 1, 0])->TO_JSON }
+        qr/\QBool value must not be undef at element 0 while serializing $class field bools\E/,
+        'undef at element 0 is reported as element 0';
+
+    throws_ok { $class->new(bools => [1, 0, undef])->TO_JSON }
+        qr/\QBool value must not be undef at element 2 while serializing $class field bools\E/,
+        'undef at element 2 is reported as element 2';
 };
 
 done_testing;

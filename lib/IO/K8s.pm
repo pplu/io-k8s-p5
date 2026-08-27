@@ -911,9 +911,10 @@ sub _inflate_struct {
         my $value = $params->{$attr};
         next unless defined $value;
 
-        # Pass through opaque fields without type coercion
+        # Pass through opaque fields without type coercion -- but not as the
+        # caller's own reference (karr #54), see the else branch below.
         if ($opaque_fields{$attr}) {
-            $args{$attr} = $value;
+            $args{$attr} = _shallow_copy($value);
             next;
         }
 
@@ -950,11 +951,28 @@ sub _inflate_struct {
                 die "$err while inflating $class field $attr\n";
             }
         } else {
-            $args{$attr} = $value;
+            # Arrays of scalars, hashes of scalars and anything untyped: the
+            # inflated object must not share the caller's containers, or later
+            # edits to the source struct silently rewrite the object (karr
+            # #54). One level only, matching the output side in
+            # IO::K8s::Role::Resource::TO_JSON: a nested structure under an
+            # opaque hash attribute (fieldsV1, a free-form HashRef) still
+            # shares its inner refs with the struct it was inflated from.
+            $args{$attr} = _shallow_copy($value);
         }
     }
 
     return \%args;
+}
+
+# One level of copying for a plain container, deliberately not deeper -- see
+# the callers above (karr #54). Anything that is not a plain ARRAY or HASH
+# (a scalar, a blessed value, a JSON boolean object) is returned untouched.
+sub _shallow_copy {
+    my ($value) = @_;
+    return [ @$value ] if ref $value eq 'ARRAY';
+    return { %$value } if ref $value eq 'HASH';
+    return $value;
 }
 
 sub object_to_struct {

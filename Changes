@@ -2,6 +2,48 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - FROM_HASH now inflates nested objects, so every class is to_json /
+    from_json symmetric (karr #59). Pod->from_json($pod->to_json) used to
+    die at the first object-typed field with a bare Moo type error on
+    metadata that never pointed at the path which worked
+    ($k8s->json_to_object). Behaviour change: FROM_HASH used to be the
+    shallow entry point and raw nested hashrefs were refused. It also
+    inherits the karr #42 diagnostics now, and an explicit undef on a
+    required Bool dies with "Missing required arguments" instead of
+    building the object -- that is a convergence, $k8s->struct_to_object
+    already behaved that way. IO::K8s::List does not consume the role and
+    still has no from_json.
+
+  - from_json now decodes UTF-8, symmetric to to_json (karr #53).
+    Class->from_json($obj->to_json) read the encoded bytes as characters
+    and produced mojibake with no error raised -- silent data mutation on
+    the class-level round-trip. Behaviour change: from_json takes a UTF-8
+    encoded byte string, which is exactly what to_json emits. An already
+    decoded character string is no longer accepted silently; it fails
+    loudly. Pure ASCII is unaffected. A tolerance shim was rejected
+    deliberately: it would have made from_json more permissive than
+    $k8s->json_to_object, which has always been byte-oriented.
+
+  - TO_JSON and the inflation path no longer share array and hash
+    references with the object (karr #54). Post-processing the struct from
+    TO_JSON silently mutated the object and the mutation showed up in
+    every later serialization: $cm->TO_JSON->{data}{key} = "MUTATED"
+    changed $cm->data->{key}. Mutating a source struct after
+    $k8s->inflate reached the object the same way. Both directions now
+    shallow-copy. The depth is deliberately one level: structures nested
+    under an opaque hash attribute (fieldsV1 and friends) still share
+    their inner references.
+
+  - An undef element in an array of Bool now dies instead of being
+    serialized as false (karr #51). bools => [1, undef, 0] emitted
+    {"bools":[true,false,false]} -- the same invented-false problem karr
+    #48 fixed one level up, where omitting the field is not an option
+    because the positions would shift. The message names class, field and
+    element index. The element still passes the constructor (Bool
+    includes undef); the refusal happens at the wire boundary. Affects
+    DeviceAttribute bools, which upstream documents as a non-empty list
+    of true/false values.
+
   - set_owner() no longer writes ownerReferences the API server rejects
     (karr #47). Behaviour changes: an owner without a uid (anything built
     locally rather than read back from the cluster) is refused with a

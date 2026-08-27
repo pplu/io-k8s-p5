@@ -132,11 +132,37 @@ sub TO_JSON {
         } elsif ($attr_info->{is_array_of_int}) {
             $data{$key} = [ map { int($_) } @$value ];
         } elsif ($attr_info->{is_array_of_bool}) {
-            $data{$key} = [ map { $_ ? JSON::MaybeXS::true : JSON::MaybeXS::false } @$value ];
+            # An undef ELEMENT dies rather than becoming a silent false
+            # (karr #51). ArrayRef[Bool] accepts undef because
+            # Types::Standard::Bool does, and _normalize_bool deliberately
+            # returns it via an explicit `return undef` so the array coercer
+            # keeps the position -- but there is nothing honest to put on the
+            # wire here. The attribute-level answer (karr #48: leave it unset,
+            # omit the field) does not apply inside an array, where omitting
+            # would shift every later element; and the only field of this
+            # shape upstream (Api::Resource::V1*::DeviceAttribute bools) is a
+            # "non-empty list of true/false values", so a JSON null would be
+            # schema-invalid too. Message names field and index, in the karr
+            # #42 diagnostic style.
+            my @bools;
+            for my $i (0 .. $#$value) {
+                die 'Bool value must not be undef at element ' . $i
+                    . ' while serializing ' . (ref($self) || $self)
+                    . " field $key\n" unless defined $value->[$i];
+                push @bools, $value->[$i] ? JSON::MaybeXS::true : JSON::MaybeXS::false;
+            }
+            $data{$key} = \@bools;
         } elsif (ref $value eq 'ARRAY') {
-            $data{$key} = $value;
+            # Shallow copy, one level (karr #54): the struct must not alias the
+            # object, or post-processing what TO_JSON returned silently edits
+            # the object and every later serialization. Deliberately one level
+            # only -- a nested structure under an opaque hash attribute
+            # (fieldsV1, a free-form HashRef) still shares its inner refs with
+            # the object. Same depth on the way in, in IO::K8s::_inflate_struct.
+            $data{$key} = [ @$value ];
         } elsif (ref $value eq 'HASH') {
-            $data{$key} = $value;
+            # Shallow copy, one level -- see the ARRAY branch above (karr #54).
+            $data{$key} = { %$value };
         } else {
             $data{$key} = $value;
         }
@@ -161,14 +187,57 @@ sub to_yaml {
     return $self->TO_YAML;
 }
 
+# The inflation that FROM_HASH routes through lives on an IO::K8s instance,
+# and FROM_HASH is a class method, so it borrows one shared default instance.
+# That is sound because the only thing it uses the instance for is
+# _struct_to_object_expanded(), which is handed class names taken straight out
+# of the attribute registry -- already fully expanded, so no resource_map, no
+# class_namespaces and no openapi_spec of any *particular* IO::K8s instance is
+# consulted. A caller who needs their own providers to take part in the
+# resolution has $k8s->inflate / ->json_to_object, which start from a Kind.
+#
+# `require`, not a top-level `use`: IO::K8s loads IO::K8s::Resource, which
+# loads this role, so a compile-time use here would close a load cycle.
+sub _default_k8s {
+    require IO::K8s;
+    state $k8s = IO::K8s->new;
+    return $k8s;
+}
+
+=method FROM_HASH
+
+    my $pod = IO::K8s::Api::Core::V1::Pod->FROM_HASH($struct);
+
+Builds an object of this class from a plain hashref of JSON field names,
+inflating nested objects, arrays of objects and hashes of objects through the
+attribute registry -- the same inflation L<IO::K8s/inflate> performs, so a
+struct from L</TO_JSON> round-trips back (karr #59). Before 1.108 this was a
+bare C<< $class->new(%$hash) >> and any nested field had to be pre-built.
+
+=cut
+
 sub FROM_HASH {
     my ($class, $hash) = @_;
-    return $class->new(%$hash);
+    return _default_k8s()->_struct_to_object_expanded($class, $hash);
 }
+
+=method from_json
+
+    my $pod = IO::K8s::Api::Core::V1::Pod->from_json($json_bytes);
+
+Builds an object of this class from a JSON document, symmetric to
+L</to_json>. The argument is a B<UTF-8 encoded byte string> -- exactly what
+C<to_json> produces; a decoded character string is not accepted and fails
+loudly in the JSON decoder rather than silently round-tripping to mojibake
+(karr #53). Decode-tolerance was rejected on purpose: it would leave
+C<from_json> more permissive than C<< $k8s->json_to_object >>, which has
+always been byte-oriented.
+
+=cut
 
 sub from_json {
     my ($class, $json_str) = @_;
-    state $json = JSON::MaybeXS->new;
+    state $json = JSON::MaybeXS->new(utf8 => 1);
     return $class->FROM_HASH($json->decode($json_str));
 }
 
