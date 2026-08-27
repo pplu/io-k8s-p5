@@ -1,0 +1,49 @@
+---
+claimed_at: 2026-08-27T18:47:43Z
+claimed_by: serialization-lane
+class: standard
+completed: 2026-08-27T18:47:43Z
+created: 2026-08-18T17:41:32Z
+id: 51
+priority: low
+started: 2026-08-27T03:59:50Z
+status: done
+tags:
+- bug
+- serialization
+title: TO_JSON emits an undef element of ArrayRef[Bool] as false instead of null or
+  dying
+updated: 2026-08-27T18:47:43Z
+---
+
+Found while implementing karr #48 (measured on the post-#48 tree):
+
+ArrayRef[Bool] accepts an undef ELEMENT (Types::Standard::Bool includes
+undef in its constraint), the attribute stores it as undef -- but the
+TO_JSON truthiness map (lib/IO/K8s/Role/Resource.pm:135) emits it as
+false:
+
+  bools => [1, undef, 0]   -->   {"bools":[true,false,false]}
+
+Same silent-invented-false class of problem as karr #48, one level down:
+the attribute-level fix (undef stays unset, field omitted) does not apply
+inside an array, where "omit" is not an option -- the positions would
+shift. The honest choices are JSON null (if the field is nullable
+upstream) or dying with field + element index (consistent with the karr
+#42 messages). Note _normalize_bool now deliberately returns undef via
+explicit `return undef` so the array coercer does NOT collapse the
+element; the wrong turn happens later, in TO_JSON.
+
+Also worth recording in the same decision: required Bool attributes (7
+attrs in 6 classes, e.g. Core::V1::ContainerStatus ready) accept explicit
+undef locally because Bool includes undef; after #48 the field is omitted
+and the API server rejects the missing required field (before #48 it was
+silently sent as false). That is the intended fail-at-server contract, but
+if a local fail-closed is ever wanted, it lands in the same few lines.
+
+t/53_bool_normalization.t deliberately does NOT assert the current
+array-element behaviour either way, so this ticket owns the decision.
+
+Lane: io-k8s-worker, then io-k8s-test-writer for t/53.
+
+Fixed: TO_JSON is_array_of_bool branch dies on an undef element naming class, field and index (karr #42 style). Element still passes the constructor; refusal at the wire boundary. Coercer untouched. Tests: t/53_bool_normalization.t.
