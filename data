@@ -1,0 +1,35 @@
+---
+claimed_at: 2026-08-27T18:47:49Z
+claimed_by: serialization-lane
+class: standard
+completed: 2026-08-27T18:47:49Z
+created: 2026-08-18T17:47:00Z
+id: 53
+priority: medium
+started: 2026-08-27T03:59:54Z
+status: done
+tags:
+- bug
+- serialization
+title: from_json decodes without utf8 -- silent mojibake on the class-level roundtrip
+updated: 2026-08-27T18:47:49Z
+---
+
+lib/IO/K8s/Role/Resource.pm:171 -- to_json encodes with utf8 => 1
+(bytes), but from_json uses state $json = JSON::MaybeXS->new without
+utf8. Class->from_json($obj->to_json) therefore reads UTF-8 bytes as
+characters.
+
+Repro (measured): ConfigMap with data => { greet => "uber-with-umlaut" }
+roundtrips to mojibake (length 5 instead of 4), with NO error raised.
+t/05_utf8.t only covers the instance path ($k8s->json_to_object), not
+this one.
+
+Silent data mutation. Fix sketch: JSON::MaybeXS->new(utf8 => 1) in
+from_json, symmetric to _build_json -- decide whether character-string
+input must stay accepted (decode-tolerant) and say so in POD.
+
+Found in the 2026-08-18 core-module review (repro verified).
+Lane: io-k8s-worker, then io-k8s-test-writer (extend t/05).
+
+Fixed: from_json decodes with utf8 => 1. Decision: strict bytes, no decode tolerance -- a shim would make from_json more permissive than json_to_object, which has always been byte-oriented. Recorded in the new =method from_json POD. Tests: t/05_utf8.t.
