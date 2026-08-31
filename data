@@ -1,0 +1,41 @@
+---
+claimed_at: 2026-08-31T03:54:14Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:43Z
+created: 2026-08-27T04:17:35Z
+id: 68
+priority: low
+started: 2026-08-31T03:54:04Z
+status: done
+tags:
+- bug
+- autogen
+- dsl
+title: 'AutoGen maps type: number to Str -- numeric fields round-trip as quoted strings'
+updated: 2026-08-31T19:04:43Z
+---
+
+lib/IO/K8s/AutoGen.pm:326-327:
+
+  elsif ($type eq "number") {
+      return "Str";  # Treat numbers as strings for now
+
+A JSON number in a generated class round-trips as a quoted string:
+{"cpu": 1.5} comes back out as {"cpu": "1.5"}. The API server rejects
+that for a numeric field. "for now" has outlived whatever now it meant.
+
+Blocked on the same gap as karr #66: the k8s DSL has no numeric scalar
+type to map onto. Int exists and int-casts in TO_JSON; there is no Num.
+So the fix is a DSL addition (a Num form plus its TO_JSON branch,
+mirroring is_int) and only then the AutoGen mapping.
+
+Note the difference to Quantity (karr #52): Quantity is a *string* type
+upstream and correctly stays a string. This ticket is about schemas that
+genuinely declare type: number.
+
+Found by the autogen lane while implementing karr #55-#57/#60 (verified
+by the orchestrating agent).
+Lane: io-k8s-worker (DSL first), then io-k8s-test-writer.
+
+2026-08-31 03:54 DSL Num added (is_num + TO_JSON numify), AutoGen type:number -> Num. Fixed in b42c9b6b, test t/62. Full suite green (4100); import-leak test t/27 still green.
