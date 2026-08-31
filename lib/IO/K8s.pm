@@ -350,6 +350,12 @@ sub BUILD {
 sub _qualify_class_path {
     my ($map, $kind, $class_path) = @_;
 
+    # A key that already carries a '/' is an exact GVK request, not a bare
+    # Kind: it is meant to be registered verbatim (see the GatewayAPI
+    # ReferenceGrant and AgentSandbox entries). Re-qualifying it would build a
+    # junk "$group/$version/$group/$version/$Kind" key (karr #61).
+    return if $kind =~ m{/};
+
     my $full_class = $class_path =~ /^\+/
         ? substr($class_path, 1) : "IO::K8s::$class_path";
 

@@ -2,6 +2,14 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - add() no longer re-qualifies a provider resource_map key that is
+    already domain-qualified (karr #61). A key carrying a '/' is an exact
+    GVK request registered verbatim; merging IO::K8s::GatewayAPI or
+    IO::K8s::AgentSandbox used to also produce junk
+    "$group/$version/$group/$version/$Kind" keys that nothing could
+    resolve. Harmless at lookup time, but they polluted resource_map for
+    anyone iterating or counting it.
+
   - FROM_HASH now inflates nested objects, so every class is to_json /
     from_json symmetric (karr #59). Pod->from_json($pod->to_json) used to
     die at the first object-typed field with a bare Moo type error on
