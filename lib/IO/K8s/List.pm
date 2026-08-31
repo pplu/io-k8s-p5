@@ -272,8 +272,49 @@ sub TO_JSON {
 
 sub to_json {
     my $self = shift;
-    state $json = JSON::MaybeXS->new->canonical;
+    # utf8 => 1, so this emits a UTF-8 byte string -- the same convention every
+    # IO::K8s::Role::Resource class uses (karr #53), and exactly what
+    # L</from_json> reads back. A character string here would round-trip
+    # non-ASCII data to mojibake once it hit a byte-oriented sink (karr #64).
+    state $json = JSON::MaybeXS->new(utf8 => 1, canonical => 1);
     return $json->encode($self->TO_JSON);
+}
+
+=method to_json
+
+    my $json_bytes = $list->to_json;
+
+Serializes the List to a canonical JSON document as a B<UTF-8 encoded byte
+string> -- the same convention every L<IO::K8s::Role::Resource> class uses
+(karr #53), and the input L</from_json> reads back (karr #64).
+
+=cut
+
+=method from_json
+
+    my $list = IO::K8s::List->from_json($json_bytes);
+    my $list = IO::K8s::List->from_json($json_bytes, $k8s);
+
+Builds a List from a JSON document, symmetric to L</to_json>. The argument
+is a B<UTF-8 encoded byte string> -- exactly what C<to_json> emits -- and is
+decoded and handed to L</FROM_STRUCT>, so the items inflate to typed objects
+the same way L<IO::K8s/inflate> does. Pass an L<IO::K8s> instance as the
+second argument when the item types must resolve through that instance's
+providers or C<class_namespaces>; without one a shared default instance is
+used, as FROM_STRUCT does.
+
+List does not consume L<IO::K8s::Role::Resource> -- it is a container, not
+an API object with its own GVK -- so this is a hand-rolled counterpart to
+the role's C<from_json>, not the role's own. C<< $k8s->inflate >> reaches
+the same FROM_STRUCT path from a full wire payload and remains the entry
+point when the Kind is only known at runtime.
+
+=cut
+
+sub from_json {
+    my ($class, $json_str, $k8s) = @_;
+    state $json = JSON::MaybeXS->new(utf8 => 1);
+    return $class->FROM_STRUCT($json->decode($json_str), $k8s);
 }
 
 1;

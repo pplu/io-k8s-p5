@@ -2,6 +2,17 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::List gains from_json, so serializing a List and reading it
+    back no longer dies with "Can not locate object method from_json"
+    (karr #64) -- it was the last class outside the to_json/from_json
+    symmetry karr #59 established. List is a container, not a
+    Role::Resource, so from_json is hand-rolled and delegates to
+    FROM_STRUCT (an optional IO::K8s instance as the second argument lets
+    item types resolve through your providers). List->to_json now also
+    emits a UTF-8 byte string like every other class, instead of a
+    wide-character string that round-tripped non-ASCII data to mojibake
+    (the karr #53 convention). ASCII payloads are unaffected.
+
   - new_object() now honours an apiVersion passed inside the params hash,
     the same key inflate() already reads, instead of silently resolving
     the short name to its default version (karr #62). It used to take the
