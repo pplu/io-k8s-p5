@@ -403,6 +403,17 @@ sub _api_version_from_isa {
     return undef;
 }
 
+=method api_version
+
+Returns the Kubernetes API version derived from the class name. For a
+consumer subclass registered via L<IO::K8s/class_namespaces>, the version is
+derived from the first ancestor in a known namespace.
+
+    $pod->api_version;  # "v1"
+    $deployment->api_version;  # "apps/v1"
+
+=cut
+
 sub api_version {
     my ($self) = @_;
     my $class = ref($self) || $self;
@@ -458,14 +469,14 @@ sub _resource_plural_from_isa {
     return undef;
 }
 
-=method api_version
+=method kind
 
-Returns the Kubernetes API version derived from the class name. For a
-consumer subclass registered via L<IO::K8s/class_namespaces>, the version is
-derived from the first ancestor in a known namespace.
+Returns the Kubernetes kind derived from the class name: the last C<::>
+segment, or the whole name for a single-segment class such as a CRD
+registered as C<+Widget>.
 
-    $pod->api_version;  # "v1"
-    $deployment->api_version;  # "apps/v1"
+    $pod->kind;  # "Pod"
+    $deployment->kind;  # "Deployment"
 
 =cut
 
@@ -489,27 +500,6 @@ sub kind {
     }
 
     return undef;
-}
-
-=method kind
-
-Returns the Kubernetes kind derived from the class name: the last C<::>
-segment, or the whole name for a single-segment class such as a CRD
-registered as C<+Widget>.
-
-    $pod->kind;  # "Pod"
-    $deployment->kind;  # "Deployment"
-
-=cut
-
-sub resource_plural {
-    my ($self) = @_;
-    my $class = ref($self) || $self;
-
-    my $plural = _resource_plural_from_class($class);
-    return $plural if defined $plural;
-
-    return _resource_plural_from_isa($class);
 }
 
 =method resource_plural
@@ -557,6 +547,16 @@ CRD classes declare their own, which always wins over the built-in table:
         resource_plural => 'staticwebsites';
 
 =cut
+
+sub resource_plural {
+    my ($self) = @_;
+    my $class = ref($self) || $self;
+
+    my $plural = _resource_plural_from_class($class);
+    return $plural if defined $plural;
+
+    return _resource_plural_from_isa($class);
+}
 
 sub _is_resource { 1 }
 
