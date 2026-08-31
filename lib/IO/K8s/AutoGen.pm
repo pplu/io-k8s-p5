@@ -357,6 +357,12 @@ sub _schema_to_type_spec {
         my $item_type = $items->{type} // 'string';
         return [ Int ]  if $item_type eq 'integer';
         return [ Bool ] if $item_type eq 'boolean';
+        # items: object / array with no further structure -> an array of
+        # opaque hashes / opaque arrays. Before karr #66 both fell through to
+        # [ Str ] below and rejected the very hashrefs/arrayrefs the schema
+        # describes.
+        return [ {} ] if $item_type eq 'object';
+        return [ [] ] if $item_type eq 'array';
         return [ Str ];  # string, and the default for anything unmodelled
     }
     elsif ($type eq 'object') {

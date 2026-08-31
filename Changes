@@ -2,6 +2,15 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - The k8s DSL gains array-of-hash and array-of-array forms, [ {} ] and
+    [ [] ], and AutoGen maps items: object / items: array onto them
+    (karr #66). Both used to fall through to [ Str ], so a generated class
+    rejected the very hashrefs and arrayrefs the schema describes on an
+    ArrayRef[Str] constraint that never named the real problem. The
+    contents are opaque -- validated as the right container shape,
+    otherwise passed through with the same one-level copy a free-form
+    HashRef gets.
+
   - The k8s DSL gains a Num scalar type, and AutoGen maps OpenAPI
     type: number onto it instead of Str (karr #68). A JSON number in a
     generated class used to round-trip as a quoted string ({"cpu":1.5}

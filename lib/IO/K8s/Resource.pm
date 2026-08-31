@@ -181,7 +181,7 @@ sub _k8s {
     # Check for ! suffix on strings (legacy/alternative required syntax)
     if (!ref $type_spec && !_is_type_tiny($type_spec) && $type_spec =~ s/!$//) {
         $required = 1;
-    } elsif (ref $type_spec eq 'ARRAY' && !_is_type_tiny($type_spec->[0]) && $type_spec->[0] =~ s/!$//) {
+    } elsif (ref $type_spec eq 'ARRAY' && !ref($type_spec->[0]) && $type_spec->[0] =~ s/!$//) {
         $required = 1;
     }
 
@@ -205,8 +205,19 @@ sub _k8s {
         }
     } elsif (ref $type_spec eq 'ARRAY') {
         my $inner = $type_spec->[0];
+        # [ {} ] / [ [] ] -- an array of opaque hashes or opaque arrays, for a
+        # schema whose items are `type: object` / `type: array` with no further
+        # structure (karr #66). Validated as arrays of the right container
+        # shape; the contents pass through untyped, the same one-level-copy
+        # opaque handling a free-form HashRef gets in TO_JSON / _inflate_struct.
+        if (ref $inner eq 'HASH') {
+            $info{is_array_of_hash} = 1;
+            $isa = $required ? ArrayRef[HashRef] : Maybe[ArrayRef[HashRef]];
+        } elsif (ref $inner eq 'ARRAY') {
+            $info{is_array_of_array} = 1;
+            $isa = $required ? ArrayRef[ArrayRef] : Maybe[ArrayRef[ArrayRef]];
         # Handle [Str] with Type::Tiny object
-        if (_is_type_tiny($inner)) {
+        } elsif (_is_type_tiny($inner)) {
             my $type_name = $inner->name;
             if ($type_name eq 'Str') {
                 $info{is_array_of_str} = 1;
