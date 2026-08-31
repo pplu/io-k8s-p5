@@ -1,0 +1,49 @@
+---
+claimed_at: 2026-08-31T03:42:34Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:11Z
+created: 2026-08-27T04:07:55Z
+id: 62
+priority: medium
+started: 2026-08-31T03:42:23Z
+status: done
+tags:
+- bug
+- resource-map
+title: new_object silently discards apiVersion passed in the params hash -- inflate
+  honours it
+updated: 2026-08-31T19:04:11Z
+---
+
+new_object() takes the exact-GVK request only as its third positional
+argument. An apiVersion INSIDE the params hashref is silently overwritten
+with the version of whatever class the short name resolves to, while
+inflate() reads the very same key and honours it.
+
+Repro (measured, with IO::K8s::AgentSandbox loaded, post-karr #58):
+
+  new_object("Sandbox", { apiVersion => "agents.x-k8s.io/v1alpha1", ... })
+    --> IO::K8s::AgentSandbox::V1beta1::Sandbox
+        api_version = agents.x-k8s.io/v1beta1     # caller ignored
+
+  inflate({ kind => "Sandbox", apiVersion => "agents.x-k8s.io/v1alpha1", ... })
+    --> IO::K8s::AgentSandbox::V1alpha1::Sandbox
+        api_version = agents.x-k8s.io/v1alpha1    # caller honoured
+
+Two entry points, same input key, opposite semantics, no diagnostic either
+way. Not AgentSandbox-specific: it hits every kind that ships more than one
+served version. The caller gets an object for a version they did not ask
+for and only finds out at the API server (or not at all, when both versions
+accept the payload).
+
+Decision needed: either honour apiVersion from the params hash (symmetric
+with inflate), or reject/warn when it contradicts the resolved class --
+fail-closed is the house line (karr #37/#39). Silently substituting a
+different API version is the one option that should not survive.
+
+Found by the sandbox lane while implementing karr #58 (repro verified by
+the orchestrating agent).
+Lane: decision first, then io-k8s-worker.
+
+2026-08-31 03:42 Decision: honour params-hash apiVersion (symmetric with inflate) + fail-closed on conflict/unresolvable. Fixed in 98ac0c2f, test t/60. Full suite green (4085).
