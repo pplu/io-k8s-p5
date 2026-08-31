@@ -6,6 +6,7 @@ use IO::K8s::Resource ();
 use Import::Into;
 use Package::Stash;
 use Moo::Role ();
+use Carp qw( croak );
 
 =head1 SYNOPSIS
 
@@ -75,7 +76,12 @@ sub import {
     my $is_crd = 0;
     if (my $api_ver = $params{api_version}) {
         my $stash = Package::Stash->new($caller);
-        $stash->add_symbol('&api_version', sub { $api_ver });
+        # A fixed identity method, not a writable field: reject an argument
+        # rather than swallow it (karr #67).
+        $stash->add_symbol('&api_version', sub {
+            croak 'api_version is fixed for this class and cannot be set' if @_ > 1;
+            $api_ver;
+        });
         $is_crd = 1;
     }
     if (my $plural = $params{resource_plural}) {

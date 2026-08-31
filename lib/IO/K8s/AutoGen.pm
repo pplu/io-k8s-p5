@@ -219,8 +219,17 @@ sub _generate_class {
     if (defined $api_ver && defined $kind_val) {
         my $stash = Package::Stash->new($class);
 
-        $stash->add_symbol('&api_version', sub { $api_ver });
-        $stash->add_symbol('&kind', sub { $kind_val });
+        # These are fixed identity methods, not writable fields. A caller
+        # passing an argument believes they retargeted the object; fail closed
+        # rather than swallow the write (karr #67, the house line of #37/#39).
+        $stash->add_symbol('&api_version', sub {
+            croak 'api_version is fixed for this class and cannot be set' if @_ > 1;
+            $api_ver;
+        });
+        $stash->add_symbol('&kind', sub {
+            croak 'kind is fixed for this class and cannot be set' if @_ > 1;
+            $kind_val;
+        });
         $stash->add_symbol('&resource_plural', sub { $res_plural });
 
         # Apply Role::APIObject for metadata, to_yaml, save, etc.

@@ -351,12 +351,13 @@ subtest 'karr #60: GVK properties excluded from the registry (schema-GVK path)' 
     is($obj->TO_JSON->{apiVersion}, 'homelab.example.com/v1',
         'TO_JSON apiVersion is unaffected by the (nonexistent) write attempt');
 
-    # kind() IS defined (as the GVK class method) but ignores any argument --
-    # calling it with one neither raises an error nor changes what a later
-    # call returns.
-    my $ret = $obj->kind('Other');
-    is($ret, 'StaticWebSite60', 'kind("Other") returns the real constant kind, ignoring the argument');
-    is($obj->kind, 'StaticWebSite60', 'kind is unchanged after the call -- the "setter" is a no-op, not a write');
+    # kind() IS defined (as the GVK class method) but is derived and read-only.
+    # karr #67 turned the former silent no-op into a fail-closed croak, so a
+    # caller who believes they retargeted the object finds out at once.
+    throws_ok { $obj->kind('Other') }
+        qr/kind is fixed for this class and cannot be set/,
+        'kind("Other") croaks -- a fixed identity accessor rejects a write (karr #67)';
+    is($obj->kind, 'StaticWebSite60', 'kind is unchanged -- the rejected call wrote nothing');
     is($obj->TO_JSON->{kind}, 'StaticWebSite60', 'TO_JSON kind still reports the real GVK kind');
 };
 

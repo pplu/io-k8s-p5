@@ -2,6 +2,16 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - kind() and api_version() now croak when passed an argument instead of
+    silently ignoring it (karr #67). They are derived, read-only identity
+    accessors; the swallow meant a caller who wrote $obj->kind('Other')
+    believing they had retargeted the object got no error and no change,
+    and only found out at the API server, if at all. Behaviour change on
+    the two most-called accessors: this covers the hand-written classes
+    (via IO::K8s::Role::APIObject), CRD classes declaring api_version as
+    an import parameter, and AutoGen-generated GVK classes. The
+    no-argument reads are unchanged.
+
   - add() no longer re-qualifies a provider resource_map key that is
     already domain-qualified (karr #61). A key carrying a '/' is an exact
     GVK request registered verbatim; merging IO::K8s::GatewayAPI or

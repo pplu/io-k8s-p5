@@ -4,6 +4,7 @@ our $VERSION = '1.108';
 use Moo::Role;
 use Types::Standard qw( InstanceOf Maybe );
 use Scalar::Util qw(blessed);
+use Carp qw( croak );
 
 has metadata => (
     is => 'rw',
@@ -416,6 +417,8 @@ derived from the first ancestor in a known namespace.
 
 sub api_version {
     my ($self) = @_;
+    croak __PACKAGE__.'->api_version is derived from the class name and cannot be set'
+        if @_ > 1;
     my $class = ref($self) || $self;
 
     my $version = _api_version_from_class($class);
@@ -482,6 +485,8 @@ registered as C<+Widget>.
 
 sub kind {
     my ($self) = @_;
+    croak __PACKAGE__.'->kind is derived from the class name and cannot be set'
+        if @_ > 1;
     my $class = ref($self) || $self;
 
     if ($class =~ /::(\w+)$/) {
