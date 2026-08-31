@@ -1,0 +1,49 @@
+---
+claimed_at: 2026-08-31T03:50:01Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:22Z
+created: 2026-08-27T04:13:17Z
+id: 64
+priority: low
+started: 2026-08-31T03:49:49Z
+status: done
+tags:
+- serialization
+- api-surface
+title: 'IO::K8s::List has to_json but no from_json -- last class outside the karr
+  #59 symmetry'
+updated: 2026-08-31T19:04:22Z
+---
+
+karr #59 made FROM_HASH inflate nested objects, so every class consuming
+IO::K8s::Role::Resource is now to_json/from_json symmetric.
+IO::K8s::List is not: it is a plain `use Moo` class that does NOT consume
+the role.
+
+Measured (post-#59):
+
+  IO::K8s::List->does("IO::K8s::Role::Resource")  --> false
+  ->can("to_json")   yes      ->can("TO_JSON")   yes
+  ->can("from_json") NO       ->can("FROM_HASH") NO
+
+It has its own to_json/TO_JSON, so it looks like a Resource from the
+outside and then has no way back in. A caller who serializes a List and
+tries to read it back hits "Can not locate object method from_json" --
+after #59 that is the only class in the distribution behaving that way,
+which makes it more surprising, not less.
+
+Decision needed: consume the role (and check what the roles bring that
+List must not have -- it is a container, not an API object with a GVK),
+or state the asymmetry in POD as deliberate and point at
+$k8s->inflate, which does handle List containers.
+
+Note the List kinds were removed as API classes in 1.105 (see the *List
+removal and IO::K8s::Deprecated); this ticket is about the generic
+IO::K8s::List container that replaced them, not about those.
+
+Found by the serialization lane while implementing karr #59 (verified by
+the orchestrating agent).
+Lane: decision first, then io-k8s-worker or io-k8s-doc-writer.
+
+2026-08-31 03:50 Decision: bring List into the karr #59 symmetry rather than document the gap. Added hand-rolled from_json (decode UTF-8 -> FROM_STRUCT, optional $k8s) without consuming Role::Resource (which would break List's non-registry shape). Also made to_json byte-oriented (utf8=>1) per karr #53 so the pair round-trips non-ASCII. Fixed in bbf169fc, test t/61. Full suite green (4093); woven POD clean.
