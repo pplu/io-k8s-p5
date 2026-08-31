@@ -230,7 +230,10 @@ sub _generate_class {
             croak 'kind is fixed for this class and cannot be set' if @_ > 1;
             $kind_val;
         });
-        $stash->add_symbol('&resource_plural', sub { $res_plural });
+        $stash->add_symbol('&resource_plural', sub {
+            croak 'resource_plural is fixed for this class and cannot be set' if @_ > 1;
+            $res_plural;
+        });
 
         # Apply Role::APIObject for metadata, to_yaml, save, etc.
         require Moo::Role;

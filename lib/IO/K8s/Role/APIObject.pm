@@ -555,6 +555,8 @@ CRD classes declare their own, which always wins over the built-in table:
 
 sub resource_plural {
     my ($self) = @_;
+    croak __PACKAGE__.'->resource_plural is derived from the class name and cannot be set'
+        if @_ > 1;
     my $class = ref($self) || $self;
 
     my $plural = _resource_plural_from_class($class);

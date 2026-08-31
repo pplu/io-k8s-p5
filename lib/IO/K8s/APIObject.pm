@@ -86,7 +86,12 @@ sub import {
     }
     if (my $plural = $params{resource_plural}) {
         my $stash = Package::Stash->new($caller);
-        $stash->add_symbol('&resource_plural', sub { $plural });
+        # A fixed identity method, not a writable field: reject an argument
+        # rather than swallow it (karr #70, same shape as #67).
+        $stash->add_symbol('&resource_plural', sub {
+            croak 'resource_plural is fixed for this class and cannot be set' if @_ > 1;
+            $plural;
+        });
     }
 
     # Apply the APIObject role (provides metadata, labels, conditions, owners)

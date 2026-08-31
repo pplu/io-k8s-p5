@@ -30,6 +30,14 @@ throws_ok { $pod->api_version('v9') }
 is($pod->kind, 'Pod', 'kind unchanged after the rejected write');
 is($pod->api_version, 'v1', 'api_version unchanged after the rejected write');
 
+# resource_plural is the same derived, read-only shape (karr #70).
+my $derived_plural = $pod->resource_plural;
+ok(defined $derived_plural && length $derived_plural, 'resource_plural() reads a derived plural');
+throws_ok { $pod->resource_plural('others') }
+    qr/resource_plural is derived from the class name and cannot be set/,
+    'resource_plural($arg) croaks instead of swallowing (karr #70)';
+is($pod->resource_plural, $derived_plural, 'resource_plural unchanged after the rejected write');
+
 # Works the same as a class method and on another Kind.
 throws_ok { IO::K8s::Api::Apps::V1::Deployment->kind('X') }
     qr/kind is derived from the class name and cannot be set/,
@@ -55,5 +63,11 @@ throws_ok { $crd->api_version('other/v9') }
 throws_ok { $crd->kind('Other') }
     qr/kind is derived from the class name and cannot be set/,
     'CRD kind($arg) croaks via the role';
+
+# resource_plural declared as an import parameter is a fixed identity too (karr #70).
+is($crd->resource_plural, 'staticwebsites', 'CRD resource_plural reads its declared value');
+throws_ok { $crd->resource_plural('others') }
+    qr/resource_plural is fixed for this class and cannot be set/,
+    'CRD resource_plural($arg) croaks -- the declared plural is read-only';
 
 done_testing;

@@ -2,6 +2,10 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - resource_plural() now croaks when passed an argument instead of silently
+    swallowing it, in all three spots (role accessor, APIObject import param,
+    AutoGen GVK constant) -- the same fail-closed shape karr #67 applied to
+    kind()/api_version() (karr #70)
   - The k8s DSL gains a hash-of-scalar-type form, { Quantity => 1 } (and
     Int/Num/Bool/Time/IntOrStr), and the fields upstream declares as
     map[ResourceName]Quantity are retyped onto it (karr #63). Those maps
