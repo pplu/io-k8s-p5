@@ -1,0 +1,35 @@
+---
+claimed_at: 2026-08-31T03:33:26Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:27Z
+created: 2026-08-27T04:13:21Z
+id: 65
+priority: low
+started: 2026-08-31T03:33:15Z
+status: done
+tags:
+- docs
+title: 'APIObject POD: =method api_version block sits above sub kind'
+updated: 2026-08-31T19:04:27Z
+---
+
+lib/IO/K8s/Role/APIObject.pm:461-471 -- the "=method api_version" POD
+block is immediately followed by "sub kind", not by "sub api_version".
+
+With the @Author::GETTY PodWeaver setup that attaches inline =method prose
+to the following sub, the api_version documentation ends up on kind() in
+the generated POD: readers of IO::K8s::Role::APIObject are told kind()
+"Returns the Kubernetes API version derived from the class name" and get
+the $pod->api_version examples.
+
+Verified by reading the file (pre-existing, unrelated to any current work).
+
+Fix: move the block above sub api_version, or move sub api_version up to
+meet it -- whichever keeps the surrounding order readable. Check the rest
+of the file for the same slip while there.
+
+Found by the serialization lane while implementing karr #51/#53/#54/#59.
+Lane: io-k8s-doc-writer.
+
+2026-08-31 03:33 Fixed in f95675bb. Verified against a real dzil build: the getty weaver renders =method from its explicit name, so the built POD was already correct (kind() was never mis-documented); the fix is source-order/readability, aligning the top three blocks with the file's dominant =method-before-sub convention. No Changes entry (no rendered/behaviour change).
