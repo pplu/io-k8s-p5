@@ -1,0 +1,55 @@
+---
+claimed_at: 2026-08-31T04:07:59Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:17Z
+created: 2026-08-27T04:10:03Z
+id: 63
+priority: medium
+started: 2026-08-31T04:07:42Z
+status: done
+tags:
+- bug
+- types
+- dsl
+title: Hash-of-scalar fields validate nothing -- ResourceRequirements limits accepts
+  cpu => banana
+updated: 2026-08-31T19:04:17Z
+---
+
+The k8s DSL form { Str => 1 } maps to a bare HashRef with NO inner
+constraint (lib/IO/K8s/Resource.pm:236, comment: "Use plain HashRef
+without inner constraint - K8s has nested hashes"). Neither the key nor
+the value type is checked.
+
+Repro (measured):
+
+  ResourceRequirements->new(limits => { cpu => "banana" })
+  --> constructs, and to_json emits {"limits":{"cpu":"banana"}}
+
+Upstream types limits/requests as map[ResourceName]Quantity. So the
+most-used quantity-carrying fields in the whole distribution validate
+nothing, while the 30 fields typed Quantity (karr #52) are strict. The
+error only surfaces at the API server -- exactly the fail-open shape the
+house line rejects (karr #37/#39).
+
+Scope: the { Str => 1 } form appears ~215 times across lib/. Not all of
+them carry Quantities (many are genuinely opaque string maps, e.g.
+labels/annotations), so this is NOT a mass sed -- the work is deciding
+which fields have a real inner type upstream and typing only those.
+
+Fix sketch: add a hash-of-scalar-type form to the k8s DSL, e.g.
+{ Quantity => 1 }, carried through the attribute registry and the
+serializer the same way the existing hash-of-objects form is; then
+retype the fields whose upstream schema names a concrete value type.
+DSL + registry change, not a Types.pm change.
+
+Note this reframes karr #52: its headline impact ("30 Quantity fields")
+understates the real exposure, because the fields users touch most
+(ResourceRequirements requests/limits) were never type-checked at all.
+
+Found by the types lane while implementing karr #52 (repro verified by
+the orchestrating agent).
+Lane: decision on scope first, then io-k8s-worker, then io-k8s-test-writer.
+
+2026-08-31 04:07 Scope decision: built the { Quantity => 1 } (and Int/Num/Bool/Time/IntOrStr) DSL mechanism and retyped the fields I could verify with high confidence as upstream map[ResourceName]Quantity (ResourceRequirements/VolumeResourceRequirements limits+requests, NodeStatus capacity/allocatable, ResourceQuota hard/used, LimitRangeItem 5 fields, PV(C) capacity/allocatedResources, DRA BasicDevice v1alpha3 capacity + CapacityRequirements requests). Left genuinely-opaque maps as { Str => 1 } (labels/annotations/fieldsV1, and PVCStatus.allocatedResourceStatuses which is a status enum, not Quantity). Did NOT blanket-retype the other ~200 { Str => 1 } sites -- most are legitimately opaque; a wrong retype would be a new fail-closed-on-valid-data bug. Fixed in 95d579fa, test t/64; t/42 synthesizer updated. Full suite green (4112).
