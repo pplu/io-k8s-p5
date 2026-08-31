@@ -1,0 +1,45 @@
+---
+claimed_at: 2026-08-31T03:28:43Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:06Z
+created: 2026-08-27T04:07:40Z
+id: 61
+priority: low
+started: 2026-08-31T03:28:32Z
+status: done
+tags:
+- bug
+- resource-map
+title: add() double-qualifies literal domain-qualified provider map keys
+updated: 2026-08-31T19:04:06Z
+---
+
+IO::K8s::add() treats every provider resource_map key as a bare Kind and
+runs it through _qualify_class_path(), so a key that is ALREADY
+domain-qualified gets qualified a second time.
+
+Repro (measured on master, pre-existing -- not introduced by karr #58):
+
+  IO::K8s->new(with => ["IO::K8s::GatewayAPI"])->resource_map
+  --> gateway.networking.k8s.io/v1/gateway.networking.k8s.io/v1/ReferenceGrant
+      => GatewayAPI::V1::ReferenceGrant
+
+The GatewayAPI ReferenceGrant entry established the literal-qualified-key
+pattern; karr #58 added four more such keys to IO::K8s::AgentSandbox, so
+the merged map now carries five junk entries of that shape.
+
+Harmless at runtime: no lookup path can produce a name of that shape, so
+nothing resolves through them. But they pollute resource_map for anyone
+dumping or iterating it, and any count-based assertion over the merged map
+is off by the number of qualified provider keys.
+
+Fix sketch: in add()/_qualify_class_path (lib/IO/K8s.pm), skip qualification
+for keys that already contain a "/" -- they are exact GVK requests and are
+meant to be registered verbatim.
+
+Found by the sandbox lane while implementing karr #58 (repro verified by
+the orchestrating agent).
+Lane: io-k8s-worker, then io-k8s-test-writer.
+
+2026-08-31 03:28 Fixed in 298a53bc: guard in _qualify_class_path skips keys with '/'; regression test t/58. dzil-related tests green.
