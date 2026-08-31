@@ -1,0 +1,43 @@
+---
+claimed_at: 2026-08-31T03:58:10Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:32Z
+created: 2026-08-27T04:17:11Z
+id: 66
+priority: low
+started: 2026-08-31T03:57:58Z
+status: done
+tags:
+- bug
+- autogen
+- dsl
+title: 'AutoGen maps items: object/array to ArrayRef[Str] -- same shape as karr #57,
+  blocked on the DSL'
+updated: 2026-08-31T19:04:32Z
+---
+
+lib/IO/K8s/AutoGen.pm:348-351 -- after karr #57 fixed boolean array items,
+two item types still fall into the [ Str ] default:
+
+  items: { type: "object" }   --> ArrayRef[Str], rejects the hashrefs
+  items: { type: "array"  }   --> ArrayRef[Str], rejects the arrayrefs
+
+Same failure shape as #57: schema-conforming data dies on a type
+constraint that never names the real problem (a wrongly generated
+attribute type).
+
+Unlike #57 this is NOT an AutoGen-only fix. The k8s DSL has no
+array-of-hash and no array-of-array form -- inside an arrayref it accepts
+only Str, Int, Bool and class names. So AutoGen has nothing correct to
+map these onto; the work is a DSL + registry + serializer change in
+lib/IO/K8s/Resource.pm first, then the AutoGen mapping.
+
+Related: karr #63 wants a hash-of-scalar-type form in the same DSL. If
+both are done, do them as one DSL extension rather than two.
+
+Found by the autogen lane while implementing karr #55-#57/#60 (verified
+by the orchestrating agent).
+Lane: io-k8s-worker (DSL first), then io-k8s-test-writer.
+
+2026-08-31 03:58 Not actually blocked: the 'blocked on the DSL' work is in-repo and was done cleanly. Added [ {} ] / [ [] ] opaque forms to the DSL (Resource.pm), AutoGen maps items:object/array onto them. Fixed in b869c5aa, test t/63. Full suite green (4106).
