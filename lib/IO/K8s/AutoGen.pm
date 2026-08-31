@@ -333,7 +333,7 @@ sub _schema_to_type_spec {
         return 'Int';
     }
     elsif ($type eq 'number') {
-        return 'Str';  # Treat numbers as strings for now
+        return 'Num';  # A genuine JSON number -- unquoted on the wire (karr #68)
     }
     elsif ($type eq 'boolean') {
         return 'Bool';

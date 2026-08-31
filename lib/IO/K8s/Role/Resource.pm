@@ -121,6 +121,12 @@ sub TO_JSON {
             $data{$key} = $value ? JSON::MaybeXS::true : JSON::MaybeXS::false;
         } elsif ($attr_info->{is_int}) {
             $data{$key} = int($value);
+        } elsif ($attr_info->{is_num}) {
+            # A genuine JSON number (OpenAPI type: number). Numify so it
+            # serializes unquoted -- the fractional counterpart to is_int's
+            # int() (karr #68). Quantity stays a string; this is only for
+            # schemas that declare type: number.
+            $data{$key} = $value + 0;
         } elsif ($attr_info->{is_int_or_string}) {
             $data{$key} = ($value =~ /\A-?\d+\z/) ? int($value) : $value;
         } elsif ($attr_info->{is_object} && blessed($value) && $value->can('TO_JSON')) {

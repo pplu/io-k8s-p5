@@ -6,7 +6,7 @@ use Moo ();
 use Moo::Role ();
 use Import::Into;
 use Package::Stash;
-use Types::Standard qw( ArrayRef Bool HashRef InstanceOf Int Maybe Str );
+use Types::Standard qw( ArrayRef Bool HashRef InstanceOf Int Maybe Num Str );
 use IO::K8s::Types qw( IntOrStr Quantity Time );
 use IO::K8s::Role::Resource ();
 use Scalar::Util qw(blessed reftype);
@@ -46,6 +46,7 @@ my %_class_prefix = (
 my %TYPE_FLAGS = (
     Str      => { is_str => 1 },
     Int      => { is_int => 1 },
+    Num      => { is_num => 1 },
     Bool     => { is_bool => 1 },
     IntOrStr => { is_int_or_string => 1 },
     Quantity => { is_quantity => 1 },
@@ -57,6 +58,7 @@ my %TYPE_FLAGS = (
 my %STR_ISA_MAP = (
     Str  => Str,
     Int  => Int,
+    Num  => Num,
     Bool => Bool,
 );
 
@@ -69,7 +71,7 @@ sub import {
 sub _setup_class {
     my ($class, $target) = @_;
     Moo->import::into($target);
-    Types::Standard->import::into($target, qw( Str Int Bool ));
+    Types::Standard->import::into($target, qw( Str Int Bool Num ));
     IO::K8s::Types->import::into($target, qw( IntOrStr Quantity Time ));
     Moo::Role->apply_roles_to_package($target, 'IO::K8s::Role::Resource');
     my $stash = Package::Stash->new($target);

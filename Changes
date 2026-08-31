@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - The k8s DSL gains a Num scalar type, and AutoGen maps OpenAPI
+    type: number onto it instead of Str (karr #68). A JSON number in a
+    generated class used to round-trip as a quoted string ({"cpu":1.5}
+    came back {"cpu":"1.5"}), which the API server rejects for a numeric
+    field. Num serializes unquoted, the fractional counterpart to Int's
+    int-cast; Quantity remains a string type, unchanged.
+
   - IO::K8s::List gains from_json, so serializing a List and reading it
     back no longer dies with "Can not locate object method from_json"
     (karr #64) -- it was the last class outside the to_json/from_json
