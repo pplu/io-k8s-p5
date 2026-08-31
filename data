@@ -1,0 +1,25 @@
+---
+class: standard
+completed: 2026-08-31T19:04:53Z
+created: 2026-08-31T03:39:26Z
+id: 70
+priority: low
+started: 2026-08-31T19:04:53Z
+status: done
+tags:
+- api-surface
+title: 'resource_plural() swallows an argument -- same shape as karr #67'
+updated: 2026-08-31T19:04:53Z
+---
+
+resource_plural() is a derived/declared read-only identity accessor with the same swallow-an-argument shape karr #67 fixed for kind()/api_version(). karr #67 scoped itself to the two most-called accessors and deliberately left resource_plural untouched.
+
+Sources, mirroring #67:
+- IO::K8s::Role::APIObject::resource_plural -- derived read-only method, no @_ guard.
+- IO::K8s::APIObject import: resource_plural import-param installed as sub { $plural } (no guard).
+- IO::K8s::AutoGen: resource_plural GVK constant sub { $res_plural } (no guard).
+
+Fix: same one-line "@_ > 1 -> croak" guard in all three spots, message "resource_plural is fixed for this class and cannot be set" (role: "derived from the class name"). Behaviour change -> Changes entry. Low priority: resource_plural is called far less than kind/api_version.
+
+Found while implementing karr #67 (fail-closed on kind/api_version).
+Lane: io-k8s-worker.
