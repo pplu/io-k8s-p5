@@ -473,6 +473,46 @@ to avoid collisions:
 
 Generate (or return cached) class for the given OpenAPI definition.
 
+Extra positional options after C<$namespace> pin the identity of a
+top-level object (C<< api_version => ..., kind => ..., resource_plural =>
+..., is_namespaced => ... >>); the generated class then also composes
+L<IO::K8s::Role::APIObject>.
+
+This function fails closed on input it cannot generate a faithful class
+from, rather than dropping fields or inventing a wrong type. It C<croak>s
+when:
+
+=over 4
+
+=item *
+
+a property, an array's C<items>, or an C<additionalProperties> schema
+carries a C<$ref> to a definition not present in C<$all_defs>. A partial
+spec that references definitions it does not ship used to generate the
+class anyway, minus those fields -- losing their data on every round-trip.
+It now dies naming the C<$ref> and where it appeared (karr #56).
+
+=item *
+
+C<additionalProperties> is a reference that is neither a schema object nor
+a JSON boolean; the message names the class and field (karr #55).
+
+=item *
+
+the schema's C<x-kubernetes-group-version-kind> metadata is ambiguous for
+the requested C<api_version>, or names no entry matching it -- the GVK
+selection fails closed rather than pick a version.
+
+=back
+
+One partial-spec shape still generates successfully by design: a top-level
+CRD schema whose C<metadata> C<$ref>s the standard C<ObjectMeta> without
+shipping its definition. C<metadata> is supplied by the role and is skipped
+before its C<$ref> is looked at (karr #60), so this common single-schema
+hand-in does not trip the unresolved-C<$ref> refusal. A side effect of that
+skip: when C<$all_defs> does carry C<ObjectMeta> and nothing else
+references it, it no longer appears in L</generated_classes()>.
+
 =head2 def_to_class($def_name, $namespace)
 
 Convert OpenAPI definition name to Perl class name.
