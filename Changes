@@ -2,6 +2,20 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - The k8s DSL gains a hash-of-scalar-type form, { Quantity => 1 } (and
+    Int/Num/Bool/Time/IntOrStr), and the fields upstream declares as
+    map[ResourceName]Quantity are retyped onto it (karr #63). Those maps
+    -- ResourceRequirements and VolumeResourceRequirements limits/requests,
+    NodeStatus capacity/allocatable, ResourceQuota hard/used, LimitRangeItem
+    max/min/default/defaultRequest/maxLimitRequestRatio, PersistentVolume(Claim)
+    capacity and allocatedResources, and the DRA capacity/requests fields --
+    validated nothing: limits => { cpu => 'banana' } constructed happily and
+    only failed at the API server. Each value is now type-checked at
+    construction. The bare { Str => 1 } form stays deliberately opaque for
+    genuinely free-form maps (labels, annotations, fieldsV1, and
+    PersistentVolumeClaimStatus allocatedResourceStatuses, whose values are
+    a status enum, not a Quantity).
+
   - The k8s DSL gains array-of-hash and array-of-array forms, [ {} ] and
     [ [] ], and AutoGen maps items: object / items: array onto them
     (karr #66). Both used to fall through to [ Str ], so a generated class

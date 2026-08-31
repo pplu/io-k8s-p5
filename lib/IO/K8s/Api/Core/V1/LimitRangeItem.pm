@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::LimitRangeItem;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s default => { Str => 1 };
+k8s default => { Quantity => 1 };
 
 =attr default
 
@@ -11,7 +11,7 @@ Default resource requirement limit value by resource name if resource limit is o
 
 =cut
 
-k8s defaultRequest => { Str => 1 };
+k8s defaultRequest => { Quantity => 1 };
 
 =attr defaultRequest
 
@@ -19,7 +19,7 @@ DefaultRequest is the default resource requirement request value by resource nam
 
 =cut
 
-k8s max => { Str => 1 };
+k8s max => { Quantity => 1 };
 
 =attr max
 
@@ -27,7 +27,7 @@ Max usage constraints on this kind by resource name.
 
 =cut
 
-k8s maxLimitRequestRatio => { Str => 1 };
+k8s maxLimitRequestRatio => { Quantity => 1 };
 
 =attr maxLimitRequestRatio
 
@@ -35,7 +35,7 @@ MaxLimitRequestRatio if specified, the named resource must have a request and li
 
 =cut
 
-k8s min => { Str => 1 };
+k8s min => { Quantity => 1 };
 
 =attr min
 

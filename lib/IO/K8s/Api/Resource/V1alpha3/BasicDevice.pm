@@ -13,7 +13,7 @@ The maximum number of attributes and capacities combined is 32.
 
 =cut
 
-k8s capacity => { Str => 1 };
+k8s capacity => { Quantity => 1 };
 
 =attr capacity
 

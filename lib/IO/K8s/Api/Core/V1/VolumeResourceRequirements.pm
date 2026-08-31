@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::VolumeResourceRequirements;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s limits => { Str => 1 };
+k8s limits => { Quantity => 1 };
 
 =attr limits
 
@@ -11,7 +11,7 @@ Limits describes the maximum amount of compute resources allowed. More info: htt
 
 =cut
 
-k8s requests => { Str => 1 };
+k8s requests => { Quantity => 1 };
 
 =attr requests
 

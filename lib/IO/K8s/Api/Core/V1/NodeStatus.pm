@@ -11,7 +11,7 @@ List of addresses reachable to the node. Queried from cloud provider, if availab
 
 =cut
 
-k8s allocatable => { Str => 1 };
+k8s allocatable => { Quantity => 1 };
 
 =attr allocatable
 
@@ -19,7 +19,7 @@ Allocatable represents the resources of a node that are available for scheduling
 
 =cut
 
-k8s capacity => { Str => 1 };
+k8s capacity => { Quantity => 1 };
 
 =attr capacity
 

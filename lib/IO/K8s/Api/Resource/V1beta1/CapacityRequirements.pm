@@ -3,7 +3,7 @@ package IO::K8s::Api::Resource::V1beta1::CapacityRequirements;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s requests => { Str => 1 };
+k8s requests => { Quantity => 1 };
 
 =attr requests
 

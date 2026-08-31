@@ -135,6 +135,19 @@ sub TO_JSON {
             $data{$key} = [ map { $_->TO_JSON } @$value ];
         } elsif ($attr_info->{is_hash_of_objects}) {
             $data{$key} = { map { $_ => $value->{$_}->TO_JSON } keys %$value };
+        } elsif ($attr_info->{is_hash_of_int}) {
+            $data{$key} = { map { $_ => int($value->{$_}) } keys %$value };
+        } elsif ($attr_info->{is_hash_of_num}) {
+            $data{$key} = { map { $_ => $value->{$_} + 0 } keys %$value };
+        } elsif ($attr_info->{is_hash_of_bool}) {
+            $data{$key} = { map {
+                $_ => $value->{$_} ? JSON::MaybeXS::true : JSON::MaybeXS::false
+            } keys %$value };
+        } elsif ($attr_info->{is_hash_of_int_or_string}) {
+            $data{$key} = { map {
+                my $v = $value->{$_};
+                $_ => (($v =~ /\A-?\d+\z/) ? int($v) : $v)
+            } keys %$value };
         } elsif ($attr_info->{is_array_of_int}) {
             $data{$key} = [ map { int($_) } @$value ];
         } elsif ($attr_info->{is_array_of_bool}) {

@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::ResourceQuotaSpec;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s hard => { Str => 1 };
+k8s hard => { Quantity => 1 };
 
 =attr hard
 

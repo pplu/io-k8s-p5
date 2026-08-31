@@ -48,7 +48,7 @@ This is an alpha field and requires enabling RecoverVolumeExpansionFailure featu
 
 =cut
 
-k8s allocatedResources => { Str => 1 };
+k8s allocatedResources => { Quantity => 1 };
 
 =attr allocatedResources
 
@@ -66,7 +66,7 @@ This is an alpha field and requires enabling RecoverVolumeExpansionFailure featu
 
 =cut
 
-k8s capacity => { Str => 1 };
+k8s capacity => { Quantity => 1 };
 
 =attr capacity
 

@@ -62,6 +62,21 @@ my %STR_ISA_MAP = (
     Bool => Bool,
 );
 
+# Value types for the hash-of-scalar-type DSL form { TypeName => 1 } (karr #63).
+# 'Str' is deliberately NOT here: it keeps its historical bare-HashRef meaning,
+# the genuinely opaque string map that labels, annotations and fieldsV1 need.
+# Everything here constrains each VALUE against the scalar type, so a map
+# upstream declares as map[X]Quantity finally rejects cpu => 'banana' at
+# construction instead of at the API server.
+my %HASH_VALUE_TYPES = (
+    Int      => { isa => Int,      flag => 'is_hash_of_int' },
+    Num      => { isa => Num,      flag => 'is_hash_of_num' },
+    Bool     => { isa => Bool,     flag => 'is_hash_of_bool' },
+    Quantity => { isa => Quantity, flag => 'is_hash_of_quantity' },
+    Time     => { isa => Time,     flag => 'is_hash_of_time' },
+    IntOrStr => { isa => IntOrStr, flag => 'is_hash_of_int_or_string' },
+);
+
 sub import {
     my $class = shift;
     my $caller = caller;
@@ -249,6 +264,11 @@ sub _k8s {
                 # Use plain HashRef without inner constraint - K8s has nested hashes
                 # in fields like fieldsV1, annotations, labels which can have any structure
                 $isa = $required ? HashRef : Maybe[HashRef];
+            } elsif (my $vt = $HASH_VALUE_TYPES{$inner}) {
+                # { Quantity => 1 } and friends: a typed value map. Each value
+                # is validated against the scalar type (karr #63).
+                $info{$vt->{flag}} = 1;
+                $isa = $required ? HashRef[$vt->{isa}] : Maybe[HashRef[$vt->{isa}]];
             } else {
                 my $full_class = _expand_class($inner);
                 $info{is_hash_of_objects} = 1;
@@ -355,15 +375,26 @@ Just C<use IO::K8s::Resource;> - no need for C<use Moo> or C<extends>.
 
     k8s name => 'Str';
     k8s replicas => 'Int';
+    k8s ratio => 'Num';                        # JSON number, unquoted on the wire
     k8s suspend => 'Bool';
     k8s spec => 'Core::V1::PodSpec';           # Short class name
     k8s containers => ['Core::V1::Container']; # Array of objects
-    k8s labels => { Str => 1 };                # Hash of strings
+    k8s labels => { Str => 1 };                # Opaque hash of strings
+    k8s limits => { Quantity => 1 };           # Typed value map (also Int/Num/Bool/Time/IntOrStr)
+    k8s rows => [ {} ];                         # Array of opaque hashes
+    k8s matrix => [ [] ];                       # Array of opaque arrays
     k8s spec => {                              # Inline struct
         replicas => Int,
         selector => Str,
         template => { Str => 1 },
     };
+
+The C<< { Str => 1 } >> form is a deliberately B<opaque> hash: any value is
+accepted, for genuinely free-form maps such as labels, annotations and
+C<fieldsV1>. C<< { Quantity => 1 } >> (and C<Int>, C<Num>, C<Bool>, C<Time>,
+C<IntOrStr>) instead validates every value against that scalar type, so a
+map upstream declares as C<map[X]Quantity> rejects a bad value at
+construction rather than at the API server.
 
 Inline structs auto-generate an inner class (e.g. C<MyClass::_Spec>) with
 the declared fields. Hashrefs are auto-coerced to the inner class on
