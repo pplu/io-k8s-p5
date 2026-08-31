@@ -1,0 +1,44 @@
+---
+claimed_at: 2026-08-31T03:39:10Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:37Z
+created: 2026-08-27T04:17:16Z
+id: 67
+priority: low
+started: 2026-08-31T03:38:59Z
+status: done
+tags:
+- api-surface
+title: kind()/api_version() silently swallow an argument on every APIObject class
+updated: 2026-08-31T19:04:37Z
+---
+
+lib/IO/K8s/Role/APIObject.pm -- kind() and api_version() are derived
+read-only methods, but they accept and ignore an argument instead of
+croaking.
+
+Repro (measured on a hand-written class):
+
+  IO::K8s::Api::Core::V1::Pod->new->kind("Other")      --> "Pod"
+  IO::K8s::Api::Core::V1::Pod->new->api_version("v9")  --> "v1"
+
+The write vanishes, no error. karr #60 removed the generated-class
+*attribute* that made this look like a writable field on AutoGen classes;
+what is left is this distribution-wide read-only-method behaviour, which
+the #60 fix deliberately left conformant rather than diverging in one
+place.
+
+Decision needed: croak on an argument ("kind is derived from the class
+name and cannot be set"), or document the swallow as intended. Croaking
+is the fail-closed house line (karr #37/#39/#42) and the failure it
+catches is a caller who believes they retargeted an object; against that,
+it is a behaviour change on the most-called accessors in the
+distribution, so it needs a Changes entry and a look at whether anything
+in the wild passes an argument positionally.
+
+Found by the autogen lane while implementing karr #60 (repro verified by
+the orchestrating agent).
+Lane: decision first, then io-k8s-worker.
+
+2026-08-31 03:39 Fixed in 47e7eb22 (fail-closed croak). Covered all three identity-method sources: role (hand-written), CRD import-param api_version constant, AutoGen GVK constants. Full suite green (4077 tests). Changes entry added. Scope note: resource_plural has the same swallow-arg shape but is out of #67's stated scope (kind/api_version) -- filing a drift ticket.
