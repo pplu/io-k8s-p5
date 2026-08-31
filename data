@@ -1,0 +1,45 @@
+---
+claimed_at: 2026-08-31T03:43:58Z
+claimed_by: time-chip
+class: standard
+completed: 2026-08-31T19:04:48Z
+created: 2026-08-27T04:17:40Z
+id: 69
+priority: low
+started: 2026-08-31T03:43:47Z
+status: done
+tags:
+- docs
+- autogen
+title: IO::K8s::AutoGen POD documents no failure modes -- get_or_generate can now
+  die on input that used to work
+updated: 2026-08-31T19:04:48Z
+---
+
+lib/IO/K8s/AutoGen.pm POD describes get_or_generate as the entry point
+but names none of the ways it refuses.
+
+After karr #55/#56 the list is longer and one entry is new:
+
+- unresolved $ref in a property, in items, or in additionalProperties
+  --> croaks (karr #56). NEW: a partial spec referencing definitions it
+  does not ship used to generate the class successfully, minus those
+  fields, losing their data on every round-trip.
+- additionalProperties that is neither a schema object nor a boolean
+  --> croaks naming class and field (karr #55)
+- the pre-existing GVK croaks in _select_gvk_entry
+
+A caller passing an openapi_spec needs to know get_or_generate can die,
+and on what. Worth stating the one partial-spec case that still works:
+a top-level CRD schema whose metadata $refs the standard ObjectMeta
+without shipping its definition -- metadata is skipped before the ref is
+looked at (karr #60).
+
+Also note the observable side effect of that skip: when all_defs does
+carry ObjectMeta and nothing else references it, it no longer appears in
+IO::K8s::AutoGen::generated_classes().
+
+Found by the autogen lane while implementing karr #55-#57/#60.
+Lane: io-k8s-doc-writer.
+
+2026-08-31 03:43 Documented in 1d810974. POD-only; podchecker + perl -c clean. No Changes entry (documents already-shipped karr #55/#56/#60 behaviour).
