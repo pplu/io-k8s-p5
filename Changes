@@ -2,6 +2,16 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - new_object() now honours an apiVersion passed inside the params hash,
+    the same key inflate() already reads, instead of silently resolving
+    the short name to its default version (karr #62). It used to take the
+    exact-GVK request only as its third positional argument, so
+    new_object('Sandbox', { apiVersion => '.../v1alpha1' }) built a
+    v1beta1 object with no diagnostic -- a version the caller never asked
+    for. Behaviour change: an apiVersion in the params hash that cannot be
+    resolved now fails closed, and one that contradicts an explicit
+    positional api_version croaks rather than picking one.
+
   - kind() and api_version() now croak when passed an argument instead of
     silently ignoring it (karr #67). They are derived, read-only identity
     accessors; the swallow meant a caller who wrote $obj->kind('Other')

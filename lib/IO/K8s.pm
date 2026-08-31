@@ -847,6 +847,28 @@ sub new_object {
         $params = { @args };
     }
 
+    # An apiVersion inside the params hash is an exact-GVK request too -- the
+    # same key inflate() reads and honours. new_object used to ignore it and
+    # resolve the short name to whatever version it defaults to, silently
+    # substituting a version the caller did not ask for (karr #62). Honour it
+    # for symmetry with inflate; when an explicit positional api_version is
+    # also given the two must agree, or it is a genuine conflict and we fail
+    # closed rather than pick one (the house line of karr #37/#39).
+    if (ref($params) eq 'HASH' && exists $params->{apiVersion}) {
+        my $inner = $params->{apiVersion};
+        if ($api_version_supplied) {
+            croak "new_object: conflicting apiVersion for kind '$short_class' -- "
+                . "params hash says '" . (defined $inner ? $inner : '<undef>')
+                . "', positional argument says '"
+                . (defined $api_version ? $api_version : '<undef>') . "'"
+                if (defined $inner xor defined $api_version)
+                || (defined $inner && defined $api_version && $inner ne $api_version);
+        } else {
+            $api_version = $inner;
+            $api_version_supplied = 1;
+        }
+    }
+
     my $class = $api_version_supplied
         ? $self->expand_class($short_class, $api_version)
         : $self->_expand_class_or_die($short_class);
