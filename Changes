@@ -4,11 +4,11 @@ Revision history for IO-K8s
 
   - resource_plural() now croaks when passed an argument instead of silently
     swallowing it, in all three spots (role accessor, APIObject import param,
-    AutoGen GVK constant) -- the same fail-closed shape karr #67 applied to
-    kind()/api_version() (karr #70)
+    AutoGen GVK constant) -- the same fail-closed shape k67 applied to
+    kind()/api_version() (k70)
   - The k8s DSL gains a hash-of-scalar-type form, { Quantity => 1 } (and
     Int/Num/Bool/Time/IntOrStr), and the fields upstream declares as
-    map[ResourceName]Quantity are retyped onto it (karr #63). Those maps
+    map[ResourceName]Quantity are retyped onto it (k63). Those maps
     -- ResourceRequirements and VolumeResourceRequirements limits/requests,
     NodeStatus capacity/allocatable, ResourceQuota hard/used, LimitRangeItem
     max/min/default/defaultRequest/maxLimitRequestRatio, PersistentVolume(Claim)
@@ -22,7 +22,7 @@ Revision history for IO-K8s
 
   - The k8s DSL gains array-of-hash and array-of-array forms, [ {} ] and
     [ [] ], and AutoGen maps items: object / items: array onto them
-    (karr #66). Both used to fall through to [ Str ], so a generated class
+    (k66). Both used to fall through to [ Str ], so a generated class
     rejected the very hashrefs and arrayrefs the schema describes on an
     ArrayRef[Str] constraint that never named the real problem. The
     contents are opaque -- validated as the right container shape,
@@ -30,7 +30,7 @@ Revision history for IO-K8s
     HashRef gets.
 
   - The k8s DSL gains a Num scalar type, and AutoGen maps OpenAPI
-    type: number onto it instead of Str (karr #68). A JSON number in a
+    type: number onto it instead of Str (k68). A JSON number in a
     generated class used to round-trip as a quoted string ({"cpu":1.5}
     came back {"cpu":"1.5"}), which the API server rejects for a numeric
     field. Num serializes unquoted, the fractional counterpart to Int's
@@ -38,18 +38,18 @@ Revision history for IO-K8s
 
   - IO::K8s::List gains from_json, so serializing a List and reading it
     back no longer dies with "Can not locate object method from_json"
-    (karr #64) -- it was the last class outside the to_json/from_json
-    symmetry karr #59 established. List is a container, not a
+    (k64) -- it was the last class outside the to_json/from_json
+    symmetry k59 established. List is a container, not a
     Role::Resource, so from_json is hand-rolled and delegates to
     FROM_STRUCT (an optional IO::K8s instance as the second argument lets
     item types resolve through your providers). List->to_json now also
     emits a UTF-8 byte string like every other class, instead of a
     wide-character string that round-tripped non-ASCII data to mojibake
-    (the karr #53 convention). ASCII payloads are unaffected.
+    (the k53 convention). ASCII payloads are unaffected.
 
   - new_object() now honours an apiVersion passed inside the params hash,
     the same key inflate() already reads, instead of silently resolving
-    the short name to its default version (karr #62). It used to take the
+    the short name to its default version (k62). It used to take the
     exact-GVK request only as its third positional argument, so
     new_object('Sandbox', { apiVersion => '.../v1alpha1' }) built a
     v1beta1 object with no diagnostic -- a version the caller never asked
@@ -58,7 +58,7 @@ Revision history for IO-K8s
     positional api_version croaks rather than picking one.
 
   - kind() and api_version() now croak when passed an argument instead of
-    silently ignoring it (karr #67). They are derived, read-only identity
+    silently ignoring it (k67). They are derived, read-only identity
     accessors; the swallow meant a caller who wrote $obj->kind('Other')
     believing they had retargeted the object got no error and no change,
     and only found out at the API server, if at all. Behaviour change on
@@ -68,7 +68,7 @@ Revision history for IO-K8s
     no-argument reads are unchanged.
 
   - add() no longer re-qualifies a provider resource_map key that is
-    already domain-qualified (karr #61). A key carrying a '/' is an exact
+    already domain-qualified (k61). A key carrying a '/' is an exact
     GVK request registered verbatim; merging IO::K8s::GatewayAPI or
     IO::K8s::AgentSandbox used to also produce junk
     "$group/$version/$group/$version/$Kind" keys that nothing could
@@ -76,18 +76,18 @@ Revision history for IO-K8s
     anyone iterating or counting it.
 
   - FROM_HASH now inflates nested objects, so every class is to_json /
-    from_json symmetric (karr #59). Pod->from_json($pod->to_json) used to
+    from_json symmetric (k59). Pod->from_json($pod->to_json) used to
     die at the first object-typed field with a bare Moo type error on
     metadata that never pointed at the path which worked
     ($k8s->json_to_object). Behaviour change: FROM_HASH used to be the
     shallow entry point and raw nested hashrefs were refused. It also
-    inherits the karr #42 diagnostics now, and an explicit undef on a
+    inherits the k42 diagnostics now, and an explicit undef on a
     required Bool dies with "Missing required arguments" instead of
     building the object -- that is a convergence, $k8s->struct_to_object
     already behaved that way. IO::K8s::List does not consume the role and
     still has no from_json.
 
-  - from_json now decodes UTF-8, symmetric to to_json (karr #53).
+  - from_json now decodes UTF-8, symmetric to to_json (k53).
     Class->from_json($obj->to_json) read the encoded bytes as characters
     and produced mojibake with no error raised -- silent data mutation on
     the class-level round-trip. Behaviour change: from_json takes a UTF-8
@@ -98,7 +98,7 @@ Revision history for IO-K8s
     $k8s->json_to_object, which has always been byte-oriented.
 
   - TO_JSON and the inflation path no longer share array and hash
-    references with the object (karr #54). Post-processing the struct from
+    references with the object (k54). Post-processing the struct from
     TO_JSON silently mutated the object and the mutation showed up in
     every later serialization: $cm->TO_JSON->{data}{key} = "MUTATED"
     changed $cm->data->{key}. Mutating a source struct after
@@ -108,9 +108,9 @@ Revision history for IO-K8s
     their inner references.
 
   - An undef element in an array of Bool now dies instead of being
-    serialized as false (karr #51). bools => [1, undef, 0] emitted
-    {"bools":[true,false,false]} -- the same invented-false problem karr
-    #48 fixed one level up, where omitting the field is not an option
+    serialized as false (k51). bools => [1, undef, 0] emitted
+    {"bools":[true,false,false]} -- the same invented-false problem
+    k48 fixed one level up, where omitting the field is not an option
     because the positions would shift. The message names class, field and
     element index. The element still passes the constructor (Bool
     includes undef); the refusal happens at the wire boundary. Affects
@@ -118,7 +118,7 @@ Revision history for IO-K8s
     of true/false values.
 
   - Quantity now accepts the n (nano) and u (micro) decimal SI suffixes
-    (karr #52). "100n" was rejected, so inflating real cluster data failed
+    (k52). "100n" was rejected, so inflating real cluster data failed
     on the 30 Quantity-typed fields -- metrics-server reports CPU that way
     and autoscaling/v2 averageValue carries such values. The suffix set
     now matches the decimal table in upstream suffix.go exactly. Note the
@@ -128,7 +128,7 @@ Revision history for IO-K8s
     emits them and accepting them would swallow a typo.
 
   - AgentSandbox v1alpha1 kinds are reachable by domain-qualified name
-    (karr #58). agents.x-k8s.io/v1alpha1/Sandbox and the three
+    (k58). agents.x-k8s.io/v1alpha1/Sandbox and the three
     extensions.agents.x-k8s.io/v1alpha1 kinds resolved to undef and died
     with "Cannot resolve Kubernetes GVK" through new_object() and
     inflate(), contradicting the module's own documentation. The short
@@ -136,7 +136,7 @@ Revision history for IO-K8s
     unchanged and still resolve to the v1beta1 storage version.
 
   - AutoGen refuses a $ref it cannot resolve instead of dropping the
-    property (karr #56). A property referencing a definition missing from
+    property (k56). A property referencing a definition missing from
     the spec was never turned into an attribute; Moo ignores unknown
     constructor arguments, so inflation accepted the data and TO_JSON
     never emitted it again -- silent data loss on the round-trip.
@@ -145,20 +145,20 @@ Revision history for IO-K8s
     and now dies at class-generation time naming class and field. An
     opaque fallback was rejected because the DSL has no array-of-hash
     form, so items: { $ref: <missing> } would have become ArrayRef[Str]
-    and rejected the very hashrefs the field carries -- karr #57's bug,
+    and rejected the very hashrefs the field carries -- k57's bug,
     reintroduced by the fix for this one. Still works: a top-level CRD
     schema whose metadata references the stock ObjectMeta without
     shipping its definition, because metadata is skipped first.
 
-  - AutoGen handles additionalProperties given as a JSON boolean (karr
-    #55). The boolean schema form is common in CRDs and killed class
+  - AutoGen handles additionalProperties given as a JSON boolean
+    (k55). The boolean schema form is common in CRDs and killed class
     generation with "Not a HASH reference" and no class or field context.
     Both polarities now yield the same opaque hash a schemaless object
     gets; additionalProperties: false deliberately narrows nothing. An
     additionalProperties that is neither a schema object nor a boolean is
     a malformed schema and croaks naming class and field.
 
-  - AutoGen maps boolean array items to an array of Bool (karr #57).
+  - AutoGen maps boolean array items to an array of Bool (k57).
     items: { type: boolean } fell into the string default, so
     schema-conforming JSON booleans were rejected with a type error that
     never named the real problem. The generated attribute now reaches the
@@ -169,16 +169,16 @@ Revision history for IO-K8s
     IO::K8s::Api::Bool objects.
 
   - AutoGen no longer generates apiVersion and kind as data attributes on
-    classes that get GVK class methods (karr #60). $obj->kind("Other")
+    classes that get GVK class methods (k60). $obj->kind("Other")
     was a silent no-op, and worse, apiVersion had no accessor collision
     at all: it stayed writable and its value overwrote the role-supplied
     one, so $obj->apiVersion("other/v9") produced a manifest claiming a
-    GVK the class does not have. Same line karr #45 drew for the
+    GVK the class does not have. Same line k45 drew for the
     hand-written template classes. Classes without a GVK keep kind as an
     ordinary writable attribute.
 
   - set_owner() no longer writes ownerReferences the API server rejects
-    (karr #47). Behaviour changes: an owner without a uid (anything built
+    (k47). Behaviour changes: an owner without a uid (anything built
     locally rather than read back from the cluster) is refused with a
     message naming the owner, instead of silently writing uid: "";
     controller is now a parameter ($obj->set_owner($owner, controller =>
@@ -189,7 +189,7 @@ Revision history for IO-K8s
     blockOwnerDeletion stays unset (upstream defaults it to false).
 
   - A Bool attribute set explicitly to undef now stays unset instead of
-    becoming false (karr #48). SecurityContext->new(privileged => undef)
+    becoming false (k48). SecurityContext->new(privileged => undef)
     used to serialize as {"privileged":false} -- an explicit claim on the
     wire that overrides cluster- or admission-controller-set values under
     strategic-merge patch and server-side apply; now the field is simply
@@ -201,13 +201,13 @@ Revision history for IO-K8s
     of being sent as an invented false.
 
   - Bad data on a Bool field now dies with a diagnostic message instead of
-    "Not a SCALAR reference at ... Resource.pm line NNN" (karr #42). A
+    "Not a SCALAR reference at ... Resource.pm line NNN" (k42). A
     hashref/arrayref/coderef where a boolean was expected reports the
     reference type; the inflation path names the class and JSON field
     ("... while inflating IO::K8s::Api::Core::V1::PodSpec field
     hostNetwork"), the constructor path keeps Moo's attribute-naming
     wrapper, and a bad array element reports its index. Also fixed: a
-    ref-to-a-ref (\\0) was silently true -- the exact bug karr #37 fixed,
+    ref-to-a-ref (\\0) was silently true -- the exact bug k37 fixed,
     one dereference deeper; it now dies too. Blessed scalar refs
     (JSON::PP::Boolean and friends) keep working unchanged.
 
@@ -215,18 +215,18 @@ Revision history for IO-K8s
     JSONSchemaPropsOrBool, JSONSchemaPropsOrStringArray) now call
     _struct_to_object_expanded() for their hard-coded, fully-qualified
     JSONSchemaProps class name instead of the public struct_to_object()
-    (karr #43), per the rule established in karr #35: callers that already
+    (k43), per the rule established in k35: callers that already
     hold a resolved class name skip re-expansion. No behaviour change.
 
   - Documentation: resource_plural's POD no longer promises a working REST
-    path for every Kind (karr #44). For the fifteen Kinds on API tracks
+    path for every Kind (k44). For the fifteen Kinds on API tracks
     upstream no longer serves (e.g. Api::Resource::V1alpha3::DeviceClass),
     the group-fallback plural is correct for RBAC resources: rules -- and no
     other value would be better -- but the REST path built from it and the
     class's own api_version 404s against a current cluster because the track
     itself is dead. POD only, no behaviour change.
 
-  - IO::K8s::List can now inflate a List-shaped payload (karr #46), matching
+  - IO::K8s::List can now inflate a List-shaped payload (k46), matching
     what the README already claimed: `$k8s->json_to_object($podlist_json)`
     and `struct_to_object()` route any `kind` ending in `List` (or the bare
     `kind: List`) to a new `IO::K8s::List->FROM_STRUCT`, which derives the
@@ -243,7 +243,7 @@ Revision history for IO-K8s
     "Can't locate object method _k8s_attr_info" error.
 
   - IO::K8s::List::item_class now only accepts a fully-qualified class name
-    (karr #49), matching the '+' convention used everywhere else in this
+    (k49), matching the '+' convention used everywhere else in this
     distribution: a leading `+` is stripped before the class is loaded, and
     a short or partially-qualified name (e.g. `'Pod'` instead of
     `'IO::K8s::Api::Core::V1::Pod'`) is not guessed at. Behaviour change:
@@ -253,7 +253,7 @@ Revision history for IO-K8s
     alongside it, in either direction now.
 
   - Stop stamping apiVersion/kind into seven embedded template classes that
-    the upstream schema carries no such keys for (karr #45): PodTemplateSpec,
+    the upstream schema carries no such keys for (k45): PodTemplateSpec,
     JobTemplateSpec, PersistentVolumeClaimTemplate, and ResourceClaimTemplateSpec
     (v1, v1alpha3, v1beta1, v1beta2). Each composed IO::K8s::APIObject, so
     TO_JSON emitted the pair on every embedded occurrence -- most visibly
@@ -277,31 +277,31 @@ Revision history for IO-K8s
     with "Can't locate object method" instead of returning a value.
 
   - Derive IO::K8s::List::kind() for a single-segment item_class too
-    (karr #41). The same missing '::' as the previous entry, in the
+    (k41). The same missing '::' as the previous entry, in the
     item_class fallback -- which is precisely the empty-list case, where
     there is no first item to ask. An empty list of a single-segment Kind
     therefore serialized apiVersion without kind:. The non-empty path was
-    already fixed by karr #38, since it asks the item.
+    already fixed by k38, since it asks the item.
 
   - Derive kind() for a single-segment class from the whole class name
-    (karr #38). A CRD registered as a top-level package -- reached as
+    (k38). A CRD registered as a top-level package -- reached as
     '+Widget' or through a resource_map value of '+Widget' -- has no '::',
     so kind() returned undef and TO_JSON emitted a manifest with no kind:
-    at all, which the API server rejects. karr #35 had just made those
+    at all, which the API server rejects. k35 had just made those
     names reliably reachable, so the class was usable and its output was
     not. set_owner() was worse than silent there: OwnerReference declares
     kind as a required Str, so an undef kind made it die outright.
     api_version() and resource_plural() are unaffected -- both key off an
     IO::K8s:: prefix, so the '::' is guaranteed by the time they parse.
 
-  - Document the fail-closed guarantee of the GVK entry points (karr #40).
+  - Document the fail-closed guarantee of the GVK entry points (k40).
     new_object, inflate, json_to_object and struct_to_object all die on an
     unresolvable GVK request rather than substituting a different version or
     a similarly-named class, and a bare unqualified name is deliberately
     exempt -- behaviour that was tested but stated nowhere. POD only.
 
   - Fail closed on an unresolvable GVK in every entry point, not just
-    new_object (karr #39). A name carrying its apiVersion inside the string,
+    new_object (k39). A name carrying its apiVersion inside the string,
     'nonexistent.io/v1/UnknownKind', is an exact GVK request and comes back
     from expand_class as undef. Only new_object turned that into the
     intended "Cannot resolve Kubernetes GVK: kind ..., apiVersion ...";
@@ -315,7 +315,7 @@ Revision history for IO-K8s
     back to IO::K8s::<Name> there, so an unknown bare Kind keeps failing on
     the missing module rather than on GVK resolution.
 
-  - Stop boolean fields reading an unblessed \0 as true (karr #37). The
+  - Stop boolean fields reading an unblessed \0 as true (k37). The
     is_bool branch of struct_to_object/inflate tested the reference itself,
     and every reference is true in Perl, so the classic Perl false idiom
     arrived as true -- and came back out blessed as a JSON::PP::Boolean,
@@ -324,7 +324,7 @@ Revision history for IO-K8s
     flip in the unsafe direction. Blessed JSON booleans and plain 0/1 were
     never affected, nor was load_yaml, whose default yields plain 0/1.
 
-  - Stop boolean fields reading the string "false" as true (karr #37, found
+  - Stop boolean fields reading the string "false" as true (k37, found
     while fixing the above). A non-empty string is truthy in Perl, so
     "false" and "False" became 1 -- the same silent flip, and on both paths:
     the inflation path and the constructor, where SecurityContext->new(
@@ -337,7 +337,7 @@ Revision history for IO-K8s
     is about.
 
   - Read a bare one-word class name as a Kubernetes Kind, never as a
-    package name (karr #35). karr #34 put the resource_map ahead of
+    package name (k35). k34 put the resource_map ahead of
     expand_class's "is there a loadable class of exactly this name?" probe,
     which made every registered Kind safe but left a window for Kinds the
     model does not know: with an openapi_spec defining kind "Widget" and an
@@ -352,7 +352,7 @@ Revision history for IO-K8s
     top-level Widget now gets IO::K8s::Widget, which fails to load.
 
   - Stop struct_to_object re-expanding a class name its caller had already
-    resolved (karr #35). new_object(), json_to_object() and the nested-object
+    resolved (k35). new_object(), json_to_object() and the nested-object
     inflation all called expand_class() and then handed the result to
     struct_to_object(), which ran the full search order over it a second
     time -- so an exactly-resolved name could be re-interpreted. Concretely,
@@ -365,7 +365,7 @@ Revision history for IO-K8s
     the short names it is given.
 
   - Resolve resource_plural for Kinds on API tracks upstream no longer
-    serves (karr #36). The generated table from the previous entry is keyed
+    serves (k36). The generated table from the previous entry is keyed
     by exact GVK, so the 15 shipped classes on dropped tracks
     (resource.k8s.io/v1alpha3, flowcontrol/v1beta3,
     storage.k8s.io/v1alpha1 and others) still had no plural. A second
@@ -380,7 +380,7 @@ Revision history for IO-K8s
     events.k8s.io/v1 Event remain distinct, and the subresources plus the
     embedded *TemplateSpec types keep returning undef.
 
-  - Give the shipped Kinds a real resource_plural (karr #33).
+  - Give the shipped Kinds a real resource_plural (k33).
     IO::K8s::Role::APIObject::resource_plural returned undef for every
     built-in class, so consumers needing Kind -> plural -- RBAC speaks
     plurals, the API speaks Kinds -- had to fall back to an lc+s guess,
@@ -413,13 +413,13 @@ Revision history for IO-K8s
 1.107     2026-08-15 15:37:52Z
 
   - Resolve resource_map short-name keys on the explicit-apiVersion path
-    (karr #31). expand_class('Kind', $api_version) and the qualified-string
+    (k31). expand_class('Kind', $api_version) and the qualified-string
     form now fall back to the resource_map's bare short-name key when no
     '$api_version/Kind' key exists, but only if the mapped class itself
     confirms the requested version via api_version() — a CRD registered as
     'StaticWebSite => "+My::StaticWebSite"' inflates again from a manifest
     hashref instead of dying with "Cannot resolve Kubernetes GVK". The
-    fail-closed semantics from karr #17 are preserved: a class that cannot
+    fail-closed semantics from k17 are preserved: a class that cannot
     verify the requested version is never substituted — whether it reports
     a different version, has no api_version() method, returns undef from it,
     or implements api_version as an instance attribute so that the class
@@ -427,7 +427,7 @@ Revision history for IO-K8s
     the user explicitly registered the class.
 
   - Stop add() from dying on a provider class whose api_version is an
-    instance attribute (karr #32). Merging a resource_map — via
+    instance attribute (k32). Merging a resource_map — via
     IO::K8s->new(with => [...]) or ->add(...) — asks each mapped class for
     its api_version() to build the domain-qualified key. A class that
     implements api_version as a Moo attribute rather than a constant made
@@ -530,7 +530,7 @@ Revision history for IO-K8s
     including the short-name-less ones. Class-method and instance dispatch
     therefore share the same complete static map without BUILD eagerly
     loading every target class; add() still derives qualified keys for
-    externally merged providers. See karr #11.
+    externally merged providers. See k11.
   - Fixed api_version() in IO::K8s::Role::APIObject for the
     Storagemigration and Apiserverinternal groups. The fallback
     `lc($group) . '/' . $version` only produces the correct wire
@@ -649,8 +649,8 @@ Revision history for IO-K8s
     attribute was never registered and silently dropped on serialization.
   - Added maint/spec-drift-check.pl, a repeatable coverage checker that
     diffs a real upstream swagger.json against what lib/IO/K8s/ actually
-    ships and reports missing Kinds/types/fields (the tool behind karr
-    #4-#8's discovery), plus a --from/--to mode that diffs two upstream
+    ships and reports missing Kinds/types/fields (the tool behind
+    k4-k8's discovery), plus a --from/--to mode that diffs two upstream
     releases directly to gauge whether a version bump is worth doing.
     Settled non-gaps (dropped *List kinds, old back-compat API tracks,
     apimachinery scalar/opaque types) are filtered via the maintained
