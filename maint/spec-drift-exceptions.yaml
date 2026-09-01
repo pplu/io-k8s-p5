@@ -116,6 +116,12 @@ perl_only:
     reason: "pre-graduation alpha track of storage.k8s.io (VolumeAttributesClass), kept for older clusters"
   - prefix: "IO::K8s::Api::Storage::V1beta1::"
     reason: "karr k72 (v1.37 sync): VolumeAttributesClass graduated storage.k8s.io/v1beta1 -> v1 and was dropped from v1beta1 upstream in v1.37; kept for older clusters"
+  - prefix: "IO::K8s::Api::Resource::V1::NodeAllocatableResourceMapping"
+    reason: "karr k72 (v1.37 sync): v1.37 restructured the flat NodeAllocatableResourceMapping (allocationMultiplier + capacityKey) into NodeAllocatableResource (mapping + overhead) on resource.k8s.io/v1; the old type is kept for older clusters (v1.36) that still serve it"
+  - prefix: "IO::K8s::Api::Resource::V1beta1::NodeAllocatableResourceMapping"
+    reason: "karr k72 (v1.37 sync): v1beta1 track of the same NodeAllocatableResourceMapping restructure above; kept for older clusters"
+  - prefix: "IO::K8s::Api::Resource::V1beta2::NodeAllocatableResourceMapping"
+    reason: "karr k72 (v1.37 sync): v1beta2 track of the same NodeAllocatableResourceMapping restructure above; kept for older clusters"
 
 # One-off suppressions that don't fit a whole-namespace prefix rule above.
 # Empty by design -- add sparingly, each with a reason, each pointing at the
@@ -137,5 +143,17 @@ perl_only:
 #       reason: "..."
 ignore_missing_classes: []
 ignore_missing_fields: []
-ignore_extra_fields: []
+ignore_extra_fields:
+  - class: "IO::K8s::Api::Core::V1::NodeAllocatableResourceClaimStatus"
+    field: "resources"
+    reason: "karr k72 (v1.37 sync): points at the restructured-away NodeAllocatableResourceMapping; kept for older clusters (v1.36) alongside the new v1.37 surface"
+  - class: "IO::K8s::Api::Resource::V1::Device"
+    field: "nodeAllocatableResourceMappings"
+    reason: "karr k72 (v1.37 sync): superseded by nodeAllocatableResources in v1.37; kept for older clusters"
+  - class: "IO::K8s::Api::Resource::V1beta1::BasicDevice"
+    field: "nodeAllocatableResourceMappings"
+    reason: "karr k72 (v1.37 sync): superseded by nodeAllocatableResources in v1.37; kept for older clusters"
+  - class: "IO::K8s::Api::Resource::V1beta2::Device"
+    field: "nodeAllocatableResourceMappings"
+    reason: "karr k72 (v1.37 sync): superseded by nodeAllocatableResources in v1.37; kept for older clusters"
 ignore_typemeta: []
