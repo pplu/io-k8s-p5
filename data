@@ -1,0 +1,40 @@
+---
+class: standard
+completed: 2026-09-01T02:30:18Z
+created: 2026-09-01T00:22:21Z
+id: 72
+priority: low
+started: 2026-09-01T02:30:18Z
+status: done
+tags:
+- spec-drift
+- upstream
+title: Decide whether to track upstream v1.37 (currently on v1.36)
+updated: 2026-09-01T03:08:53Z
+---
+
+spec-drift-check gegen die getrackte v1.36.3 ist sauber: 0 missing kinds/types/fields, kein Extra/Stale/TypeMeta-Drift (846 Klassen). lib/ ist deckungsgleich mit v1.36.
+
+Upstream hat v1.37.0 veroeffentlicht. Compare-Mode v1.36.3->v1.37.0:
+  22 new Kind, 12 removed Kind, 103 new Type, 22 removed Type,
+  10 new required field, 4 removed field, 48 new optional field, 103 desc-only.
+
+Das ist ein eigenes Arbeitspaket, keine Drift und kein Defekt in der aktuellen Zeile. Entscheidung noetig: v1.37 backporten (grosse Sweep ueber lib/, plus removed-Kinds-Protokoll a la 1.105 *List-Removal fuer die 12 entfernten Kinds) oder bewusst auf v1.36 bleiben. Falls bleiben: die v1.37-only-Klassen als spec-drift-exceptions-Eintraege dokumentieren, damit der No-arg-Report (laeuft gegen latest stable) nicht dauerhaft rot leuchtet.
+
+Neue Kinds u.a.: certificates.v1 ClusterTrustBundle/PodCertificateRequest, lifecycle.v1alpha1 Eviction/EvictionRequest, resource.v1 DeviceTaintRule, scheduling.v1alpha3/v1beta1 PodGroup/Workload, storagemigration.v1 StorageVersionMigration.
+
+Referenz: maint/spec-drift-check.pl --from v1.36.3 --to v1.37.0. Kein Code angefasst.
+
+PASS 1 (additiv) umgesetzt im Worktree agent-a09584: --tag v1.37.0 jetzt 0 MISSING KIND/TYPE/FIELD. Angelegt: 114 neue Klassen (11 Kinds + 103 Typen) ueber Batch/Certificates/Core/Lifecycle(neu)/Resource/Scheduling(v1alpha3+v1beta1)/Storage/Storagemigration V1. 43 bestehende Klassen um Felder ergaenzt (die 48 neuen optionalen Felder inkl. gekoppelte Typ-Refs). Plumbing: Lifecycle in %_class_prefix (Resource.pm) + lifecycle=>lifecycle.k8s.io in %API_GROUP_MAP (Role/APIObject.pm, sonst falsche apiVersion). CLAUDE.md Tracking-Zeile auf v1.37. t/51_resource_plural.t Pin-Erwartungen aktualisiert (120->131 api objects, 110->118 mit plural, +3 undef: Lifecycle Eviction/EvictionRequest, Scheduling CompositePodGroup). Volle Suite prove -lr t/ GRUEN (4420 Tests), inkl. t/25/t/26/t/34/t/43. dzil build scheitert NUR am fehlenden (nicht committeten) LICENSE — vorbestehend, code-unabhaengig (mit generiertem LICENSE laueft der Build durch). spec-drift-exceptions.yaml: 4 perl_only-KEEP-Eintraege fuer Alpha/Beta-Churn (Certificates::V1alpha1, Networking::V1beta1, Scheduling::V1alpha2, Storage::V1beta1).
+
+OFFEN als Folgearbeit (nicht in diesem additiven Pass): (1) GVK-Dispatch-Registrierung: DEFAULT_RESOURCE_MAP (lib/IO/K8s.pm) Bare-/qualified-Eintraege fuer die neuen Kinds + resource_plural-Tabelle fuer neue Kind-Namen (Eviction/EvictionRequest/CompositePodGroup undef) + t/43-Fixture-Regeneration (v1.36.3->v1.37.0: SHA256, 311-Count, 88/125/98, 78 Bare-Aliases, 14 Collision-Kinds). Coupled an t/-Lane; Bare-Alias-Aenderung bricht t/43-Pins. (2) 10 'neue Pflichtfelder' sind in Wahrheit optional->required-FLIPS auf bestehenden Feldern (apps/v1 DaemonSet/Deployment/ReplicaSet/StatefulSet .spec, ControllerRevision.data, flowcontrol.v1 FlowSchema.spec/FlowSchemaCondition.type/LimitedPriorityLevelConfiguration.limitResponse/PriorityLevelConfiguration.spec/PriorityLevelConfigurationCondition.type). Fuer --tag unsichtbar (prueft nur Praesenz), aber konstruktions-brechend -> eigene Entscheidung + Changes-Notiz noetig, nicht auto-angewandt. (3) REMOVAL-PLAN: siehe naechste Notiz.
+
+REMOVAL-ANALYSE (NICHT ausgefuehrt, IO::K8s::Deprecated NICHT angefasst): Kategorie A — Alpha/Beta-Track-Churn, BEHALTEN fuer aeltere Cluster (Aktion: perl_only-Exception, in diesem Pass bereits gesetzt): Certificates::V1alpha1::ClusterTrustBundle* (->v1beta1/v1), Networking::V1beta1::IPAddress/ServiceCIDR+Support (->networking.k8s.io/v1), Scheduling::V1alpha2::PodGroup/Workload+Support (->v1alpha3/v1beta1), Storage::V1beta1::VolumeAttributesClass (->storage.k8s.io/v1). Entspricht 12 removed Kinds (6 real x2 mit List) + Grossteil der 22 removed Types. Kategorie B — STABLE-Version-Entfernung (resource.k8s.io/v1, KEINE Alpha-Churn), braucht echte Entscheidung -> RUECKFRAGE bzw. Deprecated-Stub+Changes: Typ Resource::V1/V1beta1/V1beta2::NodeAllocatableResourceMapping (3 STALE) + die 4 removed Fields, die darauf zeigen: Core::V1::NodeAllocatableResourceClaimStatus.resources, Resource::{V1::Device,V1beta1::BasicDevice,V1beta2::Device}.nodeAllocatableResourceMappings. Upstream hat nodeAllocatableResourceMappings->NodeAllocatableResourceMapping durch nodeAllocatableResources->NodeAllocatableResource ersetzt (neue Typen/Felder in diesem Pass bereits geshippt). Diese 4 EXTRA + 3 STALE bleiben bewusst im Coverage-Report sichtbar (keine Exception gesetzt), bis entschieden. Removed-Field-Entfernung = Breaking Change mit Protokoll.
+
+MERGE BLOCKIERT: Der k72-Upgrade-Worktree (agent-a09584edb632b72f7, branch worktree-agent-...) wurde von 4887f658 geforkt, NICHT von master 7af6684a. Base ist 24 Commits hinter master (die gesamte Serie k42-k70 + LICENSE + skill-rename fehlen). Die additiven Aenderungen (114 neue Klassen, 43 Feld-Edits, Lifecycle-API-Group-Bugfix, exceptions, CLAUDE.md v1.36->v1.37) sind inhaltlich gut, aber gegen veralteten Code getestet -> Verifikation ungueltig, wholesale-Merge wuerde 24 Commits zurueckrollen. Ueberschneidung Worker-Dateien x master-seit-Base: nur 5 (Resource.pm, Role/APIObject.pm, Core/V1/PersistentVolumeClaimStatus.pm, spec-drift-exceptions.yaml, t/51). Plan: additiven Durchgang auf frischem master-basiertem Worktree WIEDERHOLEN, Worker-Analyse (Kind/Typ/Feld-Liste, Lifecycle-Bug, Removal-Kategorien A/B) als Vorlage wiederverwenden. Offene Entscheidungen bleiben: (B) resource.k8s.io/v1 NodeAllocatableResourceMapping-Removal + 4 Felder; required-field-Flips (apps/v1 specs etc., konstruktions-brechend); GVK-dispatch-Registrierung + t/43-Fixture-Regen auf v1.37.
+
+IMPLEMENTED on branch v137-upgrade (worktree .claude/worktrees/v137-upgrade, based on master HEAD 0264efee). All 4 stages complete, full suite green (prove -lr t/, 4546 tests) after each, plus dzil build exit 0. Coverage --tag v1.37.0 now 0 on EVERY tier (kind/type/field/extra/typemeta/stale). Commits: ab736b95 (stage1 additive: 114 new classes, 48 new optional fields on 43 classes, Lifecycle plumbing, resource_plural table regen, 4 perl_only KEEP exceptions), bf35dddc (stage2 GVK dispatch: DEFAULT_RESOURCE_MAP bare+qualified, 8 Namespaced roles, t/43 fixture regen v1.37.0, t/51 pins), 8d29ee24 (stage3: 10 optional->required flips, t/55 fix), 6aab1be0 (stage4: NodeAllocatableResourceMapping removal). Category B WAS released (1.105-1.107) => breaking; Deprecated-dist stub follow-up filed as k73 (NOT created here). Handoff: human to write Changes {{NEXT}} bullet + CLAUDE.md v1.36->v1.37 tracking line.
+
+v1.37-Track auf master gemergt (merge 06be2668, stage-commits ab736b95/bf35dddc/8d29ee24/6aab1be0). Drift --tag v1.37.0 = 0 auf allen Tiers, 957 Klassen, Suite 4555 grün. Changes-Bullets + CLAUDE.md-Tracking-Zeile gesetzt. Offen nur noch k73 (Deprecated-Stubs, separate Dist).
+
+Stage-4-Removal per git revert zurueckgedreht (commit folgt): NodeAllocatableResourceMapping (3 Klassen) + 4 Felder BLEIBEN als Superset fuer aeltere Cluster (v1.36), analog Category A / Cilium-Restore. spec-drift-exceptions: 3 perl_only + 4 ignore_extra_fields (k72). Nicht-brechend, kein Deprecated-Tombstone. --tag v1.37.0 bleibt 0 auf allen Tiers, Suite 4567 gruen.
