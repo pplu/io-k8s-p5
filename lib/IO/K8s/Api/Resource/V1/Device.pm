@@ -79,16 +79,6 @@ Name is unique identifier among all devices managed by the driver in the pool. I
 
 =cut
 
-k8s nodeAllocatableResourceMappings => { 'Resource::V1::NodeAllocatableResourceMapping' => 1 };
-
-=attr nodeAllocatableResourceMappings
-
-NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node C<status.allocatable> that are not extended resources. Examples include "cpu", "memory", "ephemeral-storage", and hugepages. In addition to standard requests made through the Pod C<spec>, these resources can also be requested through claims and allocated by the DRA driver.
-
-The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory"). Extended resource names are not permitted as keys.
-
-=cut
-
 k8s nodeAllocatableResources => { 'Resource::V1::NodeAllocatableResource' => 1 };
 
 =attr nodeAllocatableResources
