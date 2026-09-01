@@ -3,6 +3,14 @@ package IO::K8s::Api::Authentication::V1::TokenRequestSpec;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
+k8s attestations => { Str => 1 };
+
+=attr attestations
+
+attestations is a map of well-known keys to string-slice values. The values for each key have a specific semantic meaning, which is documented on the key definition. Requesters of tokens may ask the Kubernetes API Server to attest to certain claims. The API Server may perform authorization checks depending on the key of this map.
+
+=cut
+
 k8s audiences => [Str], 'required';
 
 =attr audiences

@@ -43,6 +43,14 @@ NodeName is the node this pool is associated with. When omitted, the pool is not
 
 =cut
 
+k8s partitionSummary => ['Resource::V1alpha3::PartitionTypeStatus'];
+
+=attr partitionSummary
+
+PartitionSummary reports allocatability per (attribute, partition type) for a partitionable pool that publishes SharedCounters. Each entry names the grouping attribute it was resolved from: the PartitionTypeAttribute declared by a device's own slice, or for devices whose slice declares none, the default named in the request. A pool that mixes partitions declared under different attributes reports each independently. When no slice declares an attribute and the request names no default, the pool reports no partition summary.
+
+=cut
+
 k8s poolName => Str, 'required';
 
 =attr poolName
@@ -56,6 +64,14 @@ k8s resourceSliceCount => Int;
 =attr resourceSliceCount
 
 ResourceSliceCount is the number of ResourceSlices that make up this pool. May be unset when validationError is set.
+
+=cut
+
+k8s shareableSummary => 'Resource::V1alpha3::ShareableSummaryStatus';
+
+=attr shareableSummary
+
+ShareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable.
 
 =cut
 

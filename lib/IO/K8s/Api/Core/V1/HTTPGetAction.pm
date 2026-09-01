@@ -35,6 +35,14 @@ Name or number of the port to access on the container. Number must be in the ran
 
 =cut
 
+k8s protocol => Str;
+
+=attr protocol
+
+Protocol selects the wire protocol for the probe connection. Nil defaults to HTTP/1.1.
+
+=cut
+
 k8s scheme => Str;
 
 =attr scheme

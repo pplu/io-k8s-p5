@@ -52,14 +52,20 @@ sub make_pod {
 }
 
 # A owner as it would come back from the cluster: has a uid.
+# apps/v1 {Deployment,ReplicaSet,StatefulSet}.spec became required in v1.37
+# (karr k72); these owners only exercise ownerReference behaviour, so a
+# minimal valid spec is enough to construct them.
 my $dep = $k8s->struct_to_object('Deployment', {
     metadata => { name => 'web', uid => 'dep-uid-1' },
+    spec     => { selector => {}, template => {} },
 });
 my $rs = $k8s->struct_to_object('ReplicaSet', {
     metadata => { name => 'rs-1', uid => 'rs-uid-1' },
+    spec     => { selector => {} },
 });
 my $ss = $k8s->struct_to_object('StatefulSet', {
     metadata => { name => 'ss-1', uid => 'ss-uid-1' },
+    spec     => { selector => {}, serviceName => 'ss-svc', template => {} },
 });
 
 # ----------------------------------------------------------------------------
@@ -180,12 +186,15 @@ subtest 'duplicate owner (same uid) is an idempotent no-op, checked before the c
 subtest 'owner with no uid, or no metadata at all: dies naming the owner' => sub {
     my $owner_no_uid = $k8s->struct_to_object('Deployment', {
         metadata => { name => 'web' },
+        spec     => { selector => {}, template => {} },
     });
     throws_ok { make_pod()->set_owner($owner_no_uid) }
         qr{\Qset_owner: cannot reference Deployment/web: owner has no uid; the uid is assigned by the API server, so only an object read back from the cluster can be referenced\E},
         'metadata present but uid absent: dies naming Kind/name';
 
-    my $owner_no_metadata = $k8s->struct_to_object('Deployment', {});
+    my $owner_no_metadata = $k8s->struct_to_object('Deployment', {
+        spec => { selector => {}, template => {} },
+    });
     throws_ok { make_pod()->set_owner($owner_no_metadata) }
         qr{\Qset_owner: cannot reference Deployment: owner has no uid; the uid is assigned by the API server, so only an object read back from the cluster can be referenced\E},
         'no metadata at all: dies naming just the Kind, no /name';

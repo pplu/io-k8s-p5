@@ -3,6 +3,18 @@ package IO::K8s::Api::Resource::V1alpha3::ResourcePoolStatusRequestSpec;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
+k8s defaultPartitionTypeAttribute => Str;
+
+=attr defaultPartitionTypeAttribute
+
+DefaultPartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. "gpu.example.com/profile") to use as the default grouping attribute for partitionable devices whose slice has not declared one themselves.
+
+A slice's own PartitionTypeAttribute always takes precedence. This default applies only to devices whose slice does not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the slice nor this default names an attribute, a partitionable pool reports no partitionSummary.
+
+Must include the domain qualifier.
+
+=cut
+
 k8s driver => Str, 'required';
 
 =attr driver

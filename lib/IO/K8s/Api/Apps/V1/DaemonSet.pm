@@ -14,7 +14,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s spec => 'Apps::V1::DaemonSetSpec';
+k8s spec => 'Apps::V1::DaemonSetSpec', 'required';
 
 =attr spec
 

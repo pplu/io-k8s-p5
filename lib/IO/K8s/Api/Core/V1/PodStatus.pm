@@ -177,4 +177,12 @@ RFC 3339 date and time at which the object was acknowledged by the Kubelet. This
 
 =cut
 
+k8s volumeHealth => ['Core::V1::PodVolumeHealth'];
+
+=attr volumeHealth
+
+volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.
+
+=cut
+
 1;

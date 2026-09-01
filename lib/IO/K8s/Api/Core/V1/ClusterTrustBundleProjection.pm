@@ -43,4 +43,12 @@ Select all ClusterTrustBundles that match this signer name. Mutually-exclusive w
 
 =cut
 
+k8s user => Int;
+
+=attr user
+
+user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+
+=cut
+
 1;

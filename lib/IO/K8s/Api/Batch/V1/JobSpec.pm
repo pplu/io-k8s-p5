@@ -101,6 +101,14 @@ When using podFailurePolicy, Failed is the the only allowed value. TerminatingOr
 
 =cut
 
+k8s scheduling => 'Batch::V1::JobSchedulingConfiguration';
+
+=attr scheduling
+
+scheduling defines the Workload-aware Scheduling configuration for this Job. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When omitted, the Job defaults to the basic scheduling policy, which behaves as standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithJob feature gate. This field is immutable, including whether it is set at all, only policy.gang.minCount may be changed after creation.
+
+=cut
+
 k8s selector => 'Meta::V1::LabelSelector';
 
 =attr selector

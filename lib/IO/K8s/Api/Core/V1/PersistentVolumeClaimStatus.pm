@@ -90,6 +90,14 @@ currentVolumeAttributesClassName is the current name of the VolumeAttributesClas
 
 =cut
 
+k8s healthStatus => 'Core::V1::VolumeHealthStatus';
+
+=attr healthStatus
+
+healthStatus contains the latest controller-reported health information for the volume bound to this claim.
+
+=cut
+
 k8s modifyVolumeStatus => 'Core::V1::ModifyVolumeStatus';
 
 =attr modifyVolumeStatus

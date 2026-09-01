@@ -365,8 +365,8 @@ subtest 'coverage over the default resource map' => sub {
 
     is_deeply(\@without, [qw(Eviction Scale TokenRequest)],
         'exactly the three subresources have no plural');
-    is(scalar(@short) - scalar(@without), 75,
-        '75 of the 78 short names carry an upstream plural');
+    is(scalar(@short) - scalar(@without), 77,
+        '77 of the 80 short names carry an upstream plural');
 };
 
 subtest 'coverage over every shipped upstream API class' => sub {
@@ -403,9 +403,9 @@ subtest 'coverage over every shipped upstream API class' => sub {
 
     my @without = grep { !defined $_->resource_plural } @api;
 
-    is(scalar @api, 113, '113 shipped upstream API object classes (120 before karr #45)');
-    is(scalar(@api) - scalar(@without), 110,
-        '110 of them carry an upstream plural (95 before karr #36)');
+    is(scalar @api, 124, '124 shipped upstream API object classes (113 before the v1.37 sync, karr k72)');
+    is(scalar(@api) - scalar(@without), 121,
+        '121 of them carry an upstream plural (110 before the v1.37 sync, karr k72)');
 
     # The exact miss list: just the 3 subresources now. The 7 embedded
     # template types are no longer Role::APIObject classes at all, so they

@@ -43,6 +43,16 @@ NodeSelector defines which nodes have access to the resources in the pool, when 
 
 =cut
 
+k8s partitionTypeAttribute => Str;
+
+=attr partitionTypeAttribute
+
+PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. "gpu.example.com/profile") whose value labels each device with its partition type, such as "Full" or "Half" for a MIG-style GPU.
+
+When set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.
+
+=cut
+
 k8s perDeviceNodeSelection => Bool;
 
 =attr perDeviceNodeSelection
@@ -64,6 +74,21 @@ k8s sharedCounters => ['Resource::V1beta2::CounterSet'];
 =attr sharedCounters
 
 SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.  The names of the counter sets must be unique in the ResourcePool.  Only one of Devices and SharedCounters can be set in a ResourceSlice.  The maximum number of counter sets is 8.
+
+=cut
+
+k8s skipNodeOperations => [Str];
+
+=attr skipNodeOperations
+
+SkipNodeOperations lists node-local resource operations (gRPC calls) that will be skipped for the devices in this slice when determining whether operations are necessary on the node. If all allocated devices for a driver in a claim skip an operation, that gRPC call will be skipped. Valid values are:
+
+- "NodePrepareResources": NodePrepareResources gRPC calls are skipped. This
+  value cannot be specified unless "NodeUnprepareResources" is also listed
+  (or "*" is specified).
+- "NodeUnprepareResources": NodeUnprepareResources gRPC calls are skipped. - "*": All node-local resource operations are skipped.
+
+Other values may be added in the future. The kubelet must ignore unknown values.
 
 =cut
 

@@ -35,7 +35,7 @@ k8s status => Str;
 
 =cut
 
-k8s type => Str;
+k8s type => Str, 'required';
 
 =attr type
 
