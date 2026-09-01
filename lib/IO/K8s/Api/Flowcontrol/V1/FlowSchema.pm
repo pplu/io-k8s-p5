@@ -13,7 +13,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s spec => 'Flowcontrol::V1::FlowSchemaSpec';
+k8s spec => 'Flowcontrol::V1::FlowSchemaSpec', 'required';
 
 =attr spec
 

@@ -25,7 +25,7 @@ LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
 
 =cut
 
-k8s limitResponse => 'Flowcontrol::V1::LimitResponse';
+k8s limitResponse => 'Flowcontrol::V1::LimitResponse', 'required';
 
 =attr limitResponse
 

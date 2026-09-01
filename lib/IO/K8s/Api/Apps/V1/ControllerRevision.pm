@@ -14,7 +14,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s data => { Str => 1 };
+k8s data => { Str => 1 }, 'required';
 
 =attr data
 

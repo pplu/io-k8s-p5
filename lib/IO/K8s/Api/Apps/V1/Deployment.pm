@@ -13,7 +13,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s spec => 'Apps::V1::DeploymentSpec';
+k8s spec => 'Apps::V1::DeploymentSpec', 'required';
 
 =attr spec
 

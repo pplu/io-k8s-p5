@@ -13,7 +13,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s spec => 'Flowcontrol::V1::PriorityLevelConfigurationSpec';
+k8s spec => 'Flowcontrol::V1::PriorityLevelConfigurationSpec', 'required';
 
 =attr spec
 
