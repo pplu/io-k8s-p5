@@ -207,4 +207,37 @@ subtest 'Class->from_json byte-level round-trip (karr #53)' => sub {
         'pure ASCII round-trips through Class->from_json');
 };
 
+# karr #71 (P4): the two-arg $k8s->json_to_object($class, $json) entry point
+# never had its own UTF-8 fixture -- every UTF-8 test above goes through
+# either the 1-arg json_to_object($json) auto-detect path or the class-level
+# Class->from_json path (karr #53). The two-arg path resolves $class through
+# expand_class() rather than the wire 'kind', a different code path in
+# IO::K8s::json_to_object, and must decode the same way.
+subtest 'json_to_object($class, $json) two-arg path preserves UTF-8 (karr #71)' => sub {
+    my $umlauts  = "Gr\x{fc}\x{df}e aus M\x{fc}nchen: \x{e4} \x{f6} \x{fc} \x{df}"; # Grüße aus München: ä ö ü ß
+    my $japanese = "\x{3053}\x{3093}\x{306b}\x{3061}\x{306f}";                     # こんにちは
+    my $emoji    = "\x{1f680}\x{2b50}\x{2764}\x{fe0f}\x{1f389}";                   # 🚀⭐❤️🎉
+
+    my $cm = $k8s->new_object('ConfigMap', {
+        metadata => { name => 'utf8-two-arg' },
+        data => {
+            'german.txt'   => $umlauts,
+            'japanese.txt' => $japanese,
+            'emoji.txt'    => $emoji,
+        },
+    });
+
+    my $bytes = $cm->to_json;
+    ok(!utf8::is_utf8($bytes), 'to_json produces UTF-8 bytes, not a decoded character string');
+
+    my $decoded = $k8s->json_to_object('ConfigMap', $bytes);
+    isa_ok($decoded, 'IO::K8s::Api::Core::V1::ConfigMap');
+    is($decoded->data->{'german.txt'}, $umlauts,
+        'German umlauts survive the two-arg json_to_object path');
+    is($decoded->data->{'japanese.txt'}, $japanese,
+        'Japanese survives the two-arg json_to_object path');
+    is($decoded->data->{'emoji.txt'}, $emoji,
+        'emoji survives the two-arg json_to_object path');
+};
+
 done_testing;
