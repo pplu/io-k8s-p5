@@ -2,6 +2,7 @@ package IO::K8s::Api::Scheduling::V1beta1::PodGroup;
 # ABSTRACT: PodGroup represents a runtime instance of pods grouped together. PodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from Workload.podGroupTemplates. PodGroup API enablement is toggled by the GenericWorkload feature gate.
 our $VERSION = '1.108';
 use IO::K8s::APIObject;
+with 'IO::K8s::Role::Namespaced';
 
 =description
 

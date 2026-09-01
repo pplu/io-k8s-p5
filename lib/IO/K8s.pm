@@ -138,12 +138,13 @@ my %DEFAULT_RESOURCE_MAP = (
 
     # -- Resource (Dynamic Resource Allocation) ----------------------------
     DeviceClass                                          => 'Api::Resource::V1::DeviceClass',
-    DeviceTaintRule                                      => 'Api::Resource::V1beta2::DeviceTaintRule',
+    DeviceTaintRule                                      => 'Api::Resource::V1::DeviceTaintRule',
     ResourceClaim                                        => 'Api::Resource::V1::ResourceClaim',
     ResourceClaimTemplate                                => 'Api::Resource::V1::ResourceClaimTemplate',
     ResourcePoolStatusRequest                            => 'Api::Resource::V1alpha3::ResourcePoolStatusRequest',
     ResourceSlice                                        => 'Api::Resource::V1::ResourceSlice',
     'resource.k8s.io/v1/DeviceClass'                     => 'Api::Resource::V1::DeviceClass',
+    'resource.k8s.io/v1/DeviceTaintRule'                 => 'Api::Resource::V1::DeviceTaintRule',
     'resource.k8s.io/v1/ResourceClaim'                   => 'Api::Resource::V1::ResourceClaim',
     'resource.k8s.io/v1/ResourceClaimTemplate'           => 'Api::Resource::V1::ResourceClaimTemplate',
     'resource.k8s.io/v1/ResourceSlice'                   => 'Api::Resource::V1::ResourceSlice',
@@ -208,9 +209,11 @@ my %DEFAULT_RESOURCE_MAP = (
 
     # -- Certificates ------------------------------------------------------
     CertificateSigningRequest                           => 'Api::Certificates::V1::CertificateSigningRequest',
-    ClusterTrustBundle                                  => 'Api::Certificates::V1beta1::ClusterTrustBundle',
-    PodCertificateRequest                               => 'Api::Certificates::V1beta1::PodCertificateRequest',
+    ClusterTrustBundle                                  => 'Api::Certificates::V1::ClusterTrustBundle',
+    PodCertificateRequest                               => 'Api::Certificates::V1::PodCertificateRequest',
     'certificates.k8s.io/v1/CertificateSigningRequest'  => 'Api::Certificates::V1::CertificateSigningRequest',
+    'certificates.k8s.io/v1/ClusterTrustBundle'         => 'Api::Certificates::V1::ClusterTrustBundle',
+    'certificates.k8s.io/v1/PodCertificateRequest'      => 'Api::Certificates::V1::PodCertificateRequest',
     'certificates.k8s.io/v1alpha1/ClusterTrustBundle'   => 'Api::Certificates::V1alpha1::ClusterTrustBundle',
     'certificates.k8s.io/v1beta1/ClusterTrustBundle'    => 'Api::Certificates::V1beta1::ClusterTrustBundle',
     'certificates.k8s.io/v1beta1/PodCertificateRequest' => 'Api::Certificates::V1beta1::PodCertificateRequest',
@@ -228,12 +231,18 @@ my %DEFAULT_RESOURCE_MAP = (
     'discovery.k8s.io/v1/EndpointSlice' => 'Api::Discovery::V1::EndpointSlice',
 
     # -- Scheduling --------------------------------------------------------
-    PodGroup                              => 'Api::Scheduling::V1alpha2::PodGroup',
+    CompositePodGroup                     => 'Api::Scheduling::V1alpha3::CompositePodGroup',
+    PodGroup                              => 'Api::Scheduling::V1beta1::PodGroup',
     PriorityClass                         => 'Api::Scheduling::V1::PriorityClass',
-    Workload                              => 'Api::Scheduling::V1alpha2::Workload',
-    'scheduling.k8s.io/v1/PriorityClass'  => 'Api::Scheduling::V1::PriorityClass',
-    'scheduling.k8s.io/v1alpha2/PodGroup' => 'Api::Scheduling::V1alpha2::PodGroup',
-    'scheduling.k8s.io/v1alpha2/Workload' => 'Api::Scheduling::V1alpha2::Workload',
+    Workload                              => 'Api::Scheduling::V1beta1::Workload',
+    'scheduling.k8s.io/v1/PriorityClass'           => 'Api::Scheduling::V1::PriorityClass',
+    'scheduling.k8s.io/v1alpha2/PodGroup'          => 'Api::Scheduling::V1alpha2::PodGroup',
+    'scheduling.k8s.io/v1alpha2/Workload'          => 'Api::Scheduling::V1alpha2::Workload',
+    'scheduling.k8s.io/v1alpha3/CompositePodGroup' => 'Api::Scheduling::V1alpha3::CompositePodGroup',
+    'scheduling.k8s.io/v1alpha3/PodGroup'          => 'Api::Scheduling::V1alpha3::PodGroup',
+    'scheduling.k8s.io/v1alpha3/Workload'          => 'Api::Scheduling::V1alpha3::Workload',
+    'scheduling.k8s.io/v1beta1/PodGroup'           => 'Api::Scheduling::V1beta1::PodGroup',
+    'scheduling.k8s.io/v1beta1/Workload'           => 'Api::Scheduling::V1beta1::Workload',
 
     # -- Node --------------------------------------------------------------
     RuntimeClass                  => 'Api::Node::V1::RuntimeClass',
@@ -269,8 +278,17 @@ my %DEFAULT_RESOURCE_MAP = (
     'admissionregistration.k8s.io/v1beta1/ValidatingAdmissionPolicy'         => 'Api::Admissionregistration::V1beta1::ValidatingAdmissionPolicy',
     'admissionregistration.k8s.io/v1beta1/ValidatingAdmissionPolicyBinding'  => 'Api::Admissionregistration::V1beta1::ValidatingAdmissionPolicyBinding',
 
+    # -- Lifecycle ---------------------------------------------------------
+    # Eviction is a collision Kind: the bare short name stays with the
+    # established policy/v1 Eviction, so lifecycle.k8s.io's Eviction is
+    # reachable by its qualified GVK only.
+    EvictionRequest                             => 'Api::Lifecycle::V1alpha1::EvictionRequest',
+    'lifecycle.k8s.io/v1alpha1/Eviction'        => 'Api::Lifecycle::V1alpha1::Eviction',
+    'lifecycle.k8s.io/v1alpha1/EvictionRequest' => 'Api::Lifecycle::V1alpha1::EvictionRequest',
+
     # -- Storage version migration -----------------------------------------
-    StorageVersionMigration                                    => 'Api::Storagemigration::V1beta1::StorageVersionMigration',
+    StorageVersionMigration                                    => 'Api::Storagemigration::V1::StorageVersionMigration',
+    'storagemigration.k8s.io/v1/StorageVersionMigration'       => 'Api::Storagemigration::V1::StorageVersionMigration',
     'storagemigration.k8s.io/v1alpha1/StorageVersionMigration' => 'Api::Storagemigration::V1alpha1::StorageVersionMigration',
     'storagemigration.k8s.io/v1beta1/StorageVersionMigration'  => 'Api::Storagemigration::V1beta1::StorageVersionMigration',
 

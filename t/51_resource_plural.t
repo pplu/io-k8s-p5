@@ -365,8 +365,8 @@ subtest 'coverage over the default resource map' => sub {
 
     is_deeply(\@without, [qw(Eviction Scale TokenRequest)],
         'exactly the three subresources have no plural');
-    is(scalar(@short) - scalar(@without), 75,
-        '75 of the 78 short names carry an upstream plural');
+    is(scalar(@short) - scalar(@without), 77,
+        '77 of the 80 short names carry an upstream plural');
 };
 
 subtest 'coverage over every shipped upstream API class' => sub {
