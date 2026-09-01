@@ -11,6 +11,14 @@ defaultMode is Optional: mode bits used to set permissions on created files by d
 
 =cut
 
+k8s defaultUser => Int;
+
+=attr defaultUser
+
+defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+
+=cut
+
 k8s items => ['Core::V1::KeyToPath'];
 
 =attr items

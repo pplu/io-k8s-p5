@@ -11,6 +11,22 @@ Containers lists the names of the containers in the Pod that use this ResourceCl
 
 =cut
 
+k8s mapping => ['Core::V1::NodeAllocatableMappedResources'];
+
+=attr mapping
+
+Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.
+
+=cut
+
+k8s overhead => ['Core::V1::NodeAllocatableOverheadResources'];
+
+=attr overhead
+
+Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.
+
+=cut
+
 k8s resourceClaimName => Str, 'required';
 
 =attr resourceClaimName

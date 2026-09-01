@@ -27,4 +27,12 @@ L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#csinode-v
 
 
 =cut
+k8s status => 'Storage::V1::CSINodeStatus';
+
+=attr status
+
+status contains health and status information for the node's storage.
+
+=cut
+
 1;

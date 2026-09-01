@@ -3,6 +3,14 @@ package IO::K8s::Api::Core::V1::GRPCAction;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
+k8s mode => Str;
+
+=attr mode
+
+mode specifies the connection mode for the gRPC health probe. Set to "TLS" to use TLS without certificate verification. Set to "Plaintext" to use a plaintext (insecure) connection explicitly. If not specified, the probe uses a plaintext (insecure) connection.
+
+=cut
+
 k8s port => Int, 'required';
 
 =attr port

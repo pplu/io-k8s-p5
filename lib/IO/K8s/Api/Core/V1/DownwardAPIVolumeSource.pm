@@ -11,6 +11,14 @@ Optional: mode bits to use on created files by default. Must be a Optional: mode
 
 =cut
 
+k8s defaultUser => Int;
+
+=attr defaultUser
+
+defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+
+=cut
+
 k8s items => ['Core::V1::DownwardAPIVolumeFile'];
 
 =attr items

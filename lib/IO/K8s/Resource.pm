@@ -37,6 +37,7 @@ my %_class_prefix = (
     'Authorization'  => 'IO::K8s::Api::Authorization',
     'Resource'       => 'IO::K8s::Api::Resource',
     'Storagemigration' => 'IO::K8s::Api::Storagemigration',
+    'Lifecycle'      => 'IO::K8s::Api::Lifecycle',
     'Meta'           => 'IO::K8s::Apimachinery::Pkg::Apis::Meta',
     'Apiextensions'  => 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions',
     'KubeAggregator' => 'IO::K8s::KubeAggregator::Pkg::Apis::Apiregistration',

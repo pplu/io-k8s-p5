@@ -3,6 +3,14 @@ package IO::K8s::Api::Core::V1::VolumeMount;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
+k8s bindMountOptions => [Str];
+
+=attr bindMountOptions
+
+bindMountOptions is the list of additional bind mount options to apply when mounting this volume into the container. Allowed values are noexec, nodev, and nosuid. These are Linux mount options and have no effect on Windows nodes. This field is not supported with image volumes. This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.
+
+=cut
+
 k8s mountPath => Str, 'required';
 
 =attr mountPath

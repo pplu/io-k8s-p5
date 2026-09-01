@@ -67,6 +67,18 @@ List of ephemeral containers run in this pod. Ephemeral containers may be run in
 
 =cut
 
+k8s evictionResponders => ['Core::V1::EvictionResponder'];
+
+=attr evictionResponders
+
+evictionResponders reference responders that react to Evictions based on EvictionRequests. Responders should observe and communicate through the Eviction Resource API to help with the graceful termination of a pod. The responders are selected sequentially, according to their specified priority.
+
+Responders should periodically report on an eviction progress by updating the .status.responders[].heartbeatTime field of the Eviction object. If this field is not updated within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction is passed over to the next responder with a lower priority. If there is no other responder, the last default imperative-eviction.k8s.io/evictor responder with a priority of 100 will evict the pod using the imperative Eviction API (pods/<name>/eviction subresource).
+
+The maximum length of the responders list is 10. Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set). This field can only be set on creation and is immutable afterwards.
+
+=cut
+
 k8s hostAliases => ['Core::V1::HostAlias'];
 
 =attr hostAliases

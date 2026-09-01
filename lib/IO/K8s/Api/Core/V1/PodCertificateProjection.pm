@@ -69,6 +69,14 @@ Kubelet's generated CSRs will be addressed to this signer.
 
 =cut
 
+k8s user => Int;
+
+=attr user
+
+user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+
+=cut
+
 k8s userAnnotations => { Str => 1 };
 
 =attr userAnnotations

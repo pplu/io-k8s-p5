@@ -35,6 +35,7 @@ my %API_GROUP_MAP = (
     resource              => 'resource.k8s.io',
     apiserverinternal     => 'internal.apiserver.k8s.io',
     storagemigration      => 'storagemigration.k8s.io',
+    lifecycle             => 'lifecycle.k8s.io',
 );
 
 # Derive apiVersion from a class-name string in a known namespace:
@@ -115,8 +116,8 @@ sub _api_version_from_class {
 # group. A miss in both tiers returns undef; nothing falls back to a guess,
 # because a wrong plural is indistinguishable from a denied permission at
 # the RBAC layer, which is the whole reason these tables exist (karr #33).
-# --- BEGIN GENERATED resource plural table (v1.36.3) ---
-# Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.36.3.json
+# --- BEGIN GENERATED resource plural table (v1.37.0) ---
+# Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.37.0.json
 my %RESOURCE_PLURAL = (
     # core
     'v1/Binding'               => 'bindings',
@@ -182,7 +183,8 @@ my %RESOURCE_PLURAL = (
 
     # certificates.k8s.io
     'certificates.k8s.io/v1/CertificateSigningRequest'  => 'certificatesigningrequests',
-    'certificates.k8s.io/v1alpha1/ClusterTrustBundle'   => 'clustertrustbundles',
+    'certificates.k8s.io/v1/ClusterTrustBundle'         => 'clustertrustbundles',
+    'certificates.k8s.io/v1/PodCertificateRequest'      => 'podcertificaterequests',
     'certificates.k8s.io/v1beta1/ClusterTrustBundle'    => 'clustertrustbundles',
     'certificates.k8s.io/v1beta1/PodCertificateRequest' => 'podcertificaterequests',
 
@@ -204,14 +206,16 @@ my %RESOURCE_PLURAL = (
     # internal.apiserver.k8s.io
     'internal.apiserver.k8s.io/v1alpha1/StorageVersion' => 'storageversions',
 
+    # lifecycle.k8s.io
+    'lifecycle.k8s.io/v1alpha1/Eviction'        => 'evictions',
+    'lifecycle.k8s.io/v1alpha1/EvictionRequest' => 'evictionrequests',
+
     # networking.k8s.io
-    'networking.k8s.io/v1/IPAddress'        => 'ipaddresses',
-    'networking.k8s.io/v1/Ingress'          => 'ingresses',
-    'networking.k8s.io/v1/IngressClass'     => 'ingressclasses',
-    'networking.k8s.io/v1/NetworkPolicy'    => 'networkpolicies',
-    'networking.k8s.io/v1/ServiceCIDR'      => 'servicecidrs',
-    'networking.k8s.io/v1beta1/IPAddress'   => 'ipaddresses',
-    'networking.k8s.io/v1beta1/ServiceCIDR' => 'servicecidrs',
+    'networking.k8s.io/v1/IPAddress'     => 'ipaddresses',
+    'networking.k8s.io/v1/Ingress'       => 'ingresses',
+    'networking.k8s.io/v1/IngressClass'  => 'ingressclasses',
+    'networking.k8s.io/v1/NetworkPolicy' => 'networkpolicies',
+    'networking.k8s.io/v1/ServiceCIDR'   => 'servicecidrs',
 
     # node.k8s.io
     'node.k8s.io/v1/RuntimeClass' => 'runtimeclasses',
@@ -227,6 +231,7 @@ my %RESOURCE_PLURAL = (
 
     # resource.k8s.io
     'resource.k8s.io/v1/DeviceClass'                     => 'deviceclasses',
+    'resource.k8s.io/v1/DeviceTaintRule'                 => 'devicetaintrules',
     'resource.k8s.io/v1/ResourceClaim'                   => 'resourceclaims',
     'resource.k8s.io/v1/ResourceClaimTemplate'           => 'resourceclaimtemplates',
     'resource.k8s.io/v1/ResourceSlice'                   => 'resourceslices',
@@ -243,26 +248,29 @@ my %RESOURCE_PLURAL = (
     'resource.k8s.io/v1beta2/ResourceSlice'              => 'resourceslices',
 
     # scheduling.k8s.io
-    'scheduling.k8s.io/v1/PriorityClass'  => 'priorityclasses',
-    'scheduling.k8s.io/v1alpha2/PodGroup' => 'podgroups',
-    'scheduling.k8s.io/v1alpha2/Workload' => 'workloads',
+    'scheduling.k8s.io/v1/PriorityClass'           => 'priorityclasses',
+    'scheduling.k8s.io/v1alpha3/CompositePodGroup' => 'compositepodgroups',
+    'scheduling.k8s.io/v1alpha3/PodGroup'          => 'podgroups',
+    'scheduling.k8s.io/v1alpha3/Workload'          => 'workloads',
+    'scheduling.k8s.io/v1beta1/PodGroup'           => 'podgroups',
+    'scheduling.k8s.io/v1beta1/Workload'           => 'workloads',
 
     # storage.k8s.io
-    'storage.k8s.io/v1/CSIDriver'                  => 'csidrivers',
-    'storage.k8s.io/v1/CSINode'                    => 'csinodes',
-    'storage.k8s.io/v1/CSIStorageCapacity'         => 'csistoragecapacities',
-    'storage.k8s.io/v1/StorageClass'               => 'storageclasses',
-    'storage.k8s.io/v1/VolumeAttachment'           => 'volumeattachments',
-    'storage.k8s.io/v1/VolumeAttributesClass'      => 'volumeattributesclasses',
-    'storage.k8s.io/v1beta1/VolumeAttributesClass' => 'volumeattributesclasses',
+    'storage.k8s.io/v1/CSIDriver'             => 'csidrivers',
+    'storage.k8s.io/v1/CSINode'               => 'csinodes',
+    'storage.k8s.io/v1/CSIStorageCapacity'    => 'csistoragecapacities',
+    'storage.k8s.io/v1/StorageClass'          => 'storageclasses',
+    'storage.k8s.io/v1/VolumeAttachment'      => 'volumeattachments',
+    'storage.k8s.io/v1/VolumeAttributesClass' => 'volumeattributesclasses',
 
     # storagemigration.k8s.io
+    'storagemigration.k8s.io/v1/StorageVersionMigration'      => 'storageversionmigrations',
     'storagemigration.k8s.io/v1beta1/StorageVersionMigration' => 'storageversionmigrations',
 );
 # --- END GENERATED resource plural table ---
 
-# --- BEGIN GENERATED group resource plural table (v1.36.3) ---
-# Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.36.3.json
+# --- BEGIN GENERATED group resource plural table (v1.37.0) ---
+# Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.37.0.json
 my %RESOURCE_PLURAL_BY_GROUP = (
     # core
     '|Binding'               => 'bindings',
@@ -343,6 +351,10 @@ my %RESOURCE_PLURAL_BY_GROUP = (
     # internal.apiserver.k8s.io
     'internal.apiserver.k8s.io|StorageVersion' => 'storageversions',
 
+    # lifecycle.k8s.io
+    'lifecycle.k8s.io|Eviction'        => 'evictions',
+    'lifecycle.k8s.io|EvictionRequest' => 'evictionrequests',
+
     # networking.k8s.io
     'networking.k8s.io|IPAddress'     => 'ipaddresses',
     'networking.k8s.io|Ingress'       => 'ingresses',
@@ -371,9 +383,10 @@ my %RESOURCE_PLURAL_BY_GROUP = (
     'resource.k8s.io|ResourceSlice'             => 'resourceslices',
 
     # scheduling.k8s.io
-    'scheduling.k8s.io|PodGroup'      => 'podgroups',
-    'scheduling.k8s.io|PriorityClass' => 'priorityclasses',
-    'scheduling.k8s.io|Workload'      => 'workloads',
+    'scheduling.k8s.io|CompositePodGroup' => 'compositepodgroups',
+    'scheduling.k8s.io|PodGroup'          => 'podgroups',
+    'scheduling.k8s.io|PriorityClass'     => 'priorityclasses',
+    'scheduling.k8s.io|Workload'          => 'workloads',
 
     # storage.k8s.io
     'storage.k8s.io|CSIDriver'             => 'csidrivers',

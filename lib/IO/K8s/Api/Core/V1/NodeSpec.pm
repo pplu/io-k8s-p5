@@ -35,6 +35,14 @@ podCIDRs represents the IP ranges assigned to the node for usage by Pods on that
 
 =cut
 
+k8s podPreemptionPolicy => 'Core::V1::NodePodPreemptionPolicy';
+
+=attr podPreemptionPolicy
+
+PodPreemptionPolicy controls the node-level preemption behaviors for pods on this node. This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+
+=cut
+
 k8s providerID => Str;
 
 =attr providerID
