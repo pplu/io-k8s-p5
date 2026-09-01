@@ -7,7 +7,7 @@ briefing:
   skills:
     - getty-perl-core
     - io-k8s-core
-    - getty-perl-kubernetes-classes
+    - perl-io-k8s-kubernetes-classes
     - kanban-issues-karr-cli
 ---
 

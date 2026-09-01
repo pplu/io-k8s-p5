@@ -45,5 +45,5 @@ principle, the lanes and this repo's hazards are in `.claude/rules/io-k8s-rules.
 
 The agents carry their conventions via `briefing.skills` (see `.claude/agents/`); the main
 agent delegates rather than loading them. Skill sources live in `.claude/skills/` —
-`io-k8s-core` holds the distribution internals, `perl-kubernetes-classes` the consumer-facing
+`io-k8s-core` holds the distribution internals, `perl-io-k8s-kubernetes-classes` the consumer-facing
 API. Work is tracked on the local `karr` board.

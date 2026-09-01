@@ -9,7 +9,7 @@ model: sonnet
 # IO::K8s — Distribution Internals
 
 Consumer-facing usage (`new_object`, `inflate`, `to_json`, short names) lives in skill
-`getty-perl-kubernetes-classes`. This skill is about *changing* the distribution.
+`perl-io-k8s-kubernetes-classes`. This skill is about *changing* the distribution.
 
 ## There is no codegen step
 
