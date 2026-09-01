@@ -1,0 +1,19 @@
+---
+class: standard
+completed: 2026-09-01T03:09:02Z
+created: 2026-09-01T01:57:47Z
+id: 73
+priority: high
+started: 2026-09-01T03:09:02Z
+status: archived
+tags:
+- spec-drift
+- deprecation
+- upstream
+title: IO::K8s::Deprecated redirect stubs for v1.37 Category-B removal (from k72)
+updated: 2026-09-01T03:09:02Z
+---
+
+karr k72 stage 4 removed, on branch v137-upgrade, the type NodeAllocatableResourceMapping (Resource V1/V1beta1/V1beta2) and the 4 fields pointing at it (Core::V1::NodeAllocatableResourceClaimStatus.resources; Resource::{V1::Device,V1beta1::BasicDevice,V1beta2::Device}.nodeAllocatableResourceMappings). Upstream v1.37 replaced nodeAllocatableResourceMappings->NodeAllocatableResourceMapping with nodeAllocatableResources->NodeAllocatableResource (added in stage 1). These classes/fields shipped in released CPAN versions 1.105/1.106/1.107, so this is a breaking removal. Per the 1.105 *List protocol, the redirect stub for IO::K8s::Api::Resource::{V1,V1beta1,V1beta2}::NodeAllocatableResourceMapping belongs in the SEPARATE IO::K8s::Deprecated distribution (its own CPAN dist, NOT this repo). Failure-mode change to note in Changes: classes are not strict-constructor, so a consumer passing the removed field/type to a constructor previously round-tripped it and now silently drops it; a use of the removed type class now fails to load. Action: add the redirect stubs in IO::K8s::Deprecated and cut a release of it, coordinating with the IO::K8s 1.108 release.
+
+WON'T DO: NodeAllocatableResourceMapping wird nicht entfernt, sondern als Superset behalten (siehe k72). Damit kein Tombstone noetig -- die Deprecated-Dist ist nur fuer wirklich tote, PAUSE-orphaned Klassen, nicht fuer etwas, das einen aelteren Cluster bedienen kann. Kein IO::K8s::Deprecated-Change, kein 1.108-Deprecated-Release.
