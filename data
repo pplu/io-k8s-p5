@@ -1,0 +1,58 @@
+---
+class: standard
+completed: 2026-09-01T02:30:09Z
+created: 2026-09-01T00:22:04Z
+id: 71
+priority: medium
+started: 2026-09-01T00:30:37Z
+status: done
+tags:
+- testing
+- serialization
+title: Load-format test coverage gaps (List provider items, error branches)
+updated: 2026-09-01T02:30:09Z
+---
+
+Coverage-Analyse (Explore) fand die Test-Suite insgesamt stark, mit gebuendelten Luecken auf der Inflation-Seite. Sieben umrissene Load-Format-Ergaenzungen, alle gegen bestehendes Verhalten (additive Regression/Coverage, kein Bugfix):
+
+P1 - List-Inflation mit Provider-/AutoGen-/CRD-Item-Typen wird nirgends geladen. List::FROM_STRUCT leitet die Item-Klasse ueber $k8s->expand_class ab (List.pm:222), getestet nur PodList/v1/Pod + unaufloesbares GizmoList. Assertion: IO::K8s->new(with=>[IO::K8s::Cilium])->json_to_object(CiliumNetworkPolicyList-JSON) liefert Items der Klasse IO::K8s::Cilium::V2::CiliumNetworkPolicy. Analog AutoGen + class_namespaces.
+
+P2 - List->from_json/FROM_STRUCT mit zweitem $k8s-Argument nie ausgeuebt (List.pm:314). Ohne $k8s kann eine Provider-List nicht round-trippen. Assertion: from_json($bytes,$k8s_with_cilium) inflatet Provider-Items; ohne $k8s fail-closed.
+
+P3 - inflate ohne kind ungetestet. Stirbt mit "Cannot inflate: missing kind field in data" (K8s.pm:805). throws_ok fehlt.
+
+P4 - UTF-8 ueber 2-arg json_to_object($class,$json) ungetestet (K8s.pm:749). 05_utf8 deckt nur 1-arg + Class->from_json.
+
+P5 - AutoGen: verschachteltes $ref auf andere autogenerierte Definition wird beim Laden nicht typisiert inflatet. Assertion: nach inflate ist ref($obj->spec) eine AutoGen-Klasse mit Accessor, nicht Hash.
+
+P6 - is_num wird ueber keinen Load-Pfad round-getrippt (62 prueft nur Konstruktion+TO_JSON). Assertion: $class->FROM_HASH({cpu=>1.5})->to_json =~ "cpu":1.5 (unquoted).
+
+P7 - load_yaml Multi-Dokument + collect_errors nur einfach abgedeckt. 3-Doc-YAML (2 gueltig, 1 boeser Typ) -> @objs==2, @errors==1, Fehlertext mit kind/name-Praefix (K8s.pm:1055-1065).
+
+Ziel-Dateien: P1/P2 -> t/61 erweitern oder neue t/65; P3 -> neue t/66 oder Ende 49; P4 -> t/05; P5 -> t/45; P6 -> t/62; P7 -> t/manifest oder t/25. Lane: io-k8s-test-writer.
+
+Implemented all 7 points. No bugfixes needed -- every assertion was green
+against unmodified lib/ on the first run, including P5 (suspected AutoGen
+gap): a nested $ref to a second, non-GVK AutoGen definition already inflates
+to a typed, accessor-bearing object via $k8s->inflate(), not a bare hashref.
+No behavioural drift found anywhere in P1-P7.
+
+Files:
+- t/65_karr_71_load_format_coverage.t (new): P1 (List item-class resolution
+  via a CRD provider [IO::K8s::Cilium], a class_namespaces subclass, and
+  AutoGen/openapi_spec), P2 (List->from_json's optional $k8s arg: with a
+  provider-carrying $k8s resolves provider items; without it, fails closed
+  with the standard GVK error), P3 (inflate() with no 'kind' dies with the
+  fixed message).
+- t/05_utf8.t: +1 subtest, UTF-8 round-trip through the 2-arg
+  json_to_object($class, $json) path (P4).
+- t/45_autogen_dispatch.t: +1 subtest, nested $ref to a second AutoGen
+  definition inflates to a typed object with working accessors (P5).
+- t/62_karr_68_num_type.t: +1 subtest, is_num round-trips through FROM_HASH
+  and from_json, unquoted on the way back out (P6).
+- t/manifest.t: +1 subtest, load_yaml(collect_errors=>1) on a mixed 3-doc
+  stream (2 valid, 1 invalid) -- 2 objects, 1 error, kind/name-prefixed (P7).
+
+prove -lr t/: 68 files, 4126 tests (was 67/4117), all green.
+
+Integriert nach master (commit ca7e3927). Suite grün.
