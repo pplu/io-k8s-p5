@@ -2,6 +2,20 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Track upstream Kubernetes v1.37: 22 new Kinds (among them a new
+    IO::K8s::Api::Lifecycle namespace), their supporting types and new
+    fields, all registered for GVK dispatch (k72).
+
+  - Ten fields upstream made required in v1.37 are now required at
+    construction (k72): the apps/v1 workload specs, ControllerRevision
+    .data, and five flowcontrol/v1 fields. Building one without the field
+    now dies instead of yielding a partial object.
+
+  - Removed NodeAllocatableResourceMapping and its four referencing
+    fields, deleted upstream in v1.37 (k72, breaking -- shipped in
+    1.105-1.107). Redirect stubs land in IO::K8s::Deprecated with 1.108
+    (k73).
+
   - resource_plural() now croaks when passed an argument instead of silently
     swallowing it, in all three spots (role accessor, APIObject import param,
     AutoGen GVK constant) -- the same fail-closed shape k67 applied to
