@@ -1,0 +1,32 @@
+---
+claimed_at: 2026-09-01T19:54:50Z
+claimed_by: oral-down
+class: standard
+completed: 2026-09-02T01:32:36Z
+created: 2026-09-01T19:46:00Z
+id: 78
+priority: medium
+started: 2026-09-01T19:50:07Z
+status: done
+tags:
+- cilium
+- resource-map
+- back-compat
+title: 'Cilium: 8 shipped back-compat classes unreachable through the dispatcher'
+updated: 2026-09-02T01:32:36Z
+---
+
+Found during the 1.108 pre-release sweep (2026-09-01). 1.105 restored eight Cilium classes "for backward compatibility with clusters still running older Cilium releases" (Changes, 1.105 entry): the v2alpha1 tracks of CiliumBGPAdvertisement, CiliumBGPClusterConfig, CiliumBGPNodeConfig, CiliumBGPNodeConfigOverride, CiliumBGPPeerConfig and CiliumCIDRGroup, plus CiliumBGPPeeringPolicy (v2alpha1) and CiliumExternalWorkload (v2). All eight load as classes, but none is registered in IO::K8s::Cilium->resource_map (22 bare keys, 0 qualified), so the stated purpose does not work:
+
+  $k8s->inflate({ kind => "CiliumBGPAdvertisement", apiVersion => "cilium.io/v2alpha1", ... })
+  -> dies "Cannot resolve Kubernetes GVK"
+  $k8s->new_object("cilium.io/v2alpha1/CiliumBGPAdvertisement", ...)   -> same
+  $k8s->inflate({ kind => "CiliumExternalWorkload", apiVersion => "cilium.io/v2", ... })  -> same
+
+AgentSandbox (k58) and GatewayAPI register their older tracks under domain-qualified keys; Cilium does not. t/07_cilium.t:106-107 asserts the two removed Kinds are absent from the map, so that test encodes the current state, not the intent.
+
+Pre-existing since 1.105, not a 1.108 regression. Options: (a) register the six v2alpha1 tracks under "cilium.io/v2alpha1/Kind" and the two removed Kinds under their qualified keys, mirroring k58, and flip the two t/07 assertions; or (b) decide they are dead and route them through IO::K8s::Deprecated. Per the house convention (deprecated-dist only for classes no cluster serves), (a) is the expected answer. Either way README "Cilium (30 CRDs)" and IO::K8s.pm POD ("23 ... 12 ... 11") need the number the decision produces; Cilium.pm itself says 22.
+
+2026-09-01 19:54 Registered 8 Cilium back-compat classes (6 v2alpha1 BGP/CIDR, CiliumBGPPeeringPolicy v2alpha1, CiliumExternalWorkload v2) under domain-qualified keys in lib/IO/K8s/Cilium.pm resource_map. t/07_cilium.t: resource_map count bumped 22 -> 30, removed-Kinds assertions flipped to assert presence via qualified keys, new 'back-compat GVK resolution (karr #78)' subtest exercises expand_class + inflate for all 8 GVKs and confirms short names still resolve to v2 storage version. prove -lr t/07_cilium.t green, prove -lr t/ green (4568 tests / 68 files). README 'Cilium (30 CRDs)' and IO::K8s.pm POD count untouched per task instruction (doc-writer lane).
+
+Review OK: 8 Back-compat-Klassen unter domain-qualifizierten Keys in Cilium.pm resource_map; t/07 auf 30 Entries + präsenz-Assertions umgestellt; neuer GVK-Subtest (expand_class+inflate) grün. Kurznamen lösen weiter auf V2-Storage auf.
