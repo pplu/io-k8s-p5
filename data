@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-02T15:46:03Z
+claimed_by: Opus/main
+class: standard
+completed: 2026-09-02T15:46:03Z
+created: 2026-09-02T15:38:02Z
+id: 87
+priority: low
+started: 2026-09-02T15:38:39Z
+status: done
+tags:
+- k3s
+- provider-bump
+title: Bump K3s provider v1.36.3+k3s1 -> v1.36.4+k3s1
+updated: 2026-09-02T15:46:03Z
+---
+
+k3s has no v1.37 release yet; latest stable is v1.36.4+k3s1. Schemaless (SOURCE UNRESOLVED) so no drift possible. Pure pin bump: upstream_version in lib/IO/K8s/K3s.pm + the t/09_k3s.t assertion (is upstream_version v1.36.4+k3s1). No class changes.
+
+Committed in ab53c186.
