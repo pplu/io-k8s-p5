@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-02T15:46:14Z
+claimed_by: Opus/main
+class: standard
+completed: 2026-09-02T15:46:14Z
+created: 2026-09-02T15:38:16Z
+id: 88
+priority: medium
+started: 2026-09-02T15:38:44Z
+status: done
+tags:
+- agentsandbox
+- provider-bump
+- back-compat
+- spec-drift
+title: Bump AgentSandbox provider v0.5.4 -> v1.0.0 (v1alpha1 removed upstream)
+updated: 2026-09-02T15:46:14Z
+---
+
+MAJOR bump. crd-drift-check --dir against v1.0.0: v1.0.0 serves ONLY v1beta1 for all 4 Kinds; the entire v1alpha1 track is REMOVED upstream -> 4 STALE/PERL-ONLY (Sandbox, SandboxClaim, SandboxTemplate, SandboxWarmPool v1alpha1). v1beta1 classes still match exactly (Tier1/3/EXTRA=0). Per deprecated-dist-only-for-dead-classes: KEEP the 4 v1alpha1 classes (serve v0.5.x clusters) + add 4 ignore_stale_kinds exceptions to maint/crd-drift-exceptions.yaml (reason refs k88). Bump upstream_version + rewrite AgentSandbox.pm POD lines that say "v1alpha1 still served as of v0.5.4" (now: served through v0.5.x, removed upstream at v1.0.0, kept for back-compat). Update t/28 upstream_version assertion. KEEP historical "new in v0.5.4" comments. k84 (dropped volumeClaimTemplatesPolicy from v1alpha1) stays correct.
+
+Committed in ab53c186.
