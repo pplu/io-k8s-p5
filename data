@@ -1,0 +1,38 @@
+---
+claimed_at: 2026-09-01T20:12:58Z
+claimed_by: wear-sale
+class: standard
+completed: 2026-09-02T01:32:45Z
+created: 2026-09-01T19:46:05Z
+id: 79
+priority: high
+started: 2026-09-01T19:58:37Z
+status: done
+tags:
+- pod
+- docs
+- release
+title: 'IO::K8s.pm POD drift: v1.36, Cilium counts, k62/k67/k70 behaviour undocumented'
+updated: 2026-09-02T01:32:45Z
+---
+
+From the 1.108 POD audit (2026-09-01), core-module findings not covered by k74 (README) or k76 (broken links):
+
+FALSCH
+- lib/IO/K8s.pm:1718-1720 "Updated to Kubernetes v1.36 API" / "from v1.14 to v1.36" -> v1.37 (k72). Also the doc-reference URL at :1159 and :1739.
+- lib/IO/K8s.pm:1627-1628 "23 Cilium CRD classes covering cilium.io/v2 (12 CRDs) and cilium.io/v2alpha1 (11 CRDs)" -- the map has 22 keys (17 + 5); see the Cilium reachability ticket for which number is right once that is decided.
+
+FEHLT
+- lib/IO/K8s.pm:1525-1561 new_object: does not mention that an apiVersion key inside the params hash is honoured and that a contradicting positional api_version croaks (k62).
+- lib/IO/K8s/Role/APIObject.pm (kind/api_version/resource_plural), lib/IO/K8s/APIObject.pm:41-52, lib/IO/K8s/AutoGen.pm:481-524: none say the accessors croak when passed an argument (k67/k70), although the code beside them does.
+- lib/IO/K8s/Role/Resource.pm: TO_JSON, to_json, TO_YAML, to_yaml, compare_to_schema have no =method block (k76 covers only the two dangling links). List.pm TO_JSON likewise.
+- lib/IO/K8s.pm: public json, expand_class, load_class have no =head2.
+
+KOSMETIK
+- "karr #NN" -> "kNN" notation in List.pm:287-289, Role/Resource.pm:233,251, AutoGen.pm:502,507,520 (Changes switched in afcf3c0b).
+
+Lane: io-k8s-doc-writer. The v1.36 and Cilium-count lines should land before 1.108 ships; the rest can follow.
+
+2026-09-01 20:12 IO/K8s.pm + 6 sibling files POD drift fixed. FALSCH: v1.36->v1.37 at IO/K8s.pm:1159, 1718-1721, 1739; Cilium count to 30 CRD classes / 30 resource_map keys (22 short + 8 back-compat) at IO/K8s.pm:1647-1653 and Cilium.pm:70. FEHLT: new_object apiVersion-key+croak (k62); kind/api_version/resource_plural croak notes (k67/k70) in Role/APIObject.pm + APIObject.pm; AutoGen.pm fixed-identity note (k67/k70); TO_JSON/to_json/TO_YAML/to_yaml/compare_to_schema =method blocks in Role/Resource.pm; TO_JSON =method block in List.pm; =head2 json/expand_class/load_class in IO/K8s.pm. KOSMETIK: karr #NN -> kNN in List.pm, Role/Resource.pm, AutoGen.pm. dzil build clean; dzil test 4568 tests pass; podchecker no real errors. Out of scope: SpecBuilder.pm + Types::Net POD belong to k80 (own lane).
+
+Review OK: IO/K8s.pm + 6 Geschwister POD-Drift behoben; v1.37, Cilium-Zahlen konsistent (18 v2 + 12 v2alpha1 = 30 Klassen, 30 map-Keys), new_object/kind/api_version/resource_plural-croak dokumentiert, json/expand_class/load_class =head2. podchecker sauber.
