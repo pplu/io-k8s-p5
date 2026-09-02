@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-02T15:45:54Z
+claimed_by: Opus/main
+class: standard
+completed: 2026-09-02T15:45:54Z
+created: 2026-09-02T15:37:58Z
+id: 86
+priority: low
+started: 2026-09-02T15:38:34Z
+status: done
+tags:
+- traefik
+- provider-bump
+- spec-drift
+title: Bump Traefik provider v3.7.10 -> v3.7.12
+updated: 2026-09-02T15:45:54Z
+---
+
+crd-drift-check --dir against v3.7.12 manifests: Tier1/Tier3/EXTRA/STALE all 0 -- no drift (CRD set stable across v3.x). Pure pin bump: upstream_version in lib/IO/K8s/Traefik.pm (+ any POD version line). No class changes.
+
+Committed in ab53c186.
