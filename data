@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-02T16:04:34Z
+claimed_by: Opus/main
+class: standard
+completed: 2026-09-02T16:04:34Z
+created: 2026-09-02T15:46:19Z
+id: 89
+priority: medium
+started: 2026-09-02T16:01:32Z
+status: done
+tags:
+- maint
+- crd-drift
+- tooling
+- footgun
+title: crd-drift-check cache is version-blind -> stale manifests after a pin bump
+updated: 2026-09-02T16:04:34Z
+---
+
+Found during k88. maint/crd-drift-check.pl caches downloaded CRD manifests under spec/crd/<Provider>/ with filenames flattened from the URL PATH only -- the upstream_version is not part of the cache key. After bumping a prov, upstream_version, a plain run reads the stale cached manifests of the OLD version and reports wrong drift (k88: reported 8 upstream GVKs / 0 suppressed against v0.5.4 cache instead of 4 against v1.0.0). --no-cache forces a correct live fetch and refreshes the cache. Fix: key the cache on upstream_version (e.g. spec/crd/<Provider>/<version>/... or embed the version in the flattened filename) so a pin bump auto-invalidates. Until then, always pass --no-cache after a version bump. Report-only tool, low blast radius, but silently-wrong output is a real trap.
+
+Committed in 8e9d6101.
