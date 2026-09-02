@@ -106,9 +106,9 @@ my $k8s = IO::K8s->new(with => [
 ]);
 ```
 
-### Cilium (30 CRDs)
+### Cilium (31 CRDs)
 
-`IO::K8s::Cilium` covers `cilium.io/v2` and `cilium.io/v2alpha1` (upstream v1.20.0):
+`IO::K8s::Cilium` covers `cilium.io/v2` and `cilium.io/v2alpha1` (upstream v1.20.1):
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
@@ -144,7 +144,7 @@ my $cert = $k8s->new_object('Certificate',
 
 ### K3s (4 CRDs)
 
-`IO::K8s::K3s` covers `helm.cattle.io/v1` and `k3s.cattle.io/v1` (upstream v1.36.3+k3s1):
+`IO::K8s::K3s` covers `helm.cattle.io/v1` and `k3s.cattle.io/v1` (upstream v1.36.4+k3s1):
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::K3s']);
@@ -168,7 +168,7 @@ my $gw = $k8s->new_object('Gateway',
 
 ### AgentSandbox (4 CRDs in 8 modules: v1alpha1 + v1beta1)
 
-`IO::K8s::AgentSandbox` covers `agents.x-k8s.io/{v1alpha1,v1beta1}` and `extensions.agents.x-k8s.io/{v1alpha1,v1beta1}` (upstream v0.5.4; v1beta1 is the storage version, v1alpha1 remains served):
+`IO::K8s::AgentSandbox` covers `agents.x-k8s.io/{v1alpha1,v1beta1}` and `extensions.agents.x-k8s.io/{v1alpha1,v1beta1}` (upstream v1.0.0; v1beta1 is the current upstream-served version — v1alpha1 was removed upstream at v1.0.0 and is kept here as a back-compat superset for clusters still on agent-sandbox v0.5.x):
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::AgentSandbox']);
