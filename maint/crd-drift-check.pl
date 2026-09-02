@@ -34,8 +34,10 @@
 # Network access: fetches each provider's CRD manifests over HTTPS via
 # HTTP::Tiny (raw.githubusercontent.com and GitHub release assets), the
 # same discipline as spec-drift-check.pl. Downloaded manifests are cached
-# under --cache-dir (default: spec/crd/<Provider>/, already gitignored) so
-# repeat runs against the same upstream_version don't re-fetch.
+# under --cache-dir (default: spec/crd/<Provider>/<upstream_version>/, already
+# gitignored) so repeat runs against the same pin don't re-fetch. The cache is
+# keyed on the provider's upstream_version, so bumping a pin re-fetches
+# automatically; --no-cache forces a re-download regardless.
 use strict;
 use warnings;
 use v5.10;
@@ -168,8 +170,10 @@ sub _slurp {
 }
 
 # A `files` entry ('v2/foo.yaml') maps to one cache file with path
-# separators flattened to '_' ('v2_foo.yaml'), matching the committed
-# fixtures under spec/crd/<Provider>/.
+# separators flattened to '_' ('v2_foo.yaml'). Nothing here is committed:
+# the cache is per-version local scratch under spec/crd/<Provider>/<version>/
+# (fully gitignored), keyed on the provider's upstream_version so a pin bump
+# re-fetches automatically.
 sub cache_name_for {
     my ($file) = @_;
     (my $name = $file) =~ s{/}{_}g;
@@ -179,7 +183,7 @@ sub cache_name_for {
 # Returns a list of [source_label, yaml_text] for a provider, either from a
 # local --dir or from crd_sources (fetching + caching as needed).
 sub load_manifests {
-    my ($opt, $provider, $sources) = @_;
+    my ($opt, $provider, $sources, $version) = @_;
     my @out;
     if (defined $opt->{dir}) {
         opendir my $dh, $opt->{dir}
@@ -194,7 +198,11 @@ sub load_manifests {
         return @out;
     }
 
-    my $cache_dir = File::Spec->catdir($opt->{'cache-dir'}, $provider);
+    # Cache is keyed on upstream_version so a pin bump caches separately and a
+    # stale older-version cache never serves the wrong manifests.
+    (my $safe_version = defined $version ? $version : '(unknown)')
+        =~ s/[^A-Za-z0-9._-]/_/g;
+    my $cache_dir = File::Spec->catdir($opt->{'cache-dir'}, $provider, $safe_version);
     make_path($cache_dir) unless -d $cache_dir;
     for my $file (@{ $sources->{files} }) {
         my $cache_file = File::Spec->catfile($cache_dir, cache_name_for($file));
@@ -390,7 +398,7 @@ sub check_provider {
         return $result;
     }
 
-    my @manifests = load_manifests($opt, $provider, $sources);
+    my @manifests = load_manifests($opt, $provider, $sources, $version);
     my $upstream  = parse_crds(@manifests);
     $result->{crd_count} = scalar keys %$upstream;
 
