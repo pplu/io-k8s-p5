@@ -295,7 +295,7 @@ subtest 'k57: boolean array items produce the [Bool] Type::Tiny form, not the ba
     # other is_array_of_bool attribute) and only dies later, in TO_JSON,
     # naming field and index. The message itself is pinned by the other
     # agent's lane (t/53_bool_normalization.t /
-    # t/56_serialization_karr_51_54_59.t); this only needs to confirm a
+    # t/56_serialization_k51_54_59.t); this only needs to confirm a
     # generated class reaches the same coercer and the same TO_JSON refusal,
     # not a different (or missing) one.
     my $obj_with_undef;

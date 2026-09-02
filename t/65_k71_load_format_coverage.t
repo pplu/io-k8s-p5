@@ -7,7 +7,7 @@
 #
 # P1: IO::K8s::List::FROM_STRUCT derives its item class via
 #     $k8s->expand_class($item_kind, $api_version) (see lib/IO/K8s/List.pm).
-#     Prior coverage (t/61_karr_64_list_from_json.t, t/44_list_api_version.t)
+#     Prior coverage (t/61_k64_list_from_json.t, t/44_list_api_version.t)
 #     only exercised a built-in shipped Kind (v1/Pod) and an unresolvable
 #     Kind (GizmoList). This exercises three more expand_class() paths List
 #     inflation routes through: a CRD provider registered via `with`, a
