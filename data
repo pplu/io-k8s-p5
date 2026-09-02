@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-01T19:51:17Z
+claimed_by: iron-flow
+class: standard
+completed: 2026-09-02T01:31:50Z
+created: 2026-09-01T19:43:33Z
+id: 74
+priority: high
+started: 2026-09-01T19:50:33Z
+status: done
+tags:
+- docs
+- release
+title: README still says v1.36; code tracks v1.37
+updated: 2026-09-02T01:31:50Z
+---
+
+README.md lines 3 and 7 (top description) and line 358 (Features list) say 'Kubernetes API (v1.36)' / 'Support for Kubernetes v1.36 API objects'; line 378's doc-reference URL points at .../kubernetes-api/v1.36/. All should read v1.37 following the k72 upstream sync now in Changes {{$NEXT}}. Additionally the 'Migration notes' section (around line 344, '1.105 -> current:') only lists karr #11/#13 and is silent on the entire k33-k72 body of work in this release (breaking changes: List's constructor role swap in k45, kind()/api_version() now croaking on an argument in k67/k70, FROM_HASH strictness in k59, Bool-undef semantics in k48, set_owner() behavior changes in k47 among them) -- worth at least a pointer to Changes. Also note: README's own karr references use the old 'karr #11'/'karr #13' style, inconsistent with the k12 notation Changes adopted in afcf3c0b. Found during pre-1.108 release audit; hand to io-k8s-doc-writer.
+
+2026-09-01 19:51 README updated to v1.37; migration notes expanded for k33-k72 body of work (k72 sync, k45 template classes, k47 set_owner, k48 bool-undef, k59 FROM_HASH, k67/k70 kind/api_version/resource_plural); karr # -> kNN notation applied; only legitimate v1.36 hits remain (historical 1.000->1.105 move + K3s upstream version).
+
+Review OK: README v1.36→v1.37 (Zeilen 3/7/358/378), Migration notes für k33-k72 ergänzt, karr#→kNN. Verifiziert im Diff.
