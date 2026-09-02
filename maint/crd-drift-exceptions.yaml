@@ -1,0 +1,80 @@
+# Maintained allowlist for maint/crd-drift-check.pl.
+#
+# The CRD analog of maint/spec-drift-exceptions.yaml. Every entry here is a
+# deliberate, already-made decision -- not a TODO. New entries should say
+# *why* and reference the karr ticket or Changes bullet that made the call
+# (this file was seeded under k82). This file is read as-is on every run;
+# there is no merge with built-in defaults, so removing an entry immediately
+# surfaces whatever it was hiding.
+#
+# Matching: GVK-level entries (ignore_missing_kinds, ignore_stale_kinds)
+# match on an exact "group/version/Kind" `gvk`; field-level entries
+# (ignore_missing_fields, ignore_extra_fields) additionally match `field`.
+# An optional `provider` narrows an entry to one provider (omit it to match
+# in any provider). No globs, no regex.
+
+# Upstream GVKs the providers deliberately do not ship a class for.
+#
+# GatewayAPI tracks the current GA (v1) version of each Standard-channel
+# Kind. Upstream still SERVES older, mostly deprecated versions of those
+# same Kinds inside the multi-version Standard CRDs (v1beta1 Gateway/
+# GatewayClass/HTTPRoute, v1alpha2/v1alpha3 route + BackendTLSPolicy
+# tracks), but the provider maps each short name to its v1 storage version
+# only -- the same current-version scope its POD documents, and the reason
+# ReferenceGrant (whose storage version is v1beta1) is the one Kind shipped
+# at an older version. These are deprecated served versions of Kinds that
+# ARE shipped at v1, not unshipped Kinds. Revisit if a v1beta1/v1alphaN
+# back-compat track is ever added (as AgentSandbox ships v1alpha1).
+ignore_missing_kinds:
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1beta1/Gateway
+    reason: "k82: deprecated older served version of Gateway; provider ships the v1 (GA/storage) class only"
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1beta1/GatewayClass
+    reason: "k82: deprecated older served version of GatewayClass; provider ships the v1 (GA/storage) class only"
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1beta1/HTTPRoute
+    reason: "k82: deprecated older served version of HTTPRoute; provider ships the v1 (GA/storage) class only"
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1alpha2/TCPRoute
+    reason: "k82: deprecated older served version of TCPRoute; provider ships the v1 (GA/storage) class only"
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1alpha2/UDPRoute
+    reason: "k82: deprecated older served version of UDPRoute; provider ships the v1 (GA/storage) class only"
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1alpha2/TLSRoute
+    reason: "k82: deprecated older served version of TLSRoute; provider ships the v1 (GA/storage) class only"
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1alpha3/TLSRoute
+    reason: "k82: deprecated older served version of TLSRoute; provider ships the v1 (GA/storage) class only"
+  - provider: GatewayAPI
+    gvk: gateway.networking.k8s.io/v1alpha3/BackendTLSPolicy
+    reason: "k82: deprecated older served version of BackendTLSPolicy; provider ships the v1 (GA/storage) class only"
+
+# Shipped GVKs (resource_map classes) intentionally kept with no matching
+# upstream CRD at the pinned upstream_version: back-compat tracks for
+# clusters still running an older provider release. Without these, every run
+# re-reports the same settled decisions.
+#
+# Cilium (k78): the v2alpha1 BGP/CIDR tracks were superseded by v2 and two
+# Kinds were REMOVED from upstream entirely -- CiliumBGPPeeringPolicy and
+# CiliumExternalWorkload. Their classes are kept, reachable only by their
+# domain-qualified resource_map keys, so older Cilium clusters still round-
+# trip. Documented in lib/IO/K8s/Cilium.pm. (The surviving v2alpha1 BGP/CIDR
+# Kinds are NOT stale: upstream v1.20 still serves them as extra versions of
+# the v2 CRDs, so they match normally.)
+ignore_stale_kinds:
+  - provider: Cilium
+    gvk: cilium.io/v2/CiliumExternalWorkload
+    reason: "k78: removed from upstream Cilium; class kept for older clusters via its domain-qualified key"
+  - provider: Cilium
+    gvk: cilium.io/v2alpha1/CiliumBGPPeeringPolicy
+    reason: "k78: removed from upstream Cilium; class kept for older clusters via its domain-qualified key"
+
+# Upstream spec fields a modeled class deliberately omits.
+ignore_missing_fields: []
+
+# Modeled spec fields a class ships that the current upstream CRD lacks:
+# fields kept for older provider releases, or upstream-removed fields kept
+# for back-compat.
+ignore_extra_fields: []

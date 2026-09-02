@@ -6,6 +6,44 @@ with 'IO::K8s::Role::ResourceMap';
 
 sub upstream_version { 'v1.20.0' }  # cilium/cilium
 
+# Upstream CRD manifests for the pinned upstream_version, consumed by
+# maint/crd-drift-check.pl. Data only -- no fetching happens here. `base`
+# + each `files` entry is the raw manifest URL; the checker caches each
+# under spec/crd/Cilium/ (path separators flattened to '_').
+sub crd_sources {
+    my $v = __PACKAGE__->upstream_version;
+    return {
+        status => 'ok',
+        base   => "https://raw.githubusercontent.com/cilium/cilium/$v/pkg/k8s/apis/cilium.io/client/crds",
+        files  => [
+            # cilium.io/v2
+            'v2/ciliumbgpadvertisements.yaml',
+            'v2/ciliumbgpclusterconfigs.yaml',
+            'v2/ciliumbgpnodeconfigoverrides.yaml',
+            'v2/ciliumbgpnodeconfigs.yaml',
+            'v2/ciliumbgppeerconfigs.yaml',
+            'v2/ciliumcidrgroups.yaml',
+            'v2/ciliumclusterwideenvoyconfigs.yaml',
+            'v2/ciliumclusterwidenetworkpolicies.yaml',
+            'v2/ciliumegressgatewaypolicies.yaml',
+            'v2/ciliumendpoints.yaml',
+            'v2/ciliumenvoyconfigs.yaml',
+            'v2/ciliumidentities.yaml',
+            'v2/ciliumloadbalancerippools.yaml',
+            'v2/ciliumlocalredirectpolicies.yaml',
+            'v2/ciliumnetworkpolicies.yaml',
+            'v2/ciliumnodeconfigs.yaml',
+            'v2/ciliumnodes.yaml',
+            # cilium.io/v2alpha1
+            'v2alpha1/ciliumdatapathplugins.yaml',
+            'v2alpha1/ciliumendpointslices.yaml',
+            'v2alpha1/ciliumgatewayclassconfigs.yaml',
+            'v2alpha1/ciliuml2announcementpolicies.yaml',
+            'v2alpha1/ciliumpodippools.yaml',
+        ],
+    };
+}
+
 sub resource_map {
     return {
         # cilium.io/v2

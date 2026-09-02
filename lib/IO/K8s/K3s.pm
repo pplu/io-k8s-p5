@@ -6,6 +6,28 @@ with 'IO::K8s::Role::ResourceMap';
 
 sub upstream_version { 'v1.36.3+k3s1' }
 
+# Source status for maint/crd-drift-check.pl. Data only -- no fetching here.
+# k3s-io/k3s does not publish machine-readable openAPIV3Schema CRDs for these
+# Kinds: helm.cattle.io (HelmChart/HelmChartConfig) and k3s.cattle.io
+# (Addon/ETCDSnapshotFile) are registered at runtime as wrangler-generated
+# CRDs, largely with x-kubernetes-preserve-unknown-fields rather than a
+# field-level schema. The helm-controller repo carries schema CRDs for
+# HelmChart/HelmChartConfig only, but on a branch that cannot be pinned to
+# this k3s release tag, and Addon/ETCDSnapshotFile have no published schema
+# at all. Rather than fake a source, this provider is reported as unresolved
+# so the other five providers are not blocked (k82).
+sub crd_sources {
+    return {
+        status => 'unresolved',
+        note   => 'k3s-io/k3s ships these CRDs as wrangler-generated, largely schemaless '
+                . '(x-kubernetes-preserve-unknown-fields) manifests with no machine-readable '
+                . 'openAPIV3Schema to diff; helm-controller carries schema for HelmChart/'
+                . 'HelmChartConfig only, on an unpinnable branch.',
+        base   => undef,
+        files  => [],
+    };
+}
+
 sub resource_map {
     return {
         HelmChart        => 'K3s::V1::HelmChart',

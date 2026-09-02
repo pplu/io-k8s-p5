@@ -6,6 +6,22 @@ with 'IO::K8s::Role::ResourceMap';
 
 sub upstream_version { 'v1.21.1' }  # cert-manager/cert-manager
 
+# Upstream CRD manifests for the pinned upstream_version, consumed by
+# maint/crd-drift-check.pl. Data only -- no fetching here. cert-manager
+# ships one released multi-document CRD bundle as a GitHub release asset;
+# `base` + the single `files` entry is that asset URL, cached under
+# spec/crd/CertManager/.
+sub crd_sources {
+    my $v = __PACKAGE__->upstream_version;
+    return {
+        status => 'ok',
+        base   => "https://github.com/cert-manager/cert-manager/releases/download/$v",
+        files  => [
+            'cert-manager.crds.yaml',
+        ],
+    };
+}
+
 sub resource_map {
     return {
         # cert-manager.io/v1

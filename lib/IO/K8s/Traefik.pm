@@ -6,6 +6,31 @@ with 'IO::K8s::Role::ResourceMap';
 
 sub upstream_version { 'v3.7.10' }  # traefik/traefik (CRD set stable across all v3.x)
 
+# Upstream CRD manifests for the pinned upstream_version, consumed by
+# maint/crd-drift-check.pl. Data only -- no fetching here. The per-Kind
+# reference CRDs (one CustomResourceDefinition per file) live under
+# docs/content/reference/dynamic-configuration; `base` + each `files`
+# entry is the raw manifest URL, cached under spec/crd/Traefik/.
+sub crd_sources {
+    my $v = __PACKAGE__->upstream_version;
+    return {
+        status => 'ok',
+        base   => "https://raw.githubusercontent.com/traefik/traefik/$v/docs/content/reference/dynamic-configuration",
+        files  => [
+            'traefik.io_ingressroutes.yaml',
+            'traefik.io_ingressroutetcps.yaml',
+            'traefik.io_ingressrouteudps.yaml',
+            'traefik.io_middlewares.yaml',
+            'traefik.io_middlewaretcps.yaml',
+            'traefik.io_serverstransports.yaml',
+            'traefik.io_serverstransporttcps.yaml',
+            'traefik.io_tlsoptions.yaml',
+            'traefik.io_tlsstores.yaml',
+            'traefik.io_traefikservices.yaml',
+        ],
+    };
+}
+
 sub resource_map {
     return {
         IngressRoute        => 'Traefik::V1alpha1::IngressRoute',

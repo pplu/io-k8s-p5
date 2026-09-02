@@ -6,6 +6,31 @@ with 'IO::K8s::Role::ResourceMap';
 
 sub upstream_version { 'v1.6.1' }  # kubernetes-sigs/gateway-api (GA/Standard channel only)
 
+# Upstream CRD manifests for the pinned upstream_version, consumed by
+# maint/crd-drift-check.pl. Data only -- no fetching here. GA/Standard
+# channel only (config/crd/standard), matching this provider's scope; the
+# experimental channel is deliberately not tracked. `base` + each `files`
+# entry is the raw manifest URL, cached under spec/crd/GatewayAPI/.
+sub crd_sources {
+    my $v = __PACKAGE__->upstream_version;
+    return {
+        status => 'ok',
+        base   => "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$v/config/crd/standard",
+        files  => [
+            'gateway.networking.k8s.io_backendtlspolicies.yaml',
+            'gateway.networking.k8s.io_gatewayclasses.yaml',
+            'gateway.networking.k8s.io_gateways.yaml',
+            'gateway.networking.k8s.io_grpcroutes.yaml',
+            'gateway.networking.k8s.io_httproutes.yaml',
+            'gateway.networking.k8s.io_listenersets.yaml',
+            'gateway.networking.k8s.io_referencegrants.yaml',
+            'gateway.networking.k8s.io_tcproutes.yaml',
+            'gateway.networking.k8s.io_tlsroutes.yaml',
+            'gateway.networking.k8s.io_udproutes.yaml',
+        ],
+    };
+}
+
 sub resource_map {
     return {
         # gateway.networking.k8s.io/v1

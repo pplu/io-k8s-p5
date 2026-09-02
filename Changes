@@ -2,6 +2,16 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - New maintenance tool maint/crd-drift-check.pl (k82): the CRD-provider
+    analog of spec-drift-check.pl. It fetches each provider's upstream CRD
+    manifests at its declared upstream_version, parses the openAPIV3Schema
+    and reports missing Kinds, missing/extra spec fields and stale classes
+    against the shipped resource_map and class registries. Each provider
+    gains a data-only crd_sources hook beside upstream_version; deliberate
+    non-gaps live in maint/crd-drift-exceptions.yaml. Report-only -- it
+    never edits lib/ and never creates tickets. K3s reports its source as
+    unresolved (k3s ships schemaless wrangler CRDs upstream).
+
   - Make the eight back-compat Cilium classes restored in 1.105 actually
     reachable (k78). The v2alpha1 BGP/CIDR tracks
     (CiliumBGPAdvertisement, CiliumBGPClusterConfig, CiliumBGPNodeConfig,

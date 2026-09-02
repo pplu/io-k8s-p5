@@ -6,6 +6,24 @@ with 'IO::K8s::Role::ResourceMap';
 
 sub upstream_version { 'v0.5.4' }  # kubernetes-sigs/agent-sandbox
 
+# Upstream CRD manifests for the pinned upstream_version, consumed by
+# maint/crd-drift-check.pl. Data only -- no fetching here. The canonical
+# CRD bases live under k8s/crds; `base` + each `files` entry is the raw
+# manifest URL, cached under spec/crd/AgentSandbox/.
+sub crd_sources {
+    my $v = __PACKAGE__->upstream_version;
+    return {
+        status => 'ok',
+        base   => "https://raw.githubusercontent.com/kubernetes-sigs/agent-sandbox/$v/k8s/crds",
+        files  => [
+            'agents.x-k8s.io_sandboxes.yaml',
+            'extensions.agents.x-k8s.io_sandboxclaims.yaml',
+            'extensions.agents.x-k8s.io_sandboxtemplates.yaml',
+            'extensions.agents.x-k8s.io_sandboxwarmpools.yaml',
+        ],
+    };
+}
+
 sub resource_map {
     return {
         # agents.x-k8s.io/v1beta1 (storage version)
