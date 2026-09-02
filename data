@@ -1,0 +1,26 @@
+---
+claimed_at: 2026-09-02T14:42:57Z
+claimed_by: Opus/main
+class: standard
+completed: 2026-09-02T14:42:57Z
+created: 2026-09-02T14:10:10Z
+id: 83
+priority: low
+started: 2026-09-02T14:33:00Z
+status: done
+tags:
+- cilium
+- resource-map
+- back-compat
+- spec-drift
+title: 'Cilium: CiliumLoadBalancerIPPool v2alpha1 back-compat key missing'
+updated: 2026-09-02T14:42:57Z
+---
+
+Found by maint/crd-drift-check.pl (k82). Upstream Cilium v1.20 serves LoadBalancerIPPool at BOTH cilium.io/v2 and cilium.io/v2alpha1. The k78 back-compat pass registered domain-qualified v2alpha1 keys for the sibling BGP/CIDR Kinds, but not for CiliumLoadBalancerIPPool. The v2alpha1 class ships and loads; it just has no cilium.io/v2alpha1/CiliumLoadBalancerIPPool resource_map entry, so that GVK does not inflate -- the same gap k78 fixed for the others. Looks like an inconsistency in k78 coverage rather than a deliberate call, so crd-drift-check does NOT suppress it. Fix: add the qualified key (mirroring k78), bump t/07 count + assertions. Decide vs. the k78 back-compat convention.
+
+Ticket premise corrected: there is NO existing Cilium::V2alpha1::CiliumLoadBalancerIPPool class (only V2). k78-faithful fix = create the real v2alpha1 opaque class + register qualified key. Verified via crd-drift-check (Tier1 MISSING KIND) and lib/ listing.
+
+DONE (pending commit). Created lib/IO/K8s/Cilium/V2alpha1/CiliumLoadBalancerIPPool.pm (opaque), registered qualified key in Cilium.pm, POD 30->31 / 8->9, t/07 updated (11 subtests pass). Short name stays on V2 storage version - not added to %v2alpha1_classes (same as k78 BGP/CIDR). drift Tier1 MISSING KIND=0. Changes bullet added. Full suite 4572 PASS.
+
+Committed in 39bfcb3a.
