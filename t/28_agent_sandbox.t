@@ -66,7 +66,7 @@ subtest 'IO::K8s::AgentSandbox resource_map' => sub {
     my $map = $provider->resource_map;
 
     # 4 short names (each resolving to the v1beta1/storage class) plus 4
-    # domain-qualified v1alpha1 keys (karr #58) -- the v1alpha1 track is
+    # domain-qualified v1alpha1 keys (k58) -- the v1alpha1 track is
     # still served upstream but is no longer the storage version, so it does
     # not get a short name of its own; it is reachable only by full class
     # name or by its own domain-qualified key.
@@ -96,7 +96,7 @@ subtest 'with constructor parameter' => sub {
             "expand_class('$kind') resolves to v1beta1");
     }
 
-    # Domain-qualified access reaches BOTH tracks (karr #58). v1beta1 is
+    # Domain-qualified access reaches BOTH tracks (k58). v1beta1 is
     # reachable via the qualified key add() derives from the short-name
     # registration; v1alpha1 is reachable because the resource_map ships its
     # own domain-qualified keys for it directly (see

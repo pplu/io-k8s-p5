@@ -6,7 +6,7 @@ use Test::More;
 use IO::K8s;
 use IO::K8s::AutoGen;
 
-# karr #68: AutoGen mapped OpenAPI type: number to Str, so a JSON number in a
+# k68: AutoGen mapped OpenAPI type: number to Str, so a JSON number in a
 # generated class round-tripped as a quoted string ({"cpu":1.5} came back
 # {"cpu":"1.5"}), which the API server rejects for a numeric field. The DSL had
 # no numeric scalar type to map onto -- Int int-casts, but there was no Num.
@@ -42,11 +42,11 @@ is($obj->TO_JSON->{cpu}, 1.5, 'AutoGen number field round-trips as a number');
 like($obj->to_json, qr/"cpu":1\.5/, 'AutoGen number field serializes unquoted');
 unlike($obj->to_json, qr/"cpu":"1\.5"/, 'AutoGen number field is not quoted');
 
-# karr #71 (P6): the above only exercises Num via direct construction
+# k71 (P6): the above only exercises Num via direct construction
 # (->new) + TO_JSON. This rounds it through the LOAD paths -- FROM_HASH and
 # from_json -- so a JSON number decoded off the wire stays numeric end to
 # end, not just when the value is handed in already as a Perl number.
-subtest 'is_num round-trips through the load paths FROM_HASH and from_json (karr #71)' => sub {
+subtest 'is_num round-trips through the load paths FROM_HASH and from_json (k71)' => sub {
     my $via_hash = Test::Karr68::Thing->FROM_HASH({ ratio => 1.5 });
     is($via_hash->ratio, 1.5, 'FROM_HASH keeps the numeric value');
     like($via_hash->to_json, qr/"ratio":1\.5/, 'to_json after FROM_HASH is unquoted');

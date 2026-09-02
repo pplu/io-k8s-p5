@@ -92,7 +92,7 @@ sub _api_version_from_class {
 # whose served siblings do. Core is a group of its own (the empty group), so
 # core Event and events.k8s.io Event stay distinct here too -- this is
 # group+Kind, never a bare Kind, and the generator only emits an entry when
-# every version of that group in the spec agrees on the plural (karr #36).
+# every version of that group in the spec agrees on the plural (k36).
 #
 # Generated, not hand-written: the plural is not derivable from the Kind
 # (Endpoints -> endpoints, NetworkPolicy -> networkpolicies, Ingress ->
@@ -115,7 +115,7 @@ sub _api_version_from_class {
 # all, and any Kind the spec has no collection endpoint for anywhere in its
 # group. A miss in both tiers returns undef; nothing falls back to a guess,
 # because a wrong plural is indistinguishable from a denied permission at
-# the RBAC layer, which is the whole reason these tables exist (karr #33).
+# the RBAC layer, which is the whole reason these tables exist (k33).
 # --- BEGIN GENERATED resource plural table (v1.37.0) ---
 # Regenerate with: maint/spec-resource-plural-gen.pl --spec spec/v1.37.0.json
 my %RESOURCE_PLURAL = (
@@ -519,10 +519,10 @@ sub kind {
     # No '::' at all: a CRD registered as a single-segment top-level package,
     # reached as '+Widget' or through a resource_map value of '+Widget'. That
     # is a supported shape -- '+Name' is the documented route to a
-    # single-segment class of your own, and karr #35 is what made those names
+    # single-segment class of your own, and k35 is what made those names
     # reliably reachable -- so the whole name is the last segment. Without
     # this the class is reachable but TO_JSON emits no kind: at all, which the
-    # API server rejects (karr #38).
+    # API server rejects (k38).
     if ($class =~ /\A(\w+)\z/) {
         return $1;
     }

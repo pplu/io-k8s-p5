@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #38: IO::K8s::Role::APIObject::kind() derived the Kind from the last
+# k38: IO::K8s::Role::APIObject::kind() derived the Kind from the last
 # '::' segment of the class name and returned undef when the name had none. A
 # CRD registered as a single-segment top-level package -- reached as '+Doodad',
 # or through a resource_map value of '+Doodad' -- therefore serialized a
@@ -7,10 +7,10 @@
 #
 # A single-segment class is a supported shape here, not an accident: '+Name' is
 # documented in lib/IO/K8s.pm as THE route to a single-segment class of your
-# own, '+Name' is a supported resource_map value, and karr #35 is what made
+# own, '+Name' is a supported resource_map value, and k35 is what made
 # those names reliably reachable (they used to be re-expanded away). Making the
 # class reachable and then letting it emit a manifest the cluster refuses is
-# the same silent misbehaviour karr #35/#37/#39 removed. The bare name is the
+# the same silent misbehaviour k35/k37/k39 removed. The bare name is the
 # consistent derivation: kind() takes the last '::' segment, and without a '::'
 # the whole name is that segment.
 #

@@ -240,7 +240,7 @@ sub synth_value {
     return [ 1, 2, 3 ]  if $info->{is_array_of_int};
     return [ 1, 0, 1 ]  if $info->{is_array_of_bool};    # the exact DeviceAttribute.bools shape
     return { 'sample-key' => 'sample-value' } if $info->{is_hash_of_str};
-    # Typed value maps -- the { TypeName => 1 } DSL form (karr #63). Each value
+    # Typed value maps -- the { TypeName => 1 } DSL form (k63). Each value
     # must satisfy the scalar constraint the map carries.
     return { 'sample-key' => '100m' }                 if $info->{is_hash_of_quantity};
     return { 'sample-key' => 5 }                       if $info->{is_hash_of_int};
@@ -248,7 +248,7 @@ sub synth_value {
     return { 'sample-key' => 1 }                       if $info->{is_hash_of_bool};
     return { 'sample-key' => '2024-01-01T00:00:00Z' }  if $info->{is_hash_of_time};
     return { 'sample-key' => '8080' }                  if $info->{is_hash_of_int_or_string};
-    # Opaque array-of-hash / array-of-array forms (karr #66).
+    # Opaque array-of-hash / array-of-array forms (k66).
     return [ { 'sample-key' => 'sample-value' } ]      if $info->{is_array_of_hash};
     return [ [ 'sample-a', 'sample-b' ] ]              if $info->{is_array_of_array};
 

@@ -17,7 +17,7 @@ sub resource_map {
         # v1alpha1 is still served upstream as of v0.5.4 but is no longer the
         # storage version, so the short names above stay on v1beta1 and the
         # older track is reachable through these domain-qualified keys only
-        # (karr #58). The matching v1beta1 qualified keys need no literal entry
+        # (k58). The matching v1beta1 qualified keys need no literal entry
         # here: IO::K8s::add() derives them from each mapped class's own
         # api_version().
         'agents.x-k8s.io/v1alpha1/Sandbox'                    => 'AgentSandbox::V1alpha1::Sandbox',

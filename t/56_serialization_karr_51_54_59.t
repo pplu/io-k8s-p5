@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
-# Regression tests for karr #54 and karr #59, both in lib/IO/K8s/Role/Resource.pm
+# Regression tests for k54 and k59, both in lib/IO/K8s/Role/Resource.pm
 # and lib/IO/K8s.pm's shared inflation path.
 #
-# karr #54: TO_JSON's is_array_of_str / is_hash_of_str (and raw array/hash
+# k54: TO_JSON's is_array_of_str / is_hash_of_str (and raw array/hash
 # attribute) branches used to hand back the attribute's own reference
 # uncopied, so mutating the struct TO_JSON returned silently mutated the
 # object -- and every later serialization carried the edit. The symmetric
@@ -14,7 +14,7 @@
 # (fieldsV1) still aliases at depth 2. That limit is pinned here as
 # intentional, not left for a future change to break silently.
 #
-# karr #59: FROM_HASH (and from_json, which sits on top of it) used to be a
+# k59: FROM_HASH (and from_json, which sits on top of it) used to be a
 # bare $class->new(%$hash) with no inflation, asymmetric with TO_JSON -- a
 # struct with any nested object-typed field died on a bare Moo type-
 # constraint error. FROM_HASH now routes through the same
@@ -23,7 +23,7 @@
 # the $k8s instance entry points) works, nested fields are real typed
 # instances, sanitized attribute names and union FROM_STRUCT classes are
 # handled identically, an already-blessed instance of the right class passes
-# through unchanged, and bad data gets the karr #42 diagnostic (class + field
+# through unchanged, and bad data gets the k42 diagnostic (class + field
 # in the message) instead of an anonymous type-constraint failure.
 
 use strict;
@@ -46,10 +46,10 @@ use IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaPro
 my $k8s = IO::K8s->new;
 
 # ============================================================================
-# karr #54: output side (TO_JSON must not alias the object)
+# k54: output side (TO_JSON must not alias the object)
 # ============================================================================
 
-subtest 'karr #54: TO_JSON does not alias the object (scalar array/hash attrs)' => sub {
+subtest 'k54: TO_JSON does not alias the object (scalar array/hash attrs)' => sub {
     my $cm = $k8s->new_object('ConfigMap', {
         metadata => { name => 'x' },
         data     => { key => 'original' },
@@ -68,7 +68,7 @@ subtest 'karr #54: TO_JSON does not alias the object (scalar array/hash attrs)' 
         'pushing onto TO_JSON->{command} does not mutate the object');
 };
 
-subtest 'karr #54: the documented depth limit -- fieldsV1 aliases one level down' => sub {
+subtest 'k54: the documented depth limit -- fieldsV1 aliases one level down' => sub {
     my $mfe = IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ManagedFieldsEntry->new(
         manager  => 'kubectl',
         fieldsV1 => { 'f:metadata' => { 'f:labels' => { 'f:app' => {} } } },
@@ -82,7 +82,7 @@ subtest 'karr #54: the documented depth limit -- fieldsV1 aliases one level down
         'a new top-level key added to the TO_JSON struct does not appear on the object (depth 1 copied)');
 
     # Depth 2 is documented to still alias: fieldsV1 is a free-form HashRef
-    # (no inner type constraint -- karr #48/#54's own comments call this
+    # (no inner type constraint -- k48/k54's own comments call this
     # out), and Role::Resource::TO_JSON's ARRAY/HASH shallow copy
     # ([@$value]/{%$value}) is one level deep only. Pinned here deliberately:
     # this is intentional, so a future deep-copy change (or a regression back
@@ -94,10 +94,10 @@ subtest 'karr #54: the documented depth limit -- fieldsV1 aliases one level down
 };
 
 # ============================================================================
-# karr #54: input side (inflate/struct_to_object must not alias the source)
+# k54: input side (inflate/struct_to_object must not alias the source)
 # ============================================================================
 
-subtest 'karr #54: inflate()/struct_to_object() do not alias the source struct' => sub {
+subtest 'k54: inflate()/struct_to_object() do not alias the source struct' => sub {
     my $src = {
         apiVersion => 'v1', kind => 'ConfigMap',
         metadata   => { name => 'x' },
@@ -120,7 +120,7 @@ subtest 'karr #54: inflate()/struct_to_object() do not alias the source struct' 
         'mutating the source struct after struct_to_object() does not mutate the object');
 };
 
-subtest 'karr #54: input-side depth limit matches the output side (fieldsV1)' => sub {
+subtest 'k54: input-side depth limit matches the output side (fieldsV1)' => sub {
     my $src = {
         manager  => 'kubectl',
         fieldsV1 => { 'f:metadata' => { 'f:labels' => { 'f:app' => {} } } },
@@ -138,10 +138,10 @@ subtest 'karr #54: input-side depth limit matches the output side (fieldsV1)' =>
 };
 
 # ============================================================================
-# karr #59: Class->from_json byte-identical deep round-trip
+# k59: Class->from_json byte-identical deep round-trip
 # ============================================================================
 
-subtest 'karr #59: Class->from_json deep round-trip is byte-identical' => sub {
+subtest 'k59: Class->from_json deep round-trip is byte-identical' => sub {
     my $deploy = $k8s->new_object('Deployment', {
         metadata => {
             name      => 'webapp',
@@ -187,10 +187,10 @@ subtest 'karr #59: Class->from_json deep round-trip is byte-identical' => sub {
 };
 
 # ============================================================================
-# karr #59: sanitized attribute names and union FROM_STRUCT classes
+# k59: sanitized attribute names and union FROM_STRUCT classes
 # ============================================================================
 
-subtest 'karr #59: sanitized names ($ref, x-kubernetes-list-type) and union FROM_STRUCT round-trip' => sub {
+subtest 'k59: sanitized names ($ref, x-kubernetes-list-type) and union FROM_STRUCT round-trip' => sub {
     my $struct = {
         '$ref'                     => '#/definitions/io.k8s.api.core.v1.Pod',
         type                       => 'object',
@@ -219,7 +219,7 @@ subtest 'karr #59: sanitized names ($ref, x-kubernetes-list-type) and union FROM
     is_deeply($props->TO_JSON, $struct,
         'TO_JSON round-trips the sanitized names and the union arm back to the wire shape');
 
-    # The boolean arm too, via Class->FROM_HASH -- karr #59's own entry
+    # The boolean arm too, via Class->FROM_HASH -- k59's own entry
     # point, not just struct_to_object.
     my $props2 = IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaProps
         ->FROM_HASH({ additionalProperties => JSON::MaybeXS::false() });
@@ -228,10 +228,10 @@ subtest 'karr #59: sanitized names ($ref, x-kubernetes-list-type) and union FROM
 };
 
 # ============================================================================
-# karr #59: blessed input of the correct class passes through unchanged
+# k59: blessed input of the correct class passes through unchanged
 # ============================================================================
 
-subtest 'karr #59: an already-blessed instance of the right class passes through unchanged' => sub {
+subtest 'k59: an already-blessed instance of the right class passes through unchanged' => sub {
     my $sc = IO::K8s::Api::Core::V1::SecurityContext->new(privileged => 1);
 
     my $via_from_hash = IO::K8s::Api::Core::V1::SecurityContext->FROM_HASH($sc);
@@ -244,10 +244,10 @@ subtest 'karr #59: an already-blessed instance of the right class passes through
 };
 
 # ============================================================================
-# karr #59 (and #42): FROM_HASH now carries the karr #42 diagnostic
+# k59 (and k42): FROM_HASH now carries the k42 diagnostic
 # ============================================================================
 
-subtest 'karr #59: FROM_HASH gets the karr #42 diagnostic (class + field) on bad data' => sub {
+subtest 'k59: FROM_HASH gets the k42 diagnostic (class + field) on bad data' => sub {
     throws_ok {
         IO::K8s::Api::Core::V1::Pod->FROM_HASH({ spec => { hostNetwork => {} } });
     }
@@ -261,19 +261,19 @@ subtest 'karr #59: FROM_HASH gets the karr #42 diagnostic (class + field) on bad
         'FROM_HASH: \\0 dies with the same class/field context, not silently true';
 };
 
-# karr #59: a required Bool explicitly set to undef in a FROM_HASH struct
+# k59: a required Bool explicitly set to undef in a FROM_HASH struct
 # dies with Moo's "Missing required arguments", not a type-constraint error.
 # _inflate_struct skips any key whose value is undef entirely
 # (`next unless defined $value`), so a required attribute given as undef
 # never reaches $class->new() at all -- it fails on being absent, not on
 # being the wrong type. This is a convergence with struct_to_object, not a
 # FROM_HASH-only quirk: both share _inflate_struct, and struct_to_object
-# already failed exactly this way before karr #59 changed FROM_HASH to use
-# the same pipeline. Contrast with karr #48's own test file
+# already failed exactly this way before k59 changed FROM_HASH to use
+# the same pipeline. Contrast with k48's own test file
 # (t/53_bool_normalization.t), where ContainerStatus->new(ready => undef)
 # succeeds -- that is the DIRECT constructor path, where Bool's own
 # undef-tolerance applies because the argument is actually passed.
-subtest 'karr #59: FROM_HASH on a required Bool given as undef dies as Missing required arguments' => sub {
+subtest 'k59: FROM_HASH on a required Bool given as undef dies as Missing required arguments' => sub {
     throws_ok {
         IO::K8s::Api::Core::V1::ContainerStatus->FROM_HASH({
             name         => 'c',

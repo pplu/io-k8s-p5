@@ -84,7 +84,7 @@ sub import {
     if (my $api_ver = $params{api_version}) {
         my $stash = Package::Stash->new($caller);
         # A fixed identity method, not a writable field: reject an argument
-        # rather than swallow it (karr #67).
+        # rather than swallow it (k67).
         $stash->add_symbol('&api_version', sub {
             croak 'api_version is fixed for this class and cannot be set' if @_ > 1;
             $api_ver;
@@ -94,7 +94,7 @@ sub import {
     if (my $plural = $params{resource_plural}) {
         my $stash = Package::Stash->new($caller);
         # A fixed identity method, not a writable field: reject an argument
-        # rather than swallow it (karr #70, same shape as #67).
+        # rather than swallow it (k70, same shape as k67).
         $stash->add_symbol('&resource_plural', sub {
             croak 'resource_plural is fixed for this class and cannot be set' if @_ > 1;
             $plural;

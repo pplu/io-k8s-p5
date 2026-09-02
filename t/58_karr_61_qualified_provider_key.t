@@ -5,7 +5,7 @@ use warnings;
 use Test::More;
 use IO::K8s;
 
-# karr #61: add() must not re-qualify a provider resource_map key that is
+# k61: add() must not re-qualify a provider resource_map key that is
 # ALREADY domain-qualified. Such a key is an exact GVK request and is
 # registered verbatim; running it through _qualify_class_path a second time
 # produced junk keys of shape "$group/$version/$group/$version/$Kind".

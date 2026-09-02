@@ -193,7 +193,7 @@ spec:
     like($errors->[1], qr/pod2|invalid2/, 'second error mentioned');
 };
 
-# karr #71 (P7): collect_errors above is only ever exercised with an
+# k71 (P7): collect_errors above is only ever exercised with an
 # all-invalid stream. A mixed stream -- most documents valid, one bad -- is
 # the realistic case (a big manifest bundle where one Kind has a typo) and
 # never had its own test: this asserts the good documents still come back as

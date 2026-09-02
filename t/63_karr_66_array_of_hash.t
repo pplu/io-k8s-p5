@@ -7,7 +7,7 @@ use Test::Deep;
 use IO::K8s;
 use IO::K8s::AutoGen;
 
-# karr #66: AutoGen mapped items: object and items: array onto [ Str ], so
+# k66: AutoGen mapped items: object and items: array onto [ Str ], so
 # schema-conforming hashrefs / arrayrefs died on ArrayRef[Str]. The DSL had no
 # array-of-hash and no array-of-array form. This adds [ {} ] (array of opaque
 # hashes) and [ [] ] (array of opaque arrays), then points AutoGen at them.

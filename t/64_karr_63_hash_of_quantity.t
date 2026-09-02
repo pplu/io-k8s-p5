@@ -7,7 +7,7 @@ use Test::Exception;
 use Test::Deep;
 use IO::K8s::Api::Core::V1::ResourceRequirements;
 
-# karr #63: the { Str => 1 } DSL form maps to a bare HashRef with no inner
+# k63: the { Str => 1 } DSL form maps to a bare HashRef with no inner
 # constraint, so the most-used quantity-carrying fields validated nothing --
 # ResourceRequirements->new(limits => { cpu => "banana" }) constructed happily
 # and only failed at the API server (fail-open, which the house line rejects).

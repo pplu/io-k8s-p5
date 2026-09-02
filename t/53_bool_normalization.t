@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #37: boolean normalization treated every reference as true, so the bare
+# k37: boolean normalization treated every reference as true, so the bare
 # Perl false idiom \0 arrived as true.
 #
 # There are two places that normalize a boolean-ish input into the plain 0/1
@@ -27,15 +27,15 @@
 # serialization directions: a test that only reads the accessor cannot fail when
 # TO_JSON flips, and TO_JSON is what actually reaches the cluster.
 #
-# karr #42 and #48 extend the same matrix, same file, same six lines of
+# k42 and k48 extend the same matrix, same file, same six lines of
 # _normalize_bool (lib/IO/K8s/Resource.pm:139-156):
 #
-#   * #42 -- bad data (a hash/array/coderef, or a ref-to-ref like \\0) must
+#   * k42 -- bad data (a hash/array/coderef, or a ref-to-ref like \\0) must
 #     die with a message that names the rejected type, and on the inflation
 #     path (struct_to_object/json_to_object) the class and field too, since
 #     that is where a caller's own bad manifest data arrives anonymously.
 #     \\0 was the silent half of the bug: it used to come out true.
-#   * #48 -- an explicit undef (or \undef) must leave a Maybe[Bool] attribute
+#   * k48 -- an explicit undef (or \undef) must leave a Maybe[Bool] attribute
 #     unset, not become a stored false that TO_JSON then emits onto the wire.
 #     A required Bool (Bool, not Maybe[Bool]) still accepts explicit undef --
 #     Types::Standard::Bool itself allows undef -- so construction does not
@@ -114,7 +114,7 @@ subtest 'is_bool via the constructor (the Moo coercer path)' => sub {
         is($sc->to_json, '{"privileged":' . json_bool_name($want) . '}',
             "$desc: serializes to " . json_bool_name($want));
 
-        # Before karr #59, FROM_HASH was a bare ->new(%$hash) -- "the shallow
+        # Before k59, FROM_HASH was a bare ->new(%$hash) -- "the shallow
         # entry point" this comment used to describe. It now routes through
         # the same _inflate_struct pipeline struct_to_object uses, so a
         # scalar Bool value passes through both the is_bool inflate branch
@@ -158,7 +158,7 @@ subtest 'is_array_of_bool keeps every element distinct' => sub {
 
 # The regression as reported, spelled out end to end: two Pods that differ only
 # in how false was written must be byte-identical on the wire.
-subtest 'karr #37: \\0 and JSON false produce identical output' => sub {
+subtest 'k37: \\0 and JSON false produce identical output' => sub {
     my $make = sub {
         my ($v) = @_;
         return $k8s->struct_to_object('Pod', {
@@ -181,10 +181,10 @@ subtest 'karr #37: \\0 and JSON false produce identical output' => sub {
     is($make->(0),       $expected, 'plain 0 matches JSON::PP::false');
 };
 
-# karr #42, item 1: a value that cannot mean true or false must die naming
+# k42, item 1: a value that cannot mean true or false must die naming
 # what it was. Called directly so the assertion is against _normalize_bool's
 # own message, before either caller attaches its own context.
-subtest 'karr #42: non-derefable references name their type' => sub {
+subtest 'k42: non-derefable references name their type' => sub {
     for my $case (
         [ HASH  => {} ],
         [ ARRAY => [] ],
@@ -197,21 +197,21 @@ subtest 'karr #42: non-derefable references name their type' => sub {
     }
 };
 
-# karr #42, item 2: the second defect found while verifying -- a ref-to-ref
+# k42, item 2: the second defect found while verifying -- a ref-to-ref
 # used to dereference once, land on another reference, and that reference's
 # truthiness silently won (\\0 came out true). It must die instead, and the
 # message must say what it dereferenced to, not just that it failed.
-subtest 'karr #42: \\0 (ref-to-ref) dies instead of silently becoming true' => sub {
+subtest 'k42: \\0 (ref-to-ref) dies instead of silently becoming true' => sub {
     eval { IO::K8s::Resource::_normalize_bool(\\0) };
     like($@,
         qr/\QBool scalar ref dereferenced to another reference (SCALAR), not a boolean\E/,
         '\\0 dies naming what it dereferenced to');
 };
 
-# karr #42, item 3: the constructor path already named the attribute before
+# k42, item 3: the constructor path already named the attribute before
 # this ticket (Moo's coercion wrapper does that for free) -- pin the combined
 # message so the two paths stay legible side by side.
-subtest 'karr #42: constructor path via Moo names the attribute too' => sub {
+subtest 'k42: constructor path via Moo names the attribute too' => sub {
     throws_ok { IO::K8s::Api::Core::V1::SecurityContext->new(privileged => {}) }
         qr/coercion for "privileged" failed: Bool value must be a scalar or scalar ref, got HASH/,
         'constructor: HASH ref names both the attribute and the rejected type';
@@ -221,11 +221,11 @@ subtest 'karr #42: constructor path via Moo names the attribute too' => sub {
         'constructor: \\0 dies naming the attribute, not silently true';
 };
 
-# karr #42, item 4: this was the anonymous half of the bug as originally
+# k42, item 4: this was the anonymous half of the bug as originally
 # reported -- struct_to_object's inflation path knows $class and $attr, and
 # now attaches them, so a caller's own bad manifest data is diagnosable
 # instead of bottoming out at a bare line number inside IO::K8s.
-subtest 'karr #42: inflation path names class and field' => sub {
+subtest 'k42: inflation path names class and field' => sub {
     throws_ok {
         $k8s->struct_to_object('Pod', { spec => { hostNetwork => {} } });
     }
@@ -239,7 +239,7 @@ subtest 'karr #42: inflation path names class and field' => sub {
         'struct_to_object: \\0 dies with class/field context too, not silently true';
 };
 
-# karr #42, item 5: is_array_of_bool shares _normalize_bool via the array
+# k42, item 5: is_array_of_bool shares _normalize_bool via the array
 # coercer in lib/IO/K8s/Resource.pm (the `elsif ($info{is_array_of_bool})`
 # branch, around lines 282-296 -- not line 264, which is just the
 # _k8s_attributes bookkeeping push()), which appends "at element N" to
@@ -247,7 +247,7 @@ subtest 'karr #42: inflation path names class and field' => sub {
 # branch for arrays of bool (documented above), so the value falls through
 # untouched and only the array coercer ever sees it -- same message, either
 # entry point.
-subtest 'karr #42: array element errors report which element failed' => sub {
+subtest 'k42: array element errors report which element failed' => sub {
     throws_ok { IO::K8s::Api::Resource::V1::DeviceAttribute->new(bools => [1, {}, 0]) }
         qr/coercion for "bools" failed: .* at element 1/,
         'constructor: bad array element (hashref) names the element index';
@@ -263,13 +263,13 @@ subtest 'karr #42: array element errors report which element failed' => sub {
         'struct_to_object: falls through to the same array coercer, same message';
 };
 
-# karr #48: an explicit undef -- via the constructor, FROM_HASH, a scalar ref
+# k48: an explicit undef -- via the constructor, FROM_HASH, a scalar ref
 # to undef, struct_to_object, or a real decoded JSON null -- must leave a
 # Maybe[Bool] attribute unset. TO_JSON is the direction that matters: an
 # unset field is omitted, not emitted as an explicit `false` that a
 # strategic-merge patch or server-side apply would then treat as a claim of
 # ownership over a value the caller never actually supplied.
-subtest 'karr #48: explicit undef leaves the field unset, not false' => sub {
+subtest 'k48: explicit undef leaves the field unset, not false' => sub {
     my $assert_unset = sub {
         my ($obj, $label) = @_;
         ok(!defined $obj->privileged, "$label: accessor is undef");
@@ -295,7 +295,7 @@ subtest 'karr #48: explicit undef leaves the field unset, not false' => sub {
     );
     $assert_unset->(
         $k8s->struct_to_object('Api::Core::V1::SecurityContext', { privileged => undef }),
-        'struct_to_object: undef (regression guard -- _inflate_struct already skipped it before #48)',
+        'struct_to_object: undef (regression guard -- _inflate_struct already skipped it before k48)',
     );
     $assert_unset->(
         $k8s->struct_to_object('Api::Core::V1::SecurityContext', { privileged => \undef }),
@@ -307,13 +307,13 @@ subtest 'karr #48: explicit undef leaves the field unset, not false' => sub {
     );
 };
 
-# karr #48: a *required* Bool (isa => Bool, not Maybe[Bool] -- ContainerStatus's
+# k48: a *required* Bool (isa => Bool, not Maybe[Bool] -- ContainerStatus's
 # "ready") still accepts an explicit undef, because Types::Standard::Bool
 # itself allows undef regardless of required-ness. This is worth pinning
 # explicitly: it means "required" does not by itself reject undef, and
 # TO_JSON's behaviour is identical to the Maybe[Bool] case -- the field is
 # simply omitted, not coerced into a stored false.
-subtest 'karr #48: a required Bool accepts explicit undef; TO_JSON omits it' => sub {
+subtest 'k48: a required Bool accepts explicit undef; TO_JSON omits it' => sub {
     my $cs;
     lives_ok {
         $cs = IO::K8s::Api::Core::V1::ContainerStatus->new(
@@ -329,17 +329,17 @@ subtest 'karr #48: a required Bool accepts explicit undef; TO_JSON omits it' => 
     ok(!exists $cs->TO_JSON->{ready}, 'TO_JSON omits the required-but-undef field');
 };
 
-# karr #51: an undef ELEMENT of ArrayRef[Bool] is accepted at construction --
+# k51: an undef ELEMENT of ArrayRef[Bool] is accepted at construction --
 # Types::Standard::Bool allows undef, and _normalize_bool's `return undef`
 # (not a bare `return`) keeps the array coercer from collapsing the element,
 # so the position is preserved -- but there is no honest wire representation
-# for it. The attribute-level answer from karr #48 (leave the field unset)
+# for it. The attribute-level answer from k48 (leave the field unset)
 # does not apply inside an array, where "omit" would shift every later
 # element. TO_JSON dies instead, naming the class, field and element index,
-# in the same style as the karr #42 messages. Covered on all three
+# in the same style as the k42 messages. Covered on all three
 # DeviceAttribute API tracks that carry `bools` (V1alpha3 has no `bools`
 # field and is out of scope).
-subtest 'karr #51: undef array element accepted at construction, dies on serialization' => sub {
+subtest 'k51: undef array element accepted at construction, dies on serialization' => sub {
     for my $class (qw(
         IO::K8s::Api::Resource::V1::DeviceAttribute
         IO::K8s::Api::Resource::V1beta1::DeviceAttribute
@@ -361,9 +361,9 @@ subtest 'karr #51: undef array element accepted at construction, dies on seriali
     }
 };
 
-# karr #51: the index in the message is the actual position, not hardcoded --
+# k51: the index in the message is the actual position, not hardcoded --
 # pin that against undef at the first and last positions too.
-subtest 'karr #51: the reported element index matches the actual position' => sub {
+subtest 'k51: the reported element index matches the actual position' => sub {
     my $class = 'IO::K8s::Api::Resource::V1::DeviceAttribute';
 
     throws_ok { $class->new(bools => [undef, 1, 0])->TO_JSON }

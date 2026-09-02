@@ -76,7 +76,7 @@ simply have nothing to derive from it (k49).
 =cut
 
 # Strip the '+' convention this distribution uses everywhere else to mean
-# "this is already a full class name" (karr #49). Returns undef if there is
+# "this is already a full class name" (k49). Returns undef if there is
 # no item_class at all, same as _item_class itself.
 sub _resolved_item_class {
     my ($self) = @_;
@@ -127,7 +127,7 @@ sub kind {
     # Fall back to deriving from item_class -- but only when api_version()
     # can also answer for it. kind() and api_version() derive from the same
     # item_class, and this class must never serialize a kind without an
-    # apiVersion alongside it (karr #49): a short or unloadable item_class
+    # apiVersion alongside it (k49): a short or unloadable item_class
     # (e.g. 'Pod' instead of 'IO::K8s::Api::Core::V1::Pod') would otherwise
     # still produce a Kind by regex here while api_version() -- which
     # actually has to load the class -- came back undef.
@@ -140,9 +140,9 @@ sub kind {
 
         # No '::' at all: a CRD registered as a single-segment top-level
         # package, so the whole name is the last segment -- the same
-        # derivation IO::K8s::Role::APIObject::kind() makes (karr #38). This
+        # derivation IO::K8s::Role::APIObject::kind() makes (k38). This
         # is the empty-list case item_class exists for, and without it
-        # TO_JSON emits apiVersion but no kind: (karr #41).
+        # TO_JSON emits apiVersion but no kind: (k41).
         if ($class =~ /\A(\w+)\z/) {
             return $1 . 'List';
         }
@@ -211,7 +211,7 @@ sub FROM_STRUCT {
 
     # item_class as an explicit override -- checked before any derivation,
     # exactly like the empty-list case item_class already covers for a
-    # hand-built list. Same '+' handling as everywhere else (karr #49).
+    # hand-built list. Same '+' handling as everywhere else (k49).
     my $resolved_item_class;
     if (defined(my $override = $struct->{item_class})) {
         $override =~ s/\A\+//;
@@ -229,7 +229,7 @@ sub FROM_STRUCT {
     if (defined(my $meta_struct = $struct->{metadata})) {
         # $LIST_META is already a final class name -- go straight to the
         # pre-expanded path so it is not re-interpreted by expand_class()
-        # (karr #35), same reasoning IO::K8s::_inflate_struct applies to
+        # (k35), same reasoning IO::K8s::_inflate_struct applies to
         # every nested object it inflates.
         $metadata = $k8s->_struct_to_object_expanded($LIST_META, $meta_struct);
     }
@@ -241,7 +241,7 @@ sub FROM_STRUCT {
             . "' has no derivable item type and no 'item_class' override was given\n"
             unless defined $resolved_item_class;
         # Already resolved above (via expand_class() or the override) --
-        # the pre-expanded path, for the same karr #35 reason as metadata.
+        # the pre-expanded path, for the same k35 reason as metadata.
         push @items, $k8s->_struct_to_object_expanded($resolved_item_class, $item_struct);
     }
 
@@ -286,9 +286,9 @@ sub TO_JSON {
 sub to_json {
     my $self = shift;
     # utf8 => 1, so this emits a UTF-8 byte string -- the same convention every
-    # IO::K8s::Role::Resource class uses (karr #53), and exactly what
+    # IO::K8s::Role::Resource class uses (k53), and exactly what
     # L</from_json> reads back. A character string here would round-trip
-    # non-ASCII data to mojibake once it hit a byte-oriented sink (karr #64).
+    # non-ASCII data to mojibake once it hit a byte-oriented sink (k64).
     state $json = JSON::MaybeXS->new(utf8 => 1, canonical => 1);
     return $json->encode($self->TO_JSON);
 }

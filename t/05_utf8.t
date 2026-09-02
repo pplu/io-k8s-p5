@@ -146,7 +146,7 @@ subtest 'Container with UTF-8 env vars' => sub {
     is $env->[1]->value, '你好', 'Chinese env var round-trip';
 };
 
-# karr #53: Class->from_json (the class-level entry point, not
+# k53: Class->from_json (the class-level entry point, not
 # $k8s->json_to_object) used to decode without utf8 => 1, while to_json
 # encodes WITH it -- so Class->from_json($obj->to_json) read to_json's UTF-8
 # bytes as characters and silently mojibaked non-ASCII data (no error at
@@ -156,7 +156,7 @@ subtest 'Container with UTF-8 env vars' => sub {
 # loudly rather than accepted and silently mishandled (decode-tolerance was
 # rejected on purpose, so from_json stays exactly as byte-oriented as
 # $k8s->json_to_object always was).
-subtest 'Class->from_json byte-level round-trip (karr #53)' => sub {
+subtest 'Class->from_json byte-level round-trip (k53)' => sub {
     # Built with \x{...} escapes rather than literal source bytes, so these
     # are unambiguous Unicode text regardless of this file having no `use
     # utf8` pragma -- exactly the kind of string a caller doing normal Perl
@@ -189,7 +189,7 @@ subtest 'Class->from_json byte-level round-trip (karr #53)' => sub {
         'emoji survives Class->from_json byte round-trip');
 
     # An already-decoded character string must fail loudly, not silently
-    # mojibake -- this is the decision half of karr #53, not just the fix.
+    # mojibake -- this is the decision half of k53, not just the fix.
     my $decoded_chars = $bytes;
     utf8::decode($decoded_chars)
         or die 'test fixture: to_json did not produce valid UTF-8 bytes';
@@ -207,13 +207,13 @@ subtest 'Class->from_json byte-level round-trip (karr #53)' => sub {
         'pure ASCII round-trips through Class->from_json');
 };
 
-# karr #71 (P4): the two-arg $k8s->json_to_object($class, $json) entry point
+# k71 (P4): the two-arg $k8s->json_to_object($class, $json) entry point
 # never had its own UTF-8 fixture -- every UTF-8 test above goes through
 # either the 1-arg json_to_object($json) auto-detect path or the class-level
-# Class->from_json path (karr #53). The two-arg path resolves $class through
+# Class->from_json path (k53). The two-arg path resolves $class through
 # expand_class() rather than the wire 'kind', a different code path in
 # IO::K8s::json_to_object, and must decode the same way.
-subtest 'json_to_object($class, $json) two-arg path preserves UTF-8 (karr #71)' => sub {
+subtest 'json_to_object($class, $json) two-arg path preserves UTF-8 (k71)' => sub {
     my $umlauts  = "Gr\x{fc}\x{df}e aus M\x{fc}nchen: \x{e4} \x{f6} \x{fc} \x{df}"; # Grüße aus München: ä ö ü ß
     my $japanese = "\x{3053}\x{3093}\x{306b}\x{3061}\x{306f}";                     # こんにちは
     my $emoji    = "\x{1f680}\x{2b50}\x{2764}\x{fe0f}\x{1f389}";                   # 🚀⭐❤️🎉

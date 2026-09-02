@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #18: class_namespaces subclassing must inflate and serialize through
+# k18: class_namespaces subclassing must inflate and serialize through
 # its parent's k8s attribute registry.
 #
 # A consumer can register a subclass via class_namespaces:

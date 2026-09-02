@@ -7,10 +7,10 @@ use Test::Exception;
 use IO::K8s::Api::Core::V1::Pod;
 use IO::K8s::Api::Apps::V1::Deployment;
 
-# karr #67: kind() and api_version() are derived, read-only methods. They used
+# k67: kind() and api_version() are derived, read-only methods. They used
 # to accept and silently ignore an argument, so a caller who believed they had
 # retargeted an object got no error and the write vanished. The fail-closed
-# house line (karr #37/#39/#42) is to croak.
+# house line (k37/k39/k42) is to croak.
 
 my $pod = IO::K8s::Api::Core::V1::Pod->new;
 
@@ -30,12 +30,12 @@ throws_ok { $pod->api_version('v9') }
 is($pod->kind, 'Pod', 'kind unchanged after the rejected write');
 is($pod->api_version, 'v1', 'api_version unchanged after the rejected write');
 
-# resource_plural is the same derived, read-only shape (karr #70).
+# resource_plural is the same derived, read-only shape (k70).
 my $derived_plural = $pod->resource_plural;
 ok(defined $derived_plural && length $derived_plural, 'resource_plural() reads a derived plural');
 throws_ok { $pod->resource_plural('others') }
     qr/resource_plural is derived from the class name and cannot be set/,
-    'resource_plural($arg) croaks instead of swallowing (karr #70)';
+    'resource_plural($arg) croaks instead of swallowing (k70)';
 is($pod->resource_plural, $derived_plural, 'resource_plural unchanged after the rejected write');
 
 # Works the same as a class method and on another Kind.
@@ -64,7 +64,7 @@ throws_ok { $crd->kind('Other') }
     qr/kind is derived from the class name and cannot be set/,
     'CRD kind($arg) croaks via the role';
 
-# resource_plural declared as an import parameter is a fixed identity too (karr #70).
+# resource_plural declared as an import parameter is a fixed identity too (k70).
 is($crd->resource_plural, 'staticwebsites', 'CRD resource_plural reads its declared value');
 throws_ok { $crd->resource_plural('others') }
     qr/resource_plural is fixed for this class and cannot be set/,

@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #35: close the residual shadow window left by karr #34 (GH
+# k35: close the residual shadow window left by k34 (GH
 # pplu/io-k8s-p5#7 + #8), and stop new_object()/json_to_object() re-expanding a
 # class name they already resolved.
 #
@@ -189,7 +189,7 @@ subtest 'harness: the fixture lib is on @INC and the shadows are real' => sub {
 
 # ---- part 2: no re-expansion of an already-resolved class -------------------
 
-subtest "karr #35/2: '+Name' survives new_object, even when Name is a Kind" => sub {
+subtest "k35/2: '+Name' survives new_object, even when Name is a Kind" => sub {
     my $io = IO::K8s->new;
 
     is($io->expand_class('+Secret'), 'Secret',
@@ -222,7 +222,7 @@ subtest "karr #35/2: '+Name' survives new_object, even when Name is a Kind" => s
         my $wire = $io->object_to_struct($obj);
         is($wire->{apiVersion}, 'vendor.example.com/v1',
             'the CRD serializes its own apiVersion');
-        # karr #38: kind() falls back to the bare class name when there is no
+        # k38: kind() falls back to the bare class name when there is no
         # '::' to split on, so a single-segment package -- the shape this
         # subtest makes reachable -- serializes a manifest the cluster accepts
         # rather than one with no kind: at all. Details in t/54.
@@ -235,7 +235,7 @@ subtest "karr #35/2: '+Name' survives new_object, even when Name is a Kind" => s
         "expand_class('Secret') is still the core v1 Kind");
 };
 
-subtest 'karr #35/2: a single-segment class reached only through +' => sub {
+subtest 'k35/2: a single-segment class reached only through +' => sub {
     my $io = IO::K8s->new;
 
     ok(!exists $INC{'Gadget.pm'}, 'Gadget.pm starts out unloaded');
@@ -257,7 +257,7 @@ subtest 'karr #35/2: a single-segment class reached only through +' => sub {
     }
 };
 
-subtest "karr #35/2: a resource_map '+Single' value resolves and loads" => sub {
+subtest "k35/2: a resource_map '+Single' value resolves and loads" => sub {
     # The exact path the ticket names: a map entry whose value is a
     # '+'-prefixed SINGLE-SEGMENT class. _resolve_mapped() returns it
     # unloaded, so nothing may send it back through expand_class().
@@ -284,7 +284,7 @@ subtest "karr #35/2: a resource_map '+Single' value resolves and loads" => sub {
 
 # ---- part 1: the shadow window is closed -----------------------------------
 
-subtest 'karr #35/1: an openapi_spec Kind beats a same-named distribution' => sub {
+subtest 'k35/1: an openapi_spec Kind beats a same-named distribution' => sub {
     my $io = _spec_k8s();
 
     my $class = $io->expand_class('Widget');
@@ -322,7 +322,7 @@ subtest 'karr #35/1: an openapi_spec Kind beats a same-named distribution' => su
     ok(!exists $INC{'Widget.pm'}, 'still never loaded Widget.pm');
 };
 
-subtest 'karr #35/1: same for a shadow that is only in the symbol table' => sub {
+subtest 'k35/1: same for a shadow that is only in the symbol table' => sub {
     my $io = _spec_k8s();
 
     my $class = $io->expand_class('Gizmo');
@@ -336,7 +336,7 @@ subtest 'karr #35/1: same for a shadow that is only in the symbol table' => sub 
     isa_ok($obj, $class, 'constructed Gizmo');
 };
 
-subtest 'karr #35/1: without a spec, a bare Kind falls back to IO::K8s::' => sub {
+subtest 'k35/1: without a spec, a bare Kind falls back to IO::K8s::' => sub {
     my $io = IO::K8s->new;   # no openapi_spec
 
     is($io->expand_class('Widget'), 'IO::K8s::Widget',
@@ -352,7 +352,7 @@ subtest 'karr #35/1: without a spec, a bare Kind falls back to IO::K8s::' => sub
     is($io->expand_class('+Widget'), 'Widget', "'+Widget' still forces the package");
 };
 
-subtest 'karr #35/1: multi-segment names keep the loadable-class probe' => sub {
+subtest 'k35/1: multi-segment names keep the loadable-class probe' => sub {
     my $io = IO::K8s->new;
 
     is($io->expand_class('My::CustomSite'), 'My::CustomSite',

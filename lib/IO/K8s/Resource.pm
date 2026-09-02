@@ -63,7 +63,7 @@ my %STR_ISA_MAP = (
     Bool => Bool,
 );
 
-# Value types for the hash-of-scalar-type DSL form { TypeName => 1 } (karr #63).
+# Value types for the hash-of-scalar-type DSL form { TypeName => 1 } (k63).
 # 'Str' is deliberately NOT here: it keeps its historical bare-HashRef meaning,
 # the genuinely opaque string map that labels, annotations and fieldsV1 need.
 # Everything here constrains each VALUE against the scalar type, so a map
@@ -139,7 +139,7 @@ sub _sanitize_attr_name {
 # arrive on a Bool attribute, reduced to a plain 0/1 -- or undef, meaning
 # "leave the field unset". Used by the Bool and [Bool] coercers below and,
 # before the constructor even runs, by the is_bool branch of
-# IO::K8s::_inflate_struct -- those two used to disagree (karr #37).
+# IO::K8s::_inflate_struct -- those two used to disagree (k37).
 #
 # Two traps, both of which silently flip false into true:
 #   * every reference is true in Perl, so \0 (the bare false idiom) and a
@@ -147,7 +147,7 @@ sub _sanitize_attr_name {
 #   * 'false' is a non-empty string and therefore true, so the strings have to
 #     be spelled out rather than left to truthiness.
 #
-# Anything that cannot mean true or false dies (karr #42): a non-scalar
+# Anything that cannot mean true or false dies (k42): a non-scalar
 # reference, and a scalar ref that dereferences to yet another reference
 # (\\0 used to come out silently true). reftype, not ref, so that blessed
 # scalar refs -- JSON::PP::Boolean, boolean.pm, Types::Serialiser, any
@@ -166,7 +166,7 @@ sub _normalize_bool {
     }
     # Explicit undef stays undef: the attribute is Maybe[Bool], TO_JSON
     # omits undef, and "no value" must not turn into an explicit false on
-    # the wire (karr #48). `return undef`, not bare `return` -- in the
+    # the wire (k48). `return undef`, not bare `return` -- in the
     # [Bool] coercer's list context a bare return would drop the element.
     return undef unless defined $value;
     return 0 if lc($value) eq 'false';
@@ -223,7 +223,7 @@ sub _k8s {
         my $inner = $type_spec->[0];
         # [ {} ] / [ [] ] -- an array of opaque hashes or opaque arrays, for a
         # schema whose items are `type: object` / `type: array` with no further
-        # structure (karr #66). Validated as arrays of the right container
+        # structure (k66). Validated as arrays of the right container
         # shape; the contents pass through untyped, the same one-level-copy
         # opaque handling a free-form HashRef gets in TO_JSON / _inflate_struct.
         if (ref $inner eq 'HASH') {
@@ -267,7 +267,7 @@ sub _k8s {
                 $isa = $required ? HashRef : Maybe[HashRef];
             } elsif (my $vt = $HASH_VALUE_TYPES{$inner}) {
                 # { Quantity => 1 } and friends: a typed value map. Each value
-                # is validated against the scalar type (karr #63).
+                # is validated against the scalar type (k63).
                 $info{$vt->{flag}} = 1;
                 $isa = $required ? HashRef[$vt->{isa}] : Maybe[HashRef[$vt->{isa}]];
             } else {

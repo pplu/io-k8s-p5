@@ -33,7 +33,7 @@ sub resource_map {
         CiliumPodIPPool                => 'Cilium::V2alpha1::CiliumPodIPPool',
         CiliumDatapathPlugin           => 'Cilium::V2alpha1::CiliumDatapathPlugin',
         # cilium.io/v2alpha1 back-compat for clusters still on older Cilium
-        # releases (karr #78): the v2alpha1 tracks of BGP/CIDR Kinds were
+        # releases (k78): the v2alpha1 tracks of BGP/CIDR Kinds were
         # superseded by the matching v2 classes (short names above), and two
         # Kinds were removed (CiliumBGPPeeringPolicy, CiliumExternalWorkload).
         # Each shipped class is reachable only via its domain-qualified key

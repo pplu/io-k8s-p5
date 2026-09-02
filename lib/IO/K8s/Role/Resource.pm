@@ -142,7 +142,7 @@ sub TO_JSON {
         } elsif ($attr_info->{is_num}) {
             # A genuine JSON number (OpenAPI type: number). Numify so it
             # serializes unquoted -- the fractional counterpart to is_int's
-            # int() (karr #68). Quantity stays a string; this is only for
+            # int() (k68). Quantity stays a string; this is only for
             # schemas that declare type: number.
             $data{$key} = $value + 0;
         } elsif ($attr_info->{is_int_or_string}) {
@@ -170,17 +170,17 @@ sub TO_JSON {
             $data{$key} = [ map { int($_) } @$value ];
         } elsif ($attr_info->{is_array_of_bool}) {
             # An undef ELEMENT dies rather than becoming a silent false
-            # (karr #51). ArrayRef[Bool] accepts undef because
+            # (k51). ArrayRef[Bool] accepts undef because
             # Types::Standard::Bool does, and _normalize_bool deliberately
             # returns it via an explicit `return undef` so the array coercer
             # keeps the position -- but there is nothing honest to put on the
-            # wire here. The attribute-level answer (karr #48: leave it unset,
+            # wire here. The attribute-level answer (k48: leave it unset,
             # omit the field) does not apply inside an array, where omitting
             # would shift every later element; and the only field of this
             # shape upstream (Api::Resource::V1*::DeviceAttribute bools) is a
             # "non-empty list of true/false values", so a JSON null would be
-            # schema-invalid too. Message names field and index, in the karr
-            # #42 diagnostic style.
+            # schema-invalid too. Message names field and index, in the k42
+            # diagnostic style.
             my @bools;
             for my $i (0 .. $#$value) {
                 die 'Bool value must not be undef at element ' . $i
@@ -190,7 +190,7 @@ sub TO_JSON {
             }
             $data{$key} = \@bools;
         } elsif (ref $value eq 'ARRAY') {
-            # Shallow copy, one level (karr #54): the struct must not alias the
+            # Shallow copy, one level (k54): the struct must not alias the
             # object, or post-processing what TO_JSON returned silently edits
             # the object and every later serialization. Deliberately one level
             # only -- a nested structure under an opaque hash attribute
@@ -198,7 +198,7 @@ sub TO_JSON {
             # the object. Same depth on the way in, in IO::K8s::_inflate_struct.
             $data{$key} = [ @$value ];
         } elsif (ref $value eq 'HASH') {
-            # Shallow copy, one level -- see the ARRAY branch above (karr #54).
+            # Shallow copy, one level -- see the ARRAY branch above (k54).
             $data{$key} = { %$value };
         } else {
             $data{$key} = $value;

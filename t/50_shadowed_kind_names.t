@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #34 / GitHub pplu/io-k8s-p5#7 + #8: a bare Kind must resolve through the
+# k34 / GitHub pplu/io-k8s-p5#7 + #8: a bare Kind must resolve through the
 # resource_map, never to a same-named top-level CPAN module that happens to be
 # installed.
 #
@@ -109,7 +109,7 @@ AUTOLOADED
 # a loadable class named in full still passes through expand_class untouched.
 #
 # Multi-segment on purpose. This control used to be the single-segment
-# 'NotAKubernetesKind'; karr #35 took single-segment names off the
+# 'NotAKubernetesKind'; k35 took single-segment names off the
 # loadable-class check entirely (a one-word bare name is a Kind, never a
 # distribution), so only a namespaced name still demonstrates the check.
 # The single-segment half of the old claim is now asserted the other way
@@ -171,7 +171,7 @@ subtest 'harness: the shadows are real and a non-Kind class still passes through
     ok(exists $INC{'Not/AKubernetesKind.pm'},
         'and it was actually loaded from the shadow lib');
 
-    # karr #35: the same module under a single-segment name does NOT. A bare
+    # k35: the same module under a single-segment name does NOT. A bare
     # one-word name is read as a Kind, so it goes to IO::K8s::<Kind> (and on
     # to AutoGen when a spec is configured) and never touches @INC.
     is($io->expand_class('NotAKubernetesKind'), 'IO::K8s::NotAKubernetesKind',

@@ -42,7 +42,7 @@ my %_autogen_cache;
 # Adding a Kind: one short name pointing at the newest stable shipped
 # version, plus one qualified key per shipped version. Omitting the
 # qualified key means an explicit GVK request fails closed, even when a
-# bare compatibility alias exists for the Kind -- see karr #11 and #17.
+# bare compatibility alias exists for the Kind -- see k11 and k17.
 #
 # Deliberately absent: Kinds served only by CRD providers (those live in
 # the provider's own resource_map, opt in via
@@ -371,7 +371,7 @@ sub _qualify_class_path {
     # A key that already carries a '/' is an exact GVK request, not a bare
     # Kind: it is meant to be registered verbatim (see the GatewayAPI
     # ReferenceGrant and AgentSandbox entries). Re-qualifying it would build a
-    # junk "$group/$version/$group/$version/$Kind" key (karr #61).
+    # junk "$group/$version/$group/$version/$Kind" key (k61).
     return if $kind =~ m{/};
 
     my $full_class = $class_path =~ /^\+/
@@ -443,7 +443,7 @@ sub add {
 #   3. User's class_namespaces
 #   4. A loaded or loadable class of exactly that name -- multi-segment names
 #      only ('My::StaticWebSite'); a single-segment bare name is read as a
-#      Kubernetes Kind and skips this step (karr #35)
+#      Kubernetes Kind and skips this step (k35)
 #   5. IO::K8s relative path
 #   6. Auto-generate from openapi_spec (if available)
 sub expand_class {
@@ -458,9 +458,9 @@ sub expand_class {
     # An explicitly supplied apiVersion is an exact GVK request, including
     # undef or an empty string. It never falls through to a bare Kind or
     # class-name fallback: a class that cannot confirm the requested version
-    # must not be substituted silently (karr #17). The one exception is the
+    # must not be substituted silently (k17). The one exception is the
     # resource_map's own short-name key — a legitimate GVK source when the
-    # mapped class's api_version() matches the request (karr #31). AutoGen
+    # mapped class's api_version() matches the request (k31). AutoGen
     # joins in only for an exact group/version match in the openapi_spec's
     # x-kubernetes-group-version-kind metadata and fails closed otherwise
     # (no silent fallback to another version).
@@ -471,7 +471,7 @@ sub expand_class {
             return $self->_resolve_mapped($map->{$qualified}, $class);
         }
         # No qualified key: the short-name key is a GVK source when the
-        # mapped class itself confirms the requested version (karr #31).
+        # mapped class itself confirms the requested version (k31).
         # It has priority over AutoGen — the user explicitly registered it.
         if (my $mapped_class = $self->_resolve_short_name_gvk($map, $class, $api_version)) {
             return $mapped_class;
@@ -491,7 +491,7 @@ sub expand_class {
         if (exists $map->{$class}) {
             return $self->_resolve_mapped($map->{$class}, (split m{/}, $class)[-1]);
         }
-        # karr #31: same short-name fallback, apiVersion taken from the string.
+        # k31: same short-name fallback, apiVersion taken from the string.
         my ($av, $kind) = $class =~ m{\A(.*)/([^/]*)\z};
         if (my $mapped_class = $self->_resolve_short_name_gvk($map, $kind, $av)) {
             return $mapped_class;
@@ -519,13 +519,13 @@ sub expand_class {
     #    returns a '+'-prefixed resource_map value without loading it, and a
     #    consumer may name their class here before anything has pulled it in.
     #
-    #    Must stay *below* the resource_map lookup (karr #34, GH #7/#8). A bare
+    #    Must stay *below* the resource_map lookup (k34, GH #7/#8). A bare
     #    Kind is a Kubernetes Kind first and a package name second: with this
     #    ahead of the map, smokers that had the CPAN distributions Event or Role
     #    installed got those back from expand_class('Event')/('Role') instead of
     #    IO::K8s::Api::Core::V1::Event / IO::K8s::Api::Rbac::V1::Role.
     #
-    #    Single-segment names are excluded outright (karr #35). Below the map
+    #    Single-segment names are excluded outright (k35). Below the map
     #    they were only reachable for a Kind the model does not know, but that
     #    still shadowed AutoGen: with an openapi_spec defining kind 'Widget'
     #    and a top-level Widget.pm installed, expand_class('Widget') returned
@@ -537,8 +537,8 @@ sub expand_class {
     #    What used to force this check to also catch single-segment names was
     #    struct_to_object() re-expanding an already-resolved class. It no
     #    longer does — new_object()/json_to_object()/_inflate_struct() hand
-    #    their resolved name to _struct_to_object_expanded() instead (karr
-    #    #35), so a resource_map value of '+Widget', or new_object('+Widget'),
+    #    their resolved name to _struct_to_object_expanded() instead (k35),
+    #    so a resource_map value of '+Widget', or new_object('+Widget'),
     #    never reaches expand_class() a second time.
     #
     #    Escape hatches for a single-segment class of your own, all documented:
@@ -601,13 +601,13 @@ sub _resolve_mapped {
     return $builtin_class;
 }
 
-# karr #31: resolve a resource_map short-name key as a GVK source on the
+# k31: resolve a resource_map short-name key as a GVK source on the
 # explicit-apiVersion path. The qualified '$api_version/$Kind' key is the
 # primary lookup; this is the fallback for a map that only carries the
 # short name (e.g. a CRD registered as 'StaticWebSite => "+My::StaticWebSite"').
 #
 # Fail closed: the mapped class must exist, expose api_version(), and report
-# exactly the requested version — otherwise undef (karr #17 semantics: never
+# exactly the requested version — otherwise undef (k17 semantics: never
 # substitute a class that cannot verify the request). No class is loaded
 # unless the short-name key exists, and _class_exists short-circuits on
 # $class->can('new'), so the common qualified-key hit costs nothing.
@@ -780,7 +780,7 @@ sub struct_to_object {
     # This is the public entry point, so the name may be anything
     # expand_class() accepts (a short Kind, a domain-qualified GVK string, a
     # '+' full class). Callers that already hold a resolved class name must
-    # use _struct_to_object_expanded() instead — see karr #35.
+    # use _struct_to_object_expanded() instead — see k35.
     return $self->_struct_to_object_expanded(
         $self->_expand_class_or_die($class_or_struct), $params);
 }
@@ -788,7 +788,7 @@ sub struct_to_object {
 # struct_to_object() minus the name resolution: $class is already the final
 # class name.
 #
-# Split out for karr #35. new_object()/json_to_object() used to call
+# Split out for k35. new_object()/json_to_object() used to call
 # expand_class() and then hand the result to struct_to_object(), which
 # expanded it a second time. That second pass re-entered the full search
 # order, so an exactly-resolved name could be re-interpreted:
@@ -828,7 +828,7 @@ sub inflate {
     # per-Kind *List classes were removed in 1.105 in favour of it, so no
     # resource_map entry -- qualified or bare -- will ever resolve one, and
     # it owns its own inflation (deriving item types from its own
-    # kind/apiVersion; see IO::K8s::List::FROM_STRUCT, karr #46).
+    # kind/apiVersion; see IO::K8s::List::FROM_STRUCT, k46).
     if ($kind =~ /List\z/) {
         require IO::K8s::List;
         return IO::K8s::List->FROM_STRUCT($struct, $self);
@@ -868,10 +868,10 @@ sub new_object {
     # An apiVersion inside the params hash is an exact-GVK request too -- the
     # same key inflate() reads and honours. new_object used to ignore it and
     # resolve the short name to whatever version it defaults to, silently
-    # substituting a version the caller did not ask for (karr #62). Honour it
+    # substituting a version the caller did not ask for (k62). Honour it
     # for symmetry with inflate; when an explicit positional api_version is
     # also given the two must agree, or it is a genuine conflict and we fail
-    # closed rather than pick one (the house line of karr #37/#39).
+    # closed rather than pick one (the house line of k37/k39).
     if (ref($params) eq 'HASH' && exists $params->{apiVersion}) {
         my $inner = $params->{apiVersion};
         if ($api_version_supplied) {
@@ -903,7 +903,7 @@ sub new_object {
 # an exact GVK request just like a separate argument, so an unresolvable one
 # comes back undef. That undef must become the GVK error here: passed on, it
 # reaches load_class() and dies out of Module::Runtime with 'argument is not a
-# module name', which names neither the kind nor the apiVersion (karr #39).
+# module name', which names neither the kind nor the apiVersion (k39).
 #
 # A name WITHOUT a domain qualifier is not an undef case and must not become
 # one: expand_class() falls back to IO::K8s::<Name> there, so an unknown bare
@@ -958,7 +958,7 @@ sub _inflate_struct {
         next unless defined $value;
 
         # Pass through opaque fields without type coercion -- but not as the
-        # caller's own reference (karr #54), see the else branch below.
+        # caller's own reference (k54), see the else branch below.
         if ($opaque_fields{$attr}) {
             $args{$attr} = _shallow_copy($value);
             next;
@@ -973,7 +973,7 @@ sub _inflate_struct {
         # before storing it, and generated inline structs are named in full.
         # So these go straight to the pre-expanded path — sending them back
         # through expand_class() would re-interpret a name that is already
-        # resolved (karr #35).
+        # resolved (k35).
         if ($info->{is_array_of_objects}) {
             my $inner_class = $info->{class};
             $args{$attr} = [ map { $self->_struct_to_object_expanded($inner_class, $_) } @$value ];
@@ -986,10 +986,10 @@ sub _inflate_struct {
             # Same normalization the Bool coercer in IO::K8s::Resource applies.
             # It has to be the same one: this runs before $class->new(%args),
             # so whatever it decides is all the coercer ever gets to see, and
-            # a wrong answer here cannot be rescued downstream (karr #37).
+            # a wrong answer here cannot be rescued downstream (k37).
             # On bad data it dies without naming the field; the constructor
             # path gets that context for free from Moo's coercion wrapper,
-            # this path has to attach it itself (karr #42). $attr is the JSON
+            # this path has to attach it itself (k42). $attr is the JSON
             # key -- the name that appears in the caller's manifest.
             $args{$attr} = eval { IO::K8s::Resource::_normalize_bool($value) };
             if (my $err = $@) {
@@ -999,8 +999,8 @@ sub _inflate_struct {
         } else {
             # Arrays of scalars, hashes of scalars and anything untyped: the
             # inflated object must not share the caller's containers, or later
-            # edits to the source struct silently rewrite the object (karr
-            # #54). One level only, matching the output side in
+            # edits to the source struct silently rewrite the object (k54).
+            # One level only, matching the output side in
             # IO::K8s::Role::Resource::TO_JSON: a nested structure under an
             # opaque hash attribute (fieldsV1, a free-form HashRef) still
             # shares its inner refs with the struct it was inflated from.
@@ -1012,7 +1012,7 @@ sub _inflate_struct {
 }
 
 # One level of copying for a plain container, deliberately not deeper -- see
-# the callers above (karr #54). Anything that is not a plain ARRAY or HASH
+# the callers above (k54). Anything that is not a plain ARRAY or HASH
 # (a scalar, a blessed value, a JSON boolean object) is returned untouched.
 sub _shallow_copy {
     my ($value) = @_;

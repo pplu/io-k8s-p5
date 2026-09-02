@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Regression coverage for karr ticket #11:
+# Regression coverage for k11:
 # expand_class() only consults domain-qualified map entries
 # ($api_version/$kind) for api_version-based disambiguation, and those
 # were only ever populated by add() when an EXTERNAL provider collided
@@ -19,7 +19,7 @@
 #
 # The same bug applied pre-existing to the already-shipped V1alpha3
 # "classic DRA" DeviceClass/ResourceClaim/etc. and to the
-# V1beta2 DeviceTaintRule family. Karr #4 added more classes that hit
+# V1beta2 DeviceTaintRule family. k4 added more classes that hit
 # the identical gap; only the fully-qualified class reference
 # (IO::K8s::Api::Resource::V1beta1::DeviceClass->new or
 # ->struct_to_object with the full class name) bypasses inflate()'s
@@ -230,7 +230,7 @@ subtest 'per-instance isolation: add() does not share state between instances' =
     my $k2 = IO::K8s->new;
 
     # Both instances get a default copy of the literal qualified entries
-    # in %DEFAULT_RESOURCE_MAP - that's the karr #11 mechanism and must
+    # in %DEFAULT_RESOURCE_MAP - that's the k11 mechanism and must
     # hold for every instance, not just the first one.
     ok( exists $k1->resource_map->{'v1/Pod'},
         'k1 has the built-in v1/Pod qualified key' );

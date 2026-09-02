@@ -102,7 +102,7 @@ subtest 'IO::K8s::Cilium resource_map' => sub {
         is($map->{$kind}, "Cilium::V2alpha1::$kind", "$kind maps to correct class path");
     }
 
-    # Back-compat CRDs (karr #78) are reachable only via domain-qualified
+    # Back-compat CRDs (k78) are reachable only via domain-qualified
     # keys; the short names stay on the storage version.
     ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPAdvertisement'},
         'CiliumBGPAdvertisement v2alpha1 back-compat reachable');
@@ -158,9 +158,9 @@ subtest 'with constructor parameter' => sub {
         'core Deployment still resolves');
 };
 
-# --- Back-compat: 8 shipped Cilium classes now reachable via qualified GVKs (karr #78) ---
+# --- Back-compat: 8 shipped Cilium classes now reachable via qualified GVKs (k78) ---
 
-subtest 'back-compat GVK resolution (karr #78)' => sub {
+subtest 'back-compat GVK resolution (k78)' => sub {
     my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
 
     my @back_compat = (

@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #71: Load-format test coverage gaps.
+# k71: Load-format test coverage gaps.
 #
 # Additive coverage for existing inflation/load-path behaviour -- every
 # assertion in this file already holds against unmodified lib/, no bugfix
@@ -17,7 +17,7 @@
 # P2: IO::K8s::List->from_json($json, $k8s) / FROM_STRUCT's second, optional
 #     $k8s argument -- never exercised with a real provider-carrying $k8s
 #     before. Without it, a provider item Kind must fail closed exactly like
-#     every other unresolvable GVK in this distribution (karr #39/#46).
+#     every other unresolvable GVK in this distribution (k39/k46).
 #
 # P3: inflate() with no 'kind' field in the data dies with a fixed, named
 #     error (lib/IO/K8s.pm).
@@ -35,7 +35,7 @@ use IO::K8s::Cilium;
 # P1a: List inflation resolves an item type through a CRD provider.
 # ---------------------------------------------------------------------------
 
-subtest 'List inflation resolves item type through a CRD provider (karr #71 / P1)' => sub {
+subtest 'List inflation resolves item type through a CRD provider (k71 / P1)' => sub {
     my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
 
     my $cnp_list_json = <<'END_JSON';
@@ -75,7 +75,7 @@ END_JSON
     $INC{'My/K8s/Api/Core/V1/Pod.pm'} = __FILE__;
 }
 
-subtest 'List inflation resolves item type through a class_namespaces subclass (karr #71 / P1)' => sub {
+subtest 'List inflation resolves item type through a class_namespaces subclass (k71 / P1)' => sub {
     my $k8s = IO::K8s->new(class_namespaces => ['My::K8s']);
 
     my $podlist_json = <<'END_JSON';
@@ -101,7 +101,7 @@ END_JSON
 # P1c: List inflation resolves an item type through AutoGen (openapi_spec).
 # ---------------------------------------------------------------------------
 
-subtest 'List inflation resolves item type through AutoGen/openapi_spec (karr #71 / P1)' => sub {
+subtest 'List inflation resolves item type through AutoGen/openapi_spec (k71 / P1)' => sub {
     my $spec = {
         definitions => {
             'io.example.v1.Widget' => {
@@ -152,7 +152,7 @@ subtest 'List inflation resolves item type through AutoGen/openapi_spec (karr #7
 # closed rather than resolving against a provider-less default instance.
 # ---------------------------------------------------------------------------
 
-subtest q{IO::K8s::List->from_json's optional $k8s argument (karr #71 / P2)} => sub {
+subtest q{IO::K8s::List->from_json's optional $k8s argument (k71 / P2)} => sub {
     my $bytes = <<'END_JSON';
 {"kind":"CiliumNetworkPolicyList","apiVersion":"cilium.io/v2","items":[{"metadata":{"name":"allow-dns","namespace":"kube-system"},"spec":{"description":"allow dns egress"}}]}
 END_JSON
@@ -178,7 +178,7 @@ END_JSON
 # P3: inflate() with no 'kind' field dies with a fixed, named error.
 # ---------------------------------------------------------------------------
 
-subtest q{inflate() without a 'kind' field dies naming the missing field (karr #71 / P3)} => sub {
+subtest q{inflate() without a 'kind' field dies naming the missing field (k71 / P3)} => sub {
     my $k8s = IO::K8s->new;
     throws_ok { $k8s->inflate({ apiVersion => 'v1' }) }
         qr/Cannot inflate: missing 'kind' field in data/,

@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Regression coverage for karr ticket #22:
+# Regression coverage for k22:
 #
 # IO::K8s::List::api_version() used to derive the wire apiVersion for
 # empty lists from item_class with a local regex that lc()-ed the
@@ -67,7 +67,7 @@ for my $class (sort keys %EXPECTED) {
 }
 
 # An unloadable / non-API item_class must yield undef, not crash and not
-# emit a bogus apiVersion in the serialised form. karr #49 extends this: an
+# emit a bogus apiVersion in the serialised form. k49 extends this: an
 # api_version() that can't answer means kind() must not answer either --
 # TO_JSON must never emit 'kind' without 'apiVersion' alongside it.
 for my $class (
@@ -81,14 +81,14 @@ for my $class (
         "empty list with item_class $class derives api_version undef" );
     is( $list->kind, undef,
         "empty list with item_class $class also derives kind() undef -- "
-        . 'never a kind without an apiVersion (karr #49)' );
+        . 'never a kind without an apiVersion (k49)' );
 
     my $wire = $json->decode($list->to_json);
     ok( !exists $wire->{apiVersion},
         "empty list with item_class $class serialises without apiVersion" );
     ok( !exists $wire->{kind},
         "empty list with item_class $class serialises without kind either -- "
-        . 'apiVersion and kind are emitted together or not at all (karr #49)' );
+        . 'apiVersion and kind are emitted together or not at all (k49)' );
 }
 
 # kind() must still derive from item_class for empty lists (regression).
@@ -110,13 +110,13 @@ for my $class (
 }
 
 # ---------------------------------------------------------------------------
-# karr #41: the item_class fallback in kind() derived the Kind from the last
+# k41: the item_class fallback in kind() derived the Kind from the last
 # '::' segment and returned undef when the name had none, so an empty list of
 # a single-segment CRD Kind serialised apiVersion but no kind: at all -- a
 # manifest the API server rejects. That empty list is precisely what
 # item_class exists for ("Used for empty lists where the type can't be
-# inferred"), so the fallback failed in its only case. Same defect as karr
-# #38, which fixed the equivalent derivation in IO::K8s::Role::APIObject and
+# inferred"), so the fallback failed in its only case. Same defect as k38,
+# which fixed the equivalent derivation in IO::K8s::Role::APIObject and
 # thereby the first-item path here.
 # ---------------------------------------------------------------------------
 
@@ -148,7 +148,7 @@ for my $class (
 }
 
 # The control: a NON-empty list of the same single-segment class goes through
-# the first-item path, which karr #38 already fixed. Asserted here so a later
+# the first-item path, which k38 already fixed. Asserted here so a later
 # rework of either path cannot silently drop the kind again.
 {
     my $list = IO::K8s::List->new(
@@ -163,11 +163,11 @@ for my $class (
     is( $wire->{apiVersion}, 'vendor.example.com/v1',
         'and the first item api_version' );
     is( $wire->{items}[0]{kind}, 'Bauble',
-        'the item itself carries its own kind (karr #38)' );
+        'the item itself carries its own kind (k38)' );
 }
 
 # ---------------------------------------------------------------------------
-# karr #49: item_class is accepted only as a FULLY QUALIFIED class name.
+# k49: item_class is accepted only as a FULLY QUALIFIED class name.
 #
 #   - A leading '+' is stripped, exactly like every other place in this
 #     distribution that spells "this is already a full class name" (see
@@ -233,7 +233,7 @@ for my $case (@ITEM_CLASS_QUALIFICATION_CASES) {
 }
 
 # ---------------------------------------------------------------------------
-# karr #46: IO::K8s::List could not inflate a List payload at all --
+# k46: IO::K8s::List could not inflate a List payload at all --
 # $k8s->json_to_object() / struct_to_object() died with "Cannot resolve
 # Kubernetes GVK: kind 'PodList', apiVersion 'v1'" because 'PodList' has no
 # resource_map entry (the *List classes were removed in 1.105 in favour of
@@ -246,7 +246,7 @@ for my $case (@ITEM_CLASS_QUALIFICATION_CASES) {
 # remains available as an explicit override for a Kind that yields nothing
 # useful on its own (a generic 'kind: List' payload). An item GVK that still
 # can't be resolved must fail closed -- an error, never a silent empty or
-# half-inflated list (karr #39's fail-closed guarantee, reopened here for
+# half-inflated list (k39's fail-closed guarantee, reopened here for
 # the List path specifically, must hold to the same standard).
 # ---------------------------------------------------------------------------
 
@@ -329,7 +329,7 @@ END_JSON
 
 # 4: an item Kind that cannot be resolved must fail closed -- never a
 # silent empty or half-inflated list. Reuses the exact GVK error format
-# every other entry point in this distribution dies with (karr #39), naming
+# every other entry point in this distribution dies with (k39), naming
 # the ITEM's derived kind/apiVersion ('Gizmo'/'v1'), not the list's own
 # ('GizmoList'/'v1') -- it is the item lookup that fails.
 {

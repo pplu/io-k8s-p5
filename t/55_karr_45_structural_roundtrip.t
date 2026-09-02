@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Regression test for karr #45: embedded *TemplateSpec classes compose
+# Regression test for k45: embedded *TemplateSpec classes compose
 # IO::K8s::APIObject and stamp a spurious apiVersion/kind into their TO_JSON
 # output, even though the upstream schema (io.k8s.api.core.v1.PodTemplateSpec,
 # io.k8s.api.batch.v1.JobTemplateSpec, ...) carries no such keys -- only
@@ -158,10 +158,10 @@ subtest 'CronJob round-trip introduces no keys beyond the input manifest' => sub
 # ============================================================================
 # 3. Control case: StatefulSet.spec.volumeClaimTemplates really does carry
 #    inline TypeMeta per the upstream schema. This must keep emitting
-#    apiVersion/kind -- a fix for karr #45 must not touch PersistentVolumeClaim.
+#    apiVersion/kind -- a fix for k45 must not touch PersistentVolumeClaim.
 # ============================================================================
 
-subtest 'PersistentVolumeClaim template keeps apiVersion/kind (control, not part of karr #45)' => sub {
+subtest 'PersistentVolumeClaim template keeps apiVersion/kind (control, not part of k45)' => sub {
     my $statefulset_manifest = {
         apiVersion => 'apps/v1',
         kind       => 'StatefulSet',

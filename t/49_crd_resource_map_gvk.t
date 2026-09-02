@@ -1,24 +1,24 @@
 #!/usr/bin/env perl
-# karr #31 / #32: expand_class() and add()/with() resolve a resource_map
+# k31 / k32: expand_class() and add()/with() resolve a resource_map
 # short-name key as a GVK source, but only when the mapped class can
 # positively confirm the requested apiVersion.
 #
 # This test locks in:
 #
-#   - karr #31: a CRD registered only under its bare kind (e.g.
+#   - k31: a CRD registered only under its bare kind (e.g.
 #     StaticWebSite => '+My::StaticWebSite') still resolves through
 #     inflate()/new_object()/expand_class() when an apiVersion is supplied,
 #     not just when it is omitted.
-#   - karr #17: a version mismatch, or a mapped class with no api_version()
+#   - k17: a version mismatch, or a mapped class with no api_version()
 #     method at all, stays fail-closed (undef).
-#   - karr #32: a mapped class that CANNOT verify its api_version — because
+#   - k32: a mapped class that CANNOT verify its api_version — because
 #     the method exists but returns undef, or because api_version is a Moo
 #     instance attribute rather than a class-level method/constant — must
 #     fail closed silently: undef, no warning, no exception. This applies
 #     on both call paths: _resolve_short_name_gvk (expand_class's GVK
 #     lookup) and _qualify_class_path (add()/with(), driven at
 #     IO::K8s->new(with => [...]) construction time).
-#   - karr #39: the undef expand_class() returns for an unresolvable
+#   - k39: the undef expand_class() returns for an unresolvable
 #     domain-qualified name has to surface as that same GVK error on EVERY
 #     public entry point, not just new_object() — and a name without a
 #     domain qualifier must keep its IO::K8s::<Name> fallback instead.
@@ -156,7 +156,7 @@ subtest 'version mismatch fails closed' => sub {
         'inflate with mismatched apiVersion dies with GVK error';
 };
 
-subtest 'karr #39: unresolvable GVK string fails closed on every entry point' => sub {
+subtest 'k39: unresolvable GVK string fails closed on every entry point' => sub {
     # expand_class() returns undef for a domain-qualified name it cannot
     # resolve. Every public entry point that forwards that result has to turn
     # it into the GVK error; without the guard the undef reaches load_class()
@@ -187,7 +187,7 @@ subtest 'karr #39: unresolvable GVK string fails closed on every entry point' =>
         $gvk_error, 'inflate with a domain-qualified kind and no apiVersion dies with the GVK error';
 };
 
-subtest 'karr #39: a name without a domain qualifier is not an undef case' => sub {
+subtest 'k39: a name without a domain qualifier is not an undef case' => sub {
     # The counterpart claim: expand_class() only fails closed for names that
     # carry an apiVersion (explicitly or inside the string). A bare Kind falls
     # back to IO::K8s::<Kind>, so the entry points must still fail on the
@@ -221,7 +221,7 @@ subtest 'mapped class without api_version() fails closed' => sub {
 };
 
 subtest 'mapped class with api_version() returning undef fails closed silently' => sub {
-    # karr #32: api_version() is callable and returns cleanly, but the
+    # k32: api_version() is callable and returns cleanly, but the
     # answer is undef. 'undef eq $api_version' in the verification guard
     # is a warning trap ("Use of uninitialized value ... in string eq") if
     # the fix does not check definedness before the string comparison. The
@@ -244,7 +244,7 @@ subtest 'mapped class with api_version() returning undef fails closed silently' 
 };
 
 subtest 'add()/with() tolerate a mapped api_version() returning undef' => sub {
-    # karr #32, released-bug side (1.106): _qualify_class_path() hit the
+    # k32, released-bug side (1.106): _qualify_class_path() hit the
     # same 'undef eq $api_version' trap, reached from add() and therefore
     # from IO::K8s->new(with => [...]) at construction time.
     my @warnings;
@@ -276,7 +276,7 @@ subtest 'add()/with() tolerate a mapped api_version() returning undef' => sub {
 };
 
 subtest 'mapped class with api_version as a Moo instance attribute fails closed' => sub {
-    # karr #32: calling api_version() as a class method on such a class
+    # k32: calling api_version() as a class method on such a class
     # dies ("Class::XSAccessor: invalid instance method invocant ..." or
     # equivalent). The eval-guarded lookup must swallow that and fail
     # closed, not propagate the exception out of expand_class().
@@ -297,7 +297,7 @@ subtest 'mapped class with api_version as a Moo instance attribute fails closed'
 };
 
 subtest 'add()/with() tolerate api_version as a Moo instance attribute' => sub {
-    # karr #32, released-bug side (1.106) — the practical case: a foreign
+    # k32, released-bug side (1.106) — the practical case: a foreign
     # CRD class not built on IO::K8s::APIObject. Before the fix, add() (and
     # therefore IO::K8s->new(with => [...])) died outright instead of
     # skipping the unqualifiable entry.

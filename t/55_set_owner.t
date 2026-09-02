@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #47: set_owner() built an ownerReference the API server rejects, on
+# k47: set_owner() built an ownerReference the API server rejects, on
 # four counts, all measured on 4887f658:
 #
 #   1. uid => $owner->metadata->uid // '' -- a locally built owner never has
@@ -30,7 +30,7 @@
 # that is the direction that actually reaches the cluster. Pure local
 # fixtures; no network, no cluster.
 #
-# The existing lives_ok in t/54_single_segment_kind.t (karr #38's claim,
+# The existing lives_ok in t/54_single_segment_kind.t (k38's claim,
 # that a single-segment owner's kind is not undef) is untouched by this file
 # and must keep passing on its own.
 

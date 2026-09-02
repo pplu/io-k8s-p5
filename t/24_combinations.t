@@ -757,7 +757,7 @@ subtest 'new_object() vs direct Class->new() vs struct_to_object' => sub {
     is($pod3->metadata->name, 'pod3', 'struct_to_object name');
 
     # FROM_HASH now inflates nested objects through the same attribute
-    # registry as $k8s->json_to_object / struct_to_object (karr #59) --
+    # registry as $k8s->json_to_object / struct_to_object (k59) --
     # before 1.108 this was a bare ->new(%$hash) and died at the first
     # object-typed field. Assert the full round-trip: raw hashrefs in,
     # typed nested objects out, and TO_JSON matches the source struct.

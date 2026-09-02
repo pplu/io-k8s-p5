@@ -43,14 +43,14 @@ subtest 'Quantity constraint' => sub {
     }
 };
 
-# ---- karr #52: decimal SI suffixes n (nano) and u (micro) ----
+# ---- k52: decimal SI suffixes n (nano) and u (micro) ----
 #
 # Upstream apimachinery accepts nine decimal SI suffixes -- n u m "" k M G T P
 # E (pkg/api/resource/suffix.go) -- but the suffix class in the Quantity
 # regex used to be [mkMGTPE], omitting n and u. Real cluster data uses both:
 # metrics-server reports CPU as e.g. "100n", and autoscaling/v2
 # MetricTarget/MetricValueStatus carry averageValue in "500u"-style units.
-subtest 'karr #52: n (nano) and u (micro) suffixes accepted' => sub {
+subtest 'k52: n (nano) and u (micro) suffixes accepted' => sub {
     my $q = IO::K8s::Types::Quantity();
     ok($q->check('100n'), 'valid: 100n (nano)');
     ok($q->check('500u'), 'valid: 500u (micro)');
@@ -72,7 +72,7 @@ subtest 'karr #52: n (nano) and u (micro) suffixes accepted' => sub {
     ok($q->check('2e3'), 'existing: 2e3 still valid');
 };
 
-# ---- karr #52: the deliberate boundary -- what stays rejected ----
+# ---- k52: the deliberate boundary -- what stays rejected ----
 #
 # Widening [mkMGTPE] to [numkMGTPE] must not go further than the fix sketch
 # called for. Two families of rejection here are intentional, not
@@ -94,7 +94,7 @@ subtest 'karr #52: n (nano) and u (micro) suffixes accepted' => sub {
 #     that widening the suffix class to include n/u did not also loosen the
 #     alternation into accepting near-misses of the binary suffixes or
 #     doubled-up decimal ones.
-subtest 'karr #52: the intended boundary stays rejected' => sub {
+subtest 'k52: the intended boundary stays rejected' => sub {
     my $q = IO::K8s::Types::Quantity();
 
     for my $bare (qw(Ki m n e3 .)) {

@@ -6,7 +6,7 @@ use Test::More;
 use Test::Exception;
 use IO::K8s;
 
-# karr #62: new_object() used to take the exact-GVK request only as its third
+# k62: new_object() used to take the exact-GVK request only as its third
 # positional argument and silently overwrite an apiVersion passed INSIDE the
 # params hash with whatever version the short name resolves to -- while
 # inflate() reads that same key and honours it. Two entry points, one input

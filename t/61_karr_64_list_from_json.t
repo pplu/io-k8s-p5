@@ -7,13 +7,13 @@ use Test::More;
 use IO::K8s;
 use IO::K8s::List;
 
-# karr #64: IO::K8s::List had to_json/TO_JSON but no from_json/FROM_HASH, the
-# last class behaving that way after karr #59 made every Role::Resource class
+# k64: IO::K8s::List had to_json/TO_JSON but no from_json/FROM_HASH, the
+# last class behaving that way after k59 made every Role::Resource class
 # to_json/from_json symmetric. A caller who serialized a List and tried to read
 # it back hit "Can not locate object method from_json". List is a container,
 # not a Role::Resource, so it does not consume the role -- it grows its own
 # from_json that decodes UTF-8 bytes and delegates to FROM_STRUCT, and its
-# to_json is byte-oriented to match every other class (the karr #53 convention).
+# to_json is byte-oriented to match every other class (the k53 convention).
 
 my $k8s = IO::K8s->new;
 my $pod = $k8s->new_object('Pod', {
@@ -24,7 +24,7 @@ my $list = IO::K8s::List->new(items => [$pod]);
 my $bytes = $list->to_json;
 
 # to_json emits a UTF-8 encoded byte string, exactly what from_json expects and
-# what every Role::Resource class already produces (karr #53).
+# what every Role::Resource class already produces (k53).
 ok(!utf8::is_utf8($bytes), 'List->to_json emits a UTF-8 byte string, not a wide-char string');
 
 can_ok('IO::K8s::List', 'from_json');

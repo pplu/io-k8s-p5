@@ -180,12 +180,12 @@ sub _generate_class {
     # IO::K8s::Role::APIObject, and with it apiVersion, kind and metadata --
     # exactly the three properties IO::K8s::Role::Resource::compare_to_schema
     # already excuses a top-level object for not declaring, and the line
-    # karr #45 drew for the hand-written template classes. Declaring them a
+    # k45 drew for the hand-written template classes. Declaring them a
     # second time as schema properties is not merely redundant:
     #
     #   kind:       add_symbol('&kind') overwrites the generated accessor
     #               afterwards, so the attribute is write-only-looking and
-    #               $obj->kind('Other') is a silent no-op (karr #60).
+    #               $obj->kind('Other') is a silent no-op (k60).
     #   apiVersion: no such collision, which is worse -- the attribute stays
     #               writable and TO_JSON emits it over the apiVersion the
     #               class actually is.
@@ -221,7 +221,7 @@ sub _generate_class {
 
         # These are fixed identity methods, not writable fields. A caller
         # passing an argument believes they retargeted the object; fail closed
-        # rather than swallow the write (karr #67, the house line of #37/#39).
+        # rather than swallow the write (k67, the house line of k37/k39).
         $stash->add_symbol('&api_version', sub {
             croak 'api_version is fixed for this class and cannot be set' if @_ > 1;
             $api_ver;
@@ -262,7 +262,7 @@ my %OPAQUE_TYPES = map { $_ => 1 } qw(
 
 # A $ref pointing at a definition the caller never supplied.
 #
-# Refusing is the fail-closed choice (karr #56). The property used to be
+# Refusing is the fail-closed choice (k56). The property used to be
 # skipped outright: the generated class simply had no such attribute, Moo
 # dropped the constructor argument for it without a word, and TO_JSON never
 # emitted the data again -- an inflate/serialize round-trip that quietly
@@ -272,7 +272,7 @@ my %OPAQUE_TYPES = map { $_ => 1 } qw(
 # rejected for two reasons. It cannot be applied at all three call sites:
 # the k8s DSL has no array-of-hash form, so `items: { $ref: <missing> }`
 # would have to become ArrayRef[Str] and then reject the very hashrefs the
-# field carries -- the karr #57 failure, reintroduced. And it guesses a
+# field carries -- the k57 failure, reintroduced. And it guesses a
 # shape: a missing definition may just as well be a string or array alias,
 # in which case the Maybe[HashRef] attribute fails its type constraint
 # without ever naming the unresolved $ref that caused it. %OPAQUE_TYPES
@@ -290,7 +290,7 @@ sub _croak_unresolved_ref {
 #
 # $field_name and $class are diagnostic context only: everything this
 # function refuses has to name the class being generated and the field it
-# choked on, because the caller sees neither (the karr #42 diagnostic line).
+# choked on, because the caller sees neither (the k42 diagnostic line).
 sub _schema_to_type_spec {
     my ($schema, $all_defs, $namespace, $field_name, $class) = @_;
 
@@ -336,7 +336,7 @@ sub _schema_to_type_spec {
         return 'Int';
     }
     elsif ($type eq 'number') {
-        return 'Num';  # A genuine JSON number -- unquoted on the wire (karr #68)
+        return 'Num';  # A genuine JSON number -- unquoted on the wire (k68)
     }
     elsif ($type eq 'boolean') {
         return 'Bool';
@@ -356,12 +356,12 @@ sub _schema_to_type_spec {
         # 'Str' and 'Int', so ['Bool'] would ask for an array of
         # IO::K8s::Api::Bool objects. [Bool] is the form that reaches the
         # is_array_of_bool branch and its per-element normalization, which is
-        # what an array of schema-true JSON booleans needs (karr #57).
+        # what an array of schema-true JSON booleans needs (k57).
         my $item_type = $items->{type} // 'string';
         return [ Int ]  if $item_type eq 'integer';
         return [ Bool ] if $item_type eq 'boolean';
         # items: object / array with no further structure -> an array of
-        # opaque hashes / opaque arrays. Before karr #66 both fell through to
+        # opaque hashes / opaque arrays. Before k66 both fell through to
         # [ Str ] below and rejected the very hashrefs/arrayrefs the schema
         # describes.
         return [ {} ] if $item_type eq 'object';
@@ -384,7 +384,7 @@ sub _schema_to_type_spec {
         # additionalProperties is allowed to be a JSON boolean instead of a
         # schema -- true: any extra property, false: none. A JSON::PP::Boolean
         # is a blessed scalar ref, so the $ref lookup above used to die "Not a
-        # HASH reference" naming neither class nor field (karr #55). Neither
+        # HASH reference" naming neither class nor field (k55). Neither
         # boolean says anything about the value types, so the field stays the
         # same opaque hash a schemaless object gets.
         if (defined $addl) {

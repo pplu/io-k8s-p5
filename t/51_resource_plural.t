@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# karr #33: IO::K8s::Role::APIObject::resource_plural used to return undef
+# k33: IO::K8s::Role::APIObject::resource_plural used to return undef
 # for every shipped Kubernetes class, so consumers that need Kind -> plural
 # (RBAC speaks plurals, the API speaks Kinds) fell back to an lc+"s"
 # heuristic. A wrong plural there is indistinguishable from a denied
@@ -7,7 +7,7 @@
 # spec's REST paths (maint/spec-resource-plural-gen.pl) rather than from any
 # string transformation.
 #
-# karr #36 added the second tier. The lookup is:
+# k36 added the second tier. The lookup is:
 #
 #   1. "$api_version/$Kind"  -- the exact GVK, still authoritative
 #   2. "$group|$Kind"        -- the GroupResource, for Kinds on API tracks
@@ -85,7 +85,7 @@ use Role::Tiny ();
     k8s spec => { Str => 1 };
 }
 
-# karr #36 tripwire. This class does not exist upstream and never will: it
+# k36 tripwire. This class does not exist upstream and never will: it
 # puts the Kind "Ingress" in the batch group, on a version nobody serves.
 # Both tiers must miss it -- "batch/v1alpha9/Ingress" is not a served GVK
 # and "batch|Ingress" is not a GroupResource. A fallback keyed on the bare
@@ -162,7 +162,7 @@ subtest 'both tiers are group-qualified, neither is a bare Kind' => sub {
 
     # Same Kind name, two groups. Tier 1 keys them apart by apiVersion and
     # tier 2 keys them apart by group -- core is the empty group, not a
-    # missing one -- so the karr #33 disambiguation survives the widening.
+    # missing one -- so the k33 disambiguation survives the widening.
     is(IO::K8s::Api::Core::V1::Event->resource_plural, 'events',
         'core/v1 Event -> events');
     is(IO::K8s::Api::Events::V1::Event->resource_plural, 'events',
@@ -179,7 +179,7 @@ subtest 'both tiers are group-qualified, neither is a bare Kind' => sub {
         'batch/v1alpha9 Ingress -> undef (a bare-Kind fallback would say "ingresses")');
 };
 
-subtest 'karr #36: Kinds on API tracks upstream dropped resolve by group' => sub {
+subtest 'k36: Kinds on API tracks upstream dropped resolve by group' => sub {
     # Every one of these is a shipped class whose exact GVK is not in
     # upstream v1.36 any more, so tier 1 misses. Tier 2 answers with the
     # plural its served same-group siblings use -- read off a real
@@ -217,7 +217,7 @@ subtest 'karr #36: Kinds on API tracks upstream dropped resolve by group' => sub
             => 'storageversionmigrations',
     );
 
-    is(scalar(keys %expected), 15, 'all 15 classes named in karr #36 are covered');
+    is(scalar(keys %expected), 15, 'all 15 classes named in k36 are covered');
 
     for my $class (sort keys %expected) {
         IO::K8s->load_class($class);
@@ -259,7 +259,7 @@ subtest 'subresources have no plural of their own' => sub {
 };
 
 subtest 'embedded template types have no plural' => sub {
-    # karr #45: these carry metadata but compose IO::K8s::Resource, not
+    # k45: these carry metadata but compose IO::K8s::Resource, not
     # IO::K8s::Role::APIObject -- upstream's OpenAPI schema for them has no
     # apiVersion/kind, only metadata and spec, so TO_JSON must not stamp a
     # GVK into them. Without Role::APIObject they have no resource_plural
@@ -351,7 +351,7 @@ subtest 'class_namespaces subclasses inherit through @ISA' => sub {
 subtest 'coverage over the default resource map' => sub {
     # Regression guard for a bad regeneration: every short name in the
     # built-in map must resolve to a plural except the three subresources.
-    # Unchanged by karr #36 -- the short names all point at served versions,
+    # Unchanged by k36 -- the short names all point at served versions,
     # so they were already answered by tier 1.
     my $map = IO::K8s->default_resource_map;
     my @short = grep { !m{/} } sort keys %$map;
@@ -370,12 +370,12 @@ subtest 'coverage over the default resource map' => sub {
 };
 
 subtest 'coverage over every shipped upstream API class' => sub {
-    # The guard karr #36 is actually about: the whole shipped surface the
+    # The guard k36 is actually about: the whole shipped surface the
     # generated tables are supposed to cover, not just the short names in
     # the default resource map. Anything in one of the three namespaces
     # _api_version_from_class() understands, composing Role::APIObject.
     #
-    # karr #45: the seven embedded template types (PodTemplateSpec,
+    # k45: the seven embedded template types (PodTemplateSpec,
     # JobTemplateSpec, PersistentVolumeClaimTemplate, and the four
     # ResourceClaimTemplateSpec versions) now compose IO::K8s::Resource
     # instead of Role::APIObject -- upstream's schema for them carries no

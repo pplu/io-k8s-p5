@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Regression tests for karr #55, #56, #57 and #60 -- four independent bugs in
+# Regression tests for k55, k56, k57 and k60 -- four independent bugs in
 # lib/IO/K8s/AutoGen.pm's schema-to-attribute conversion, all found in the
 # same 2026-08-18 core-module review. t/04_autogen.t already covers AutoGen's
 # general mechanics (class naming, GVK dispatch, IntOrStr/Quantity/Time); this
@@ -7,7 +7,7 @@
 # regression on any of them fails here instead of only under a live cluster
 # nobody runs in CI.
 #
-# karr #55 -- additionalProperties: true/false (a JSON boolean, not a schema
+# k55 -- additionalProperties: true/false (a JSON boolean, not a schema
 #   object) used to die "Not a HASH reference" with no class/field context.
 #   Both polarities now fall back to the same opaque { Str => 1 } hash a
 #   schemaless object gets. additionalProperties: false does NOT narrow
@@ -15,18 +15,18 @@
 #   malformed additionalProperties (an ARRAY/CODE ref -- a broken schema, not
 #   a boolean) still refuses, now naming class and field.
 #
-# karr #56 -- a property/items/additionalProperties $ref that does not
+# k56 -- a property/items/additionalProperties $ref that does not
 #   resolve against $all_defs used to be silently skipped: the class built
 #   without that attribute, Moo dropped the unknown constructor argument, and
 #   TO_JSON never re-emitted it -- silent data loss on every round-trip. The
-#   decision was a loud croak instead (fail-closed, the karr #37/#39 line),
+#   decision was a loud croak instead (fail-closed, the k37/k39 line),
 #   naming class and field, at all three call sites. The one carved-out
 #   exception: a GVK-bearing class's own 'metadata' property is skipped
-#   before any $ref lookup happens at all (the karr #60 interaction), so the
+#   before any $ref lookup happens at all (the k60 interaction), so the
 #   extremely common "single CRD schema whose metadata points at the stock
 #   ObjectMeta it never embeds" case keeps working.
 #
-# karr #57 -- items: { type: boolean } used to fall into the ["Str"] default,
+# k57 -- items: { type: boolean } used to fall into the ["Str"] default,
 #   so schema-conforming JSON::PP::Boolean payloads failed ArrayRef[Str]. The
 #   fix returns the DSL's [Bool] form (a Type::Tiny object, not the bareword
 #   'Bool' -- ['Bool'] would be read by the DSL as an array of instances of a
@@ -35,13 +35,13 @@
 #   visible in the registry even on a run where a Bool-shaped payload happens
 #   to still construct.
 #
-# karr #60 -- a GVK-bearing generated class installs kind()/api_version() as
+# k60 -- a GVK-bearing generated class installs kind()/api_version() as
 #   class methods (constants) after the property loop; if apiVersion/kind
 #   were ALSO registered as ordinary k8s attributes, add_symbol('&kind', ...)
 #   silently shadowed the accessor ($obj->kind('Other') became a no-op) and,
 #   worse, apiVersion stayed a writable attribute whose stored value
 #   overwrote the role-correct apiVersion in TO_JSON on every emit. Both
-#   properties (plus metadata, see #56 above) are now skipped when building
+#   properties (plus metadata, see k56 above) are now skipped when building
 #   attributes for a class that will get GVK methods, from either source: the
 #   schema's own x-kubernetes-group-version-kind, or an explicit
 #   --kind/--api_version opt.
@@ -57,10 +57,10 @@ use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
 sub json_bool_name { $_[0] ? 'true' : 'false' }
 
 # ============================================================================
-# karr #55 -- additionalProperties as a JSON boolean
+# k55 -- additionalProperties as a JSON boolean
 # ============================================================================
 
-subtest 'karr #55: additionalProperties: true falls back to opaque hash, nested roundtrip' => sub {
+subtest 'k55: additionalProperties: true falls back to opaque hash, nested roundtrip' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $schema = {
         type       => 'object',
@@ -80,7 +80,7 @@ subtest 'karr #55: additionalProperties: true falls back to opaque hash, nested 
     is_deeply($obj->TO_JSON->{blob}, $nested, 'nested structure under additionalProperties: true round-trips untouched');
 };
 
-subtest 'karr #55: additionalProperties: false ALSO falls back to the same opaque hash (deliberate non-fix)' => sub {
+subtest 'k55: additionalProperties: false ALSO falls back to the same opaque hash (deliberate non-fix)' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $schema = {
         type       => 'object',
@@ -103,7 +103,7 @@ subtest 'karr #55: additionalProperties: false ALSO falls back to the same opaqu
         'and the value round-trips exactly -- false is not enforced as "no extra properties"');
 };
 
-subtest 'karr #55: additionalProperties as an ARRAY/CODE ref is a broken schema -- croaks naming class and field' => sub {
+subtest 'k55: additionalProperties as an ARRAY/CODE ref is a broken schema -- croaks naming class and field' => sub {
     for my $case (
         [ ARRAY => [] ],
         [ CODE  => sub { 1 } ],
@@ -127,10 +127,10 @@ subtest 'karr #55: additionalProperties as an ARRAY/CODE ref is a broken schema 
 };
 
 # ============================================================================
-# karr #56 -- an unresolvable $ref croaks (fail-closed), not silent data loss
+# k56 -- an unresolvable $ref croaks (fail-closed), not silent data loss
 # ============================================================================
 
-subtest 'karr #56: unresolvable $ref on a plain property croaks naming class and field' => sub {
+subtest 'k56: unresolvable $ref on a plain property croaks naming class and field' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $def_name  = 'test.example.v1.Danglio56';
     my $namespace = 'IO::K8s::_AUTOGEN_karr56a';
@@ -147,7 +147,7 @@ subtest 'karr #56: unresolvable $ref on a plain property croaks naming class and
         'property $ref: croaks naming the missing ref, the field, and the class';
 };
 
-subtest 'karr #56: unresolvable $ref inside array items croaks naming class and field' => sub {
+subtest 'k56: unresolvable $ref inside array items croaks naming class and field' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $def_name  = 'test.example.v1.Arrayo56';
     my $namespace = 'IO::K8s::_AUTOGEN_karr56b';
@@ -163,7 +163,7 @@ subtest 'karr #56: unresolvable $ref inside array items croaks naming class and 
         'items.$ref: croaks naming the missing ref, the field, and the class';
 };
 
-subtest 'karr #56: unresolvable $ref inside additionalProperties croaks naming class and field' => sub {
+subtest 'k56: unresolvable $ref inside additionalProperties croaks naming class and field' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $def_name  = 'test.example.v1.Mappo56';
     my $namespace = 'IO::K8s::_AUTOGEN_karr56c';
@@ -179,11 +179,11 @@ subtest 'karr #56: unresolvable $ref inside additionalProperties croaks naming c
         'additionalProperties.$ref: croaks naming the missing ref, the field, and the class';
 };
 
-subtest 'karr #56/#60: a GVK class\'s own metadata $ref is skipped before lookup -- the realistic single-CRD-schema case' => sub {
+subtest 'k56/k60: a GVK class\'s own metadata $ref is skipped before lookup -- the realistic single-CRD-schema case' => sub {
     # A CRD schema shipped on its own very commonly references the stock
     # ObjectMeta for 'metadata' without embedding ObjectMeta's own
-    # definition -- $all_defs is empty here on purpose. Without the #60 skip,
-    # this would trip the #56 refusal above over a field the APIObject role
+    # definition -- $all_defs is empty here on purpose. Without the k60 skip,
+    # this would trip the k56 refusal above over a field the APIObject role
     # supplies anyway.
     my $make_schema = sub {
         my (%gvk) = @_;
@@ -239,10 +239,10 @@ subtest 'karr #56/#60: a GVK class\'s own metadata $ref is skipped before lookup
     is($obj_b->TO_JSON->{kind}, 'SiteB', 'kind comes from the opt');
 
     # Control: WITHOUT a GVK, the same metadata $ref is NOT exempt -- it goes
-    # through the ordinary property path and hits the #56 refusal like any
+    # through the ordinary property path and hits the k56 refusal like any
     # other unresolved $ref. This is what proves the skip is tied to
     # role_supplied (GVK-bearing classes only), not a blanket "always skip
-    # metadata" shortcut that would quietly reintroduce #56 for a class that
+    # metadata" shortcut that would quietly reintroduce k56 for a class that
     # never gets the APIObject role to supply metadata for it.
     IO::K8s::AutoGen::clear_cache();
     my $ref_lit = '$ref';
@@ -257,10 +257,10 @@ subtest 'karr #56/#60: a GVK class\'s own metadata $ref is skipped before lookup
 };
 
 # ============================================================================
-# karr #57 -- items: { type: boolean } generates [Bool], not ['Str']
+# k57 -- items: { type: boolean } generates [Bool], not ['Str']
 # ============================================================================
 
-subtest 'karr #57: boolean array items produce the [Bool] Type::Tiny form, not the bareword class-name trap' => sub {
+subtest 'k57: boolean array items produce the [Bool] Type::Tiny form, not the bareword class-name trap' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $schema = { type => 'object', properties => {
         flags => { type => 'array', items => { type => 'boolean' } },
@@ -290,7 +290,7 @@ subtest 'karr #57: boolean array items produce the [Bool] Type::Tiny form, not t
     my $expected_json = '{"flags":[' . join(',', map { json_bool_name($_) } @want) . ']}';
     is($obj->to_json, $expected_json, 'array of bool serializes as real JSON booleans, not quoted strings');
 
-    # karr #51 interplay: an undef ELEMENT still passes the constructor (the
+    # k51 interplay: an undef ELEMENT still passes the constructor (the
     # [Bool] coercer's `return undef` keeps the array position, same as any
     # other is_array_of_bool attribute) and only dies later, in TO_JSON,
     # naming field and index. The message itself is pinned by the other
@@ -300,17 +300,17 @@ subtest 'karr #57: boolean array items produce the [Bool] Type::Tiny form, not t
     # not a different (or missing) one.
     my $obj_with_undef;
     lives_ok { $obj_with_undef = $class->new(flags => [ JSON::MaybeXS::true(), undef ]) }
-        'an undef element in a generated is_array_of_bool attribute still passes the constructor (karr #51 semantics)';
+        'an undef element in a generated is_array_of_bool attribute still passes the constructor (k51 semantics)';
     dies_ok { $obj_with_undef->TO_JSON }
         'but TO_JSON refuses to serialize it rather than silently emitting a false for that element';
 };
 
 # ============================================================================
-# karr #60 -- kind()/apiVersion() are real class-method constants; the
+# k60 -- kind()/apiVersion() are real class-method constants; the
 # properties are excluded from the k8s attribute registry entirely
 # ============================================================================
 
-subtest 'karr #60: GVK properties excluded from the registry (schema-GVK path)' => sub {
+subtest 'k60: GVK properties excluded from the registry (schema-GVK path)' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $schema = {
         type                                 => 'object',
@@ -340,7 +340,7 @@ subtest 'karr #60: GVK properties excluded from the registry (schema-GVK path)' 
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => 'site'),
     );
 
-    # karr #60's more severe half: apiVersion used to stay a writable
+    # k60's more severe half: apiVersion used to stay a writable
     # attribute whose stored value overwrote the role-correct apiVersion in
     # TO_JSON on every emit. With no accessor at all, there is no write path
     # left to smuggle a false GVK through -- pin that the method plainly does
@@ -352,16 +352,16 @@ subtest 'karr #60: GVK properties excluded from the registry (schema-GVK path)' 
         'TO_JSON apiVersion is unaffected by the (nonexistent) write attempt');
 
     # kind() IS defined (as the GVK class method) but is derived and read-only.
-    # karr #67 turned the former silent no-op into a fail-closed croak, so a
+    # k67 turned the former silent no-op into a fail-closed croak, so a
     # caller who believes they retargeted the object finds out at once.
     throws_ok { $obj->kind('Other') }
         qr/kind is fixed for this class and cannot be set/,
-        'kind("Other") croaks -- a fixed identity accessor rejects a write (karr #67)';
+        'kind("Other") croaks -- a fixed identity accessor rejects a write (k67)';
     is($obj->kind, 'StaticWebSite60', 'kind is unchanged -- the rejected call wrote nothing');
     is($obj->TO_JSON->{kind}, 'StaticWebSite60', 'TO_JSON kind still reports the real GVK kind');
 };
 
-subtest 'karr #60: GVK properties excluded from the registry (opts-only path -- --api_version/--kind)' => sub {
+subtest 'k60: GVK properties excluded from the registry (opts-only path -- --api_version/--kind)' => sub {
     IO::K8s::AutoGen::clear_cache();
     my $schema = { type => 'object', properties => {
         apiVersion => { type => 'string' },
