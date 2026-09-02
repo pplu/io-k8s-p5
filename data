@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-01T19:56:35Z
+claimed_by: site-fair
+class: standard
+completed: 2026-09-02T01:32:08Z
+created: 2026-09-01T19:43:47Z
+id: 76
+priority: low
+started: 2026-09-01T19:56:14Z
+status: done
+tags:
+- docs
+title: 'Role::Resource.pm: broken L</TO_JSON> / L</to_json> POD links'
+updated: 2026-09-02T01:32:08Z
+---
+
+lib/IO/K8s/Role/Resource.pm: sub TO_JSON (line 96) and sub to_json (line 192) have no =method POD block, so PodWeaver never emits a =head2 TO_JSON / =head2 to_json anchor for them. The POD added for FROM_HASH (commit 5ab95ca3, karr k59) links L<IO::K8s/inflate> and L</TO_JSON>; from_json's POD (same commit, k53) links L</to_json>. Both internal links are dangling -- confirmed with podchecker against the built (post-PodWeaver) tree: '*** ERROR: unresolved internal link ... at line 370/380 in file lib/IO/K8s/Role/Resource.pm'. dzil test's Test::Pod-based t/author-pod-syntax.t doesn't catch this (it checks syntax, not link resolution), so it built and tested green. Fix: add =method TO_JSON / =method to_json POD blocks (both are central serialization entry points and arguably deserve documentation regardless of the link bug), which will also make the two L</...> links resolve. Found during pre-1.108 release audit; hand to io-k8s-doc-writer.
+
+2026-09-01 19:56 =method TO_JSON and =method to_json added in Role/Resource.pm; dangling L</...> links now resolve; podchecker clean
+
+Review OK: =method TO_JSON/to_json in Role/Resource.pm ergänzt; podchecker auf gebautem Baum (post-PodWeaver) sauber → hängende L</...> Links aufgelöst.
