@@ -29,8 +29,7 @@ use Test::More;
 use Test::Exception;
 use Scalar::Util ();
 use File::Temp ();
-use File::Path ();
-use File::Spec;
+use Path::Tiny;
 use lib 'lib';
 use IO::K8s;
 
@@ -70,9 +69,8 @@ sub _is_a {
 sub _write_module {
     my ($module, $body) = @_;
     my @parts = split /::/, $module;
-    my $file  = File::Spec->catfile($shadow_lib, @parts) . '.pm';
-    my $dir   = File::Spec->catdir($shadow_lib, @parts[0 .. $#parts - 1]);
-    File::Path::make_path($dir) if @parts > 1;
+    my $file = path($shadow_lib, @parts) . '.pm';
+    path($shadow_lib, @parts[0 .. $#parts - 1])->mkpath if @parts > 1;
     open my $fh, '>', $file or die "cannot write $file: $!";
     print $fh $body;
     close $fh or die "cannot close $file: $!";

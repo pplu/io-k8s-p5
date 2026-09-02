@@ -487,6 +487,12 @@ top-level object (C<< api_version => ..., kind => ..., resource_plural =>
 ..., is_namespaced => ... >>); the generated class then also composes
 L<IO::K8s::Role::APIObject>.
 
+When C<api_version> (or C<kind> / C<resource_plural>) is supplied, the
+generated class installs fixed-value methods for each. These are fixed
+identity, not writable fields: passing an argument croaks rather than
+silently retargeting the object (k67, k70) -- the same contract the
+hand-written CRD template installs via L<IO::K8s::APIObject>.
+
 This function fails closed on input it cannot generate a faithful class
 from, rather than dropping fields or inventing a wrong type. It C<croak>s
 when:
@@ -499,12 +505,12 @@ a property, an array's C<items>, or an C<additionalProperties> schema
 carries a C<$ref> to a definition not present in C<$all_defs>. A partial
 spec that references definitions it does not ship used to generate the
 class anyway, minus those fields -- losing their data on every round-trip.
-It now dies naming the C<$ref> and where it appeared (karr #56).
+It now dies naming the C<$ref> and where it appeared (k56).
 
 =item *
 
 C<additionalProperties> is a reference that is neither a schema object nor
-a JSON boolean; the message names the class and field (karr #55).
+a JSON boolean; the message names the class and field (k55).
 
 =item *
 
@@ -517,7 +523,7 @@ selection fails closed rather than pick a version.
 One partial-spec shape still generates successfully by design: a top-level
 CRD schema whose C<metadata> C<$ref>s the standard C<ObjectMeta> without
 shipping its definition. C<metadata> is supplied by the role and is skipped
-before its C<$ref> is looked at (karr #60), so this common single-schema
+before its C<$ref> is looked at (k60), so this common single-schema
 hand-in does not trip the unresolved-C<$ref> refusal. A side effect of that
 skip: when C<$all_defs> does carry C<ObjectMeta> and nothing else
 references it, it no longer appears in L</generated_classes()>.

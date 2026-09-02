@@ -6,6 +6,20 @@ use Carp qw(croak);
 
 # --- Certificate methods ---
 
+=method for_domains
+
+    $cert->for_domains(@domains);
+
+Adds C<@domains> to the certificate's C<spec.dnsNames> array. Existing
+entries are preserved; duplicates are not deduplicated. This is the
+caller-facing way to populate the SAN list for a Certificate CRD -- the
+common name (CN) is taken from the first entry by cert-manager.
+Returns C<$self> for chaining.
+
+    $cert->for_domains('example.com', '*.example.com');
+
+=cut
+
 sub for_domains {
     my ($self, @domains) = @_;
     my $spec = $self->spec // {};
@@ -15,6 +29,18 @@ sub for_domains {
     $self->spec($spec);
     return $self;
 }
+
+=method with_issuer
+
+    $cert->with_issuer($name, kind => 'Issuer', group => 'cert-manager.io');
+
+Sets C<spec.issuerRef> to point at the named issuer. C<kind> defaults to
+C<Issuer> and C<group> to C<cert-manager.io>; pass C<kind =E<gt>
+'ClusterIssuer'> for cluster-scoped issuers. Returns C<$self> for chaining.
+
+    $cert->with_issuer('letsencrypt-prod', kind => 'ClusterIssuer');
+
+=cut
 
 sub with_issuer {
     my ($self, $name, %opts) = @_;
@@ -28,6 +54,17 @@ sub with_issuer {
     return $self;
 }
 
+=method store_in_secret
+
+    $cert->store_in_secret($secret_name);
+
+Sets C<spec.secretName> to the Kubernetes Secret name cert-manager should
+write the issued certificate into. Returns C<$self> for chaining.
+
+    $cert->store_in_secret('example-tls');
+
+=cut
+
 sub store_in_secret {
     my ($self, $secret_name) = @_;
     my $spec = $self->spec // {};
@@ -35,6 +72,19 @@ sub store_in_secret {
     $self->spec($spec);
     return $self;
 }
+
+=method add_ip_san
+
+    $cert->add_ip_san(@ips);
+
+Adds C<@ips> to the certificate's C<spec.ipAddresses> array after
+validating each one through L<IO::K8s::Types::Net/IPAddress>. Croaks if any
+value is not a valid IPv4 or IPv6 address. Duplicates are not deduplicated.
+Returns C<$self> for chaining.
+
+    $cert->add_ip_san('10.0.0.1', '192.168.1.1');
+
+=cut
 
 sub add_ip_san {
     my ($self, @ips) = @_;
@@ -51,6 +101,18 @@ sub add_ip_san {
     return $self;
 }
 
+=method renew_before
+
+    $cert->renew_before(days => $n);
+    $cert->renew_before(hours => $n);
+
+Sets C<spec.renewBefore> from either C<days> or C<hours>. The value is
+formatted as a Go duration string C<"<n>h0m0s"> -- the wire format
+cert-manager accepts. Pass exactly one of the two keys; if both are given
+C<days> wins. Returns C<$self> for chaining.
+
+=cut
+
 sub renew_before {
     my ($self, %opts) = @_;
     my $spec = $self->spec // {};
@@ -64,6 +126,21 @@ sub renew_before {
 }
 
 # --- Issuer/ClusterIssuer methods ---
+
+=method letsencrypt
+
+    $issuer->letsencrypt(email => $addr, production => 1, secret => 'le-account');
+
+Configures C<spec.acme> to obtain certificates from Let's Encrypt. The
+C<email> option is mandatory and croaks if missing; C<production =E<gt> 1>
+selects the production ACME directory and C<0> (the default) selects the
+staging directory. C<secret> names the Secret that holds the ACME account
+private key (defaults to C<letsencrypt-account-key>). Returns C<$self> for
+chaining.
+
+    $issuer->letsencrypt(email => 'ops@example.com', production => 1);
+
+=cut
 
 sub letsencrypt {
     my ($self, %opts) = @_;
@@ -83,6 +160,17 @@ sub letsencrypt {
     return $self;
 }
 
+=method self_signed
+
+    $issuer->self_signed;
+
+Configures C<spec.selfSigned> as an empty hash -- cert-manager's signal
+that the issuer issues certificates from itself. This is the issuer-side
+counterpart of the self-signed CA bootstrapping flow. Returns C<$self>
+for chaining.
+
+=cut
+
 sub self_signed {
     my ($self) = @_;
     my $spec = $self->spec // {};
@@ -90,6 +178,18 @@ sub self_signed {
     $self->spec($spec);
     return $self;
 }
+
+=method ca
+
+    $issuer->ca(secret => 'my-ca-key');
+
+Configures C<spec.ca> with the Secret name holding the CA private key and
+certificate. C<secret> is required and croaks if missing. Returns C<$self>
+for chaining.
+
+    $issuer->ca(secret => 'internal-ca');
+
+=cut
 
 sub ca {
     my ($self, %opts) = @_;
@@ -100,6 +200,19 @@ sub ca {
     $self->spec($spec);
     return $self;
 }
+
+=method add_http01_solver
+
+    $issuer->add_http01_solver(class => 'nginx');
+
+Appends an HTTP-01 challenge solver to C<spec.acme.solvers>. The solver
+configures cert-manager to satisfy ACME challenges via an Ingress; pass
+C<class =E<gt> $name> to select a specific Ingress class (the empty class
+default is C<nginx>). Returns C<$self> for chaining.
+
+    $issuer->add_http01_solver(class => 'nginx');
+
+=cut
 
 sub add_http01_solver {
     my ($self, %opts) = @_;
@@ -112,6 +225,23 @@ sub add_http01_solver {
     $self->spec($spec);
     return $self;
 }
+
+=method add_dns01_solver
+
+    $issuer->add_dns01_solver(provider => 'cloudflare', secret => 'cf-token', key => 'api-token');
+    $issuer->add_dns01_solver(provider => 'route53', region => 'us-east-1');
+    $issuer->add_dns01_solver(provider => 'acme-dns');
+
+Appends a DNS-01 challenge solver to C<spec.acme.solvers>. The
+C<provider> option selects the underlying solver block -- C<cloudflare>
+and C<route53> get the matching cloud-specific shape; any other provider
+name is written as a bare C<< { provider =E<gt> {} } >> block, leaving
+the details for the consumer to fill in. C<secret> / C<key> are
+Cloudflare-specific (the Kubernetes Secret holding the API token and the
+key inside that Secret, defaulting to C<api-token>); C<region> is
+Route53-specific. Returns C<$self> for chaining.
+
+=cut
 
 sub add_dns01_solver {
     my ($self, %opts) = @_;
@@ -136,3 +266,49 @@ sub add_dns01_solver {
 }
 
 1;
+
+__END__
+
+=head1 SYNOPSIS
+
+    package My::Certificate;
+    use IO::K8s::APIObject
+        api_version     => 'cert-manager.io/v1',
+        resource_plural => 'certificates';
+    with 'IO::K8s::Role::CertManaged';
+
+    package main;
+    my $k8s = IO::K8s->new(with => ['IO::K8s::CertManager']);
+    my $cert = $k8s->new_object('Certificate',
+        metadata => { name => 'example', namespace => 'default' },
+    );
+    $cert->for_domains('example.com', '*.example.com')
+         ->with_issuer('letsencrypt-prod', kind => 'ClusterIssuer')
+         ->store_in_secret('example-tls');
+
+=head1 DESCRIPTION
+
+This role provides the fluent certificate and issuer builders documented
+in the README's cert-manager section. Methods on the top half
+(C<for_domains>, C<with_issuer>, C<store_in_secret>, C<add_ip_san>,
+C<renew_before>) operate on C<Certificate> CRDs; methods on the bottom
+half (C<letsencrypt>, C<self_signed>, C<ca>, C<add_http01_solver>,
+C<add_dns01_solver>) operate on C<Issuer> / C<ClusterIssuer> CRDs. They
+are defined on the same role because the underlying spec shape overlaps
+and the consumer's CRD classes typically declare both.
+
+The two halves can be composed on the same class or split across two --
+the role does not enforce separation. Each setter returns C<$self>, so
+the chain reads top-to-bottom in declaration order regardless of which
+half each call belongs to.
+
+Validation is performed up-front: C<add_ip_san> croaks on a non-IP value,
+C<letsencrypt> croaks if C<email> is missing, and C<ca> croaks if
+C<secret> is missing. Croak rather than silent skip -- the consumer
+should not ship a manifest that the cluster will reject.
+
+=head1 SEE ALSO
+
+L<IO::K8s::CertManager>, L<IO::K8s::Types::Net>, L<IO::K8s::APIObject>
+
+=cut

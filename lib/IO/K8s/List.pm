@@ -71,7 +71,7 @@ Accepted only as a fully-qualified class name, exactly like every other
 class-name-taking parameter in this distribution: a leading C<+> is
 stripped before use ("this is already a full class name"), and a short or
 partially-qualified name is not guessed at -- L</kind> and L</api_version>
-simply have nothing to derive from it (karr #49).
+simply have nothing to derive from it (k49).
 
 =cut
 
@@ -157,7 +157,7 @@ Returns the Kubernetes kind (e.g., "PodList"), derived from items or item_class.
 For an C<item_class> the Kind is its last C<::> segment, or the whole name for
 a single-segment class such as a CRD registered as C<+Widget> -- but only when
 L</api_version> can also resolve for the same item_class; otherwise C<undef>,
-never a Kind with no apiVersion to go with it (karr #49).
+never a Kind with no apiVersion to go with it (k49).
 
 =cut
 
@@ -179,7 +179,7 @@ derive one" meaning it already has for an empty list built directly via
 C<new>. It is the only way to inflate a bare C<kind: List> payload, whose
 Kind minus its C<List> suffix is empty and so derives nothing on its own.
 
-Fails closed (karr #39/#46): an item Kind that cannot be resolved to a
+Fails closed (k39/k46): an item Kind that cannot be resolved to a
 class dies with the same "Cannot resolve Kubernetes GVK" error every other
 entry point in this distribution uses, naming the ITEM's kind/apiVersion,
 never a silently empty or half-inflated list.
@@ -252,6 +252,19 @@ sub FROM_STRUCT {
     );
 }
 
+=method TO_JSON
+
+    my $struct = $list->TO_JSON;
+
+Returns the canonical wire-format hashref for the list: C<apiVersion>
+and C<kind> when L</api_version> and L</kind> can derive them, plus an
+C<items> array of each entry's own C<TO_JSON> (untouched when an item is
+not a blessed object with a C<TO_JSON> method) and C<metadata> when set.
+This is the inverse of L</FROM_STRUCT> and the input L</to_json> runs
+through its JSON encoder.
+
+=cut
+
 sub TO_JSON {
     my $self = shift;
     my %data;
@@ -286,7 +299,7 @@ sub to_json {
 
 Serializes the List to a canonical JSON document as a B<UTF-8 encoded byte
 string> -- the same convention every L<IO::K8s::Role::Resource> class uses
-(karr #53), and the input L</from_json> reads back (karr #64).
+(k53), and the input L</from_json> reads back (k64).
 
 =cut
 

@@ -93,6 +93,24 @@ sub _invalidate_k8s_attr_cache {
     }
 }
 
+=method TO_JSON
+
+    my $struct = $pod->TO_JSON;
+
+Returns a plain hashref representation of the object suitable for JSON
+encoding -- the canonical wire format Kubernetes accepts. Walks the
+attribute registry of the class and emits each declared field with the
+right JSON type: integers unquoted, booleans as C<true>/C<false>, nested
+objects recursively via their own C<TO_JSON>, hashes and arrays of objects
+in their canonical shape. For classes that compose
+L<IO::K8s::Role::APIObject>, the C<apiVersion>, C<kind> and C<metadata>
+fields are prepended.
+
+This is the entry point L</to_json> builds on, and the inverse of
+L</FROM_HASH>.
+
+=cut
+
 sub TO_JSON {
     my $self = shift;
     my %data;
@@ -189,10 +207,32 @@ sub TO_JSON {
     return \%data;
 }
 
+=method to_json
+
+    my $json = $pod->to_json;
+
+Returns a UTF-8 encoded JSON byte string for the object. Thin wrapper over
+L</TO_JSON> that runs the resulting hashref through the canonical encoder
+configured in C<json()>. Symmetric to L</from_json> on the consumer side.
+
+=cut
+
 sub to_json {
     my $self = shift;
     return $self->json->encode($self->TO_JSON);
 }
+
+=method TO_YAML
+
+    my $yaml_string = $pod->TO_YAML;
+
+Returns a YAML string for the object, built via L<YAML::PP> on top of
+L</TO_JSON>. Uses the JSON schema with JSON booleans (so C<true>/C<false>
+survive the round-trip the way they would to the API server). Symmetric
+to L</TO_JSON> -- the YAML is just another wire format over the same
+canonical struct.
+
+=cut
 
 sub TO_YAML {
     my $self = shift;
@@ -205,6 +245,17 @@ sub to_yaml {
     my $self = shift;
     return $self->TO_YAML;
 }
+
+=method to_yaml
+
+    my $yaml_string = $pod->to_yaml;
+
+Returns a YAML byte string for the object, suitable for C<kubectl apply
+-f>. Thin wrapper over L</TO_YAML>; provided so the role offers both
+C<TO_JSON> and L<IO::K8s::APIObject/save> a single canonical entry
+point.
+
+=cut
 
 # The inflation that FROM_HASH routes through lives on an IO::K8s instance,
 # and FROM_HASH is a class method, so it borrows one shared default instance.
@@ -230,7 +281,7 @@ sub _default_k8s {
 Builds an object of this class from a plain hashref of JSON field names,
 inflating nested objects, arrays of objects and hashes of objects through the
 attribute registry -- the same inflation L<IO::K8s/inflate> performs, so a
-struct from L</TO_JSON> round-trips back (karr #59). Before 1.108 this was a
+struct from L</TO_JSON> round-trips back (k59). Before 1.108 this was a
 bare C<< $class->new(%$hash) >> and any nested field had to be pre-built.
 
 =cut
@@ -248,7 +299,7 @@ Builds an object of this class from a JSON document, symmetric to
 L</to_json>. The argument is a B<UTF-8 encoded byte string> -- exactly what
 C<to_json> produces; a decoded character string is not accepted and fails
 loudly in the JSON decoder rather than silently round-tripping to mojibake
-(karr #53). Decode-tolerance was rejected on purpose: it would leave
+(k53). Decode-tolerance was rejected on purpose: it would leave
 C<from_json> more permissive than C<< $k8s->json_to_object >>, which has
 always been byte-oriented.
 
@@ -259,6 +310,26 @@ sub from_json {
     state $json = JSON::MaybeXS->new(utf8 => 1);
     return $class->FROM_HASH($json->decode($json_str));
 }
+
+=method compare_to_schema
+
+    my $diff = IO::K8s::Api::Core::V1::Pod->compare_to_schema($swagger_def);
+
+Drift detector used by L<maint/spec-drift-check.pl> and other coverage
+checks. Compares this class's declared attributes against an OpenAPI
+schema hashref (one entry from a C<swagger.json>) and returns a hashref:
+
+    {
+        missing_locally    => [ ...property names the schema has but the class does not... ],
+        missing_in_schema  => [ ...json_key names the class has but the schema does not... ],
+        type_mismatch      => [ { attr => $name, local => $type, schema => $type }, ... ],
+    }
+
+C<apiVersion>, C<kind> and C<metadata> are skipped on the schema side --
+they are not declared with the C<k8s> DSL but are supplied by
+L<IO::K8s::Role::APIObject> and the role mesh.
+
+=cut
 
 # Compare local class attributes against OpenAPI schema
 # Returns hashref with differences:

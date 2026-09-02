@@ -91,7 +91,7 @@ subtest 'IO::K8s::Cilium resource_map' => sub {
     ok($provider->does('IO::K8s::Role::ResourceMap'), 'consumes ResourceMap role');
 
     my $map = $provider->resource_map;
-    is(scalar keys %$map, 22, 'resource_map has 22 entries');
+    is(scalar keys %$map, 30, 'resource_map has 30 entries');
 
     for my $kind (sort keys %v2_classes) {
         ok(exists $map->{$kind}, "$kind in resource_map");
@@ -102,9 +102,27 @@ subtest 'IO::K8s::Cilium resource_map' => sub {
         is($map->{$kind}, "Cilium::V2alpha1::$kind", "$kind maps to correct class path");
     }
 
-    # Removed CRDs should not be present
-    ok(!exists $map->{CiliumExternalWorkload},  'CiliumExternalWorkload removed');
-    ok(!exists $map->{CiliumBGPPeeringPolicy},  'CiliumBGPPeeringPolicy removed');
+    # Back-compat CRDs (karr #78) are reachable only via domain-qualified
+    # keys; the short names stay on the storage version.
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPAdvertisement'},
+        'CiliumBGPAdvertisement v2alpha1 back-compat reachable');
+    is($map->{'cilium.io/v2alpha1/CiliumBGPAdvertisement'},
+        'Cilium::V2alpha1::CiliumBGPAdvertisement',
+        'CiliumBGPAdvertisement v2alpha1 maps correctly');
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPClusterConfig'},
+        'CiliumBGPClusterConfig v2alpha1 back-compat reachable');
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPNodeConfig'},
+        'CiliumBGPNodeConfig v2alpha1 back-compat reachable');
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPNodeConfigOverride'},
+        'CiliumBGPNodeConfigOverride v2alpha1 back-compat reachable');
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPPeerConfig'},
+        'CiliumBGPPeerConfig v2alpha1 back-compat reachable');
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumCIDRGroup'},
+        'CiliumCIDRGroup v2alpha1 back-compat reachable');
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPPeeringPolicy'},
+        'CiliumBGPPeeringPolicy reachable (back-compat, removed upstream)');
+    ok(exists $map->{'cilium.io/v2/CiliumExternalWorkload'},
+        'CiliumExternalWorkload reachable (back-compat, removed upstream)');
 };
 
 # --- new(with => ['IO::K8s::Cilium']) integration ---
@@ -138,6 +156,64 @@ subtest 'with constructor parameter' => sub {
         'core Pod still resolves');
     is($k8s->expand_class('Deployment'), 'IO::K8s::Api::Apps::V1::Deployment',
         'core Deployment still resolves');
+};
+
+# --- Back-compat: 8 shipped Cilium classes now reachable via qualified GVKs (karr #78) ---
+
+subtest 'back-compat GVK resolution (karr #78)' => sub {
+    my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+
+    my @back_compat = (
+        [ 'cilium.io/v2alpha1', 'CiliumBGPAdvertisement',      'IO::K8s::Cilium::V2alpha1::CiliumBGPAdvertisement' ],
+        [ 'cilium.io/v2alpha1', 'CiliumBGPClusterConfig',      'IO::K8s::Cilium::V2alpha1::CiliumBGPClusterConfig' ],
+        [ 'cilium.io/v2alpha1', 'CiliumBGPNodeConfig',         'IO::K8s::Cilium::V2alpha1::CiliumBGPNodeConfig' ],
+        [ 'cilium.io/v2alpha1', 'CiliumBGPNodeConfigOverride', 'IO::K8s::Cilium::V2alpha1::CiliumBGPNodeConfigOverride' ],
+        [ 'cilium.io/v2alpha1', 'CiliumBGPPeerConfig',         'IO::K8s::Cilium::V2alpha1::CiliumBGPPeerConfig' ],
+        [ 'cilium.io/v2alpha1', 'CiliumCIDRGroup',             'IO::K8s::Cilium::V2alpha1::CiliumCIDRGroup' ],
+        [ 'cilium.io/v2alpha1', 'CiliumBGPPeeringPolicy',      'IO::K8s::Cilium::V2alpha1::CiliumBGPPeeringPolicy' ],
+        [ 'cilium.io/v2',       'CiliumExternalWorkload',      'IO::K8s::Cilium::V2::CiliumExternalWorkload' ],
+    );
+
+    for my $row (@back_compat) {
+        my ($api_version, $kind, $expected_class) = @$row;
+        my $qualified = "$api_version/$kind";
+
+        # Domain-qualified lookup
+        is($k8s->expand_class($qualified), $expected_class,
+            "expand_class('$qualified') resolves");
+
+        # inflate() of a hashref with the matching apiVersion
+        my $obj = $k8s->inflate({
+            apiVersion => $api_version,
+            kind       => $kind,
+            metadata   => { name => 'sample', namespace => 'default' },
+            spec       => {},
+        });
+        isa_ok($obj, $expected_class, "inflate returned $expected_class");
+        is($obj->api_version, $api_version, "$kind api_version preserved");
+        is($obj->kind, $kind, "$kind kind preserved");
+    }
+
+    # Short name for the 6 BGP/CIDR Kinds still resolves to the storage version (v2)
+    for my $kind (qw(CiliumBGPAdvertisement CiliumBGPClusterConfig
+                     CiliumBGPNodeConfig CiliumBGPNodeConfigOverride
+                     CiliumBGPPeerConfig CiliumCIDRGroup)) {
+        is($k8s->expand_class($kind), "IO::K8s::Cilium::V2::$kind",
+            "short name '$kind' still resolves to V2 storage version");
+        is($k8s->expand_class($kind, 'cilium.io/v2'),
+            "IO::K8s::Cilium::V2::$kind",
+            "$kind with api_version v2 resolves to V2");
+        is($k8s->expand_class($kind, 'cilium.io/v2alpha1'),
+            "IO::K8s::Cilium::V2alpha1::$kind",
+            "$kind with api_version v2alpha1 resolves to V2alpha1");
+    }
+
+    # The two removed Kinds are reachable only via their qualified keys —
+    # no short-name entry exists, matching the k58 pattern. (This is not
+    # tested via expand_class() directly: expand_class() falls through to a
+    # non-existent IO::K8s::<Kind> class without the resource_map entry.
+    # What callers care about is that inflate/dispatch of the back-compat
+    # GVKs above now succeeds — which the rows above assert.)
 };
 
 # --- new_object + inflate round-trip ---

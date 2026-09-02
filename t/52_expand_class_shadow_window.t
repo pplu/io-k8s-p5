@@ -42,8 +42,7 @@ use Test::More;
 use Test::Exception;
 use Scalar::Util ();
 use File::Temp ();
-use File::Path ();
-use File::Spec;
+use Path::Tiny;
 use lib 'lib';
 use IO::K8s;
 use IO::K8s::AutoGen ();
@@ -59,9 +58,8 @@ my $shadow_lib = "$shadow_dir";
 sub _write_module {
     my ($module, $body) = @_;
     my @parts = split /::/, $module;
-    my $file  = File::Spec->catfile($shadow_lib, @parts) . '.pm';
-    File::Path::make_path(File::Spec->catdir($shadow_lib, @parts[0 .. $#parts - 1]))
-        if @parts > 1;
+    my $file = path($shadow_lib, @parts) . '.pm';
+    path($shadow_lib, @parts[0 .. $#parts - 1])->mkpath if @parts > 1;
     open my $fh, '>', $file or die "cannot write $file: $!";
     print $fh $body;
     close $fh or die "cannot close $file: $!";
@@ -176,7 +174,7 @@ sub _is_a {
 # ----------------------------------------------------------------------------
 
 subtest 'harness: the fixture lib is on @INC and the shadows are real' => sub {
-    ok(-e File::Spec->catfile($shadow_lib, 'Widget.pm'), 'Widget.pm exists on disk');
+    ok(path($shadow_lib, 'Widget.pm')->exists, 'Widget.pm exists on disk');
     ok(!exists $INC{'Widget.pm'}, 'Widget.pm is loadable but not yet loaded');
     ok(Gizmo->can('new'), 'Gizmo exists in the symbol table only');
 

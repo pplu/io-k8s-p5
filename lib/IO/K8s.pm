@@ -1156,7 +1156,7 @@ IO::K8s - Objects representing things found in the Kubernetes API
 =head1 DESCRIPTION
 
 This module provides objects and serialization / deserialization methods that represent
-the structures found in the Kubernetes API L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/>
+the structures found in the Kubernetes API L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/>
 
 Kubernetes API is strict about input types. When a value is expected to be an integer,
 sending it as a string will cause rejection. This module ensures correct value types
@@ -1416,6 +1416,16 @@ HashRef mapping short names (like C<Pod>) and domain-qualified names
 built-in mappings for standard Kubernetes resources. Each instance gets its
 own copy, so modifications via C<add()> do not affect other instances.
 
+=head2 json
+
+A L<JSON::MaybeXS> encoder/decoder configured with C<utf8 =E<gt> 1> and
+C<canonical =E<gt> 1>. Used by L</object_to_json>, L</json_to_object> and
+L</inflate> for their default encoding/decoding. Override at construction
+when the caller needs a different encoder (for example, to disable
+C<canonical> for tighter output, or to swap in a different backend):
+
+    my $k8s = IO::K8s->new(json => JSON::MaybeXS->new(utf8 => 1));
+
 =head1 METHODS
 
 =head2 add
@@ -1543,6 +1553,16 @@ single-segment class of your own, prefix it: C<< $k8s->new_object('+Widget',
 An optional third argument specifies the C<api_version> to disambiguate when
 multiple providers register the same kind name.
 
+An C<apiVersion> key inside the params hash is honoured symmetrically with
+L</inflate>: it is treated as the exact GVK the caller wants, and the
+short name resolves against it instead of whichever version the class
+defaults to. When a positional C<api_version> is also given and the two
+disagree -- including one being defined and the other undef -- this
+croaks rather than picking one (k62):
+
+    new_object: conflicting apiVersion for kind 'NetworkPolicy' --
+    params hash says 'cilium.io/v2', positional argument says 'networking.k8s.io/v1'
+
 If the name is domain-qualified (like C<cilium.io/v2/NetworkPolicy>) or an
 explicit C<api_version> argument is given, it is a GVK (Group/Version/Kind)
 request. When such a request cannot be resolved to a class, the call dies
@@ -1622,11 +1642,50 @@ Serialize an IO::K8s object to JSON.
 
 Convert an IO::K8s object to a plain Perl hashref.
 
+=head2 expand_class
+
+    my $class = $k8s->expand_class('Pod');
+    my $class = $k8s->expand_class('cilium.io/v2/NetworkPolicy');
+    my $class = $k8s->expand_class('NetworkPolicy', 'cilium.io/v2');
+
+Resolve a name to a Perl class. The name can be a short Kind, a
+domain-qualified C<api_version/Kind>, or a full class path (prefix with
+C<+> for a verbatim class name, or write the C<IO::K8s::> prefix in
+full). Returns the class name as a string -- this method does not load
+the class.
+
+An explicit C<api_version> makes the lookup an exact GVK request: when
+no class can confirm the requested version, returns C<undef>. The
+qualified C<api_version/Kind> form is checked first against the resource
+map, then a short-name key whose mapped class itself reports the
+requested C<api_version>, then the C<openapi_spec> for an auto-generated
+class. Anything else fails closed rather than substituting a different
+version (k17).
+
+A bare unqualified name is B<not> a GVK request: it falls through to
+C<IO::K8s::>E<lt>KindE<gt> and then to auto-generation, and a name that
+resolves to nothing fails with the usual module-loading exception, not
+the GVK error.
+
+=head2 load_class
+
+    $k8s->load_class('IO::K8s::Api::Core::V1::Pod');
+
+Load (C<< require >>) a class by name. Used internally after
+L</expand_class> to make sure the class is in C<%INC> before the caller
+hands it to C<< $class->new >>. Dies with the usual C<Can't locate ... in
+@INC> message when the class is not installable.
+
 =head1 CILIUM CRD SUPPORT
 
-IO::K8s includes L<IO::K8s::Cilium> with 23 Cilium CRD classes covering
-C<cilium.io/v2> (12 CRDs) and C<cilium.io/v2alpha1> (11 CRDs). These are
-not loaded by default -- opt in at construction:
+IO::K8s includes L<IO::K8s::Cilium> with 30 Cilium CRD classes covering
+C<cilium.io/v2> (18 CRDs) and C<cilium.io/v2alpha1> (12 CRDs). The
+provider's C<resource_map> exposes 30 keys: 22 short-name keys (17
+C<cilium.io/v2> + 5 C<cilium.io/v2alpha1>) plus 8 domain-qualified
+back-compat keys for v2alpha1 BGP/CIDR tracks superseded by their v2
+counterparts and C<CiliumExternalWorkload>, which remain reachable for
+older clusters without losing the v2 short name (k78). These are not
+loaded by default -- opt in at construction:
 
   my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
 
@@ -1660,7 +1719,7 @@ Create a class that consumes L<IO::K8s::Role::ResourceMap>:
       };
   }
 
-See L<IO::K8s::Cilium> for a real-world example with 23 CRD classes.
+See L<IO::K8s::Cilium> for a real-world example with 30 CRD classes.
 
 =head2 Collision handling
 
@@ -1715,9 +1774,9 @@ from this distribution entirely. If you need the old name to fail loudly
 instead of silently resolving to a stale prior release, install
 L<IO::K8s::Deprecated>, which ships CPAN redirect stubs for all 76 of them.
 
-=item * B<Updated to Kubernetes v1.36 API>
+=item * B<Updated to Kubernetes v1.37 API>
 
-API objects have been updated from v1.14 to v1.36. Some fields may have changed,
+API objects have been updated from v1.14 to v1.37. Some fields may have changed,
 been added, or removed according to upstream Kubernetes API changes.
 
 =item * B<New Role for namespaced resources>
@@ -1736,7 +1795,7 @@ L<IO::K8s::Deprecated> - CPAN redirect stubs for IO::K8s module names that were 
 
 L<Kubernetes::REST::Example> - Comprehensive examples for using Kubernetes::REST with IO::K8s against a real cluster (Minikube, K3s, etc.)
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/>
 
 =head1 BUGS and SOURCE
 

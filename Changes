@@ -2,6 +2,34 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Make the eight back-compat Cilium classes restored in 1.105 actually
+    reachable (k78). The v2alpha1 BGP/CIDR tracks
+    (CiliumBGPAdvertisement, CiliumBGPClusterConfig, CiliumBGPNodeConfig,
+    CiliumBGPNodeConfigOverride, CiliumBGPPeerConfig, CiliumCIDRGroup),
+    CiliumBGPPeeringPolicy (v2alpha1) and CiliumExternalWorkload (v2)
+    loaded as classes but were absent from IO::K8s::Cilium's resource_map,
+    so inflate()/new_object() on their GVKs died "Cannot resolve
+    Kubernetes GVK" -- the stated purpose (serving clusters on older
+    Cilium releases) did not work. They are now registered under
+    domain-qualified keys, mirroring the k58 AgentSandbox pattern, so the
+    v2 short names keep resolving to the storage version.
+
+  - Fix the built META.json x_authority, which read "cpan:cpan:JLMARTIN"
+    (k75). dist.ini carried authority = cpan:JLMARTIN, but the
+    Author::GETTY plugin bundle prepends "cpan:" itself; the doubled
+    prefix -- shipped in every release to date -- did not match
+    cpan:JLMARTIN, so authority-aware tooling could not confirm the
+    co-maintainer's claim. dist.ini now carries the bare PAUSE id.
+
+  - Documentation corrections for the 1.108 audit: README and the core
+    POD now say Kubernetes v1.37 (k74, k79); the per-Kind API-class doc
+    reference URLs were moved from v1.36 to v1.37 to match (k74); the
+    dangling L</TO_JSON> / L</to_json> links in Role::Resource are
+    resolved and the serialization entry points documented (k76); the
+    fail-closed kind()/api_version()/resource_plural() and new_object
+    apiVersion contracts are now stated in POD (k79); and the builder
+    roles and IO::K8s::Types::Net ship with full =method/=func POD (k80).
+
   - Track upstream Kubernetes v1.37: 22 new Kinds (among them a new
     IO::K8s::Api::Lifecycle namespace), their supporting types and new
     fields, all registered for GVK dispatch (k72).

@@ -51,6 +51,13 @@ Kinds; C<undef> when there is no plural, e.g. a subresource)
 
 =back
 
+C<api_version()> and C<resource_plural()> are fixed identity methods, not
+writable fields: when a CRD declares its own via the import parameters
+below, passing an argument croaks rather than silently rebinding (k67, k70).
+The methods derive their value from the class name in the built-in case, so
+the same guard applies -- see L<IO::K8s::Role::APIObject> for the exact
+messages.
+
 For Custom Resource Definitions (CRDs), pass C<api_version> and
 optionally C<resource_plural> as import parameters. These are installed
 as class methods before the role is composed, avoiding redefinition warnings.

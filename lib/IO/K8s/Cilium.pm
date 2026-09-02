@@ -32,6 +32,20 @@ sub resource_map {
         CiliumGatewayClassConfig       => 'Cilium::V2alpha1::CiliumGatewayClassConfig',
         CiliumPodIPPool                => 'Cilium::V2alpha1::CiliumPodIPPool',
         CiliumDatapathPlugin           => 'Cilium::V2alpha1::CiliumDatapathPlugin',
+        # cilium.io/v2alpha1 back-compat for clusters still on older Cilium
+        # releases (karr #78): the v2alpha1 tracks of BGP/CIDR Kinds were
+        # superseded by the matching v2 classes (short names above), and two
+        # Kinds were removed (CiliumBGPPeeringPolicy, CiliumExternalWorkload).
+        # Each shipped class is reachable only via its domain-qualified key
+        # so the short name keeps resolving to the storage version.
+        'cilium.io/v2alpha1/CiliumBGPAdvertisement'      => 'Cilium::V2alpha1::CiliumBGPAdvertisement',
+        'cilium.io/v2alpha1/CiliumBGPClusterConfig'      => 'Cilium::V2alpha1::CiliumBGPClusterConfig',
+        'cilium.io/v2alpha1/CiliumBGPNodeConfig'         => 'Cilium::V2alpha1::CiliumBGPNodeConfig',
+        'cilium.io/v2alpha1/CiliumBGPNodeConfigOverride' => 'Cilium::V2alpha1::CiliumBGPNodeConfigOverride',
+        'cilium.io/v2alpha1/CiliumBGPPeerConfig'         => 'Cilium::V2alpha1::CiliumBGPPeerConfig',
+        'cilium.io/v2alpha1/CiliumCIDRGroup'             => 'Cilium::V2alpha1::CiliumCIDRGroup',
+        'cilium.io/v2alpha1/CiliumBGPPeeringPolicy'      => 'Cilium::V2alpha1::CiliumBGPPeeringPolicy',
+        'cilium.io/v2/CiliumExternalWorkload'            => 'Cilium::V2::CiliumExternalWorkload',
     };
 }
 
@@ -53,8 +67,10 @@ __END__
 =head1 DESCRIPTION
 
 Resource map provider for L<Cilium|https://cilium.io/> Custom Resource
-Definitions. Registers 22 CRD classes covering C<cilium.io/v2> and
-C<cilium.io/v2alpha1>, matching upstream Cilium v1.20.0.
+Definitions. Registers 30 resource_map entries (22 short-name keys plus 8
+domain-qualified back-compat keys for v2alpha1 BGP/CIDR tracks and
+CiliumExternalWorkload) covering C<cilium.io/v2> and C<cilium.io/v2alpha1>,
+matching upstream Cilium v1.20.0.
 
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.

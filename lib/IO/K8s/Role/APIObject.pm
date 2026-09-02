@@ -426,6 +426,11 @@ derived from the first ancestor in a known namespace.
     $pod->api_version;  # "v1"
     $deployment->api_version;  # "apps/v1"
 
+Derived identity, not a writable field: passing an argument croaks
+rather than silently rebinding (k67). CRD classes installed via
+L<IO::K8s::APIObject/api_version> install a fixed-value method with the
+same contract -- see there for the precise error message.
+
 =cut
 
 sub api_version {
@@ -493,6 +498,11 @@ registered as C<+Widget>.
 
     $pod->kind;  # "Pod"
     $deployment->kind;  # "Deployment"
+
+Derived identity, not a writable field: passing an argument croaks
+rather than silently rebinding (k67). Auto-generated CRD classes
+install a fixed-value method with the same contract -- see
+L<IO::K8s::AutoGen> for the precise error message.
 
 =cut
 
@@ -563,6 +573,11 @@ CRD classes declare their own, which always wins over the built-in table:
     use IO::K8s::APIObject
         api_version     => 'homelab.example.com/v1',
         resource_plural => 'staticwebsites';
+
+Derived identity, not a writable field: passing an argument croaks
+rather than silently rebinding (k70). CRD classes installed via
+L<IO::K8s::APIObject/resource_plural> install a fixed-value method with
+the same contract -- see there for the precise error message.
 
 =cut
 

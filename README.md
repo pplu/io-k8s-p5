@@ -1,10 +1,10 @@
 # IO::K8s
 
-Perl objects representing the Kubernetes API (v1.36).
+Perl objects representing the Kubernetes API (v1.37).
 
 ## Description
 
-This module provides Perl objects and serialization/deserialization methods that represent the structures found in the Kubernetes API (v1.36).
+This module provides Perl objects and serialization/deserialization methods that represent the structures found in the Kubernetes API (v1.37).
 
 Kubernetes API is strict about input types. When a value is expected to be an integer, sending it as a string will cause rejection. This module ensures correct value types in JSON that can be sent to Kubernetes.
 
@@ -344,10 +344,37 @@ If you are upgrading from a pre-1.100 release:
   The 76 `*List` classes were removed; the four stub-only namespaces
   above were dropped.
 - **1.105 → current:** `inflate()` now honours `apiVersion` for every
-  shipped multi-version Kind (karr #11). `api_version()` now produces
+  shipped multi-version Kind (k11). `api_version()` now produces
   the correct wire `apiVersion` for `storagemigration.k8s.io` and
-  `internal.apiserver.k8s.io` (karr #13); before the fix, manifests
+  `internal.apiserver.k8s.io` (k13); before the fix, manifests
   serialised for these two groups were rejected by the API server.
+  The release between 1.105 and now also carried a substantial body of
+  behaviour changes worth knowing about before upgrading:
+  - **Upstream sync to v1.37** (k72) — 22 new Kinds, a new
+    `IO::K8s::Api::Lifecycle` namespace, and ten fields upstream made
+    required are now required at construction.
+  - **Seven embedded template classes** (`PodTemplateSpec`,
+    `JobTemplateSpec`, `PersistentVolumeClaimTemplate`,
+    `ResourceClaimTemplateSpec` × 4 versions) no longer compose
+    `IO::K8s::APIObject` (k45), so `kind()`, `api_version()`,
+    `add_label()` and the rest of the role are gone from their
+    instances. Use the role on a wrapping object instead.
+  - **`set_owner()` became strict** (k47): owners without a `uid` are
+    refused; `controller` is now an explicit parameter (default 1);
+    a second controller reference or a duplicate owner is rejected
+    rather than silently written.
+  - **Booleans stop inventing `false` from `undef`** (k48); an explicit
+    `undef` now omits the field, matching the inflation path.
+  - **`FROM_HASH` is now strict and recursive** (k59) — every class is
+    `to_json` / `from_json` symmetric; raw nested hashrefs that used to
+    be refused are now inflated.
+  - **`kind()` and `api_version()` croak on an argument** (k67, k70) —
+    they are derived read-only identity accessors and silently
+    swallowing an argument was the source of hidden bugs.
+  - **`resource_plural()` croaks on an argument** too (k70), in the
+    three spots it lives (role accessor, `APIObject` import param,
+    AutoGen GVK constant).
+  See `Changes` for the full k33–k72 history.
 
 Code that still references one of the 76 removed `*List` class names
 will fail to install; install `IO::K8s::Deprecated` from CPAN for a
@@ -355,7 +382,7 @@ clear redirect message.
 
 ## Features
 
-- Support for Kubernetes v1.36 API objects
+- Support for Kubernetes v1.37 API objects
 - Type-safe object creation and serialization
 - Lightweight Moo-based implementation
 - Handles all Kubernetes resource types (Pods, Services, Deployments, etc.)
@@ -375,7 +402,7 @@ clear redirect message.
 - CPAN: https://metacpan.org/pod/IO::K8s
 - GitHub: https://github.com/pplu/io-k8s-p5
 - Issues: https://github.com/pplu/io-k8s-p5/issues
-- Kubernetes API Reference: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/
+- Kubernetes API Reference: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/
 
 ## Authors
 
