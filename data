@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-02T14:11:31Z
+claimed_by: io-k8s-worker
+class: standard
+completed: 2026-09-02T14:11:31Z
+created: 2026-09-02T13:51:41Z
+id: 82
+priority: medium
+started: 2026-09-02T13:52:20Z
+status: done
+tags:
+- maint
+- tooling
+- crd
+- spec-drift
+title: CRD spec-drift checker for the CRD providers
+updated: 2026-09-02T14:11:31Z
+---
+
+Analog to maint/spec-drift-check.pl but for the CRD providers (Cilium, Traefik, K3s, CertManager, GatewayAPI, AgentSandbox). The core tool only diffs the k8s swagger; the providers have no drift check at all. Each provider already declares sub upstream_version. New maint/crd-drift-check.pl fetches each provider upstream CRD manifests at that version, parses openAPIV3Schema, and diffs GVKs + top-level spec fields against the shipped resource_map and class registries. Per-provider crd_sources() hook added to each provider (co-located with upstream_version). Offline fixtures under spec/crd/, maint/crd-drift-exceptions.yaml for deliberate non-gaps. Report-only, never edits lib/. Requested 2026-09-02.
