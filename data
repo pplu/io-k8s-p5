@@ -1,0 +1,24 @@
+---
+claimed_at: 2026-09-02T14:43:03Z
+claimed_by: Opus/main
+class: standard
+completed: 2026-09-02T14:43:03Z
+created: 2026-09-02T14:10:27Z
+id: 84
+priority: low
+started: 2026-09-02T14:33:47Z
+status: done
+tags:
+- agentsandbox
+- spec-drift
+title: 'AgentSandbox: SandboxTemplate v1alpha1 over-models spec.volumeClaimTemplatesPolicy'
+updated: 2026-09-02T14:43:03Z
+---
+
+Found by maint/crd-drift-check.pl (k82). EXTRA FIELD: the shipped IO::K8s::AgentSandbox v1alpha1 SandboxTemplate class declares spec.volumeClaimTemplatesPolicy, but upstream agent-sandbox v0.5.4 introduces that field only at v1beta1 -- the v1alpha1 CRD schema does not carry it. Harmless at runtime (typed Str passthrough) but a genuine schema mismatch: the v1alpha1 class over-models by one field. Decide: drop the field from the v1alpha1 class to match upstream, or keep it with an exceptions entry if intentional forward-compat.
+
+Verified vs cached upstream CRD: v1alpha1 spec lacks volumeClaimTemplatesPolicy (only v1beta1 has it). Decision: drop field from v1alpha1 class + fix POD.
+
+DONE (pending commit). Dropped spec.volumeClaimTemplatesPolicy from v1alpha1 SandboxTemplate; POD fixed on both v1alpha1+v1beta1; t/28 assertion made version-conditional. drift extra-field line gone, Tier3 MISSING FIELD=0. Changes bullet added. Full suite 4572 PASS.
+
+Committed in 39bfcb3a.
