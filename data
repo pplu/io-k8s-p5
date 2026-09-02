@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-01T19:51:11Z
+claimed_by: harm-cook
+class: standard
+completed: 2026-09-02T01:31:59Z
+created: 2026-09-01T19:43:40Z
+id: 75
+priority: medium
+started: 2026-09-01T19:49:35Z
+status: done
+tags:
+- release
+- metadata
+title: 'META.json x_authority doubles the cpan: prefix: cpan:cpan:JLMARTIN'
+updated: 2026-09-02T01:31:59Z
+---
+
+dist.ini has 'authority = cpan:JLMARTIN'. Dist::Zilla::PluginBundle::Author::GETTY (installed at /home/getty/perl5/lib/perl5/Dist/Zilla/PluginBundle/Author/GETTY.pm line 61) unconditionally prepends 'cpan:' to whatever the authority payload option holds: return 'cpan:'.$self->payload->{authority} if $self->payload->{authority};. Because dist.ini already includes the 'cpan:' prefix, the built META.json ends up with x_authority: "cpan:cpan:JLMARTIN" -- confirmed both in a fresh 'dzil build' of this working tree and in the already-released IO-K8s-1.107.tar.gz pulled from CPAN (GETTY/IO-K8s-1.107.tar.gz), so this is not new to 1.108 -- it has shipped broken in every release to date. The bundle's own POD documents the option as bare, e.g. 'authority = ETHER' (no cpan: prefix). Fix: dist.ini should read 'authority = JLMARTIN' (bare), which the bundle will correctly turn into cpan:JLMARTIN. Malformed x_authority undermines the very point of a co-maintained dist -- it doesn't match cpan:JLMARTIN so authority-aware tooling can't confirm JLMARTIN's claim. Not a blocker for 1.108 specifically (pre-existing, hasn't stopped any prior release) but worth fixing now that it's identified. Found during pre-1.108 release audit.
+
+2026-09-01 19:51 dist.ini authority line now reads 'JLMARTIN' (bare); bundle will prepend cpan: → META.json x_authority becomes cpan:JLMARTIN. Verified with 'dzil build' on the modified dist.ini: built IO-K8s-1.108/META.json now contains "x_authority" : "cpan:JLMARTIN" (single prefix, was cpan:cpan:JLMARTIN before). Build artifacts cleaned.
+
+Review OK: dist.ini authority=JLMARTIN (bare). GETTY-Bundle Zeile 61 prepended 'cpan:' → x_authority=cpan:JLMARTIN. Bundle-Verhalten bestätigt.
