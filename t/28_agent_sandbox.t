@@ -6,7 +6,8 @@ use Test::Exception;
 use IO::K8s;
 use IO::K8s::AgentSandbox;
 
-# --- All AgentSandbox CRD classes (v1alpha1: served, deprecated; v1beta1: storage) ---
+# --- All AgentSandbox CRD classes (v1alpha1: removed upstream at v1.0.0, kept as
+#     back-compat for v0.5.x clusters; v1beta1: current, only upstream-served) ---
 
 my %core_classes = (
     Sandbox => {
@@ -62,14 +63,14 @@ subtest 'class metadata (v1alpha1 and v1beta1)' => sub {
 subtest 'IO::K8s::AgentSandbox resource_map' => sub {
     my $provider = IO::K8s::AgentSandbox->new;
     ok($provider->does('IO::K8s::Role::ResourceMap'), 'consumes ResourceMap role');
-    is($provider->upstream_version, 'v0.5.4', 'upstream_version is v0.5.4');
+    is($provider->upstream_version, 'v1.0.0', 'upstream_version is v1.0.0');
     my $map = $provider->resource_map;
 
     # 4 short names (each resolving to the v1beta1/storage class) plus 4
-    # domain-qualified v1alpha1 keys (k58) -- the v1alpha1 track is
-    # still served upstream but is no longer the storage version, so it does
-    # not get a short name of its own; it is reachable only by full class
-    # name or by its own domain-qualified key.
+    # domain-qualified v1alpha1 keys (k58, k88) -- the v1alpha1 track was
+    # removed upstream at v1.0.0 and is kept here as back-compat for v0.5.x
+    # clusters, so it does not get a short name of its own; it is reachable
+    # only by full class name or by its own domain-qualified key.
     is(scalar keys %$map, 8, 'resource_map has 4 short names + 4 domain-qualified v1alpha1 keys');
     for my $kind (sort keys %all_classes) {
         ok(exists $map->{$kind}, "$kind in resource_map");
@@ -105,8 +106,9 @@ subtest 'with constructor parameter' => sub {
     # maps only to its GA class, and the older v1beta1/v1alpha1 tracks
     # fail-close under a domain-qualified lookup): that precedent applies
     # where there IS a GA release to prefer. AgentSandbox has no GA version at
-    # all -- v1beta1 is only the current storage version, v1alpha1 is still
-    # actively served upstream, and IO::K8s::AgentSandbox's own POD has always
+    # all -- v1beta1 is the current (and now only) upstream-served version,
+    # v1alpha1 was removed upstream at v1.0.0 and is kept here as back-compat,
+    # and IO::K8s::AgentSandbox's own POD has always
     # promised this lookup ("via domain-qualified lookup (e.g.
     # agents.x-k8s.io/v1alpha1/Sandbox)"). All eight GVK combinations (2
     # tracks x 4 kinds) resolve; the four short names stay pinned to v1beta1

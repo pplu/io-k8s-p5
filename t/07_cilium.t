@@ -7,7 +7,7 @@ use Test::Exception;
 use IO::K8s;
 use IO::K8s::Cilium;
 
-# --- All Cilium CRD classes (matching upstream Cilium v1.20.0) ---
+# --- All Cilium CRD classes (matching upstream Cilium v1.20.1) ---
 
 my %v2_classes = (
     CiliumNetworkPolicy            => { plural => 'ciliumnetworkpolicies',            namespaced => 1 },

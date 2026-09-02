@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
-sub upstream_version { 'v1.20.0' }  # cilium/cilium
+sub upstream_version { 'v1.20.1' }  # cilium/cilium
 
 # Upstream CRD manifests for the pinned upstream_version, consumed by
 # maint/crd-drift-check.pl. Data only -- no fetching happens here. `base`
@@ -109,7 +109,7 @@ Resource map provider for L<Cilium|https://cilium.io/> Custom Resource
 Definitions. Registers 31 resource_map entries (22 short-name keys plus 9
 domain-qualified back-compat keys for v2alpha1 BGP/CIDR/LB tracks and
 CiliumExternalWorkload) covering C<cilium.io/v2> and C<cilium.io/v2alpha1>,
-matching upstream Cilium v1.20.0.
+matching upstream Cilium v1.20.1.
 
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.

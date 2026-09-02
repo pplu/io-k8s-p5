@@ -2,6 +2,20 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Bump CRD-provider upstream pins (k85-k88). Verified with
+    maint/crd-drift-check.pl against each new upstream release:
+      * Cilium v1.20.0 -> v1.20.1 (k85) -- no schema drift.
+      * Traefik v3.7.10 -> v3.7.12 (k86) -- no schema drift.
+      * K3s v1.36.3+k3s1 -> v1.36.4+k3s1 (k87) -- schemaless upstream;
+        version pin only (k3s has no v1.37 release yet).
+      * AgentSandbox v0.5.4 -> v1.0.0 (k88) -- v1.0.0 removes the entire
+        v1alpha1 track upstream (all four Kinds now serve v1beta1 only).
+        The four v1alpha1 classes are kept as a back-compat superset for
+        clusters still on agent-sandbox v0.5.x and suppressed via new
+        ignore_stale_kinds entries in maint/crd-drift-exceptions.yaml; the
+        v1beta1 classes still match upstream exactly.
+    GatewayAPI (v1.6.1) and CertManager (v1.21.1) were already current.
+
   - Register the missing cilium.io/v2alpha1/CiliumLoadBalancerIPPool
     back-compat GVK (k83). Upstream Cilium v1.20 serves
     CiliumLoadBalancerIPPool at both cilium.io/v2 and cilium.io/v2alpha1,

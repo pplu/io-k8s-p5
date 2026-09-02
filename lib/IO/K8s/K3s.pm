@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
-sub upstream_version { 'v1.36.3+k3s1' }
+sub upstream_version { 'v1.36.4+k3s1' }
 
 # Source status for maint/crd-drift-check.pl. Data only -- no fetching here.
 # k3s-io/k3s does not publish machine-readable openAPIV3Schema CRDs for these

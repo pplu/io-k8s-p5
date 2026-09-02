@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use Moo;
 with 'IO::K8s::Role::ResourceMap';
 
-sub upstream_version { 'v3.7.10' }  # traefik/traefik (CRD set stable across all v3.x)
+sub upstream_version { 'v3.7.12' }  # traefik/traefik (CRD set stable across all v3.x)
 
 # Upstream CRD manifests for the pinned upstream_version, consumed by
 # maint/crd-drift-check.pl. Data only -- no fetching here. The per-Kind
