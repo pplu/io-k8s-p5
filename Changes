@@ -2,6 +2,23 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Register the missing cilium.io/v2alpha1/CiliumLoadBalancerIPPool
+    back-compat GVK (k83). Upstream Cilium v1.20 serves
+    CiliumLoadBalancerIPPool at both cilium.io/v2 and cilium.io/v2alpha1,
+    but the k78 back-compat pass covered only the sibling BGP/CIDR Kinds --
+    the v2alpha1 LB pool had no shipped class and did not inflate. A new
+    opaque IO::K8s::Cilium::V2alpha1::CiliumLoadBalancerIPPool class is
+    registered under its domain-qualified key, mirroring k78; the
+    CiliumLoadBalancerIPPool short name still resolves to the v2 storage
+    version.
+
+  - Drop spec.volumeClaimTemplatesPolicy from
+    IO::K8s::AgentSandbox::V1alpha1::SandboxTemplate (k84). Upstream
+    agent-sandbox v0.5.4 adds that field only at v1beta1; the v1alpha1 CRD
+    schema does not carry it, so the shipped v1alpha1 class over-modelled by
+    one field. The v1beta1 class keeps the field; POD on both tracks is
+    corrected.
+
   - New maintenance tool maint/crd-drift-check.pl (k82): the CRD-provider
     analog of spec-drift-check.pl. It fetches each provider's upstream CRD
     manifests at its declared upstream_version, parses the openAPIV3Schema

@@ -314,7 +314,17 @@ subtest 'SandboxTemplate inline struct inner classes exist (both versions)' => s
         ok($spec_class->can('envVarsInjectionPolicy'),        "[$ver] spec has envVarsInjectionPolicy (new in v0.5.4)");
         ok($spec_class->can('service'),                       "[$ver] spec has service (new in v0.5.4)");
         ok($spec_class->can('volumeClaimTemplates'),          "[$ver] spec has volumeClaimTemplates (new in v0.5.4)");
-        ok($spec_class->can('volumeClaimTemplatesPolicy'),    "[$ver] spec has volumeClaimTemplatesPolicy (new in v0.5.4)");
+
+        # volumeClaimTemplatesPolicy is a v1beta1-only addition; the v1alpha1 CRD
+        # schema does not carry it (karr k84).
+        if ($ver eq 'V1beta1') {
+            ok($spec_class->can('volumeClaimTemplatesPolicy'),
+                "[$ver] spec has volumeClaimTemplatesPolicy (v1beta1-only)");
+        }
+        else {
+            ok(!$spec_class->can('volumeClaimTemplatesPolicy'),
+                "[$ver] spec has no volumeClaimTemplatesPolicy (v1beta1-only, absent from v1alpha1 schema)");
+        }
 
         ok(!"IO::K8s::AgentSandbox::${ver}::SandboxTemplate"->can('status'),
             "[$ver] SandboxTemplate has no status object (upstream schema omits it)");

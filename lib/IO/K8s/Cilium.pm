@@ -71,7 +71,7 @@ sub resource_map {
         CiliumPodIPPool                => 'Cilium::V2alpha1::CiliumPodIPPool',
         CiliumDatapathPlugin           => 'Cilium::V2alpha1::CiliumDatapathPlugin',
         # cilium.io/v2alpha1 back-compat for clusters still on older Cilium
-        # releases (k78): the v2alpha1 tracks of BGP/CIDR Kinds were
+        # releases (k78, k83): the v2alpha1 tracks of BGP/CIDR/LB Kinds were
         # superseded by the matching v2 classes (short names above), and two
         # Kinds were removed (CiliumBGPPeeringPolicy, CiliumExternalWorkload).
         # Each shipped class is reachable only via its domain-qualified key
@@ -82,6 +82,7 @@ sub resource_map {
         'cilium.io/v2alpha1/CiliumBGPNodeConfigOverride' => 'Cilium::V2alpha1::CiliumBGPNodeConfigOverride',
         'cilium.io/v2alpha1/CiliumBGPPeerConfig'         => 'Cilium::V2alpha1::CiliumBGPPeerConfig',
         'cilium.io/v2alpha1/CiliumCIDRGroup'             => 'Cilium::V2alpha1::CiliumCIDRGroup',
+        'cilium.io/v2alpha1/CiliumLoadBalancerIPPool'    => 'Cilium::V2alpha1::CiliumLoadBalancerIPPool',
         'cilium.io/v2alpha1/CiliumBGPPeeringPolicy'      => 'Cilium::V2alpha1::CiliumBGPPeeringPolicy',
         'cilium.io/v2/CiliumExternalWorkload'            => 'Cilium::V2::CiliumExternalWorkload',
     };
@@ -105,8 +106,8 @@ __END__
 =head1 DESCRIPTION
 
 Resource map provider for L<Cilium|https://cilium.io/> Custom Resource
-Definitions. Registers 30 resource_map entries (22 short-name keys plus 8
-domain-qualified back-compat keys for v2alpha1 BGP/CIDR tracks and
+Definitions. Registers 31 resource_map entries (22 short-name keys plus 9
+domain-qualified back-compat keys for v2alpha1 BGP/CIDR/LB tracks and
 CiliumExternalWorkload) covering C<cilium.io/v2> and C<cilium.io/v2alpha1>,
 matching upstream Cilium v1.20.0.
 

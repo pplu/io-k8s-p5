@@ -31,8 +31,9 @@ API version.
 
 Compared to the deprecated (served-but-not-storage) C<extensions.agents.x-k8s.io/v1alpha1>
 track modeled by L<IO::K8s::AgentSandbox::V1alpha1::SandboxTemplate>, this version's
-C<spec> gains C<envVarsInjectionPolicy>, C<service>, C<volumeClaimTemplates>, and
-C<volumeClaimTemplatesPolicy> — the same additions made to the C<v1alpha1> track.
+C<spec> shares C<envVarsInjectionPolicy>, C<service>, and C<volumeClaimTemplates> with
+that track, and additionally carries C<volumeClaimTemplatesPolicy>, which is present only
+here and absent from the C<v1alpha1> CRD schema.
 
 =seealso
 

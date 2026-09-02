@@ -91,7 +91,7 @@ subtest 'IO::K8s::Cilium resource_map' => sub {
     ok($provider->does('IO::K8s::Role::ResourceMap'), 'consumes ResourceMap role');
 
     my $map = $provider->resource_map;
-    is(scalar keys %$map, 30, 'resource_map has 30 entries');
+    is(scalar keys %$map, 31, 'resource_map has 31 entries');
 
     for my $kind (sort keys %v2_classes) {
         ok(exists $map->{$kind}, "$kind in resource_map");
@@ -119,6 +119,11 @@ subtest 'IO::K8s::Cilium resource_map' => sub {
         'CiliumBGPPeerConfig v2alpha1 back-compat reachable');
     ok(exists $map->{'cilium.io/v2alpha1/CiliumCIDRGroup'},
         'CiliumCIDRGroup v2alpha1 back-compat reachable');
+    ok(exists $map->{'cilium.io/v2alpha1/CiliumLoadBalancerIPPool'},
+        'CiliumLoadBalancerIPPool v2alpha1 back-compat reachable');
+    is($map->{'cilium.io/v2alpha1/CiliumLoadBalancerIPPool'},
+        'Cilium::V2alpha1::CiliumLoadBalancerIPPool',
+        'CiliumLoadBalancerIPPool v2alpha1 maps correctly');
     ok(exists $map->{'cilium.io/v2alpha1/CiliumBGPPeeringPolicy'},
         'CiliumBGPPeeringPolicy reachable (back-compat, removed upstream)');
     ok(exists $map->{'cilium.io/v2/CiliumExternalWorkload'},
@@ -158,9 +163,9 @@ subtest 'with constructor parameter' => sub {
         'core Deployment still resolves');
 };
 
-# --- Back-compat: 8 shipped Cilium classes now reachable via qualified GVKs (k78) ---
+# --- Back-compat: 9 shipped Cilium classes now reachable via qualified GVKs (k78, k83) ---
 
-subtest 'back-compat GVK resolution (k78)' => sub {
+subtest 'back-compat GVK resolution (k78, k83)' => sub {
     my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
 
     my @back_compat = (
@@ -170,6 +175,7 @@ subtest 'back-compat GVK resolution (k78)' => sub {
         [ 'cilium.io/v2alpha1', 'CiliumBGPNodeConfigOverride', 'IO::K8s::Cilium::V2alpha1::CiliumBGPNodeConfigOverride' ],
         [ 'cilium.io/v2alpha1', 'CiliumBGPPeerConfig',         'IO::K8s::Cilium::V2alpha1::CiliumBGPPeerConfig' ],
         [ 'cilium.io/v2alpha1', 'CiliumCIDRGroup',             'IO::K8s::Cilium::V2alpha1::CiliumCIDRGroup' ],
+        [ 'cilium.io/v2alpha1', 'CiliumLoadBalancerIPPool',    'IO::K8s::Cilium::V2alpha1::CiliumLoadBalancerIPPool' ],
         [ 'cilium.io/v2alpha1', 'CiliumBGPPeeringPolicy',      'IO::K8s::Cilium::V2alpha1::CiliumBGPPeeringPolicy' ],
         [ 'cilium.io/v2',       'CiliumExternalWorkload',      'IO::K8s::Cilium::V2::CiliumExternalWorkload' ],
     );
@@ -194,10 +200,11 @@ subtest 'back-compat GVK resolution (k78)' => sub {
         is($obj->kind, $kind, "$kind kind preserved");
     }
 
-    # Short name for the 6 BGP/CIDR Kinds still resolves to the storage version (v2)
+    # Short name for the 7 BGP/CIDR/LB Kinds still resolves to the storage version (v2)
     for my $kind (qw(CiliumBGPAdvertisement CiliumBGPClusterConfig
                      CiliumBGPNodeConfig CiliumBGPNodeConfigOverride
-                     CiliumBGPPeerConfig CiliumCIDRGroup)) {
+                     CiliumBGPPeerConfig CiliumCIDRGroup
+                     CiliumLoadBalancerIPPool)) {
         is($k8s->expand_class($kind), "IO::K8s::Cilium::V2::$kind",
             "short name '$kind' still resolves to V2 storage version");
         is($k8s->expand_class($kind, 'cilium.io/v2'),
