@@ -38,7 +38,7 @@ status contains information about whether the request is approved or denied, and
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#certificatesigningrequest-v1-certificates.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#certificatesigningrequest-v1-certificates.k8s.io>
 
 
 =cut

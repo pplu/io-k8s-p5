@@ -33,7 +33,7 @@ status is the current information about the autoscaler.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#horizontalpodautoscaler-v2-autoscaling.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#horizontalpodautoscaler-v2-autoscaling.k8s.io>
 
 
 =cut

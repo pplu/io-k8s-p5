@@ -32,7 +32,7 @@ API server instances report the version they can decode and the version they enc
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#storageversion-v1alpha1-apiserver.internal.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#storageversion-v1alpha1-apiserver.internal.k8s.io>
 
 
 =cut

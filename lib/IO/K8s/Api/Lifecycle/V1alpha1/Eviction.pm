@@ -40,7 +40,7 @@ status represents the most recently observed status of the eviction. Populated b
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#eviction-v1alpha1-lifecycle.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#eviction-v1alpha1-lifecycle.k8s.io>
 
 
 =cut

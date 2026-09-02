@@ -23,7 +23,7 @@ spec is the specification of CSINode
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#csinode-v1-storage.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#csinode-v1-storage.k8s.io>
 
 
 =cut

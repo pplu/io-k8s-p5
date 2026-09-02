@@ -46,7 +46,7 @@ Used to facilitate programmatic handling of secret data. More info: https://kube
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#secret-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#secret-v1-core>
 
 =cut
 1;

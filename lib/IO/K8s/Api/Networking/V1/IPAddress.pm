@@ -23,7 +23,7 @@ spec is the desired state of the IPAddress. More info: https://git.k8s.io/commun
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#ipaddress-v1-networking-k8s-io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#ipaddress-v1-networking-k8s-io>
 
 
 =cut

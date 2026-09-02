@@ -34,7 +34,7 @@ status is the current state of the Ingress. More info: https://git.k8s.io/commun
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#ingress-v1-networking.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#ingress-v1-networking.k8s.io>
 
 
 =cut

@@ -32,7 +32,7 @@ Status is filled in by the server and indicates the set of actions a user can pe
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#selfsubjectrulesreview-v1-authorization.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#selfsubjectrulesreview-v1-authorization.k8s.io>
 
 
 =cut

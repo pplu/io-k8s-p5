@@ -42,7 +42,7 @@ ports specifies the list of network ports exposed by each endpoint in this slice
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#endpointslice-v1-discovery.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#endpointslice-v1-discovery.k8s.io>
 
 
 =cut

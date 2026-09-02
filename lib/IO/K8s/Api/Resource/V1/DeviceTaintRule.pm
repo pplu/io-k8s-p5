@@ -33,7 +33,7 @@ Status provides information about what was requested in the spec.
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#devicetaintrule-v1-resource.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#devicetaintrule-v1-resource.k8s.io>
 
 
 =cut

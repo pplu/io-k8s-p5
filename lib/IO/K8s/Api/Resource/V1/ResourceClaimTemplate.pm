@@ -26,7 +26,7 @@ This field is immutable. A ResourceClaim will get created by the control plane f
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#resourceclaimtemplate-v1-resource.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#resourceclaimtemplate-v1-resource.k8s.io>
 
 
 =cut

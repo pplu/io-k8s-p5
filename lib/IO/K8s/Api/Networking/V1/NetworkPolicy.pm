@@ -25,7 +25,7 @@ spec represents the specification of the desired behavior for this NetworkPolicy
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#networkpolicy-v1-networking.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#networkpolicy-v1-networking.k8s.io>
 
 
 =cut

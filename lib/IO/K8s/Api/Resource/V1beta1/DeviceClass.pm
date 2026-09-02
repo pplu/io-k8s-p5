@@ -23,7 +23,7 @@ Spec defines what can be allocated and how to configure it.  This is mutable. Co
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#deviceclass-v1beta1-resource.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#deviceclass-v1beta1-resource.k8s.io>
 
 
 =cut

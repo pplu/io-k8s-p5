@@ -32,7 +32,7 @@ Status is populated by the controller with the calculated pool status. When stat
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#resourcepoolstatusrequest-v1alpha3-resource.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#resourcepoolstatusrequest-v1alpha3-resource.k8s.io>
 
 
 =cut

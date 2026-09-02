@@ -32,7 +32,7 @@ k8s status => 'Flowcontrol::V1::PriorityLevelConfigurationStatus';
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#prioritylevelconfiguration-v1-flowcontrol.apiserver.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#prioritylevelconfiguration-v1-flowcontrol.apiserver.k8s.io>
 
 
 =cut

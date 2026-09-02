@@ -33,7 +33,7 @@ status represents the current information/status of a persistent volume claim. R
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#persistentvolumeclaim-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#persistentvolumeclaim-v1-core>
 
 
 =cut

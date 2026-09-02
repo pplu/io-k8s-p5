@@ -24,7 +24,7 @@ Describes the ResourceClaim that is to be generated.  This field is immutable. A
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#resourceclaimtemplate-v1beta2-resource.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#resourceclaimtemplate-v1beta2-resource.k8s.io>
 
 
 =cut

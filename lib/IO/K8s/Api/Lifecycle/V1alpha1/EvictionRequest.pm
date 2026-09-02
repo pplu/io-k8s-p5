@@ -42,7 +42,7 @@ status represents the most recently observed status of the eviction request. Mor
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#evictionrequest-v1alpha1-lifecycle.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#evictionrequest-v1alpha1-lifecycle.k8s.io>
 
 
 =cut

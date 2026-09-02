@@ -23,7 +23,7 @@ spec defines the desired behavior of the MutatingAdmissionPolicy.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#mutatingadmissionpolicy-v1alpha1-admissionregistration.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#mutatingadmissionpolicy-v1alpha1-admissionregistration.k8s.io>
 
 
 =cut

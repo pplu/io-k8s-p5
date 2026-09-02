@@ -33,7 +33,7 @@ Current status of a cron job. More info: https://git.k8s.io/community/contributo
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#cronjob-v1-batch>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#cronjob-v1-batch>
 
 
 =cut

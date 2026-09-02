@@ -32,7 +32,7 @@ Subjects holds references to the objects the role applies to.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#clusterrolebinding-v1-rbac.authorization.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#clusterrolebinding-v1-rbac.authorization.k8s.io>
 
 
 =cut

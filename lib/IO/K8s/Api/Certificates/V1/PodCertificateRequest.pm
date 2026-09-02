@@ -34,7 +34,7 @@ status contains the issued certificate, and a standard set of conditions.
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#podcertificaterequest-v1-certificates.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#podcertificaterequest-v1-certificates.k8s.io>
 
 
 =cut

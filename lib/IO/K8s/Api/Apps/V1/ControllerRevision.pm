@@ -33,7 +33,7 @@ Revision indicates the revision of the state represented by Data.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#controllerrevision-v1-apps>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#controllerrevision-v1-apps>
 
 
 =cut

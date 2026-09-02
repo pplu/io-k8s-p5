@@ -24,7 +24,7 @@ The target object that you want to bind to the standard object.
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#binding-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#binding-v1-core>
 
 
 =cut

@@ -32,7 +32,7 @@ Status describes whether the claim is ready to use and what has been allocated.
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#resourceclaim-v1beta2-resource.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#resourceclaim-v1beta2-resource.k8s.io>
 
 
 =cut

@@ -23,7 +23,7 @@ Contains the information published by the driver.  Changing the spec automatical
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#resourceslice-v1beta1-resource.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#resourceslice-v1beta1-resource.k8s.io>
 
 
 =cut

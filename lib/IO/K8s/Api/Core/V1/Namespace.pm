@@ -30,7 +30,7 @@ Status describes the current status of a Namespace. More info: https://git.k8s.i
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#namespace-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#namespace-v1-core>
 
 =cut
 

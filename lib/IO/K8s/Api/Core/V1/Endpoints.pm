@@ -36,7 +36,7 @@ The set of all endpoints is the union of all subsets. Addresses are placed into 
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#endpoints-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#endpoints-v1-core>
 
 
 =cut

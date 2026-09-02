@@ -24,7 +24,7 @@ DeleteOptions may be provided
 =cut
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#eviction-v1-policy.k8s.io>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#eviction-v1-policy.k8s.io>
 
 
 =cut

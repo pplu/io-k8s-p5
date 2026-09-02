@@ -34,7 +34,7 @@ Most recently observed status of the pod. This data may not be up to date. Popul
 
 =seealso
 
-L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#pod-v1-core>
+L<https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.37/#pod-v1-core>
 
 
 =cut
