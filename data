@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-01T19:54:38Z
+claimed_by: plan-dark
+class: standard
+completed: 2026-09-02T01:32:27Z
+created: 2026-09-01T19:43:53Z
+id: 77
+priority: low
+started: 2026-09-01T19:51:20Z
+status: done
+tags:
+- tests
+- style
+title: New shadow-window tests use File::Spec instead of Path::Tiny
+updated: 2026-09-02T01:32:27Z
+---
+
+t/50_shadowed_kind_names.t and t/52_expand_class_shadow_window.t (both new in this release cycle, added whole by cb0ab218/3fc626a1, 338 and 383 lines) use File::Spec->catfile/catdir to build shadow-lib fixture paths on disk. House style (getty-perl-core skill): 'Path::Tiny for every file operation -- not File::Spec' / '\xe2\x9d\x8c File::Spec in new code'. Tests pass either way; this is a style nit on genuinely new test code, not a functional problem. Found during pre-1.108 release audit; hand to io-k8s-test-writer if worth a follow-up pass.
+
+2026-09-01 19:54 File::Spec replaced with Path::Tiny in t/50 and t/52; use File::Spec and use File::Path dropped where unused; full test suite green (4568 tests, 68 files)
+
+Review OK: File::Spec/File::Path → Path::Tiny in t/50 + t/52; ungenutzte use-Zeilen entfernt. Suite grün (4568).
