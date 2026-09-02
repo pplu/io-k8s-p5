@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-02T15:45:44Z
+claimed_by: Opus/main
+class: standard
+completed: 2026-09-02T15:45:44Z
+created: 2026-09-02T15:37:53Z
+id: 85
+priority: low
+started: 2026-09-02T15:38:29Z
+status: done
+tags:
+- cilium
+- provider-bump
+- spec-drift
+title: Bump Cilium provider v1.20.0 -> v1.20.1
+updated: 2026-09-02T15:45:44Z
+---
+
+crd-drift-check --dir against v1.20.1 manifests: Tier1/Tier3/EXTRA/STALE all 0 -- no schema drift, our opaque classes still match. Pure pin bump: upstream_version in lib/IO/K8s/Cilium.pm + the POD "matching upstream Cilium v1.20.0" line -> v1.20.1. KEEP historical "new in v1.20.0" comments (CiliumDatapathPlugin was genuinely introduced in 1.20.0) in Cilium.pm/t/07. No class changes.
+
+Committed in ab53c186.
