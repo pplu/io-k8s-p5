@@ -74,6 +74,17 @@ my %STR_ISA_MAP = (
     Bool => Bool,
 );
 
+# The Type::Tiny base type for a scalar kind name -- Str, Int, Num, Bool
+# keep their own Types::Standard constraint; IntOrStr, Quantity and Time
+# fall back to Str, the same way the bareword type-spec branch of _k8s
+# does via %STR_ISA_MAP above. Exposed so AutoGen's own default-vs-kind
+# guard (_field_options) can build the same constrained type _k8s would
+# without duplicating this map.
+sub _scalar_base_for {
+    my ($kind) = @_;
+    return $STR_ISA_MAP{$kind} // Str;
+}
+
 # Value types for the hash-of-scalar-type DSL form { TypeName => 1 } (k63).
 # 'Str' is deliberately NOT here: it keeps its historical bare-HashRef meaning,
 # the genuinely opaque string map that labels, annotations and fieldsV1 need.
@@ -317,13 +328,24 @@ sub _k8s {
         croak "k8s: field option '$key' for $where must not be undef"
             unless defined $opts{$key};
     }
-    my $required = delete $opts{required} ? 1 : 0;
+    # required => 1 (or the legacy 'required' marker / '!' suffix) both
+    # enforces the field at construction and records required => 1 in the
+    # registry. required => 'schema' does the second half only: AutoGen
+    # uses it for an OpenAPI schema's required list, since a real cluster
+    # document can omit a field the schema requires -- a server-side
+    # default, or an object still short of that field (an empty status
+    # right after creation) -- and Moo enforcement would reject a
+    # perfectly valid document for it (Critical 1 of the k93 review). Any
+    # other true value is treated the same as 1.
+    my $required_opt = delete $opts{required};
+    my $required_recorded = $required_opt ? 1 : 0;
+    my $required = ($required_opt && $required_opt ne 'schema') ? 1 : 0;
 
     # `!` suffix on strings (legacy/alternative required syntax)
     if (!ref $type_spec && !_is_type_tiny($type_spec) && $type_spec =~ s/!$//) {
-        $required = 1;
+        $required = $required_recorded = 1;
     } elsif (ref $type_spec eq 'ARRAY' && !ref($type_spec->[0]) && $type_spec->[0] =~ s/!$//) {
-        $required = 1;
+        $required = $required_recorded = 1;
     }
 
     # Ensure the registry entry exists
@@ -431,15 +453,22 @@ sub _k8s {
     croak "k8s: cannot interpret the type of $where" unless defined $inner;
 
     # A default that the field's own type rejects is a declaration error,
-    # not something to discover when to_crd emits it.
-    if (exists $opts{default} && !$inner->check($opts{default})) {
+    # not something to discover when to_crd emits it -- except on an
+    # object-bearing field (a referenced class, an inline struct, an array
+    # or hash of objects), where $inner is InstanceOf[...] or wraps it: no
+    # plain hash/array default can ever satisfy that, so there is nothing
+    # useful to check here. The default is recorded as given; to_crd
+    # validates it against the schema instead (Important 3 of the k93
+    # review).
+    if (exists $opts{default} && !$info{is_object} && !$info{is_array_of_objects}
+        && !$info{is_hash_of_objects} && !$inner->check($opts{default})) {
         croak "k8s: 'default' for $where fails the field's own type: "
             . $inner->get_message($opts{default});
     }
 
     my $isa = $required ? $inner : Maybe[$inner];
 
-    $info{required} = 1 if $required;
+    $info{required} = 1 if $required_recorded;
     if (%opts) {
         # A one-level copy: the registry must not alias a caller's arrayref
         # (the common `enum => $schema->{enum}` idiom reads straight off a
@@ -601,6 +630,17 @@ The nine recognised option keys are C<required>, C<default>, C<enum>,
 C<minimum>, C<maximum>, C<pattern>, C<description>, C<nullable> and
 C<preserve_unknown>. All nine are recorded in the attribute registry for
 the CRD schema a C<to_crd> emitter builds from it.
+
+C<required> itself takes two meaningful values. C<required => 1> (like the
+legacy marker and the C<!> suffix) both makes the field a Moo-required
+constructor argument and records C<required => 1> in the registry.
+C<required => 'schema'> records the same registry fact without the Moo
+enforcement, leaving the field optional at construction -- this is what
+L<IO::K8s::AutoGen> uses for an OpenAPI C<required> list, since a document
+a real cluster returns can still omit such a field (a server-side default,
+or a status object not yet populated), and C<inflate> must not fail on
+data the cluster actually sent. Any other true value is treated the same
+as C<1>.
 
 C<enum>, C<minimum>, C<maximum> and C<pattern> are additionally enforced as
 Type::Tiny constraints at construction, the same way C<< { Quantity => 1 }

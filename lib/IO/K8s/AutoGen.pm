@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Carp qw(croak);
 use Package::Stash;
-use Scalar::Util qw(blessed reftype);
+use Scalar::Util qw(blessed reftype looks_like_number);
 use Types::Standard qw( Bool Int Str );
 
 # Cache of generated classes
@@ -417,8 +417,18 @@ sub _scalar_kind {
     if (ref $type_spec eq 'ARRAY') {
         my $elem = $type_spec->[0];
         return undef if ref $elem eq 'HASH' || ref $elem eq 'ARRAY';
-        return $elem->name if blessed($elem) && $elem->isa('Type::Tiny');
-        return $SCALAR_KIND{$elem} ? $elem : undef;
+        # Mirror _k8s's own array-element handling exactly (Important 4 of
+        # the k93 review): a Type::Tiny element is a scalar kind only when
+        # its name is one of the seven the DSL knows, and a bareword
+        # string element is a scalar kind only for 'Str' and 'Int' -- _k8s
+        # treats every other bareword (including the kind names 'Num',
+        # 'Bool', 'Quantity', 'Time', 'IntOrStr' spelled as plain strings)
+        # as a class name and hands it to _expand_class.
+        if (blessed($elem) && $elem->isa('Type::Tiny')) {
+            return $SCALAR_KIND{$elem->name} ? $elem->name : undef;
+        }
+        return undef if ref $elem;
+        return ($elem eq 'Str' || $elem eq 'Int') ? $elem : undef;
     }
     if (ref $type_spec eq 'HASH') {
         my ($k) = keys %$type_spec;
@@ -435,11 +445,25 @@ sub _scalar_kind {
 # field; the value constraints only where the DSL can enforce them. For an
 # array the constraints sit on `items` and apply per element.
 #
+# required => 'schema' (not 1): the schema's required list is a fact for
+# to_crd, not a client-side guarantee. A cluster document can validly omit
+# a field the schema requires -- a server-side default, or an object still
+# short of that field (an empty status right after creation) -- and
+# rejecting inflate over that would reject real cluster data. required =>
+# 1 would enforce it at construction; see IO::K8s::Resource/k8s (Critical
+# 1 of the k93 review).
+#
 # A pattern is an ECMA 262 regex on the wire. Perl compiles nearly all of
 # them; one it cannot is dropped rather than failing the whole class -- the
 # client-side check is a convenience, the API server validates regardless,
 # and no data is lost (the k56 line is about data, not about checks). An
-# empty or duplicate enum is dropped the same way, for the same reason.
+# empty enum, a duplicate enum, or an enum containing a JSON null is
+# dropped the same way; minimum/maximum are dropped (individually, if only
+# one bound is bad, or both together when minimum exceeds maximum) when
+# either fails to parse as a number; and a default the field cannot hold --
+# wrong type, or outside its own enum/range -- is dropped rather than
+# refused at generation time the way a hand-written k8s declaration would
+# refuse it (Important 2 of the k93 review).
 #
 # `default: null` in a schema (common on a `nullable: true` field) decodes
 # to undef; that is treated as no default at all, not as a default of
@@ -449,18 +473,20 @@ sub _scalar_kind {
 sub _field_options {
     my ($prop_schema, $type_spec, $is_required) = @_;
     my %opts;
-    $opts{required}    = 1 if $is_required;
+    $opts{required}    = 'schema' if $is_required;
     $opts{description} = $prop_schema->{description} if defined $prop_schema->{description};
     $opts{default}     = $prop_schema->{default}     if defined $prop_schema->{default};
     # nullable and x-kubernetes-preserve-unknown-fields are JSON booleans on
     # the wire and so need the same normalization every other Bool value in
     # the distribution gets (plain Perl truthiness would treat the string
-    # 'false' as true). A value _normalize_bool can't make sense of means
-    # "not set" here, not a fatal -- eval swallows the die.
+    # 'false' as true). _normalize_bool only dies on a value that cannot
+    # mean true or false at all (a non-scalar reference); a schema property
+    # is always a plain scalar or JSON boolean here, so there is nothing for
+    # an eval to usefully swallow (Minor 6 of the k93 review).
     $opts{nullable} = 1
-        if eval { IO::K8s::Resource::_normalize_bool($prop_schema->{nullable}) };
+        if IO::K8s::Resource::_normalize_bool($prop_schema->{nullable});
     $opts{preserve_unknown} = 1
-        if eval { IO::K8s::Resource::_normalize_bool($prop_schema->{'x-kubernetes-preserve-unknown-fields'}) };
+        if IO::K8s::Resource::_normalize_bool($prop_schema->{'x-kubernetes-preserve-unknown-fields'});
 
     my $kind = _scalar_kind($type_spec);
     # A schema decoded from JSON carries a boolean default as a
@@ -474,19 +500,44 @@ sub _field_options {
         if $kind && $kind eq 'Bool' && exists $opts{default};
     if ($kind && $kind ne 'Bool') {
         my $src = ($prop_schema->{type} // '') eq 'array' ? ($prop_schema->{items} // {}) : $prop_schema;
-        if (ref $src->{enum} eq 'ARRAY' && @{ $src->{enum} }) {
+        if (ref $src->{enum} eq 'ARRAY' && @{ $src->{enum} } && !grep { !defined } @{ $src->{enum} }) {
             my %seen;
             $seen{$_}++ for @{ $src->{enum} };
             $opts{enum} = $src->{enum} if keys %seen == @{ $src->{enum} };
         }
         if ($kind eq 'Int' || $kind eq 'Num') {
-            $opts{minimum} = $src->{minimum} if defined $src->{minimum};
-            $opts{maximum} = $src->{maximum} if defined $src->{maximum};
+            my ($min, $max) = @{$src}{qw(minimum maximum)};
+            $min = undef if defined $min && !looks_like_number($min);
+            $max = undef if defined $max && !looks_like_number($max);
+            if (defined $min && defined $max && $min > $max) {
+                $min = $max = undef;
+            }
+            $opts{minimum} = $min if defined $min;
+            $opts{maximum} = $max if defined $max;
         } elsif (defined $src->{pattern}) {
             my $re = eval { my $p = $src->{pattern}; qr/$p/ };
             $opts{pattern} = $re if $re;
         }
     }
+
+    # A default the field cannot hold kills class generation via _k8s's own
+    # default-vs-type check unless it is dropped here first. Built from the
+    # same (already-filtered) enum/minimum/maximum/pattern collected above
+    # so the check matches what _k8s itself would enforce. Object-bearing
+    # and opaque fields ($kind undef) keep the default as given -- there is
+    # no scalar Type::Tiny check to run there, and to_crd validates it
+    # against the schema instead (Important 3 of the k93 review; _k8s's own
+    # default check now skips those fields too).
+    if (exists $opts{default} && $kind) {
+        my $base = IO::K8s::Resource::_scalar_base_for($kind);
+        my %check_opts = map { $_ => $opts{$_} } grep { exists $opts{$_} } qw(enum minimum maximum pattern);
+        my $constrained = IO::K8s::Resource::_constrain($base, $kind, \%check_opts, 'AutoGen default check');
+        my $default_ok = ref $type_spec eq 'ARRAY'
+            ? (ref $opts{default} eq 'ARRAY' && !grep { !$constrained->check($_) } @{ $opts{default} })
+            : $constrained->check($opts{default});
+        delete $opts{default} unless $default_ok;
+    }
+
     return %opts ? \%opts : undef;
 }
 
@@ -569,11 +620,15 @@ to avoid collisions:
 Each OpenAPI property also carries its field options (D3 of the CRD
 design) into the generated class, through the same C<k8s> option hash a
 hand-written class would use (see L<IO::K8s::Resource/k8s>): the schema's
-C<required> list becomes the field's C<required> option, so a generated
-class now enforces the fields the schema demands, and a construction
-missing one dies with Moo's own "Missing required arguments" instead of
-silently accepting a partial object. C<enum>, C<minimum>, C<maximum>,
-C<pattern>, C<default>, C<description>, C<nullable> and
+C<required> list becomes the field's C<required => 'schema'> option, so a
+generated class records which fields the schema demands -- available to
+C<to_crd> and to L<IO::K8s::Resource/_k8s_attr_info> -- without enforcing
+them at construction. An OpenAPI-required field can still be absent from a
+real cluster document (a server-side default, a status object not yet
+populated), and rejecting it at C<inflate> would reject valid data; use
+C<required => 1> for a field that must always be enforced (see
+L<IO::K8s::Resource/k8s>). C<enum>, C<minimum>, C<maximum>, C<pattern>,
+C<default>, C<description>, C<nullable> and
 C<x-kubernetes-preserve-unknown-fields> are carried the same way, so a
 generated class enforces enum, range and pattern values exactly like a
 hand-written one that declares the same options. For an array property,
@@ -586,17 +641,21 @@ JSON C<null> -- common on a C<nullable: true> field -- is treated as no
 default at all, not as a default of C<undef>, which the DSL's own
 field-option check would otherwise refuse.
 
-An C<enum> that is empty or has duplicate entries, or a C<pattern> that
-does not compile as a Perl regex, is dropped rather than failing the
-whole class: the client-side check is a convenience, the API server
-validates every value regardless, and dropping it loses no data.
+A malformed schema option is dropped rather than failing the whole class:
+the client-side check is a convenience, the API server validates every
+value regardless, and dropping it loses no data. This covers an C<enum>
+that is empty, has duplicate entries, or contains a JSON C<null>; a
+C<pattern> that does not compile as a Perl regex; a C<minimum>/C<maximum>
+where either bound is not a number or C<minimum> exceeds C<maximum>; and a
+C<default> the field cannot hold -- the wrong type, or a value outside its
+own enum or range.
 
-Field options only travel for a property this module already turns into a
-typed nested class, i.e. one that C<$ref>s a sibling definition; an inline
-C<type: object> schema with its own C<properties> and no
-C<$ref>/C<additionalProperties> is still the existing opaque hash of
-strings, so options below the top level of a schema that inlines rather
-than references its nested objects do not apply yet (k94).
+A nested object's own properties get field options only where this module
+turns that object into a typed class, i.e. one that C<$ref>s a sibling
+definition; an inline C<type: object> schema with its own C<properties>
+and no C<$ref>/C<additionalProperties> is still the existing opaque hash
+of strings, with no per-property typed class underneath to attach options
+to. Scalar properties carry their options at every level regardless (k94).
 
 =head1 FUNCTIONS
 

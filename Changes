@@ -11,19 +11,30 @@ Revision history for IO-K8s
     also enforced at construction on scalar fields, arrays of scalars and
     typed value maps, failing with "Value "x" is not one of: ...", "is
     below the minimum N" / "is above the maximum N" and "does not match
-    the pattern ...". default is never applied client-side. An option a
-    field cannot carry (enum on Bool, minimum on Str, pattern on an object)
-    is a class-load error naming class and field. The legacy 'required'
-    marker and the Type! suffix keep working.
+    the pattern ...". default is never applied client-side. required => 1
+    both enforces and records, like the legacy 'required' marker and the
+    Type! suffix; required => 'schema' records required => 1 without
+    enforcing it, for a field a real document may validly omit. An option
+    a field cannot carry (enum on Bool, minimum on Str, pattern on an
+    object) is a class-load error naming class and field -- as is a type
+    spec _k8s cannot interpret at all (a Type::Tiny outside the seven
+    kinds, or a coderef), which now croaks "k8s: cannot interpret the
+    type of field ..." instead of silently building an unconstrained
+    attribute.
 
   - IO::K8s::AutoGen carries an OpenAPI property's required list, enum,
     minimum, maximum, pattern, default, description, nullable and
     x-kubernetes-preserve-unknown-fields into those options, per element
-    for arrays. Generated classes therefore reject a bad value at
-    construction and require the fields the schema lists as required --
-    an AutoGen object built without one now dies with "Missing required
-    arguments". A pattern Perl cannot compile is dropped (the API server
-    still validates it); no data is affected.
+    for arrays, so a generated class enforces a bad enum/range/pattern
+    value at construction exactly like a hand-written one does. The
+    schema's required list becomes required => 'schema': recorded (for
+    to_crd) but not enforced, since a real cluster document can validly
+    omit a field the schema requires -- a server-side default, or a
+    status object not yet populated -- and inflate must not die over
+    that. A malformed schema option -- a minimum above the maximum or a
+    non-numeric bound, a default the field cannot hold, an enum
+    containing a JSON null -- is dropped the same way an uncompilable
+    pattern already was, rather than failing class generation.
 
   - Unknown fields are kept instead of dropped (D1 of the CRD design,
     docs/superpowers/specs/2026-09-03-crd-design.md). A constructor key no

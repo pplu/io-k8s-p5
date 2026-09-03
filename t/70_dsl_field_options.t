@@ -23,6 +23,7 @@ use Test::Exception;
     k8s weights  => { Int => 1 }, { maximum => 100 };
     k8s labels   => { Str => 1 }, { preserve_unknown => 1 };
     k8s note     => Str, { nullable => 1 };
+    k8s soft     => Str, { required => 'schema' };
     k8s legacy   => Str, 'required';
     k8s bang     => 'Str!';
     k8s spec     => {
@@ -72,6 +73,8 @@ subtest 'registry carries required and the other options' => sub {
     is($info->{bang}{required}, 1, "'Str!' suffix still records required");
     is($info->{note}{options}{nullable}, 1, 'nullable is schema-only but recorded');
     is($info->{labels}{options}{preserve_unknown}, 1, 'preserve_unknown recorded');
+    is($info->{soft}{required}, 1, "required => 'schema' still records required => 1 (Critical 1)");
+    ok(!exists $info->{soft}{options}, 'and adds no options');
 
     my $spec = $IO::K8s::Resource::_attr_registry{'TestOpt::Widget::_Spec'};
     is($spec->{mode}{required}, 1, 'inline [Type, {opts}] form: required');
@@ -85,6 +88,7 @@ subtest 'required is enforced through the options hash' => sub {
     throws_ok { TestOpt::Widget->new(legacy => 'ok', bang => 'ok', spec => { mode => 'fast' }) } qr/Missing required arguments: name/, 'required => 1';
     throws_ok { TestOpt::Widget->new(name => 'w', legacy => 'ok', bang => 'ok', spec => {}) } qr/Missing required arguments: mode/, 'inline required';
     lives_ok { widget() } 'both present';
+    lives_ok { widget() } "required => 'schema' (soft) is not enforced -- constructs fine without it (Critical 1)";
 };
 
 subtest 'enum' => sub {
@@ -201,6 +205,22 @@ subtest 'schema-only options are accepted on any field' => sub {
             1;
         } or die $@;
     } 'description, nullable, preserve_unknown, default on non-scalar fields';
+};
+
+subtest 'a default on an object-bearing field is recorded, not type-checked (Important 3)' => sub {
+    lives_ok {
+        eval q{
+            package TestOpt::ObjDefault; use IO::K8s::Resource;
+            k8s s => { a => Str }, { default => {} };
+            k8s o => 'Core::V1::PodSpec', { default => { containers => [] } };
+            k8s l => ['Core::V1::Container'], { default => [] };
+            1;
+        } or die $@;
+    } 'inline struct, referenced object and array-of-objects all accept a hash/array default that InstanceOf could never satisfy';
+    my $info = TestOpt::ObjDefault->_k8s_attr_info;
+    is_deeply($info->{s}{options}{default}, {}, 'inline struct default recorded as given');
+    is_deeply($info->{o}{options}{default}, { containers => [] }, 'referenced-object default recorded as given');
+    is_deeply($info->{l}{options}{default}, [], 'array-of-objects default recorded as given');
 };
 
 done_testing;
