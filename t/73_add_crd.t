@@ -32,10 +32,18 @@ subtest 'load accepts every input form' => sub {
     is(scalar @{ IO::K8s::CRD->load([ $fixture, $from_path->[0] ]) }, 2, 'an arrayref of inputs concatenates');
 
     throws_ok { IO::K8s::CRD->load("apiVersion: v1\nkind: Pod\nmetadata:\n  name: x\n") }
-        qr/document is a 'Pod', not a CustomResourceDefinition/, 'wrong kind dies';
+        qr/document 1 is a 'Pod', not a CustomResourceDefinition/, 'wrong kind dies, names the document';
     throws_ok { IO::K8s::CRD->load({ kind => 'CustomResourceDefinition', spec => { group => 'g' } }) }
         qr/without spec\.group \/ spec\.names\.kind \/ spec\.versions/, 'incomplete CRD dies';
     throws_ok { IO::K8s::CRD->load(undef) } qr/needs a CustomResourceDefinition/, 'undef dies';
+    throws_ok {
+        IO::K8s::CRD->load({
+            apiVersion => 'apiextensions.k8s.io/v1',
+            kind       => 'CustomResourceDefinition',
+            metadata   => { name => 'x' },
+            spec       => { group => 'g', names => { kind => 'X', plural => 'xs' }, versions => [] },
+        });
+    } qr/without spec\.group \/ spec\.names\.kind \/ spec\.versions/, 'empty versions array dies the same way';
 };
 
 subtest 'served_versions skips unserved and marks storage' => sub {
@@ -45,6 +53,53 @@ subtest 'served_versions skips unserved and marks storage' => sub {
     is_deeply([ map { $_->{storage} } @$v ], [ 0, 1 ], 'storage flag');
     is($v->[1]{name}, 'v1', 'name');
     ok($v->[1]{schema}{properties}{spec}, 'schema carried');
+};
+
+subtest 'served_versions accepts a quoted "true"/"false" and rejects a malformed flag' => sub {
+    my ($crd) = @{ IO::K8s::CRD->load($fixture) };
+    my @versions = @{ $crd->{spec}{versions} };
+
+    # v0 is unserved in the fixture (served: false); flip it to the quoted
+    # string form and confirm it now counts as served.
+    my %quoted_crd = %$crd;
+    $quoted_crd{spec} = {
+        %{ $crd->{spec} },
+        versions => [ @versions[0, 1], { %{ $versions[2] }, served => 'true' } ],
+    };
+    my $v = IO::K8s::CRD->served_versions(\%quoted_crd);
+    is_deeply([ map { $_->{name} } @$v ], [ 'v1alpha1', 'v1', 'v0' ], 'served: "true" (quoted string) counts as served');
+
+    # A value _normalize_bool cannot read as true/false must not be
+    # swallowed into "not served" -- it has to fail loudly instead.
+    my %malformed_crd = %$crd;
+    $malformed_crd{spec} = {
+        %{ $crd->{spec} },
+        versions => [ { %{ $versions[0] }, served => [ 1, 2 ] }, $versions[1] ],
+    };
+    throws_ok { IO::K8s::CRD->served_versions(\%malformed_crd) }
+        qr/spec\.versions\[0\]\.served is not a boolean/, 'a malformed served value dies loudly, naming the index and field';
+};
+
+subtest 'generate falls back to the LAST served version when none marks storage' => sub {
+    my ($crd) = @{ IO::K8s::CRD->load($fixture) };
+    my %no_storage_crd = %$crd;
+    $no_storage_crd{spec} = {
+        %{ $crd->{spec} },
+        versions => [ map { +{ %$_, storage => 0 } } @{ $crd->{spec}{versions} } ],
+    };
+    my $k8s = IO::K8s->new;
+    my $classes = IO::K8s::CRD->generate(\%no_storage_crd, $k8s->_autogen_namespace);
+    is($classes->{storage}, 'opts.example.com/v1', 'v1 (the last served version) is picked, not v1alpha1 (the first)');
+};
+
+subtest 'generate: scope Cluster does not compose Role::Namespaced' => sub {
+    my ($crd) = @{ IO::K8s::CRD->load($fixture) };
+    my %cluster_crd = %$crd;
+    $cluster_crd{spec} = { %{ $crd->{spec} }, scope => 'Cluster' };
+    my $k8s = IO::K8s->new;
+    my $classes = IO::K8s::CRD->generate(\%cluster_crd, $k8s->_autogen_namespace);
+    my $storage_class = $classes->{ $classes->{storage} };
+    ok(!$storage_class->does('IO::K8s::Role::Namespaced'), 'Cluster-scoped generated class is not Namespaced');
 };
 
 subtest 'add_crd registers every served version and the storage short name' => sub {

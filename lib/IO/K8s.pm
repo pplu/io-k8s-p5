@@ -451,6 +451,10 @@ storage version under the bare Kind -- through L</add>, so a class already
 holding the short name (a provider merged earlier) keeps it and the CRD's
 class stays reachable by its qualified key. Returns
 C<< { $Kind => { $api_version => $class, ..., storage => $api_version } } >>.
+Classes are cached by group/version/Kind within this instance's AutoGen
+namespace (L<IO::K8s::CRD/generate>), so re-adding an edited manifest on
+the same C<$k8s> silently returns the class generated the first time --
+call C<add_crd> on a fresh instance to pick up schema changes.
 
 =cut
 

@@ -80,9 +80,10 @@ sub load {
         croak 'IO::K8s::CRD->load: unsupported input ' . ref($input);
     }
 
-    for my $doc (@docs) {
+    for my $i (0 .. $#docs) {
+        my $doc = $docs[$i];
         my $kind = $doc->{kind} // '';
-        croak "IO::K8s::CRD->load: document is a '$kind', not a CustomResourceDefinition"
+        croak 'IO::K8s::CRD->load: document ' . ($i + 1) . " is a '$kind', not a CustomResourceDefinition"
             unless $kind eq 'CustomResourceDefinition';
         croak 'IO::K8s::CRD->load: CustomResourceDefinition without spec.group / spec.names.kind / spec.versions'
             unless ref $doc->{spec} eq 'HASH'
@@ -95,10 +96,15 @@ sub load {
 
 # served / storage arrive as JSON booleans, plain 0/1, or the strings a
 # hand-written YAML may carry; the DSL's one boolean normalization decides.
+# A missing field is a legitimate "not set" and stays 0/false; a field that
+# IS present but cannot mean true or false (an arrayref, say) must not be
+# swallowed into the same "not set" answer -- croak instead, naming the
+# version index and field so the manifest is easy to find.
 sub _flag {
-    my ($value) = @_;
+    my ($value, $field, $index) = @_;
     return 0 unless defined $value;
     my $bool = eval { IO::K8s::Resource::_normalize_bool($value) };
+    croak "IO::K8s::CRD: spec.versions[$index].$field is not a boolean" if $@;
     return $bool ? 1 : 0;
 }
 
@@ -116,13 +122,15 @@ none). Dies when no version is served.
 sub served_versions {
     my ($class, $crd) = @_;
     my $group = $crd->{spec}{group};
+    my $versions = $crd->{spec}{versions};
     my @out;
-    for my $v (@{ $crd->{spec}{versions} }) {
-        next unless _flag($v->{served});
+    for my $i (0 .. $#$versions) {
+        my $v = $versions->[$i];
+        next unless _flag($v->{served}, 'served', $i);
         push @out, {
             name        => $v->{name},
             api_version => "$group/$v->{name}",
-            storage     => _flag($v->{storage}),
+            storage     => _flag($v->{storage}, 'storage', $i),
             schema      => $v->{schema}{openAPIV3Schema} // { type => 'object' },
         };
     }
@@ -142,6 +150,16 @@ fixtures) the last served version is used. Each class carries the CRD's
 C<kind>, C<names.plural> and scope, and every object with C<properties>
 below it is a nested class (see L<IO::K8s::AutoGen>).
 
+L<IO::K8s::AutoGen> caches by class name, and the class name is derived
+from C<$namespace> plus the group/version/Kind (see
+L<IO::K8s::AutoGen/get_or_generate>) -- not from the schema. Calling
+C<generate> a second time for the same group/version/Kind under the same
+C<$namespace> returns the class generated the first time, silently, even
+when the schema in C<$crd> has since changed. Iterating on an edited
+manifest needs a fresh C<$namespace> (in practice: a fresh L<IO::K8s>
+instance, since L<IO::K8s/add_crd> always passes its own
+C<_autogen_namespace>).
+
 =cut
 
 sub generate {
@@ -152,6 +170,7 @@ sub generate {
     my $namespaced = ($spec->{scope} // 'Namespaced') eq 'Namespaced' ? 1 : 0;
 
     my %out;
+    my $fallback;
     for my $v (@{ $class->served_versions($crd) }) {
         my $def_name = join '.', $group, $v->{name}, $kind;
         my $schema = {
@@ -165,8 +184,13 @@ sub generate {
             resource_plural => $spec->{names}{plural},
             is_namespaced   => $namespaced,
         );
-        $out{storage} = $v->{api_version} if $v->{storage} || !exists $out{storage};
+        # Track every served version as the fallback so the LAST one wins
+        # when none is marked storage -- matching the POD above. An explicit
+        # storage:true always overrides it, regardless of position.
+        $fallback = $v->{api_version};
+        $out{storage} = $v->{api_version} if $v->{storage};
     }
+    $out{storage} //= $fallback;
     return \%out;
 }
 
