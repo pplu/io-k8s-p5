@@ -46,6 +46,7 @@ use File::Spec;
 use File::Path qw(make_path);
 use Getopt::Long qw(GetOptions);
 use JSON::PP;
+use Cwd qw(realpath);
 
 # File::Spec->rel2abs makes a path absolute but, on Unix, never collapses a
 # '..' segment already in it (that's deliberate upstream: collapsing one
@@ -67,6 +68,43 @@ sub _canon_abs {
         push @out, $seg;
     }
     return File::Spec->catdir($vol, File::Spec->rootdir, @out);
+}
+
+# _canon_abs is lexical only -- it never touches the filesystem, so a
+# symlink component (a --suggest-dir that is itself a symlink into lib/, or
+# has one anywhere in its existing prefix) sails straight through it
+# unresolved, and the "not inside lib/" guard below is a plain string-prefix
+# test on that unresolved string. Cwd::realpath resolves symlinks but
+# returns undef for a path that doesn't fully exist -- and a --suggest-dir
+# legitimately doesn't exist yet, that's the option's whole point. So walk
+# up from the full (lexically collapsed) path until an existing prefix is
+# found, realpath just that prefix, and reattach whatever tail doesn't
+# exist untouched -- a path component that isn't there cannot itself be a
+# symlink, so the lexical form is already correct for it.
+sub _resolve_path {
+    my ($path) = @_;
+    # A failed realpath() during the walk below leaves $! set (ENOENT) as a
+    # side effect of the underlying stat -- localize it so a caller's own
+    # die (e.g. the --suggest-dir guard) doesn't inherit that as its exit
+    # status instead of the usual 255.
+    local $!;
+    my ($vol, $dirs) = File::Spec->splitpath(_canon_abs($path), 1);
+    my @segs = grep { length } File::Spec->splitdir($dirs);
+    my @tail;
+    while (1) {
+        my $candidate = @segs
+            ? File::Spec->catdir($vol, File::Spec->rootdir, @segs)
+            : File::Spec->catdir($vol, File::Spec->rootdir);
+        my $real = realpath($candidate);
+        if (defined $real) {
+            return @tail ? File::Spec->catdir($real, @tail) : $real;
+        }
+        last unless @segs;
+        unshift @tail, pop @segs;
+    }
+    # Not even the root resolved (shouldn't happen on a real filesystem) --
+    # fall back to the lexical form rather than die.
+    return _canon_abs($path);
 }
 
 my $DIST_ROOT = _canon_abs(File::Spec->catdir($FindBin::Bin, '..'));
@@ -153,9 +191,13 @@ sub parse_args {
     }
     if ($opt{suggest_dir}) {
         $opt{suggest_dir} = _canon_abs($opt{suggest_dir});
-        my $lib_abs = _canon_abs($opt{lib});
+        # The write target stays the lexical form (a --suggest-dir may not
+        # exist yet); the guard compares symlink-resolved forms so a
+        # symlink into lib/ can't sneak past a lexical-only check.
+        my $suggest_real = _resolve_path($opt{suggest_dir});
+        my $lib_real      = _resolve_path($opt{lib});
         die "crd-drift-check: --suggest-dir must not point inside lib/\n"
-            if $opt{suggest_dir} eq $lib_abs || index($opt{suggest_dir}, "$lib_abs/") == 0;
+            if $suggest_real eq $lib_real || index($suggest_real, "$lib_real/") == 0;
     }
     $opt{provider} = \@providers;
     return \%opt;
@@ -676,9 +718,18 @@ my $exceptions = load_exceptions($opt->{exceptions});
 
 my @results = map { check_provider($opt, $_, $exceptions) } @{ $opt->{provider} };
 
+# check_provider embeds the parsed upstream view as _upstream purely to get
+# it out to --suggest below. Pull it into its own map and strip it off
+# @results right away, unconditionally -- not only for --format json -- so
+# neither render_report nor the JSON encode ever has to know it was there,
+# and so --suggest still has it regardless of --format.
+my %upstream_by_provider;
+for my $r (@results) {
+    $upstream_by_provider{ $r->{provider} } = delete $r->{_upstream} if $r->{_upstream};
+}
+
 my $report;
 if ($opt->{format} eq 'json') {
-    delete $_->{_upstream} for @results;
     $report = JSON::PP->new->canonical->pretty->encode({ providers => \@results });
 } else {
     $report = render_report(\@results, $opt->{verbose});
@@ -696,8 +747,8 @@ if ($opt->{suggest} || $opt->{suggest_dir}) {
     my $names = load_names($opt->{names});
     my %files;
     for my $r (@results) {
-        next unless $r->{_upstream};
-        my $f = suggest_for($opt, $r, $r->{_upstream}, $names);
+        my $upstream = $upstream_by_provider{ $r->{provider} } or next;
+        my $f = suggest_for($opt, $r, $upstream, $names);
         $files{$_} = $f->{$_} for keys %$f;
     }
     emit_suggestions($opt, \%files);
