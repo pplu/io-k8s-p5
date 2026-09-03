@@ -19,6 +19,19 @@ use Module::Runtime qw(use_module);
 # spec_set replaced the struct with {} and wrote into an orphan (k90).
 # ---------------------------------------------------------------------------
 
+# Run a Moo constructor or accessor call from inside a walk and re-raise
+# its failure with the spec path in front: Moo and Type::Tiny name the
+# attribute, never the path the caller wrote, and a "Missing required
+# arguments" from a class the walk tried to vivify would otherwise be
+# reported against this file's line number (k101).
+sub _sb_guard {
+    my ($path, $what, $code) = @_;
+    my $result = eval { $code->() };
+    return $result unless $@;
+    (my $err = $@) =~ s/ at \S+ line \d+\.?\n?\z//;
+    croak "spec path '$path': $what: $err";
+}
+
 sub _sb_is_obj { blessed($_[0]) && $_[0]->can('_k8s_attr_info') }
 
 sub _sb_is_index { defined $_[0] && $_[0] =~ /\A-?\d+\z/ }
@@ -107,7 +120,7 @@ sub _sb_store {
         my ($attr, $info) = _sb_attr($node, $seg);
         if (defined $attr) {
             $value = _sb_inflate($info, $value);
-            $node->$attr($value);
+            _sb_guard($path, "cannot set '$seg'", sub { $node->$attr($value) });
             return $value;
         }
         return $node->_unknown_fields->{$seg} = $value;
@@ -143,7 +156,8 @@ sub _sb_fresh {
     if (_sb_is_obj($node)) {
         my (undef, $info) = _sb_attr($node, $seg);
         if ($info) {
-            return use_module($info->{class})->new if $info->{is_object};
+            return _sb_guard($path, "cannot create $info->{class} for '$seg'", sub { use_module($info->{class})->new })
+                if $info->{is_object};
             return [] if grep { $info->{$_} } qw(
                 is_array_of_objects is_array_of_str is_array_of_int
                 is_array_of_bool is_array_of_hash is_array_of_array
@@ -156,19 +170,22 @@ sub _sb_fresh {
             croak "spec path '$path': cannot descend through scalar field '$seg'";
         }
     }
-    return use_module($elem_class)->new if $elem_class;
+    return _sb_guard($path, "cannot create $elem_class for '$seg'", sub { use_module($elem_class)->new })
+        if $elem_class;
     return _sb_is_index($next) ? [] : {};
 }
 
 # The spec node. With $vivify, create it when missing: the declared class
 # when spec is a typed field of this object, a plain hash otherwise.
 sub _sb_root {
-    my ($self, $vivify) = @_;
+    my ($self, $vivify, $path) = @_;
     my $spec = $self->spec;
     return $spec if ref $spec;
     return undef unless $vivify;
     my (undef, $info) = _sb_is_obj($self) ? _sb_attr($self, 'spec') : ();
-    $spec = $info && $info->{is_object} ? use_module($info->{class})->new : {};
+    $spec = $info && $info->{is_object}
+        ? _sb_guard($path, "cannot create $info->{class} for 'spec'", sub { use_module($info->{class})->new })
+        : {};
     $self->spec($spec);
     return $spec;
 }
@@ -181,7 +198,7 @@ sub _sb_walk_vivify {
     my @segs = split /\./, $path;
     my $last = pop @segs;
     croak "spec path '$path' is empty" unless defined $last && length $last;
-    my $node = $self->_sb_root(1);
+    my $node = $self->_sb_root(1, $path);
     my $elem_class;
     for my $i (0 .. $#segs) {
         my $seg  = $segs[$i];
@@ -244,6 +261,11 @@ declare. A hashref handed to a declared object/array/hash-of-objects slot
 is inflated through the registry the same way C<FROM_HASH> would. Returns
 C<$self> for chaining.
 
+Vivifying a typed intermediate constructs the declared class with no
+arguments; a class with required attributes (k101) cannot be built that
+way, and the call croaks naming the spec path instead -- build that object
+yourself and hand it to C<spec_set> as the value.
+
     $ir->spec_set('tls.secretName', 'my-cert');
 
 =cut
@@ -263,7 +285,8 @@ Vivifies and returns the arrayref at the dotted path C<$path> -- the same
 intermediate vivification as C<spec_set>, but returning the container
 itself rather than storing a value into it, so the caller can push, splice
 or iterate in place. Croaks if the path already holds a defined,
-non-array value.
+non-array value. Vivifies intermediates the same way C<spec_set> does,
+including the required-attribute croak described there.
 
     push @{ $ir->spec_array('entryPoints') }, 'websecure';
 
@@ -285,7 +308,9 @@ sub spec_array {
 Vivifies and returns the container at the dotted path C<$path> -- a plain
 hashref for an opaque map or a struct field, or the struct/object itself
 when the declared field is one, so the caller can read or write it
-directly. Croaks if the path already holds a defined scalar.
+directly. Croaks if the path already holds a defined scalar. Vivifies
+intermediates the same way C<spec_set> does, including the
+required-attribute croak described there.
 
     $ir->spec_hash('tls')->{secretName} = 'my-cert';
 
@@ -306,10 +331,11 @@ sub spec_hash {
     $obj->spec_push($path, @values);
 
 Appends C<@values> onto the arrayref located at the dotted path C<$path>,
-vivifying it (and its parent structure) as needed via C<spec_array>. A
-hashref value handed to an array-of-objects slot is inflated to the
-element class, same as C<spec_set>; an already-blessed value is kept as
-is. Returns C<$self> for chaining.
+vivifying it (and its parent structure, including the required-attribute
+croak described under C<spec_set>) as needed via C<spec_array>. A hashref
+value handed to an array-of-objects slot is inflated to the element
+class, same as C<spec_set>; an already-blessed value is kept as is.
+Returns C<$self> for chaining.
 
     $ir->spec_push('routes', { match => 'Host(`api.example.com`)' });
 
@@ -341,8 +367,10 @@ merge are left alone. Returns C<$self> for chaining.
 
 sub spec_merge {
     my ($self, %data) = @_;
-    my $root = $self->_sb_root(1);
-    _sb_store($root, $_, $data{$_}, $_) for keys %data;
+    for my $key (keys %data) {
+        my $root = $self->_sb_root(1, $key);
+        _sb_store($root, $key, $data{$key}, $key);
+    }
     return $self;
 }
 
@@ -374,7 +402,7 @@ sub spec_delete {
     if (_sb_is_obj($node)) {
         my ($attr) = _sb_attr($node, $last);
         if (defined $attr) {
-            $node->$attr(undef);
+            _sb_guard($path, "cannot clear '$last'", sub { $node->$attr(undef) });
         } else {
             delete $node->_unknown_fields->{$last};
         }

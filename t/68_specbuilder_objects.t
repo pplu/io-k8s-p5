@@ -16,6 +16,12 @@ use IO::K8s;
 }
 
 {
+    package TestSB::Guarded;
+    use IO::K8s::Resource;
+    k8s must => Str, 'required';
+}
+
+{
     package TestSB::Widget;
     use IO::K8s::APIObject
         api_version     => 'test.example.com/v1',
@@ -28,6 +34,7 @@ use IO::K8s;
         routes   => ['+TestSB::Route'],
         template => 'Core::V1::PodTemplateSpec',
         labels   => { Str => 1 },
+        guarded  => '+TestSB::Guarded',
         '$ref'   => Str,
     };
 }
@@ -167,6 +174,30 @@ subtest 'plain hash specs behave as before' => sub {
     $ir->spec_push('routes.-1.services', { name => 'svc', port => 80 });
     is_deeply($ir->spec, { routes => [ { match => 'Host(`a`)', services => [ { name => 'svc', port => 80 } ] } ] }, 'hash path with -1 vivification');
     is_deeply($ir->spec_array('entryPoints'), [], 'spec_array on a hash spec');
+};
+
+subtest 'spec_set croaks with the spec path when vivifying a required-attribute class (k101)' => sub {
+    my $w = widget();
+    throws_ok { $w->spec_set('guarded.must', 'x') }
+        qr/^spec path 'guarded\.must': cannot create TestSB::Guarded for 'guarded': Missing required arguments: must/,
+        'vivifying a class with a required attribute croaks naming the path and the class';
+    $w->spec_set('guarded', TestSB::Guarded->new(must => 'x'));
+    is($w->spec_get('guarded.must'), 'x', 'building the object first and assigning it works');
+};
+
+subtest 'spec_set re-raises a type-constraint failure with the spec path (k101)' => sub {
+    my $w = widget();
+    throws_ok { $w->spec_set('replicas', 'abc') }
+        qr/^spec path 'replicas': cannot set 'replicas':.*Int/s,
+        'the accessor failure is prefixed with the path and keeps the original Type::Tiny text';
+};
+
+subtest 'spec_delete re-raises a clear failure with the spec path (k101)' => sub {
+    my $w = widget();
+    $w->spec_set('guarded', TestSB::Guarded->new(must => 'x'));
+    throws_ok { $w->spec_delete('guarded.must') }
+        qr/^spec path 'guarded\.must': cannot clear 'must':/,
+        'clearing a required attribute croaks naming the path';
 };
 
 done_testing;
