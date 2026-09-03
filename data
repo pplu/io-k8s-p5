@@ -1,0 +1,25 @@
+---
+class: standard
+completed: 2026-09-03T05:04:28Z
+created: 2026-09-03T01:25:50Z
+id: 92
+priority: high
+started: 2026-09-03T05:04:28Z
+status: done
+tags:
+- crd
+- core
+- specbuilder
+title: 'CRD step 1: preserve unknown fields + strict, object-aware SpecBuilder and
+  builder roles (D1, D2)'
+updated: 2026-09-03T05:04:33Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D1, D2). Plan: docs/superpowers/plans/2026-09-03-crd-step1-core-unknown-fields-specbuilder.md.
+
+- Role::Resource keeps undeclared constructor keys in _unknown_fields, TO_JSON re-emits them; IO::K8s->new(strict => 1) dies instead ($IO::K8s::Resource::STRICT localized in inflate/new_object/json_to_object/struct_to_object).
+- SpecBuilder walks typed specs through the registry, vivifies declared classes, -1 index, spec_array/spec_hash; builder roles rewritten on top of it.
+- Closes k90 and k91.
+Depends on: nothing. Unblocks: k93 (DSL options), k94 (IO::K8s::CRD).
+
+Merged to master as 87e48095..37657a81 (fast-forward, 2026-09-03). Follow-ups: k99 (List bag/strict), k100 (direct ->new coercion), k101 (required-attr vivification), k102 (inflation cost), k103 (role/SpecBuilder coupling).
