@@ -20,13 +20,11 @@ C<$self> for chaining.
 
 sub rate_limit {
     my ($self, %opts) = @_;
-    my $spec = $self->spec // {};
-    $spec->{rateLimit} = {
+    $self->spec_set('rateLimit', {
         $opts{average} ? (average => $opts{average}) : (),
         $opts{burst}   ? (burst   => $opts{burst})   : (),
         $opts{period}  ? (period  => $opts{period})  : (),
-    };
-    $self->spec($spec);
+    });
     return $self;
 }
 
@@ -45,12 +43,10 @@ chaining.
 
 sub basic_auth {
     my ($self, %opts) = @_;
-    my $spec = $self->spec // {};
-    $spec->{basicAuth} = {
+    $self->spec_set('basicAuth', {
         $opts{secret} ? (secret => $opts{secret}) : (),
         $opts{realm}  ? (realm  => $opts{realm})  : (),
-    };
-    $self->spec($spec);
+    });
     return $self;
 }
 
@@ -70,11 +66,7 @@ C<stripPrefix.prefixes> array. Returns C<$self> for chaining.
 
 sub strip_prefix {
     my ($self, @prefixes) = @_;
-    my $spec = $self->spec // {};
-    $spec->{stripPrefix} = {
-        prefixes => \@prefixes,
-    };
-    $self->spec($spec);
+    $self->spec_set('stripPrefix', { prefixes => \@prefixes });
     return $self;
 }
 
@@ -91,12 +83,7 @@ chaining.
 
 sub redirect_https {
     my ($self) = @_;
-    my $spec = $self->spec // {};
-    $spec->{redirectScheme} = {
-        scheme    => 'https',
-        permanent => 1,
-    };
-    $self->spec($spec);
+    $self->spec_set('redirectScheme', { scheme => 'https', permanent => 1 });
     return $self;
 }
 
@@ -115,11 +102,8 @@ C<$key> is added twice the last value wins. Returns C<$self> for chaining.
 
 sub add_request_header {
     my ($self, $key, $value) = @_;
-    my $spec = $self->spec // {};
-    my $headers = $spec->{headers} //= {};
-    my $custom = $headers->{customRequestHeaders} //= {};
-    $custom->{$key} = $value;
-    $self->spec($spec);
+    # Header names may legally contain dots; write into the map directly.
+    $self->spec_hash('headers.customRequestHeaders')->{$key} = $value;
     return $self;
 }
 
@@ -138,11 +122,7 @@ C<$key> is added twice the last value wins. Returns C<$self> for chaining.
 
 sub add_response_header {
     my ($self, $key, $value) = @_;
-    my $spec = $self->spec // {};
-    my $headers = $spec->{headers} //= {};
-    my $custom = $headers->{customResponseHeaders} //= {};
-    $custom->{$key} = $value;
-    $self->spec($spec);
+    $self->spec_hash('headers.customResponseHeaders')->{$key} = $value;
     return $self;
 }
 

@@ -17,10 +17,8 @@ fields under C<helm.cattle.io/v1>. Returns C<$self> for chaining.
 
 sub from_repo {
     my ($self, $repo_url, $chart_name) = @_;
-    my $spec = $self->spec // {};
-    $spec->{repo}  = $repo_url;
-    $spec->{chart} = $chart_name;
-    $self->spec($spec);
+    $self->spec_set('repo',  $repo_url);
+    $self->spec_set('chart', $chart_name);
     return $self;
 }
 
@@ -37,9 +35,7 @@ not the C<apiVersion> of the CRD. Returns C<$self> for chaining.
 
 sub set_version {
     my ($self, $version) = @_;
-    my $spec = $self->spec // {};
-    $spec->{version} = $version;
-    $self->spec($spec);
+    $self->spec_set('version', $version);
     return $self;
 }
 
@@ -59,11 +55,10 @@ chaining.
 
 sub set_values {
     my ($self, %values) = @_;
-    my $spec = $self->spec // {};
-    my $existing = $spec->{set} // {};
-    @{$existing}{keys %values} = values %values;
-    $spec->{set} = $existing;
-    $self->spec($spec);
+    # Helm keys carry dots (image.tag), so they must not travel through a
+    # dotted spec path: fetch the map once and write into it directly.
+    my $set = $self->spec_hash('set');
+    @{$set}{keys %values} = values %values;
     return $self;
 }
 
@@ -86,9 +81,7 @@ C<$self> for chaining.
 
 sub set_values_yaml {
     my ($self, $yaml_str) = @_;
-    my $spec = $self->spec // {};
-    $spec->{valuesContent} = $yaml_str;
-    $self->spec($spec);
+    $self->spec_set('valuesContent', $yaml_str);
     return $self;
 }
 
@@ -117,9 +110,9 @@ __END__
 
 This role provides the fluent setters documented in README's K3s section
 for working with C<HelmChart> and C<HelmChartConfig> CRDs from
-L<IO::K8s::K3s>. Each setter writes into C<spec> directly using a plain
-hashref, so the methods do not require the underlying C<spec> attribute to
-be a typed object -- a plain hash works.
+L<IO::K8s::K3s>. Each setter writes through L<IO::K8s::Role::SpecBuilder>'s
+C<spec_*> methods, so the methods work whether the underlying C<spec>
+attribute is a plain hash or a typed object.
 
 Use this role on a custom CRD class with
 C<api_version =E<gt> 'helm.cattle.io/v1'> or

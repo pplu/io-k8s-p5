@@ -37,21 +37,13 @@ Returns C<$self> for chaining.
 sub add_hostname {
     my ($self, @hostnames) = @_;
     my $format = $self->_route_format;
-
     if ($format eq 'gateway') {
-        my $spec = $self->spec // {};
-        my $existing = $spec->{hostnames} // [];
-        push @$existing, @hostnames;
-        $spec->{hostnames} = $existing;
-        $self->spec($spec);
+        $self->spec_push('hostnames', @hostnames);
     } elsif ($format eq 'traefik') {
         # Traefik uses match rules like Host(`example.com`)
         # We add a route with the host match
-        my $spec = $self->spec // {};
-        my $routes = $spec->{routes} //= [];
         my $hosts = join ', ', map { "Host(`$_`)" } @hostnames;
-        push @$routes, { match => $hosts, kind => 'Rule', services => [] };
-        $self->spec($spec);
+        $self->spec_push('routes', { match => $hosts, kind => 'Rule', services => [] });
     } elsif ($format eq 'ingress') {
         my $spec = $self->spec;
         unless ($spec) {
@@ -100,29 +92,15 @@ Returns C<$self> for chaining.
 sub add_backend {
     my ($self, $name, %opts) = @_;
     my $format = $self->_route_format;
-
+    my %backend = (
+        name => $name,
+        $opts{port}   ? (port   => $opts{port})   : (),
+        $opts{weight} ? (weight => $opts{weight}) : (),
+    );
     if ($format eq 'gateway') {
-        my $spec = $self->spec // {};
-        my $rules = $spec->{rules} //= [{}];
-        my $rule = $rules->[-1];
-        my $backends = $rule->{backendRefs} //= [];
-        push @$backends, {
-            name => $name,
-            $opts{port}   ? (port   => $opts{port})   : (),
-            $opts{weight} ? (weight => $opts{weight}) : (),
-        };
-        $self->spec($spec);
+        $self->spec_push('rules.-1.backendRefs', \%backend);
     } elsif ($format eq 'traefik') {
-        my $spec = $self->spec // {};
-        my $routes = $spec->{routes} //= [{}];
-        my $route = $routes->[-1];
-        my $services = $route->{services} //= [];
-        push @$services, {
-            name => $name,
-            $opts{port}   ? (port   => $opts{port})   : (),
-            $opts{weight} ? (weight => $opts{weight}) : (),
-        };
-        $self->spec($spec);
+        $self->spec_push('routes.-1.services', \%backend);
     } elsif ($format eq 'ingress') {
         # For Ingress, add to the last rule's paths
         my $spec = $self->spec;
@@ -171,28 +149,14 @@ sub add_path_match {
     my ($self, $path, %opts) = @_;
     my $type = $opts{type} // 'Prefix';
     my $format = $self->_route_format;
-
     if ($format eq 'gateway') {
-        my $spec = $self->spec // {};
-        my $rules = $spec->{rules} //= [{}];
-        my $rule = $rules->[-1];
-        my $matches = $rule->{matches} //= [];
-        push @$matches, {
-            path => { type => $type, value => $path },
-        };
-        $self->spec($spec);
+        $self->spec_push('rules.-1.matches', { path => { type => $type, value => $path } });
     } elsif ($format eq 'traefik') {
-        my $spec = $self->spec // {};
-        my $routes = $spec->{routes} //= [{}];
-        my $route = $routes->[-1];
-        if ($type eq 'Prefix') {
-            $route->{match} = "PathPrefix(`$path`)";
-        } elsif ($type eq 'Exact') {
-            $route->{match} = "Path(`$path`)";
-        } elsif ($type eq 'Regex') {
-            $route->{match} = "PathRegexp(`$path`)";
-        }
-        $self->spec($spec);
+        my $match = $type eq 'Prefix' ? "PathPrefix(`$path`)"
+                  : $type eq 'Exact'  ? "Path(`$path`)"
+                  : $type eq 'Regex'  ? "PathRegexp(`$path`)"
+                  : undef;
+        $self->spec_set('routes.-1.match', $match) if defined $match;
     } elsif ($format eq 'ingress') {
         my $spec = $self->spec;
         unless ($spec) {
@@ -236,24 +200,12 @@ no-op in that mode. Returns C<$self> for chaining.
 sub add_header_match {
     my ($self, $header, $value) = @_;
     my $format = $self->_route_format;
-
     if ($format eq 'gateway') {
-        my $spec = $self->spec // {};
-        my $rules = $spec->{rules} //= [{}];
-        my $rule = $rules->[-1];
-        my $matches = $rule->{matches} //= [{}];
-        my $match = $matches->[-1];
-        my $headers = $match->{headers} //= [];
-        push @$headers, { name => $header, value => $value };
-        $self->spec($spec);
+        $self->spec_push('rules.-1.matches.-1.headers', { name => $header, value => $value });
     } elsif ($format eq 'traefik') {
-        my $spec = $self->spec // {};
-        my $routes = $spec->{routes} //= [{}];
-        my $route = $routes->[-1];
-        my $existing = $route->{match} // '';
+        my $existing = $self->spec_get('routes.-1.match') // '';
         my $header_match = "Header(`$header`, `$value`)";
-        $route->{match} = $existing ? "$existing && $header_match" : $header_match;
-        $self->spec($spec);
+        $self->spec_set('routes.-1.match', $existing ? "$existing && $header_match" : $header_match);
     }
     # Ingress doesn't support header matching natively
     return $self;
@@ -290,10 +242,12 @@ The three backends produce three different wire shapes:
 
 =over
 
-=item * C<'gateway'> operates on a plain C<spec> hashref that mirrors the
-HTTPRoute wire schema (C<hostnames>, C<rules[].matches[].path>, C<rules[].backendRefs>).
+=item * C<'gateway'> writes through L<IO::K8s::Role::SpecBuilder>'s
+C<spec_*> methods into a C<spec> that mirrors the HTTPRoute wire schema
+(C<hostnames>, C<rules[].matches[].path>, C<rules[].backendRefs>) --
+either a plain hash or a typed struct.
 
-=item * C<'traefik'> operates on a plain hashref that mirrors the
+=item * C<'traefik'> writes the same way into a C<spec> that mirrors the
 IngressRoute wire schema (C<routes[].match> as a Traefik expression,
 C<routes[].services[]>).
 

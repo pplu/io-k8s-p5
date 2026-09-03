@@ -20,21 +20,13 @@ traffic-management kinds. Returns C<$self> for chaining.
 
 sub set_weighted {
     my ($self, $name, $weight) = @_;
-    my $spec = $self->spec // {};
-    my $weighted = $spec->{weighted} //= { services => [] };
-    my $services = $weighted->{services};
-
-    # Update existing or add new
-    my $found = 0;
-    for my $svc (@$services) {
-        if ($svc->{name} eq $name) {
-            $svc->{weight} = $weight;
-            $found = 1;
-            last;
-        }
+    my $services = $self->spec_array('weighted.services');
+    for my $i (0 .. $#$services) {
+        next unless ($self->spec_get("weighted.services.$i.name") // '') eq $name;
+        $self->spec_set("weighted.services.$i.weight", $weight);
+        return $self;
     }
-    push @$services, { name => $name, weight => $weight } unless $found;
-    $self->spec($spec);
+    $self->spec_push('weighted.services', { name => $name, weight => $weight });
     return $self;
 }
 
@@ -54,14 +46,10 @@ does not de-duplicate. Returns C<$self> for chaining.
 
 sub mirror_to {
     my ($self, $name, %opts) = @_;
-    my $spec = $self->spec // {};
-    my $mirroring = $spec->{mirroring} //= {};
-    my $mirrors = $mirroring->{mirrors} //= [];
-    push @$mirrors, {
+    $self->spec_push('mirroring.mirrors', {
         name => $name,
         $opts{percent} ? (percent => $opts{percent}) : (),
-    };
-    $self->spec($spec);
+    });
     return $self;
 }
 
@@ -84,10 +72,9 @@ __END__
 
 This role provides the two traffic-distribution operations documented in
 the README's fluent-API section: weighted backend fan-out and traffic
-mirroring. Both write into a plain hashref C<spec> (no typed nested
-object), so the role composes cleanly with CRD classes whose C<spec> is
-either a hash or a typed object -- the existing C<spec> is read, mutated,
-and re-assigned.
+mirroring. Both write through L<IO::K8s::Role::SpecBuilder>'s C<spec_*>
+methods, so the role composes cleanly with CRD classes whose C<spec> is
+either a hash or a typed object.
 
 Apply this role to a custom CRD class that exposes the same
 C<weighted.services> / C<mirroring.mirrors> shape on the wire. The

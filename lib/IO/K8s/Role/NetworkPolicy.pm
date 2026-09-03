@@ -32,9 +32,7 @@ sub select_pods {
             )
         );
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        $spec->{endpointSelector} = { matchLabels => \%labels };
-        $self->spec($spec);
+        $self->spec_set('endpointSelector', { matchLabels => \%labels });
     }
     return $self;
 }
@@ -92,13 +90,10 @@ sub allow_ingress_from_cidrs {
         my @from = map { { ipBlock => { cidr => $_ } } } @$cidrs;
         $self->_add_core_ingress_rule_multi(\@from, $opts{ports});
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        my $ingress = $spec->{ingress} //= [];
-        push @$ingress, {
+        $self->spec_push('ingress', {
             fromCIDR => $cidrs,
-            $opts{ports} ? (toPorts => [{ ports => $opts{ports} }]) : (),
-        };
-        $self->spec($spec);
+            $opts{ports} ? (toPorts => [ { ports => $opts{ports} } ]) : (),
+        });
     }
     return $self;
 }
@@ -125,13 +120,10 @@ sub allow_ingress_from_namespace {
             $opts{ports},
         );
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        my $ingress = $spec->{ingress} //= [];
-        push @$ingress, {
-            fromEndpoints => [{ matchLabels => { 'k8s:io.kubernetes.pod.namespace' => $namespace } }],
-            $opts{ports} ? (toPorts => [{ ports => $opts{ports} }]) : (),
-        };
-        $self->spec($spec);
+        $self->spec_push('ingress', {
+            fromEndpoints => [ { matchLabels => { 'k8s:io.kubernetes.pod.namespace' => $namespace } } ],
+            $opts{ports} ? (toPorts => [ { ports => $opts{ports} } ]) : (),
+        });
     }
     return $self;
 }
@@ -157,13 +149,10 @@ sub allow_egress_to_pods {
             $opts{ports},
         );
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        my $egress = $spec->{egress} //= [];
-        push @$egress, {
-            toEndpoints => [{ matchLabels => $labels }],
-            $opts{ports} ? (toPorts => [{ ports => $opts{ports} }]) : (),
-        };
-        $self->spec($spec);
+        $self->spec_push('egress', {
+            toEndpoints => [ { matchLabels => $labels } ],
+            $opts{ports} ? (toPorts => [ { ports => $opts{ports} } ]) : (),
+        });
     }
     return $self;
 }
@@ -190,10 +179,7 @@ sub allow_egress_to_cidrs {
             [ map { { ipBlock => { cidr => $_ } } } @$cidrs ],
         );
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        my $egress = $spec->{egress} //= [];
-        push @$egress, { toCIDR => $cidrs };
-        $self->spec($spec);
+        $self->spec_push('egress', { toCIDR => $cidrs });
     }
     return $self;
 }
@@ -221,13 +207,10 @@ sub allow_egress_to_dns {
     if ($format eq 'core') {
         $self->_add_core_egress_rule(undef, $dns_ports);
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        my $egress = $spec->{egress} //= [];
-        push @$egress, {
-            toEndpoints => [{ matchLabels => { 'k8s:io.kubernetes.pod.namespace' => 'kube-system', 'k8s:k8s-app' => 'kube-dns' } }],
-            toPorts => [{ ports => $dns_ports }],
-        };
-        $self->spec($spec);
+        $self->spec_push('egress', {
+            toEndpoints => [ { matchLabels => { 'k8s:io.kubernetes.pod.namespace' => 'kube-system', 'k8s:k8s-app' => 'kube-dns' } } ],
+            toPorts     => [ { ports => $dns_ports } ],
+        });
     }
     return $self;
 }
@@ -254,10 +237,8 @@ sub deny_all_ingress {
         # Empty ingress array = deny all
         $self->spec->ingress([]);
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        $spec->{ingress} = [];
-        $spec->{ingressDeny} = [{}];
-        $self->spec($spec);
+        $self->spec_set('ingress',     []);
+        $self->spec_set('ingressDeny', [ {} ]);
     }
     return $self;
 }
@@ -282,10 +263,8 @@ sub deny_all_egress {
         $self->_ensure_policy_types('Egress');
         $self->spec->egress([]);
     } elsif ($format eq 'cilium') {
-        my $spec = $self->spec // {};
-        $spec->{egress} = [];
-        $spec->{egressDeny} = [{}];
-        $self->spec($spec);
+        $self->spec_set('egress',     []);
+        $self->spec_set('egressDeny', [ {} ]);
     }
     return $self;
 }
@@ -440,13 +419,10 @@ sub _add_core_egress_rule_multi {
 
 sub _add_cilium_ingress_rule {
     my ($self, $endpoint_selector, $ports) = @_;
-    my $spec = $self->spec // {};
-    my $ingress = $spec->{ingress} //= [];
-    push @$ingress, {
-        fromEndpoints => [$endpoint_selector],
-        $ports ? (toPorts => [{ ports => $ports }]) : (),
-    };
-    $self->spec($spec);
+    $self->spec_push('ingress', {
+        fromEndpoints => [ $endpoint_selector ],
+        $ports ? (toPorts => [ { ports => $ports } ]) : (),
+    });
 }
 
 1;
