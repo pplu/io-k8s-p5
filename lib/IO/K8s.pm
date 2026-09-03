@@ -1415,6 +1415,23 @@ When kinds collide (e.g. both core and Cilium have C<NetworkPolicy>), the
 first-registered entry keeps the short name. All entries are always reachable
 via domain-qualified names (C<api_version/Kind>).
 
+=head2 strict
+
+Optional. Boolean, default C<0>. Governs what happens when a constructor key
+matches no declared attribute, at any nesting level. With the default C<0> the
+field is kept and re-emitted by C<TO_JSON> (see
+L<IO::K8s::Role::Resource/UNKNOWN FIELDS>); with C<1> it dies instead, with
+C<Unknown field 'E<lt>nameE<gt>' for E<lt>classE<gt>>.
+
+    my $k8s = IO::K8s->new(strict => 1);
+    $k8s->new_object('Pod', { spec => { bogusField => 1 } });
+    # dies: Unknown field 'bogusField' for IO::K8s::Api::Core::V1::PodSpec
+
+C<strict> is read by L</inflate>, L</new_object>, L</json_to_object> and
+L</struct_to_object>; L</load> and L</load_yaml> inherit it because both
+build on C<inflate>/C<new_object>. It applies for the duration of that one
+call, including every nested object it constructs along the way.
+
 =head2 openapi_spec
 
 Optional. The OpenAPI v2 specification from a Kubernetes cluster. When provided,

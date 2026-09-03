@@ -235,9 +235,11 @@ sub _sb_walk_vivify {
 Reads a value from the object's C<spec> at the dotted path C<$path>. Each
 segment is a hash key, an array index (a purely numeric segment, C<-1> for
 the last element), or a JSON field name on a typed C<spec> node -- an
-inline struct, a referenced class, or an array/hash of either. Returns
-C<undef> if any segment along the way is missing, C<spec> itself is unset,
-or the terminal value is not defined. Never vivifies.
+inline struct, a referenced class, or an array/hash of either. A terminal
+that is itself typed comes back as that object, not a hashref -- C<spec_get>
+never serializes what it finds. Returns C<undef> if any segment along the
+way is missing, C<spec> itself is unset, or the terminal value is not
+defined. Never vivifies.
 
     my $match = $ir->spec_get('routes.0.match');
 
@@ -266,8 +268,11 @@ whatever the attribute registry declares for that field -- an inline
 struct or referenced class, an array/hash container, or (via the
 C<_unknown_fields> bag, D1) a plain hash for a field the class does not
 declare. A hashref handed to a declared object/array/hash-of-objects slot
-is inflated through the registry the same way C<FROM_HASH> would. Returns
-C<$self> for chaining.
+is inflated through the registry the same way C<FROM_HASH> would, and the
+final write goes through the target's ordinary accessor, so a declared
+field's own type constraint validates the value -- the wrong type croaks
+the same way a direct C<< ->attr($value) >> call would. Returns C<$self>
+for chaining.
 
 Vivifying a typed intermediate constructs the declared class with no
 arguments; a class with required attributes (k101) cannot be built that
@@ -313,12 +318,12 @@ sub spec_array {
 
     my $hashref = $obj->spec_hash($path);
 
-Vivifies and returns the container at the dotted path C<$path> -- a plain
-hashref for an opaque map or a struct field, or the struct/object itself
-when the declared field is one, so the caller can read or write it
-directly. Croaks if the path already holds a defined scalar. Vivifies
-intermediates the same way C<spec_set> does, including the
-required-attribute croak described there.
+Vivifies and returns the container at the dotted path C<$path>, so the
+caller can read or write it directly: a plain hashref on an untyped node
+or an opaque map field, or the struct/object itself when the declared
+field is a typed struct or referenced class. Croaks if the path already
+holds a defined scalar. Vivifies intermediates the same way C<spec_set>
+does, including the required-attribute croak described there.
 
     $ir->spec_hash('tls')->{secretName} = 'my-cert';
 
@@ -340,10 +345,11 @@ sub spec_hash {
 
 Appends C<@values> onto the arrayref located at the dotted path C<$path>,
 vivifying it (and its parent structure, including the required-attribute
-croak described under C<spec_set>) as needed via C<spec_array>. A hashref
-value handed to an array-of-objects slot is inflated to the element
-class, same as C<spec_set>; an already-blessed value is kept as is.
-Returns C<$self> for chaining.
+croak described under C<spec_set>) as needed via C<spec_array>; pushing
+onto a path that already holds a defined, non-array value croaks rather
+than replacing it. A hashref value handed to an array-of-objects slot is
+inflated to the element class, same as C<spec_set>; an already-blessed
+value is kept as is. Returns C<$self> for chaining.
 
     $ir->spec_push('routes', { match => 'Host(`api.example.com`)' });
 
@@ -387,11 +393,13 @@ sub spec_merge {
     $obj->spec_delete($path);
 
 Removes the value at the dotted path C<$path>. For a hash parent the key
-is deleted (a declared field on a typed node is set to C<undef> through
-its accessor rather than removed from the object); for an array parent the
-indexed element is spliced out. If the path does not resolve -- C<spec> is
-unset, a parent is missing, or the terminal is undefined -- the call is a
-no-op. Returns C<$self> for chaining.
+is deleted; for a declared field on a typed node there is nothing to
+remove, so it is cleared to C<undef> through its accessor instead -- which
+croaks, through Moo's own required-attribute check, if that field is
+C<required>. For an array parent the indexed element is spliced out. If
+the path does not resolve -- C<spec> is unset, a parent is missing, or the
+terminal is undefined -- the call is a no-op. Returns C<$self> for
+chaining.
 
     $ir->spec_delete('tls');
 
@@ -451,12 +459,34 @@ a consumer class's C<spec> attribute. It exists so callers building
 arbitrary CRDs (IngressRoute, HTTPRoute, Gateway listeners, ...) can reach
 deeply-nested fields without writing the indexing by hand each time.
 
-Path syntax: dot-separated segments where each segment is a hash key, with
-one exception -- a segment that is purely numeric indexes into the arrayref
-at the current position. C<spec_set>, C<spec_push> and C<spec_delete>
-vivify missing intermediate hashrefs as needed; C<spec_get> never does.
-C<spec_merge> bypasses the path machinery entirely and shallow-merges into
-the top level only.
+Path syntax: dot-separated segments. On a plain hashref/arrayref node each
+segment is a hash key or an array index; on an object node -- a typed
+C<spec>, or any nested typed field reached along the way -- a segment is
+instead the JSON field name mapped to its attribute through the registry,
+or, for a key the class does not declare, read and written through the
+object's C<_unknown_fields> bag (D1) exactly as it would be on a plain
+hash. A purely numeric segment is always an array index: it counts from
+the end when negative, so C<-1> addresses the last element, or (on an
+empty array) the one C<spec_set>/C<spec_array>/C<spec_push> create there;
+any other index that resolves outside the array croaks rather than
+autovivifying a hole.
+
+C<spec_set>, C<spec_array>, C<spec_hash> and C<spec_push> vivify missing
+intermediate structure as they walk: a plain hashref/arrayref on an
+untyped node, or, on a typed node, whatever the attribute registry
+declares for that field (an inline struct or referenced class, an
+array/hash container), with a hashref handed to a typed slot inflated the
+same way C<FROM_HASH> does. C<spec_get> and C<spec_delete> never vivify.
+Every failure raised while walking or vivifying is re-raised with the
+spec path in front, with no internal file or line inside it (k101), as
+one of:
+
+    spec path 'PATH': cannot set 'SEG': ORIGINAL MESSAGE
+    spec path 'PATH': cannot create CLASS for 'SEG': ORIGINAL MESSAGE
+    spec path 'PATH': cannot clear 'SEG': ORIGINAL MESSAGE
+
+depending which step failed. C<spec_merge> bypasses the path machinery
+entirely and shallow-merges into the top level only.
 
 The role is composed automatically by L<IO::K8s::APIObject> on any class
 that did not pass C<api_version> as an import parameter (i.e. on every

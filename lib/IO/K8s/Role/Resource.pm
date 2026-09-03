@@ -182,6 +182,24 @@ sub _invalidate_k8s_attr_cache {
     }
 }
 
+=head1 UNKNOWN FIELDS
+
+A constructor key that no C<k8s>-declared attribute claims is not dropped,
+at every nesting level and every entry point -- a top-level C<< ->new >>,
+L<IO::K8s/inflate>, L<IO::K8s/new_object>, L<IO::K8s/json_to_object>,
+L<IO::K8s/struct_to_object>, and every inline struct built along the way.
+It exists so a document written against a newer upstream schema than this
+distribution ships still round-trips instead of silently losing the
+field. C<TO_JSON> re-emits it alongside the declared attributes, with a
+declared attribute winning on a name clash. The bag itself lives on
+C<_unknown_fields>, a plain hashref attribute that C<TO_JSON>'s own
+attribute walk never sees as a field of its own.
+
+An instance created through L<IO::K8s> with C<< strict => 1 >> turns this
+into a fatal error instead: any key that would otherwise land in the bag
+dies as C<Unknown field 'E<lt>nameE<gt>' for E<lt>classE<gt>>, again at every
+nesting level, for the duration of that call.
+
 =method TO_JSON
 
     my $struct = $pod->TO_JSON;

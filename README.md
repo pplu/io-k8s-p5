@@ -174,7 +174,10 @@ my $gw = $k8s->new_object('Gateway',
 my $k8s = IO::K8s->new(with => ['IO::K8s::AgentSandbox']);
 my $sandbox = $k8s->new_object('Sandbox',
     metadata => { name => 'my-sandbox', namespace => 'default' },
-    spec => { replicas => 1, shutdownPolicy => 'Retain' },
+    spec => {
+        shutdownPolicy => 'Retain',
+        podTemplate    => { spec => { containers => [ { name => 'agent', image => 'agent:latest' } ] } },
+    },
 );
 ```
 
@@ -209,6 +212,9 @@ $ir->spec_push('routes', { match => 'Host(`api.example.com`)' });
 $ir->spec_merge(entryPoints => ['web', 'websecure']);
 $ir->spec_delete('tls');
 ```
+
+Paths walk typed specs too: `-1` addresses the last (or a new) array
+element, and a hashref written into a typed slot is inflated.
 
 Domain-specific builder roles provide fluent APIs for common tasks:
 

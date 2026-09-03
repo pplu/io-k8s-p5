@@ -2,6 +2,45 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Unknown fields are kept instead of dropped (D1 of the CRD design,
+    docs/superpowers/specs/2026-09-03-crd-design.md). A constructor key no
+    attribute claims -- on inflate, new_object, FROM_HASH or a direct
+    ->new, at any nesting level including inline structs -- now lands in
+    the object's _unknown_fields bag and TO_JSON emits it again, declared
+    attributes winning on a clash. Before, every class silently lost such
+    a field on the round-trip (the README AgentSandbox example passed a
+    spec.replicas that vanished, k91). IO::K8s->new(strict => 1) makes
+    the same situation die with "Unknown field '<name>' for <class>" for
+    the duration of that instance's inflate / new_object / json_to_object
+    / struct_to_object calls (load and load_yaml inherit it).
+
+  - SpecBuilder walks typed specs (k90). spec_get/spec_set/spec_push/
+    spec_merge/spec_delete used to assume spec was a plain hashref; on a
+    class whose spec is an inline struct (the eight AgentSandbox classes)
+    spec_set replaced the struct with an empty hash and wrote into an
+    orphan, so to_json emitted spec: {} afterwards. The methods now walk
+    objects through their accessors, vivify missing intermediates as the
+    declared class, inflate hashrefs handed to typed slots, and put a key
+    an object does not declare into its _unknown_fields bag. A -1 path
+    segment addresses the last array element, or a freshly created one on
+    an empty array. New: spec_array($path) and spec_hash($path) return
+    the vivified container. The builder roles (CertManaged, HelmManaged,
+    MiddlewareBuilder, Loadbalanced, Routable's gateway and traefik
+    branches, NetworkPolicy's cilium branch) are expressed in these calls
+    and therefore work on hash and object specs alike. Visible changes:
+    Routable::add_path_match on a traefik route with an unknown type no
+    longer leaves an empty route behind; on a plain-hash spec too,
+    spec_push onto a path holding a defined non-array value now croaks
+    instead of replacing it, spec_set through a defined scalar
+    intermediate croaks instead of clobbering it, and spec_set('a.5', ...)
+    on an empty array croaks instead of autovivifying the holes in
+    between. Every failure inside a walk is re-raised with the spec path
+    in front (k101); a class with required attributes cannot be
+    vivified, since it would have to be constructed with none.
+
+  - README: the AgentSandbox example no longer passes spec.replicas, a
+    field neither the class nor upstream agent-sandbox v1.0.0 has (k91).
+
   - Bump CRD-provider upstream pins (k85-k88). Verified with
     maint/crd-drift-check.pl against each new upstream release:
       * Cilium v1.20.0 -> v1.20.1 (k85) -- no schema drift.

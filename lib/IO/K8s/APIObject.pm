@@ -62,8 +62,10 @@ For Custom Resource Definitions (CRDs), pass C<api_version> and
 optionally C<resource_plural> as import parameters. These are installed
 as class methods before the role is composed, avoiding redefinition warnings.
 CRD classes also get L<IO::K8s::Role::SpecBuilder> applied automatically
-for deep-path spec manipulation (C<spec_get>, C<spec_set>, C<spec_push>,
-C<spec_merge>, C<spec_delete>).
+for deep-path spec manipulation (C<spec_get>, C<spec_set>, C<spec_array>,
+C<spec_hash>, C<spec_push>, C<spec_merge>, C<spec_delete>), walking a
+typed C<spec> through its own declared fields as readily as a plain hash
+one.
 
 Use C<IO::K8s::Resource> for embedded objects (PodSpec, Container, etc.)
 and C<IO::K8s::APIObject> for top-level resources (Pod, Deployment, Service, etc.)
