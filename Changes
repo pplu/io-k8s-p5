@@ -2,6 +2,15 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - New IO::K8s::Unstructured and IO::K8s->new(unknown_kinds => 'unstructured')
+    (D4, k96): apiVersion/kind/metadata as ordinary typed attributes, with no
+    fixed api_version()/kind() identity, and every other field on the wire
+    preserved byte-for-byte through the existing _unknown_fields bag. Opt-in
+    only -- bare IO::K8s still dies with the current "Cannot resolve
+    Kubernetes GVK" error on an unresolvable Kind; passing unknown_kinds =>
+    'unstructured' to inflate() or new_object() builds an
+    IO::K8s::Unstructured from the document instead.
+
   - K3s modeled to full depth by hand (D5/D6, k95): 14 classes across its 4
     Kinds (HelmChart, HelmChartConfig, Addon, ETCDSnapshotFile), named after
     the upstream Go types -- helm.cattle.io/v1 from k3s-io/helm-controller

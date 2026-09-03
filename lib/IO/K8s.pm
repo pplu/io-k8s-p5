@@ -9,6 +9,7 @@ use JSON::MaybeXS;
 use Scalar::Util ();
 use IO::K8s::AutoGen;
 use IO::K8s::Resource ();
+use IO::K8s::Unstructured ();
 use namespace::clean;
 
 our $VERSION = '1.108';
@@ -338,6 +339,17 @@ has with => (
 has strict => (
     is      => 'ro',
     default => sub { 0 },
+);
+
+# Unknown-Kind policy (D4). '': the current fail-closed default -- inflate
+# and new_object die with the GVK resolution error below when apiVersion/kind
+# resolves to no registered class (built-in, CRD-registered, or AutoGen'd).
+# 'unstructured': build an IO::K8s::Unstructured from the document instead of
+# dying. Any other value keeps the fail-closed default unchanged -- only the
+# literal string 'unstructured' opts in.
+has unknown_kinds => (
+    is      => 'ro',
+    default => sub { '' },
 );
 
 # User namespaces to search for pre-built classes (checked before IO::K8s::)
@@ -926,8 +938,11 @@ sub inflate {
     my $class = $api_version_supplied
         ? $self->expand_class($kind, $api_version)
         : $self->_expand_class_or_die($kind);
-    _die_resolution_error($kind, $api_version)
-        if $api_version_supplied && !defined $class;
+    if ($api_version_supplied && !defined $class) {
+        return $self->_unstructured_from_struct($struct)
+            if $self->unknown_kinds eq 'unstructured';
+        _die_resolution_error($kind, $api_version);
+    }
     $self->load_class($class);
     my $inflated = $self->_inflate_struct($class, $struct);
     return $class->new(%$inflated);
@@ -977,9 +992,28 @@ sub new_object {
     my $class = $api_version_supplied
         ? $self->expand_class($short_class, $api_version)
         : $self->_expand_class_or_die($short_class);
-    _die_resolution_error($short_class, $api_version)
-        if $api_version_supplied && !defined $class;
+    if ($api_version_supplied && !defined $class) {
+        if ($self->unknown_kinds eq 'unstructured') {
+            my %struct = (ref($params) eq 'HASH') ? %$params : ();
+            $struct{kind} = $short_class unless exists $struct{kind};
+            $struct{apiVersion} = $api_version unless exists $struct{apiVersion};
+            return $self->_unstructured_from_struct(\%struct);
+        }
+        _die_resolution_error($short_class, $api_version);
+    }
     return $self->_struct_to_object_expanded($class, $params);
+}
+
+# unknown_kinds => 'unstructured' opt-in (D4): build an untyped
+# IO::K8s::Unstructured envelope from a document instead of dying, called
+# only from the two GVK-resolution-failure sites above -- inflate()'s
+# apiVersion-supplied branch and new_object()'s equivalent. apiVersion/kind
+# land on their own typed attributes; everything else preserved through
+# FROM_HASH's normal D1 handling (an undeclared constructor key is kept in
+# _unknown_fields and re-emitted by TO_JSON).
+sub _unstructured_from_struct {
+    my ($self, $struct) = @_;
+    return IO::K8s::Unstructured->FROM_HASH($struct);
 }
 
 # expand_class() for a caller-supplied name that carries no separate
