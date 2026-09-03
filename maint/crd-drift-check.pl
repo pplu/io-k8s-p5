@@ -266,16 +266,43 @@ sub _slurp {
     # were UTF-8-encoded twice: e.g. 'µ' (correctly, bytes C2 B5) written
     # through ':encoding(UTF-8)' without ever having been decoded first
     # becomes, on disk, the UTF-8 encoding of the two CHARACTERS U+00C2 and
-    # U+00B5 -- always C3 82 C2 B5 for ANY originally-2-byte UTF-8
-    # character, since every codepoint a UTF-8 lead byte can produce
-    # (U+00C2-U+00DF) maps to that same C3 lead byte once misread as
-    # Latin-1 and re-encoded. That "\xC3" immediately followed by a
-    # continuation byte (\x80-\xBF) in the RAW bytes is therefore a
-    # reliable, character-independent double-encoding signature -- decode
-    # the raw bytes as UTF-8 a second time to undo it. A freshly (correctly)
-    # cached file never matches, so this is a no-op there.
-    if ($bytes =~ /\xC3[\x80-\xBF]/) {
-        $content = Encode::decode('UTF-8', Encode::encode('iso-8859-1', $content));
+    # U+00B5, i.e. C3 82 C2 B5. An earlier version of this check matched
+    # any "\xC3" followed by a continuation byte -- but that signature is
+    # NOT unique to double-encoded content: a single, correctly-encoded
+    # Latin-1-Supplement character (C3 A9 = 'e-acute', C3 BC = 'u-umlaut',
+    # ...) is EXACTLY that shape, since every codepoint from U+00C0-U+00FF
+    # has UTF-8 lead byte C3 too. That false positive silently mangled a
+    # legitimately cached 'Grüße'/'Délai' into U+FFFD replacement
+    # characters on read alone (round-2 review finding).
+    #
+    # The double-encoding signature actually IS unique: re-encoding any
+    # ORIGINAL 2-byte UTF-8 lead byte (always C2 or C3 for a character in
+    # the Latin-1 Supplement block -- covers 'µ' via C2 and 'ü'/'é'-style
+    # letters via C3, which is what this distribution's CRD manifests
+    # realistically carry) via the misread-as-Latin-1 path always produces
+    # "C3 82" or "C3 83" for that first byte, followed by "C2" plus a
+    # continuation byte (\x80-\xBF) for the second -- four bytes, not two.
+    # A lone 'ü'/'é' never produces that 4-byte run on its own; it would
+    # need a literal "C2" + continuation byte immediately afterward too.
+    #
+    # Even with that tighter signature, only ACCEPT the repair if the
+    # WHOLE text survives the reinterpret-as-Latin-1-then-decode-as-UTF-8
+    # round trip strictly. FB_CROAK on both encode() and decode(): encode()
+    # alone would otherwise silently substitute '?' for any codepoint above
+    # U+00FF (a real emoji elsewhere in an otherwise-unrelated part of the
+    # same cached file, say), which decode() would then just as silently
+    # accept -- masking real data loss instead of tripping this fallback.
+    # LEAVE_SRC on both: CHECK => FB_CROAK makes encode()/decode() consume
+    # (empty out) their source argument as they convert it, which would
+    # destroy $content -- the exact value this needs to fall back to --
+    # even along the success path. A file that fails this check keeps its
+    # own, already correctly single-decoded $content.
+    if ($bytes =~ /\xC3[\x82\x83]\xC2[\x80-\xBF]/) {
+        my $check = Encode::FB_CROAK() | Encode::LEAVE_SRC();
+        my $repaired = eval {
+            Encode::decode('UTF-8', Encode::encode('iso-8859-1', $content, $check), $check);
+        };
+        $content = $repaired if defined $repaired;
     }
     return $content;
 }
