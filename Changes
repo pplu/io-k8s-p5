@@ -2,6 +2,26 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - K3s modeled to full depth by hand (D5/D6, k95): 14 classes across its 4
+    Kinds (HelmChart, HelmChartConfig, Addon, ETCDSnapshotFile), named after
+    the upstream Go types -- helm.cattle.io/v1 from k3s-io/helm-controller
+    v0.17.7 (the version k3s v1.36.4+k3s1's go.mod vendors), k3s.cattle.io/v1
+    from k3s-io/api v0.1.4 (split out of k3s-io/k3s itself at this tag).
+    K3s's CRDs stay schemaless upstream (x-kubernetes-preserve-unknown-fields,
+    no openAPIV3Schema), so this is the one provider modeled by hand from Go
+    source rather than rendered and `--check`ed against a manifest;
+    `crd-drift-check.pl --provider K3s` stays SOURCE UNRESOLVED by design.
+    Reused core types where the Go field is exactly one (LocalObjectReference,
+    PodSecurityContext, SecurityContext, apiextensions/v1.JSON for the
+    `values` field). Two opaque fields the pre-full-depth model guessed
+    disappear because upstream's Go structs never had them: Addon has no
+    `status` (`+genclient:noStatus`) and HelmChartConfig has no `status`
+    either. HelmManaged is unchanged. t/68_specbuilder_objects.t's "plain
+    hash specs behave as before" subtest, which used HelmChart as its
+    opaque-hash-spec fixture, now uses a small class local to the test file
+    instead, since every bundled provider's Kinds have gone to full-depth
+    typed modeling in turn and none is left to borrow.
+
   - AgentSandbox v1beta1 modeled to full depth (D5, k95): 28 classes across
     the 4 served Kinds (Sandbox, SandboxClaim, SandboxTemplate,
     SandboxWarmPool), named after the upstream kubernetes-sigs/agent-sandbox

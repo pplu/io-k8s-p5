@@ -39,6 +39,22 @@ use IO::K8s;
     };
 }
 
+{
+    # A genuinely opaque hash spec, kept local to this test rather than
+    # borrowed from a real provider class: every bundled provider's Kinds
+    # have gone to full-depth typed modeling (k95/D5) in turn -- Traefik's
+    # IngressRoute, Cilium's CiliumNetworkPolicy, Gateway API's GatewayClass
+    # and now K3s's HelmChart -- so there is no longer a shipped class this
+    # subtest can rely on staying an opaque `{ Str => 1 }` spec.
+    package TestSB::OpaqueThing;
+    use IO::K8s::APIObject
+        api_version     => 'test.example.com/v1',
+        resource_plural => 'opaquethings';
+    with 'IO::K8s::Role::Namespaced';
+
+    k8s spec => { Str => 1 };
+}
+
 sub widget {
     my (%spec) = @_;
     return TestSB::Widget->FROM_HASH({
@@ -169,13 +185,7 @@ subtest 'spec_array and spec_hash vivify and return the container' => sub {
 };
 
 subtest 'plain hash specs behave as before' => sub {
-    # Traefik's IngressRoute, Cilium's CiliumNetworkPolicy and Gateway API's
-    # GatewayClass all went to full-depth typed modeling (k95/D5) in turn
-    # and no longer serve as a plain-opaque-hash example -- K3s's HelmChart
-    # (k8s spec => { Str => 1 }; K3s CRDs are schemaless upstream, so it
-    # stays opaque by design, not as a pending-modeling gap) still does.
-    require IO::K8s::K3s::V1::HelmChart;
-    my $gc = IO::K8s::K3s::V1::HelmChart->new(
+    my $gc = TestSB::OpaqueThing->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => 'r'),
     );
     $gc->spec_set('rules.-1.match', 'Host(`a`)');
