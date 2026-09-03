@@ -47,7 +47,29 @@ use File::Path qw(make_path);
 use Getopt::Long qw(GetOptions);
 use JSON::PP;
 
-my $DIST_ROOT = File::Spec->rel2abs(File::Spec->catdir($FindBin::Bin, '..'));
+# File::Spec->rel2abs makes a path absolute but, on Unix, never collapses a
+# '..' segment already in it (that's deliberate upstream: collapsing one
+# blindly can change what a path means across a symlink). $DIST_ROOT itself
+# is built from FindBin::Bin + '..', so left at rel2abs alone it would read
+# as ".../maint/.." forever -- harmless for open()/-d, which the OS resolves
+# fine, but fatal for the --suggest-dir "not inside lib/" guard below, which
+# is a plain string-prefix test: a literal '..' anywhere in either side
+# defeats it silently instead of refusing. _canon_abs collapses '.'/'..'
+# lexically after rel2abs, with no filesystem lookup -- unlike Cwd::abs_path,
+# it works on a --suggest-dir that doesn't exist yet.
+sub _canon_abs {
+    my ($path) = @_;
+    my ($vol, $dirs) = File::Spec->splitpath(File::Spec->rel2abs($path), 1);
+    my @out;
+    for my $seg (File::Spec->splitdir($dirs)) {
+        next if $seg eq '' || $seg eq '.';
+        if ($seg eq '..') { pop @out if @out; next; }
+        push @out, $seg;
+    }
+    return File::Spec->catdir($vol, File::Spec->rootdir, @out);
+}
+
+my $DIST_ROOT = _canon_abs(File::Spec->catdir($FindBin::Bin, '..'));
 my $UA_STRING = 'io-k8s-p5-crd-drift-check (+https://github.com/pplu/io-k8s-p5)';
 
 # The provider modules this tool knows how to check, in report order. Each
@@ -79,6 +101,15 @@ Options:
   --verbose           Also list items suppressed by the exceptions file
   --format text|json  Report format (default: text)
   --output PATH       Also write the report to this file
+  --suggest           After the report, print the class source the emitter
+                       renders for every OPAQUE SPEC and MISSING FIELD Kind
+                       (never touches lib/).
+  --suggest-dir PATH  Write those files under PATH instead of printing
+                       (PATH must not be inside the distribution's lib/).
+  --names FILE        YAML map of generated-class path (relative to the
+                       Kind, e.g. "Middleware::Spec::RateLimit") to the
+                       package name to use (e.g. "RateLimit") -- the
+                       upstream Go type names (D6).
   --help              This message
 
 For each provider, fetches its upstream CustomResourceDefinition manifests at
@@ -103,6 +134,7 @@ sub parse_args {
         'provider=s@', 'dir=s', 'spec=s',
         'exceptions=s', 'lib=s', 'cache-dir=s', 'no-cache',
         'verbose', 'output=s', 'format=s', 'help|h',
+        'suggest' => \$opt{suggest}, 'suggest-dir=s' => \$opt{suggest_dir}, 'names=s' => \$opt{names},
     ) or usage(1);
     usage(0) if $opt{help};
     if ($opt{format} !~ /^(text|json)$/) {
@@ -118,6 +150,12 @@ sub parse_args {
     }
     if (defined $opt{dir} && @providers != 1) {
         die "crd-drift-check: --dir/--spec requires exactly one --provider\n";
+    }
+    if ($opt{suggest_dir}) {
+        $opt{suggest_dir} = _canon_abs($opt{suggest_dir});
+        my $lib_abs = _canon_abs($opt{lib});
+        die "crd-drift-check: --suggest-dir must not point inside lib/\n"
+            if $opt{suggest_dir} eq $lib_abs || index($opt{suggest_dir}, "$lib_abs/") == 0;
     }
     $opt{provider} = \@providers;
     return \%opt;
@@ -228,13 +266,16 @@ sub load_manifests {
 # From each CustomResourceDefinition document: spec.group, spec.names.kind,
 # and per served version its name + the spec-object property set from
 # openAPIV3Schema.properties.spec.properties. GVK = "group/version/Kind".
+# The whole document rides along too (doc), so --suggest can hand a
+# reported GVK's manifest straight to IO::K8s::CRD->generate without
+# re-fetching or re-parsing it.
 # ---------------------------------------------------------------------------
 
 sub parse_crds {
     my (@manifests) = @_;
     require YAML::PP;
     my $yp = YAML::PP->new(boolean => 'JSON::PP');
-    my %by_gvk;    # "group/version/Kind" -> { kind, group, version, spec_props => {name=>1}, has_spec_schema }
+    my %by_gvk;    # "group/version/Kind" -> { kind, group, version, doc, spec_props => {name=>1}, has_spec_schema }
     for my $m (@manifests) {
         my ($label, $text) = @$m;
         my @docs = eval { $yp->load_string($text) };
@@ -258,6 +299,7 @@ sub parse_crds {
                     group           => $group,
                     version         => $vname,
                     label           => $label,
+                    doc             => $doc,
                     has_spec_schema => ($spec_props ? 1 : 0),
                     spec_props      => { map { $_ => 1 } keys %{ $spec_props // {} } },
                 };
@@ -461,6 +503,7 @@ sub check_provider {
             push @{ $result->{extra_field} }, [$gvk, $class, $f];
         }
     }
+    $result->{_upstream} = $upstream;
     return $result;
 }
 
@@ -553,6 +596,77 @@ sub render_report {
 }
 
 # ---------------------------------------------------------------------------
+# --suggest: the classes the emitter would write for a reported Kind.
+#
+# Report-only stays report-only: the source goes to stdout or to a directory
+# the caller names, never into lib/. One throwaway AutoGen namespace per
+# GVK keeps the generated classes apart from anything the providers loaded.
+# ---------------------------------------------------------------------------
+
+sub load_names {
+    my ($path) = @_;
+    return {} unless $path;
+    require YAML::PP;
+    my $map = YAML::PP->new->load_file($path);
+    die "crd-drift-check: --names file must be a YAML map\n" unless ref $map eq 'HASH';
+    return $map;
+}
+
+sub suggest_for {
+    my ($opt, $result, $upstream, $names) = @_;
+    require IO::K8s::CRD;
+    require IO::K8s::CRD::Emitter;
+    my @gvks = map { $_->[0] } @{ $result->{opaque_spec} }, @{ $result->{missing_field} };
+    my %seen;
+    my %files;
+    my $n = 0;
+    for my $gvk (grep { !$seen{$_}++ } @gvks) {
+        my $u = $upstream->{$gvk} or next;
+        my $ns = 'IO::K8s::_SUGGEST_' . ++$n;
+        my $classes = IO::K8s::CRD->generate($u->{doc}, $ns);
+        my $root = $classes->{"$u->{group}/$u->{version}"} or next;
+        # A --names key is written relative to the Kind (the Kind's own
+        # generated class IS $root, e.g. '...::Middleware'), so a key of
+        # 'Middleware::Spec::RateLimit' names the nested class
+        # '$root::Spec::RateLimit' -- the leading 'Middleware::' names the
+        # Kind, it is not repeated inside $root. Strip it before joining.
+        my %class_names;
+        for my $key (grep { $_ ne $u->{kind} } keys %$names) {
+            (my $suffix = $key) =~ s/^\Q$u->{kind}\E:://;
+            $class_names{"$root\::$suffix"} = $names->{$key};
+        }
+        my $emitter = IO::K8s::CRD::Emitter->new(
+            base  => "IO::K8s::$result->{provider}::" . ucfirst($u->{version}),
+            names => \%class_names,
+        );
+        my $rendered = $emitter->render($root);
+        $files{$_} = $rendered->{$_} for keys %$rendered;
+    }
+    return \%files;
+}
+
+sub emit_suggestions {
+    my ($opt, $files) = @_;
+    return unless %$files;
+    if ($opt->{suggest_dir}) {
+        require File::Path;
+        require File::Basename;
+        for my $rel (sort keys %$files) {
+            my $path = "$opt->{suggest_dir}/$rel";
+            File::Path::make_path(File::Basename::dirname($path));
+            open my $fh, '>:encoding(UTF-8)', $path or die "crd-drift-check: cannot write $path: $!\n";
+            print $fh $files->{$rel};
+            close $fh;
+        }
+        print "\n--- suggest: wrote " . scalar(keys %$files) . " file(s) under $opt->{suggest_dir}\n";
+        return;
+    }
+    for my $rel (sort keys %$files) {
+        print "\n#### $rel\n", $files->{$rel};
+    }
+}
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -564,6 +678,7 @@ my @results = map { check_provider($opt, $_, $exceptions) } @{ $opt->{provider} 
 
 my $report;
 if ($opt->{format} eq 'json') {
+    delete $_->{_upstream} for @results;
     $report = JSON::PP->new->canonical->pretty->encode({ providers => \@results });
 } else {
     $report = render_report(\@results, $opt->{verbose});
@@ -575,4 +690,15 @@ if ($opt->{output}) {
         or die "crd-drift-check: cannot write $opt->{output}: $!\n";
     print $fh $report;
     close $fh;
+}
+
+if ($opt->{suggest} || $opt->{suggest_dir}) {
+    my $names = load_names($opt->{names});
+    my %files;
+    for my $r (@results) {
+        next unless $r->{_upstream};
+        my $f = suggest_for($opt, $r, $r->{_upstream}, $names);
+        $files{$_} = $f->{$_} for keys %$f;
+    }
+    emit_suggestions($opt, \%files);
 }
