@@ -1,0 +1,32 @@
+---
+class: standard
+completed: 2026-09-03T17:39:18Z
+created: 2026-09-03T17:00:01Z
+id: 105
+priority: high
+started: 2026-09-03T17:39:18Z
+status: done
+tags:
+- crd
+- tooling
+- drift-check
+title: crd-drift-check.pl shipped_view() only loads resource_map root classes, not
+  nested provider classes -- false MISSING FIELD for every D5 multi-file provider
+updated: 2026-09-03T17:39:18Z
+---
+
+maint/crd-drift-check.pl shipped_view() (around line 456) calls require_class($class) only for the classes listed directly in a provider's resource_map (the Kind roots, e.g. IngressRoute). It never walks/requires the rest of lib/IO/K8s/<Provider>/**/*.pm the way t/34_registry_guard.t and maint/spec-drift-check.pl do for the core API.
+
+Consequence: for a D5-style provider where `spec` is a NAMED nested class in its own file (e.g. `k8s spec => \'+IO::K8s::Traefik::V1alpha1::IngressRouteSpec\'`), shipped_spec_fields() reads %IO::K8s::Resource::_attr_registry for that nested class -- but since the nested .pm file was never require()d, its registry entry does not exist yet, so every one of its fields is reported as Tier 3 MISSING FIELD even though the class has the field.
+
+Reproduced on task B-Traefik (k95) after modeling all 10 Traefik Kinds to full depth (86 classes, verified correct against the traefik/traefik v3.7.12 Go sources by hand and via `--check` which reports 86/86 MATCH -- check_for() does not go through shipped_view/shipped_spec_fields, it diffs rendered source bytes against lib/, so it is unaffected and correctly all-green):
+
+  perl maint/crd-drift-check.pl --provider Traefik --dir spec/crd/Traefik/v3.7.12
+  # => 75 Tier 3 MISSING FIELD entries, e.g. "traefik.io/v1alpha1/IngressRoute spec.entryPoints"
+  # even though IngressRouteSpec.pm HAS entryPoints (confirmed: registry populates
+  # correctly with all 5 expected fields once every .pm under lib/IO/K8s/Traefik/
+  # is manually require()d first).
+
+Fix: shipped_view() (or check_provider(), before calling shipped_spec_fields) should File::Find + require every .pm under lib/IO/K8s/<Provider>/, the same way t/34_registry_guard.t walks lib/IO/K8s/ for the core registry, not just the resource_map root classes. This will hit every future Phase B provider task (cert-manager, Cilium, Gateway API, AgentSandbox) the same way once they go multi-file, so worth fixing before/alongside the next one rather than re-discovering it per provider.
+
+Per house rules crd-drift-check.pl is on the Phase A frozen/approved list -- io-k8s-worker on task B-Traefik did not edit it, filed this ticket instead.
