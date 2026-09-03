@@ -15,6 +15,16 @@ use Scalar::Util qw(blessed reftype);
 # Use 'our' to make it a proper package variable accessible via symbol table
 our %_attr_registry;
 
+# Unknown-field policy (D1). Off: a constructor key no attribute claims is
+# kept in the object's _unknown_fields bag and emitted again by TO_JSON, so
+# a document from a newer upstream than the class still round-trips. On: it
+# dies naming the class and the field. IO::K8s localizes this around its own
+# entry points when built with strict => 1 (see IO::K8s/strict); nothing
+# else writes it. A package variable rather than a constructor argument so
+# that it reaches the inline-struct coercers, which call ->new directly and
+# never pass through IO::K8s::_inflate_struct.
+our $STRICT = 0;
+
 # Class name expansion map
 my %_class_prefix = (
     'Core'           => 'IO::K8s::Api::Core',

@@ -16,11 +16,87 @@ sub _build_json {
     return JSON::MaybeXS->new(utf8 => 1, canonical => 1);
 }
 
+# Constructor arguments no attribute claims (D1). Kept so a document from a
+# newer upstream than the class round-trips instead of losing fields; TO_JSON
+# emits them again, declared attributes winning on a name clash. Filled by
+# the BUILDARGS wrapper below; SpecBuilder writes undeclared keys here too.
+# Not a k8s-registered attribute, so TO_JSON's attribute walk never sees the
+# bag as a field of its own.
+has _unknown_fields => (
+    is       => 'rw',
+    init_arg => '_unknown_fields',
+    default  => sub { {} },
+);
+
 # The registry lookup is the hot path (every inflate / TO_JSON), so the
 # merged views are cached per class. IO::K8s::Resource::_k8s() invalidates
 # the affected entries whenever it registers a new attribute.
 my %_attr_info_cache;
 my %_attributes_cache;
+my %_known_init_args_cache;
+
+# Every constructor key a class accepts: the JSON key of each k8s-registered
+# attribute (json_key when the Perl name was sanitized), the init_arg of every
+# Moo attribute declared with a plain `has` (metadata from Role::APIObject,
+# json, _unknown_fields itself), and apiVersion/kind on a top-level object,
+# which Role::APIObject supplies as methods rather than attributes. The Moo
+# side is read from the constructor maker -- the same view
+# MooX::StrictConstructor uses; Moo has no public accessor for it.
+sub _known_init_args {
+    my ($class) = @_;
+    return $_known_init_args_cache{$class} //= _collect_known_init_args($class);
+}
+
+sub _collect_known_init_args {
+    my ($class) = @_;
+    my %known;
+    my $info = _k8s_attr_info($class);
+    for my $attr (keys %$info) {
+        $known{ $info->{$attr}{json_key} // $attr } = 1;
+    }
+    if (my $maker = Moo->_constructor_maker_for($class)) {
+        my $specs = $maker->all_attribute_specs;
+        for my $name (keys %$specs) {
+            my $spec = $specs->{$name};
+            my $init = exists $spec->{init_arg} ? $spec->{init_arg} : $name;
+            $known{$init} = 1 if defined $init;
+        }
+    }
+    if ($class->can('_is_resource')) {
+        $known{apiVersion} = 1;
+        $known{kind}       = 1;
+    }
+    return \%known;
+}
+
+# One level of copying for a plain container -- the same depth TO_JSON and
+# IO::K8s::_inflate_struct use (k54), duplicated here because IO::K8s.pm is
+# loaded after this role and must not be required from it.
+sub _copy_one_level {
+    my ($value) = @_;
+    return [ @$value ] if ref $value eq 'ARRAY';
+    return { %$value } if ref $value eq 'HASH';
+    return $value;
+}
+
+around BUILDARGS => sub {
+    my ($orig, $class, @args) = @_;
+    my $args  = $class->$orig(@args);
+    my $known = _known_init_args($class);
+    my %unknown;
+    for my $key (keys %$args) {
+        next if $known->{$key};
+        die "Unknown field '$key' for $class\n" if $IO::K8s::Resource::STRICT;
+        my $value = delete $args->{$key};
+        next unless defined $value;
+        $unknown{$key} = _copy_one_level($value);
+    }
+    if (%unknown) {
+        my $bag = $args->{_unknown_fields} // {};
+        $args->{_unknown_fields} = { %$bag, %unknown };
+    }
+    return $args;
+};
 
 # Get merged attribute info from the global registry in IO::K8s::Resource,
 # walking @ISA so a consumer subclass registered via class_namespaces sees
@@ -83,13 +159,15 @@ sub _invalidate_k8s_attr_cache {
     my ($class) = @_;
     delete $_attr_info_cache{$class};
     delete $_attributes_cache{$class};
+    delete $_known_init_args_cache{$class};
     my %sweep;
-    @sweep{keys %_attr_info_cache, keys %_attributes_cache} = ();
+    @sweep{keys %_attr_info_cache, keys %_attributes_cache, keys %_known_init_args_cache} = ();
     for my $cached_class (keys %sweep) {
         next if $cached_class eq $class;
         next unless $cached_class->isa($class);
         delete $_attr_info_cache{$cached_class};
         delete $_attributes_cache{$cached_class};
+        delete $_known_init_args_cache{$cached_class};
     }
 }
 
@@ -202,6 +280,16 @@ sub TO_JSON {
             $data{$key} = { %$value };
         } else {
             $data{$key} = $value;
+        }
+    }
+
+    # Unknown fields ride along (D1). Declared attributes win on a clash:
+    # the bag only fills keys nothing above has set.
+    my $extra = $self->_unknown_fields;
+    if ($extra && %$extra) {
+        for my $key (keys %$extra) {
+            next if exists $data{$key};
+            $data{$key} = _copy_one_level($extra->{$key});
         }
     }
     return \%data;
