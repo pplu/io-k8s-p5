@@ -110,29 +110,16 @@ for my $path (sort @pm_paths) {
 
 my $registry = \%IO::K8s::Resource::_attr_registry;
 
-# k108: IO::K8s::Cilium::V2alpha1::AccessLogs is the one class in the whole
-# registry with a real upstream field literally named `json`. Role::Resource
-# already provides its own `has json` (the shared JSON encoder to_json()
-# calls), and Resource.pm's _k8s() skips creating a second attribute when a
-# class already can($attr_name) -- so AccessLogs's "json" field never gets
-# its own attribute; the slot IS the encoder. That makes TO_JSON/to_json
-# broken on *any* AccessLogs instance, whether or not the upstream json
-# field was ever given a value: TO_JSON unconditionally reads $self->json
-# for the registered field and gets the encoder object back, which then
-# can't itself be JSON-encoded. Confirmed core bug, not a synthesis gap or
-# a Cilium-provider bug -- see karr #108 for the full analysis and
-# suggested fix direction (out of this CRD-provider task's scope; the class
-# is kept rendered faithfully rather than hand-altered to hide this).
-# Excluded here (both as a top-level target and, via %SKIP_FIELD below, as
-# a nested field of Telemetry -- its only referrer) so this known bug
-# doesn't fail the generic sweep; t/07_cilium.t carries a dedicated TODO
-# regression test reproducing the crash directly.
-my %SKIP_CLASS = (
-    'IO::K8s::Cilium::V2alpha1::AccessLogs' => 1,
-);
-my %SKIP_FIELD = (
-    'IO::K8s::Cilium::V2alpha1::Telemetry' => { accessLogs => 1 },
-);
+# k108 (fixed in 1.108): IO::K8s::Cilium::V2alpha1::AccessLogs used to be
+# excluded here -- it is the one class in the whole registry with a real
+# upstream field literally named `json`, which collided with
+# Role::Resource's own internal JSON-encoder attribute (also named `json`
+# at the time). Now that the role's encoder attribute is private
+# (`_json_encoder`), AccessLogs and its only referrer (Telemetry.accessLogs)
+# need no special-casing and are covered by the generic sweep below like
+# every other class.
+my %SKIP_CLASS  = ();
+my %SKIP_FIELD  = ();
 
 my @classes = sort grep { !$SKIP_CLASS{$_} } keys %$registry;
 

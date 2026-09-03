@@ -140,13 +140,14 @@ C<CiliumEndpointSlice> is the third and last Kind with no C<spec> field
 upstream; its C<endpoints> is still fully typed
 (L<IO::K8s::Cilium::V2alpha1::CoreCiliumEndpoint>).
 
-B<Known issue (karr #108):> L<IO::K8s::Cilium::V2alpha1::AccessLogs>
+B<Fixed in 1.108 (karr #108):> L<IO::K8s::Cilium::V2alpha1::AccessLogs>
 (nested under C<CiliumGatewayClassConfig>'s
 C<spec.telemetry.accessLogs[]>) has a real upstream field literally named
-C<json>, which collides with L<IO::K8s::Role::Resource>'s own C<json>
-attribute (the shared JSON encoder C<to_json>/C<to_yaml> use internally).
-C<to_json>/C<to_yaml> on any C<AccessLogs> instance currently die; every
-other field of C<CiliumGatewayClassConfig> is unaffected.
+C<json>, which used to collide with L<IO::K8s::Role::Resource>'s own
+internal JSON-encoder attribute (previously also named C<json>). The role's
+encoder attribute is now private (C<_json_encoder>), so C<to_json>/
+C<to_yaml> work normally on C<AccessLogs> and any parent recursing into a
+populated C<accessLogs[]>.
 
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.

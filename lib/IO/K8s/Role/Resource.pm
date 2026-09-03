@@ -9,13 +9,13 @@ use Types::Standard qw(HashRef);
 use JSON::MaybeXS ();
 use Scalar::Util qw(blessed);
 
-has json => (
+has _json_encoder => (
     is      => 'ro',
     lazy    => 1,
-    builder => '_build_json',
+    builder => '_build__json_encoder',
 );
 
-sub _build_json {
+sub _build__json_encoder {
     return JSON::MaybeXS->new(utf8 => 1, canonical => 1);
 }
 
@@ -344,13 +344,13 @@ sub TO_JSON {
 
 Returns a UTF-8 encoded JSON byte string for the object. Thin wrapper over
 L</TO_JSON> that runs the resulting hashref through the canonical encoder
-configured in C<json()>. Symmetric to L</from_json> on the consumer side.
+configured internally. Symmetric to L</from_json> on the consumer side.
 
 =cut
 
 sub to_json {
     my $self = shift;
-    return $self->json->encode($self->TO_JSON);
+    return $self->_json_encoder->encode($self->TO_JSON);
 }
 
 =method TO_YAML

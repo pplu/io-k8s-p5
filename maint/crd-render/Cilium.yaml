@@ -24,7 +24,7 @@
 #   so every Rule-family path is mapped to the SAME bare name at all four
 #   prefixes (CNP Spec::, CNP SpecsItem::, CCNP Spec::, CCNP SpecsItem::):
 #   one class per version directory, proven by --check MATCH plus
-#   t/09_cilium.t's "same Rule class" assertion.
+#   t/07_cilium.t's "same Rule class" assertion.
 #   pkg/k8s/apis/cilium.io/v2/*.go -- the per-Kind CRD wrapper types
 #   (CiliumBGPAdvertisementSpec, CiliumNetworkPolicyStatus,
 #   CiliumNetworkPolicyNodeStatus, NodeSpec/NodeStatus, EndpointStatus, ...).

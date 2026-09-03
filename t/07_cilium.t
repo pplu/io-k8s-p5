@@ -863,7 +863,10 @@ subtest 'full depth round-trip: CiliumGatewayClassConfig' => sub {
             description => 'shared gateway class config',
             service     => { type => 'LoadBalancer', externalTrafficPolicy => 'Local' },
             httpOptions => { grpcWebTranslation => { enabled => 1 } },
-            telemetry   => { accessLogs => [{ format => 'JSON', targets => ['HTTP'] }] },
+            telemetry   => { accessLogs => [{
+                format => 'JSON', targets => ['HTTP'],
+                json   => { authority => '%REQUEST_HEADER(:AUTHORITY)%' },
+            }] },
             envoy       => { serverHeaderTransformation => 'PASS_THROUGH' },
         },
         status => { conditions => [{
@@ -881,6 +884,15 @@ subtest 'full depth round-trip: CiliumGatewayClassConfig' => sub {
     isa_ok($gcc->status, 'IO::K8s::Cilium::V2alpha1::CiliumGatewayClassConfigStatus');
     isa_ok($gcc->status->conditions->[0], 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::Condition');
     is($gcc->TO_JSON->{spec}{telemetry}{accessLogs}[0]{format}, 'JSON', 'TO_JSON deep telemetry.accessLogs format');
+
+    # Full object_to_json -> inflate round-trip (k108: this used to die
+    # recursing into the populated accessLogs[].json field, since that
+    # field's attribute slot was the Role::Resource JSON encoder itself).
+    my $re = $k8s->inflate($k8s->object_to_json($gcc));
+    isa_ok($re, 'IO::K8s::Cilium::V2alpha1::CiliumGatewayClassConfig');
+    is_deeply($re->spec->telemetry->accessLogs->[0]->json,
+        { authority => '%REQUEST_HEADER(:AUTHORITY)%' },
+        'JSON round-trip preserves deep telemetry.accessLogs.json (k108)');
 };
 
 subtest 'full depth round-trip: CiliumL2AnnouncementPolicy' => sub {
@@ -950,24 +962,18 @@ subtest 'full depth round-trip: CiliumEndpointSlice (no spec upstream, like Cili
         'JSON round-trip preserves deep networking.addressing.ipv4');
 };
 
-subtest 'known bug (k108): AccessLogs.json collides with the Role::Resource json encoder attribute' => sub {
+subtest 'AccessLogs.json field (k108, fixed in 1.108)' => sub {
     # IO::K8s::Cilium::V2alpha1::AccessLogs (nested under
     # CiliumGatewayClassConfig.spec.telemetry.accessLogs[]) is the one class
     # in the whole registry with a real upstream field literally named
-    # `json` (Envoy access-log format spec, map[string]string). It is
-    # rendered faithfully -- `k8s json => { Str => 1 }, {...}` -- but
-    # IO::K8s::Role::Resource already provides its own `has json` (the
-    # shared JSON encoder to_json() calls), and Resource.pm's _k8s() skips
-    # creating a second attribute when the class already can($attr_name).
-    # So this field's attribute slot IS the encoder: passing a value for it
-    # at construction overwrites the encoder, and to_json()/to_yaml() on
-    # that object then dies. Not fixable from lib/IO/K8s/Cilium/ -- the
-    # real fix is a core (Role::Resource.pm / Resource.pm) change, out of
-    # this CRD-provider task's scope. See karr #108 for the full analysis
-    # and suggested fix direction. This test documents the CURRENT (broken)
-    # behavior with TODO so the bug stays visible without failing the suite.
-    local $TODO = 'k108: AccessLogs.json collides with the Role::Resource json encoder attribute';
-
+    # `json` (Envoy access-log format spec, map[string]string). Before
+    # 1.108 this collided with IO::K8s::Role::Resource's own internal JSON
+    # encoder attribute (also named `json`): Resource.pm's _k8s() skips
+    # creating a second attribute when the class already can($attr_name),
+    # so the field's attribute slot WAS the encoder, and to_json()/to_yaml()
+    # died on every AccessLogs instance, populated or not. Fixed by
+    # renaming the role's internal encoder attribute to `_json_encoder`,
+    # freeing `json` for this real upstream field. See karr #108.
     my $al = IO::K8s::Cilium::V2alpha1::AccessLogs->new(
         format  => 'JSON',
         json    => { authority => '%REQUEST_HEADER(:AUTHORITY)%' },
@@ -975,7 +981,26 @@ subtest 'known bug (k108): AccessLogs.json collides with the Role::Resource json
         text    => 'unused-in-json-format',
     );
     my $json = eval { $al->to_json };
-    ok(!$@, 'to_json does not die once AccessLogs.json is set (k108)')
+    ok(!$@, 'to_json does not die with AccessLogs.json set (k108)')
+        or diag("died: $@");
+    like($json, qr/"json":\{"authority":"%REQUEST_HEADER\(:AUTHORITY\)%"\}/,
+        'to_json emits the json field value, not the encoder');
+
+    my $yaml = eval { $al->to_yaml };
+    ok(!$@, 'to_yaml does not die with AccessLogs.json set (k108)')
+        or diag("died: $@");
+
+    my $re = eval { IO::K8s::Cilium::V2alpha1::AccessLogs->from_json($json) };
+    ok(!$@, 'from_json round-trip does not die') or diag("died: $@");
+    is_deeply($re->json, { authority => '%REQUEST_HEADER(:AUTHORITY)%' },
+        'round-trip preserves the json field value');
+
+    # A bare instance (json field left unset) also used to die -- TO_JSON
+    # read the encoder object back unconditionally regardless of whether
+    # the field was ever populated.
+    my $bare = IO::K8s::Cilium::V2alpha1::AccessLogs->new(format => 'JSON');
+    my $bare_json = eval { $bare->to_json };
+    ok(!$@, 'to_json does not die on a bare AccessLogs instance (k108)')
         or diag("died: $@");
 };
 

@@ -778,12 +778,23 @@ Revision history for IO-K8s
     spec_merge, which do coerce. Filed as karr #108: IO::K8s::Cilium::
     V2alpha1::AccessLogs (nested under CiliumGatewayClassConfig's
     spec.telemetry.accessLogs[]) has a real upstream field literally
-    named json, which collides with IO::K8s::Role::Resource's own json
-    attribute (the shared JSON encoder); to_json/to_yaml on any
-    AccessLogs instance currently dies. The class is kept rendered
-    faithfully rather than hand-altered to hide this -- fixing it needs a
-    core change outside this task's scope. t/07_cilium.t carries a TODO
-    regression test for it.
+    named json, which collided with IO::K8s::Role::Resource's own
+    internal json-encoder attribute (same name at the time); to_json/
+    to_yaml on any AccessLogs instance died. Fixed in this release by
+    renaming the role's internal encoder attribute to _json_encoder (see
+    below) -- AccessLogs is rendered faithfully and to_json/to_yaml now
+    work like any other class.
+
+  - IO::K8s::Role::Resource's internal JSON-encoder attribute is renamed
+    from json to _json_encoder (karr #108). It previously collided with
+    any k8s-declared field literally named json -- Resource.pm's _k8s()
+    skips creating a Moo attribute when the class already can($attr_name),
+    so such a field's slot silently became the encoder instead, and
+    to_json/to_yaml died trying to serialize it (IO::K8s::Cilium::
+    V2alpha1::AccessLogs is the shipped class this hit). The encoder is
+    implementation-private and was never part of the public API; to_json/
+    to_yaml/TO_JSON/FROM_HASH are unchanged. A class with its own json
+    field now works normally.
 
 1.107     2026-08-15 15:37:52Z
 

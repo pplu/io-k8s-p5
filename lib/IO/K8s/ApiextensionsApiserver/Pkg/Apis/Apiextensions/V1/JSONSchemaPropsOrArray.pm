@@ -52,7 +52,7 @@ C<[]>.
 
 =cut
 
-sub _build_json {
+sub _build__json_encoder {
     return JSON::MaybeXS->new(utf8 => 1, canonical => 1, allow_nonref => 1);
 }
 

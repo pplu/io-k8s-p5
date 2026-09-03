@@ -150,7 +150,7 @@ subtest 'Container with UTF-8 env vars' => sub {
 # $k8s->json_to_object) used to decode without utf8 => 1, while to_json
 # encodes WITH it -- so Class->from_json($obj->to_json) read to_json's UTF-8
 # bytes as characters and silently mojibaked non-ASCII data (no error at
-# all). Fixed by decoding with utf8 => 1, symmetric to _build_json. The
+# all). Fixed by decoding with utf8 => 1, symmetric to _build__json_encoder. The
 # decision recorded alongside the fix: from_json takes UTF-8 BYTES, exactly
 # what to_json produces; an already-decoded character string is rejected
 # loudly rather than accepted and silently mishandled (decode-tolerance was
