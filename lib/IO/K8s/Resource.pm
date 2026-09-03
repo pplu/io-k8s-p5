@@ -579,4 +579,72 @@ original keys.
     k8s '$ref' => Str;                          # Moo attr: _ref
     k8s 'x-kubernetes-list-type' => Str;        # Moo attr: x_kubernetes_list_type
 
+=head3 Field options
+
+    k8s replicas => Int, { minimum => 0, maximum => 10, default => 1 };
+    k8s policy   => Str, { enum => [qw(Retain Delete)], required => 1 };
+    k8s name     => Str, { pattern => qr/\A[a-z0-9-]+\z/, description => '...' };
+    k8s spec     => {
+        mode  => [ Str, { enum => [qw(fast safe)] } ],   # inside an inline struct
+        hosts => [ [Str], { pattern => '^[a-z.]+$' } ],
+    };
+
+A field declaration takes an optional third argument: a hashref of options,
+directly after the type spec (C<k8s name => Type, { ... }>), or as the
+second element of a two-element arrayref in place of the type spec
+(C<name => [ Type, { ... } ]>) for a field inside an inline struct, which
+has no third-argument slot of its own. The legacy C<'required'> string
+marker and the C<Type!> suffix (C<k8s x => 'Str!'>) still work and are
+equivalent to C<{ required => 1 }>.
+
+The nine recognised option keys are C<required>, C<default>, C<enum>,
+C<minimum>, C<maximum>, C<pattern>, C<description>, C<nullable> and
+C<preserve_unknown>. All nine are recorded in the attribute registry for
+the CRD schema a C<to_crd> emitter builds from it.
+
+C<enum>, C<minimum>, C<maximum> and C<pattern> are additionally enforced as
+Type::Tiny constraints at construction, the same way C<< { Quantity => 1 }
+>> validates a typed value map -- a bad value fails here instead of at the
+API server. They apply to a scalar field, to each element of an array of
+scalars (C<< k8s tags => [Str], { enum => [...] } >>), and to each value of
+a typed value map (C<< k8s weights => { Int => 1 }, { maximum => 100 } >>).
+Declaring one of them on an object, inline-struct or opaque-container field
+(C<{ Str => 1 }>, C<[ {} ]>, C<[ [] ]>, a nested class) is a class-load
+error, since there is no scalar value to check. A failing value dies with
+one of:
+
+    Value "x" is not one of: a, b
+    Value "-1" is below the minimum 0
+    Value "11" is above the maximum 10
+    Value "x" does not match the pattern ...
+
+On an optional field the message is prefixed with Type::Tiny's own generic
+"did not pass type constraint" line; the rule text above follows in the
+explanation.
+
+C<default>, C<description>, C<nullable> and C<preserve_unknown> are
+schema-only: they are recorded for C<to_crd> and never change anything at
+construction or serialization. In particular, C<default> is B<not> applied
+client-side -- defaulting is the API server's job, and a client-side
+default would change the wire output, so a field with no value given still
+serializes as absent. C<nullable> likewise does not make C<TO_JSON> emit
+C<null>: an unset field is still omitted from the JSON either way.
+
+Class load fails, naming the class and field, on: an unrecognised option
+key (C<k8s: unknown field option '<key>' for field '<name>' of <class>
+(known: ...)>); any option given an explicit C<undef> value, since that is
+a declaration error rather than "no option" (C<k8s: field option '<key>'
+for ... must not be undef>); a third argument that is neither
+C<'required'> nor a hashref; an empty or duplicate C<enum>, or C<enum> on a
+C<Bool> field; C<minimum>/C<maximum> on a non-numeric field, a non-numeric
+bound, or a C<minimum> exceeding C<maximum>; a C<pattern> on a non-string
+field or one that does not compile as a Perl regex; and a C<default> that
+fails the field's own type (C<k8s: 'default' for ... fails the field's own
+type: <message>>), checked once at class-load time rather than discovered
+later when C<to_crd> emits it.
+
+The registry (C<_k8s_attr_info>) keeps C<required> as a plain C<1> (absent
+when not required, matching the pre-D3 shape) and every other given option,
+one level deep, under C<options>.
+
 =cut

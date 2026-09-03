@@ -566,6 +566,38 @@ to avoid collisions:
 
     IO::K8s::_AUTOGEN_abc123::helm::cattle::io::v1::HelmChart
 
+Each OpenAPI property also carries its field options (D3 of the CRD
+design) into the generated class, through the same C<k8s> option hash a
+hand-written class would use (see L<IO::K8s::Resource/k8s>): the schema's
+C<required> list becomes the field's C<required> option, so a generated
+class now enforces the fields the schema demands, and a construction
+missing one dies with Moo's own "Missing required arguments" instead of
+silently accepting a partial object. C<enum>, C<minimum>, C<maximum>,
+C<pattern>, C<default>, C<description>, C<nullable> and
+C<x-kubernetes-preserve-unknown-fields> are carried the same way, so a
+generated class enforces enum, range and pattern values exactly like a
+hand-written one that declares the same options. For an array property,
+C<enum>/C<minimum>/C<maximum>/C<pattern> are read off C<items> and lifted
+onto the field's own options, since it is each element that is
+constrained, not the array itself. C<nullable> and
+C<x-kubernetes-preserve-unknown-fields> are read as JSON booleans, not
+Perl truthiness, so the wire string C<"false"> is false; a C<default> of
+JSON C<null> -- common on a C<nullable: true> field -- is treated as no
+default at all, not as a default of C<undef>, which the DSL's own
+field-option check would otherwise refuse.
+
+An C<enum> that is empty or has duplicate entries, or a C<pattern> that
+does not compile as a Perl regex, is dropped rather than failing the
+whole class: the client-side check is a convenience, the API server
+validates every value regardless, and dropping it loses no data.
+
+Field options only travel for a property this module already turns into a
+typed nested class, i.e. one that C<$ref>s a sibling definition; an inline
+C<type: object> schema with its own C<properties> and no
+C<$ref>/C<additionalProperties> is still the existing opaque hash of
+strings, so options below the top level of a schema that inlines rather
+than references its nested objects do not apply yet (k94).
+
 =head1 FUNCTIONS
 
 =head2 get_or_generate($def_name, $schema, $all_defs, $namespace)

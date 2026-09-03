@@ -2,6 +2,29 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - The k8s DSL takes per-field options (D3 of the CRD design, k93):
+    k8s replicas => Int, { minimum => 0, maximum => 10, default => 1 },
+    or name => [ Type, { ... } ] inside an inline struct. required,
+    default, enum, minimum, maximum, pattern, description, nullable and
+    preserve_unknown are recorded in the attribute registry for the CRD
+    schema that to_crd will emit; enum, minimum, maximum and pattern are
+    also enforced at construction on scalar fields, arrays of scalars and
+    typed value maps, failing with "Value "x" is not one of: ...", "is
+    below the minimum N" / "is above the maximum N" and "does not match
+    the pattern ...". default is never applied client-side. An option a
+    field cannot carry (enum on Bool, minimum on Str, pattern on an object)
+    is a class-load error naming class and field. The legacy 'required'
+    marker and the Type! suffix keep working.
+
+  - IO::K8s::AutoGen carries an OpenAPI property's required list, enum,
+    minimum, maximum, pattern, default, description, nullable and
+    x-kubernetes-preserve-unknown-fields into those options, per element
+    for arrays. Generated classes therefore reject a bad value at
+    construction and require the fields the schema lists as required --
+    an AutoGen object built without one now dies with "Missing required
+    arguments". A pattern Perl cannot compile is dropped (the API server
+    still validates it); no data is affected.
+
   - Unknown fields are kept instead of dropped (D1 of the CRD design,
     docs/superpowers/specs/2026-09-03-crd-design.md). A constructor key no
     attribute claims -- on inflate, new_object, FROM_HASH or a direct
