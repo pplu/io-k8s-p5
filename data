@@ -1,0 +1,23 @@
+---
+class: standard
+completed: 2026-09-03T06:44:07Z
+created: 2026-09-03T01:25:55Z
+id: 93
+priority: high
+started: 2026-09-03T06:44:07Z
+status: done
+tags:
+- crd
+- dsl
+title: 'CRD step 2: per-field option hash in the k8s DSL with client-side constraints
+  (D3)'
+updated: 2026-09-03T06:44:12Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D3). Plan: to be written as docs/superpowers/plans/2026-09-03-crd-step2-dsl-options.md once step 1 has landed.
+
+k8s replicas => Int, { required => 1, default => 1, enum => [...], minimum => 0, maximum => 10, pattern => qr/../, description => '...', nullable => 1, preserve_unknown => 1 }.
+All eight options are recorded in the attribute registry (to_crd reads them in step 5). enum/minimum/maximum/pattern become Type::Tiny constraints at construction; default is never applied client-side; description/nullable/preserve_unknown are schema-only.
+Depends on: k92.
+
+Merged to master as 29f65917..e8dcd2e2 (fast-forward, 2026-09-03). required => 'schema' (recorded, not enforced) is what AutoGen uses; the step-3 plan carries the two re-review minors.
