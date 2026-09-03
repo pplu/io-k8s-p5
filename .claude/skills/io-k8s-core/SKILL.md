@@ -100,10 +100,10 @@ classes also get `IO::K8s::Role::SpecBuilder` automatically.
 
 | Role | Purpose |
 |---|---|
-| `Resource` | instance behaviour: `TO_JSON`, `to_json`, `TO_YAML`, `to_yaml`, `FROM_HASH`, `from_json`, `compare_to_schema` |
+| `Resource` | instance behaviour: `TO_JSON`, `to_json`, `TO_YAML`, `to_yaml`, `FROM_HASH`, `from_json`, `compare_to_schema`; since 1.108 the `_unknown_fields` bag (undeclared constructor keys are kept and re-emitted; `IO::K8s->new(strict => 1)` makes them die instead, via `$IO::K8s::Resource::STRICT`) |
 | `APIObject` | top-level identity, metadata, labels, annotations, conditions, owners |
 | `Namespaced` | resources that live in a namespace |
-| `SpecBuilder` | deep-path spec manipulation: `spec_get`/`spec_set`/`spec_push`/`spec_merge`/`spec_delete` |
+| `SpecBuilder` | deep-path spec manipulation: `spec_get`/`spec_set`/`spec_push`/`spec_merge`/`spec_delete`/`spec_array`/`spec_hash`; walks typed specs through the registry since 1.108 (`-1` = last or new element, undeclared keys go to the bag, every write failure starts with `spec path '...':`) |
 | `ResourceMap` | packages that provide a short-name → class map (requires `resource_map`) |
 | `Routable`, `Loadbalanced`, `NetworkPolicy`, `CertManaged`, `HelmManaged`, `MiddlewareBuilder` | opt-in behaviour mixins for routing, traffic splitting, netpol, cert-manager, K3s Helm, Traefik middleware |
 
