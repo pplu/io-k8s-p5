@@ -595,6 +595,24 @@ sub resource_plural {
 
 sub _is_resource { 1 }
 
+=method to_crd
+
+    my $crd = $pod->to_crd;
+    my $crd = IO::K8s::Api::Core::V1::Pod->to_crd;
+
+The C<CustomResourceDefinition> this class's own attribute registry
+describes (D9) -- the exact inverse of L<IO::K8s::AutoGen>'s
+schema-to-DSL mapping. See L<IO::K8s::CRD/crd_for_class>, which this
+delegates to.
+
+=cut
+
+sub to_crd {
+    my ($self) = @_;
+    require IO::K8s::CRD;
+    return IO::K8s::CRD::crd_for_class(ref($self) || $self);
+}
+
 sub to_yaml {
     my ($self) = @_;
     require YAML::PP;

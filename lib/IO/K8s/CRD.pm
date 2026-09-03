@@ -6,8 +6,18 @@ use strict;
 use warnings;
 use Carp qw( croak );
 use Scalar::Util qw( blessed );
+use Module::Runtime qw( require_module );
+use JSON::MaybeXS ();
+use re ();
 use IO::K8s::AutoGen ();
 use IO::K8s::Resource ();
+
+# The typed class crd_for_class() builds and returns (D9). Kept as a
+# constant rather than spelled out at each call site -- the brief's own
+# shorthand ('IO::K8s::Apiextensions::Pkg::...') drops the
+# 'ApiextensionsApiserver' segment the shipped classes actually use; this
+# is the real, checked-in name (see lib/IO/K8s/ApiextensionsApiserver/).
+my $CRD_CLASS = 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceDefinition';
 
 =head1 SYNOPSIS
 
@@ -220,6 +230,261 @@ sub generate {
     }
     $out{storage} //= $fallback;
     return \%out;
+}
+
+=method crd_for_class
+
+    my $crd = IO::K8s::CRD::crd_for_class($class);
+    my $crd = $class->to_crd;   # installed on every APIObject class, see IO::K8s::Role::APIObject
+
+D9: the inverse of L<IO::K8s::AutoGen>'s schema-to-DSL mapping. Builds a
+single-version C<CustomResourceDefinition> object from a top-level
+C<$class>'s own attribute registry: C<spec.group> and the one
+C<spec.versions[]> entry's C<name> come from splitting C<< $class->api_version >>
+on the last C</>; C<spec.scope> is C<Namespaced> when C<$class> composes
+L<IO::K8s::Role::Namespaced>, else C<Cluster>; C<spec.names> comes from
+C<< $class->kind >>, C<< $class->resource_plural >> (C<singular> is
+C<lc(kind)>, C<listKind> is C<"${kind}List">); C<metadata.name> is
+C<"$plural.$group">. The schema itself is L</_schema_for_class>.
+
+The manifest is assembled as a plain hashref and handed to
+L<IO::K8s/_struct_to_object_expanded> -- the same inflation path C<add_crd>
+and C<inflate> use -- so the object this returns is a real, fully typed
+C<CustomResourceDefinition>: nested C<CustomResourceDefinitionSpec>,
+C<CustomResourceDefinitionNames>, C<CustomResourceDefinitionVersion>,
+C<CustomResourceValidation> and C<JSONSchemaProps> objects all the way
+down, not a bare hashref standing in for them.
+
+=cut
+
+sub crd_for_class {
+    my ($class) = @_;
+    croak 'IO::K8s::CRD::crd_for_class needs a class name' unless defined $class && length $class;
+
+    my $api_version = $class->api_version;
+    my ($group, $version) = $api_version =~ m{\A(?:(.*)/)?([^/]+)\z};
+    croak "IO::K8s::CRD::crd_for_class: cannot read a version out of "
+        . "'$api_version' (from ${class}->api_version)"
+        unless defined $version && length $version;
+    $group = '' unless defined $group;
+
+    my $kind   = $class->kind;
+    my $plural = $class->resource_plural;
+    croak "IO::K8s::CRD::crd_for_class: $class has no resource_plural"
+        unless defined $plural && length $plural;
+
+    my $scope = $class->DOES('IO::K8s::Role::Namespaced') ? 'Namespaced' : 'Cluster';
+
+    my $manifest = {
+        metadata => { name => "$plural.$group" },
+        spec     => {
+            group => $group,
+            scope => $scope,
+            names => {
+                plural   => $plural,
+                kind     => $kind,
+                singular => lc($kind),
+                listKind => "${kind}List",
+            },
+            versions => [ {
+                name    => $version,
+                served  => JSON::MaybeXS::true,
+                storage => JSON::MaybeXS::true,
+                schema  => { openAPIV3Schema => _schema_for_class($class) },
+            } ],
+        },
+    };
+
+    require IO::K8s;
+    my $k8s = IO::K8s->new;
+    return $k8s->_struct_to_object_expanded($CRD_CLASS, $manifest);
+}
+
+=method _schema_for_class
+
+    my $schema = IO::K8s::CRD::_schema_for_class($class);
+
+The C<openAPIV3Schema> for one version of C<$class> (D9): walks
+C<< $class->_k8s_attr_info >> and mirrors L<IO::K8s::AutoGen>'s
+schema-to-DSL mapping (C<_schema_to_type_spec>) field by field, in
+reverse, keyed by each field's C<json_key>.
+
+For a top-level Kind (C<< $class->can('_is_resource') >>) the registry's
+own C<metadata> entry is skipped and C<apiVersion>/C<kind>/C<metadata>
+get the standard envelope stubs instead -- the same three fields
+L<IO::K8s::AutoGen>'s C<%role_supplied> excludes when building attributes
+FROM a schema (see C<_generate_class> there), lined up here in the
+opposite direction. A nested class reached through a field is walked
+exactly the same way, minus the stubs (it is never itself C<_is_resource>).
+
+Recursion guards against cycles by tracking the classes already on the
+CURRENT path (the second, internal C<$seen> argument -- never pass it from
+outside): a class that references itself, directly or through a reused
+core class, becomes an opaque
+C<< { type => 'object', 'x-kubernetes-preserve-unknown-fields' => true } >>
+stub at the repeat instead of recursing forever, the same stub the opaque
+C<< { Str => 1 } >> map gets. This is deliberately PATH-scoped, not global:
+a class that legitimately appears more than once as unrelated siblings
+(C<LabelSelector>, reused all over a real CRD schema per D5) must not be
+flattened to that stub on its second, unrelated appearance.
+
+=cut
+
+sub _schema_for_class {
+    my ($class, $seen) = @_;
+    $seen ||= {};
+    return _opaque_object() if $seen->{$class};
+
+    _ensure_class_loaded($class);
+    my $info   = $class->_k8s_attr_info;
+    my $is_top = $class->can('_is_resource') ? 1 : 0;
+    my %next_seen = (%$seen, $class => 1);
+
+    my (%properties, @required);
+    for my $attr (sort keys %$info) {
+        next if $is_top && $attr eq 'metadata';
+        my $entry    = $info->{$attr};
+        my $json_key = $entry->{json_key} // $attr;
+        $properties{$json_key} = _property_schema($entry, \%next_seen);
+        push @required, $json_key if $entry->{required};
+    }
+
+    if ($is_top) {
+        $properties{apiVersion} = { type => 'string' };
+        $properties{kind}       = { type => 'string' };
+        $properties{metadata}   = { type => 'object' };
+    }
+
+    my %schema = (type => 'object', properties => \%properties);
+    $schema{required} = [ sort @required ] if @required;
+    return \%schema;
+}
+
+# $class already loaded as a file (require_module needed) vs. already
+# usable in memory (an inline-struct class the k8s DSL built synchronously
+# when its parent's own `k8s foo => { ... }` line ran, or $class itself,
+# already loaded by the caller of to_crd/crd_for_class). The inline-struct
+# case has no .pm file at all -- require_module would fail "Can't locate
+# ... in @INC" for exactly the classes _schema_for_class most needs to
+# recurse into. can('_k8s_attr_info') is true the moment
+# IO::K8s::Role::Resource is composed onto a package, which happens
+# synchronously either way (_generate_inline_struct, or a real file's own
+# `use IO::K8s::Resource;` at compile time), so it is the right question
+# for both.
+sub _ensure_class_loaded {
+    my ($class) = @_;
+    return if $class->can('_k8s_attr_info');
+    require_module($class);
+}
+
+sub _property_schema {
+    my ($entry, $seen) = @_;
+    my $schema = _type_schema($entry, $seen);
+    _apply_options($schema, $entry->{options}) if $entry->{options};
+    return $schema;
+}
+
+# The registry's one classifying is_* flag, turned into its schema shape --
+# the reverse of IO::K8s::AutoGen::_schema_to_type_spec's dispatch (and
+# IO::K8s::CRD::Emitter::_type_source's DSL-source mirror of the same
+# flags, read alongside this while writing it).
+#
+# is_quantity has no format upstream ever puts on a plain `type: string`
+# schema: AutoGen only ever reaches Quantity through a $ref to
+# resource.Quantity, never through a format string, so there is nothing to
+# emit here that would read back as Quantity. A Quantity field therefore
+# round-trips through add_crd as a plain Str -- documented in the task-2
+# report, not worked around here. is_time does not share that gap: `format:
+# date-time` is exactly what AutoGen's own dispatch reads back into Time,
+# so it is emitted, and the round trip is lossless.
+sub _type_schema {
+    my ($entry, $seen) = @_;
+
+    return { type => 'string' }  if $entry->{is_str};
+    return { type => 'integer' } if $entry->{is_int};
+    return { type => 'number' }  if $entry->{is_num};
+    return { type => 'boolean' } if $entry->{is_bool};
+    return { 'x-kubernetes-int-or-string' => JSON::MaybeXS::true } if $entry->{is_int_or_string};
+    return { type => 'string' }  if $entry->{is_quantity};
+    return { type => 'string', format => 'date-time' } if $entry->{is_time};
+
+    return _schema_for_class($entry->{class}, $seen) if $entry->{is_object};
+
+    return { type => 'array', items => _schema_for_class($entry->{class}, $seen) }
+        if $entry->{is_array_of_objects};
+    return { type => 'array', items => { type => 'string' } }  if $entry->{is_array_of_str};
+    return { type => 'array', items => { type => 'integer' } } if $entry->{is_array_of_int};
+    return { type => 'array', items => { type => 'boolean' } } if $entry->{is_array_of_bool};
+    return { type => 'array', items => _opaque_object() } if $entry->{is_array_of_hash};
+    return { type => 'array', items => { type => 'array' } }   if $entry->{is_array_of_array};
+
+    return { type => 'object', additionalProperties => _schema_for_class($entry->{class}, $seen) }
+        if $entry->{is_hash_of_objects};
+    # is_hash_of_str is the opaque { Str => 1 } marker itself (see
+    # Resource.pm: "the genuinely opaque string map that labels,
+    # annotations and fieldsV1 need") -- never a typed additionalProperties
+    # schema, unlike every other is_hash_of_* flag below.
+    return _opaque_object() if $entry->{is_hash_of_str};
+    return { type => 'object', additionalProperties => { type => 'integer' } } if $entry->{is_hash_of_int};
+    return { type => 'object', additionalProperties => { type => 'number' } }  if $entry->{is_hash_of_num};
+    return { type => 'object', additionalProperties => { type => 'boolean' } } if $entry->{is_hash_of_bool};
+    return { type => 'object', additionalProperties => { type => 'string' } }  if $entry->{is_hash_of_quantity};
+    return { type => 'object', additionalProperties => { type => 'string', format => 'date-time' } }
+        if $entry->{is_hash_of_time};
+    return { type => 'object', additionalProperties => { 'x-kubernetes-int-or-string' => JSON::MaybeXS::true } }
+        if $entry->{is_hash_of_int_or_string};
+
+    croak 'IO::K8s::CRD::_schema_for_class: registry entry with no recognizable is_* flag';
+}
+
+sub _opaque_object {
+    return { type => 'object', 'x-kubernetes-preserve-unknown-fields' => JSON::MaybeXS::true };
+}
+
+# D3 -> openAPIV3Schema: every option version 1 of D3 carries is emitted
+# ("All of them are emitted into the CRD schema (D9)" -- the design spec's
+# own words). 'required' is excluded here on purpose -- it is not a
+# per-property key, it joins the ENCLOSING object's own 'required' array,
+# handled by _schema_for_class's caller loop above.
+sub _apply_options {
+    my ($schema, $opts) = @_;
+    $schema->{enum} = [ @{ $opts->{enum} } ] if exists $opts->{enum};
+    $schema->{minimum} = $opts->{minimum} if exists $opts->{minimum};
+    $schema->{maximum} = $opts->{maximum} if exists $opts->{maximum};
+    if (exists $opts->{pattern}) {
+        my $p = $opts->{pattern};
+        # re::regexp_pattern in LIST context returns the raw pattern text a
+        # qr// was built from -- unlike plain stringification, it carries no
+        # '(?^:...)' wrapper, so what lands in the schema is what the author
+        # (or AutoGen's own $src->{pattern}) originally wrote. Regex flags
+        # (a qr/.../i, say) have no standard JSON Schema carrier and are
+        # dropped -- every hand-written 'pattern' in this distribution is
+        # case-sensitive, so this has not lost anything real yet; a future
+        # flagged pattern would need an explicit decision, not a guess here.
+        $schema->{pattern} = (ref $p eq 'Regexp') ? (re::regexp_pattern($p))[0] : $p;
+    }
+    $schema->{description} = $opts->{description} if exists $opts->{description};
+    $schema->{default} = _copy_one_level($opts->{default}) if exists $opts->{default};
+    $schema->{nullable} = $opts->{nullable} ? JSON::MaybeXS::true : JSON::MaybeXS::false
+        if exists $opts->{nullable};
+    $schema->{'x-kubernetes-preserve-unknown-fields'} = $opts->{preserve_unknown} ? JSON::MaybeXS::true : JSON::MaybeXS::false
+        if exists $opts->{preserve_unknown};
+    return;
+}
+
+# One level of copying for a 'default' option that might be an array/hash
+# ref -- the registry never copies 'default' itself (only 'enum'; see
+# IO::K8s::Resource::_k8s), so a plain assignment here would alias the
+# class's own stored default the same way k54 warns against elsewhere.
+# Duplicated from IO::K8s::Role::Resource::_copy_one_level rather than
+# called cross-package, for the same reason that one gives for not calling
+# IO::K8s.pm's version: this file must not force-load IO::K8s at compile
+# time (see crd_for_class's own lazy 'require IO::K8s' above).
+sub _copy_one_level {
+    my ($value) = @_;
+    return [ @$value ] if ref $value eq 'ARRAY';
+    return { %$value } if ref $value eq 'HASH';
+    return $value;
 }
 
 1;

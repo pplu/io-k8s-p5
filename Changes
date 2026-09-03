@@ -2,6 +2,23 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - New Class->to_crd (D9, k96): any IO::K8s::APIObject class now emits its
+    own CustomResourceDefinition, built from the same attribute registry
+    add_crd/IO::K8s::AutoGen reads -- the exact inverse of AutoGen's
+    schema-to-DSL mapping, so add_crd(Class->to_crd) reconstructs an
+    equivalent class (verified against a shipped cert-manager Kind).
+    IO::K8s::CRD::_schema_for_class walks the registry into an
+    openAPIV3Schema, recursing into referenced/inline-struct classes with a
+    path-scoped cycle guard (a class reused as unrelated siblings, e.g. a
+    shared LabelSelector, is unaffected -- only a genuine cycle on the
+    current path becomes an opaque x-kubernetes-preserve-unknown-fields
+    stub); D3 field options (enum, minimum, maximum, pattern, description,
+    default, nullable, preserve_unknown) are carried onto the emitted
+    property. One documented lossy edge: a Quantity-typed field has no
+    schema shape AutoGen reads back as Quantity (it is only ever produced
+    from a $ref, never a format string), so it round-trips as a plain Str;
+    a Time-typed field is lossless (format: date-time).
+
   - New IO::K8s::Unstructured and IO::K8s->new(unknown_kinds => 'unstructured')
     (D4, k96): apiVersion/kind/metadata as ordinary typed attributes, with no
     fixed api_version()/kind() identity, and every other field on the wire
