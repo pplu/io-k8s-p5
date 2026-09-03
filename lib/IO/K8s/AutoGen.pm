@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Carp qw(croak);
 use Package::Stash;
-use Scalar::Util qw(reftype);
+use Scalar::Util qw(blessed reftype);
 use Types::Standard qw( Bool Int Str );
 
 # Cache of generated classes
@@ -206,13 +206,15 @@ sub _generate_class {
     # Property names with special characters ($ref, x-kubernetes-*) are
     # automatically sanitized to valid Perl identifiers by _k8s(), with
     # init_arg mapping so constructors still accept the original JSON keys.
+    my %required = map { $_ => 1 } @{ $schema->{required} // [] };
     for my $prop (sort keys %$properties) {
         next if $role_supplied{$prop};
         my $prop_schema = $properties->{$prop};
         my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class);
         next unless defined $type_spec;  # Skip unsupported types
 
-        $k8s->($prop, $type_spec);
+        my $opts = _field_options($prop_schema, $type_spec, $required{$prop});
+        $k8s->($prop, $type_spec, ($opts ? $opts : ()));
     }
 
     # Install class methods if we have api_version/kind
@@ -398,6 +400,81 @@ sub _schema_to_type_spec {
 
     # Unknown type
     return 'Str';
+}
+
+# The scalar type a DSL type spec is built on -- Str, Int, Num, Bool,
+# IntOrStr, Quantity, Time -- or undef for objects, structs and the opaque
+# container forms. Value constraints (enum, minimum, maximum, pattern) only
+# make sense on the former; passing one to the DSL for the latter would
+# croak at class generation.
+my %SCALAR_KIND = map { $_ => 1 } qw( Str Int Num Bool IntOrStr Quantity Time );
+
+sub _scalar_kind {
+    my ($type_spec) = @_;
+    if (!ref $type_spec) {
+        return $SCALAR_KIND{$type_spec} ? $type_spec : undef;
+    }
+    if (ref $type_spec eq 'ARRAY') {
+        my $elem = $type_spec->[0];
+        return undef if ref $elem eq 'HASH' || ref $elem eq 'ARRAY';
+        return $elem->name if blessed($elem) && $elem->isa('Type::Tiny');
+        return $SCALAR_KIND{$elem} ? $elem : undef;
+    }
+    if (ref $type_spec eq 'HASH') {
+        my ($k) = keys %$type_spec;
+        # { Str => 1 } is the deliberately opaque map; typed maps carry
+        # their value kind.
+        return undef if $k eq 'Str';
+        return $SCALAR_KIND{$k} ? $k : undef;
+    }
+    return undef;
+}
+
+# Field options for one property (D3). Schema-only facts (description,
+# default, nullable, x-kubernetes-preserve-unknown-fields) travel for every
+# field; the value constraints only where the DSL can enforce them. For an
+# array the constraints sit on `items` and apply per element.
+#
+# A pattern is an ECMA 262 regex on the wire. Perl compiles nearly all of
+# them; one it cannot is dropped rather than failing the whole class -- the
+# client-side check is a convenience, the API server validates regardless,
+# and no data is lost (the k56 line is about data, not about checks). An
+# empty or duplicate enum is dropped the same way, for the same reason.
+sub _field_options {
+    my ($prop_schema, $type_spec, $is_required) = @_;
+    my %opts;
+    $opts{required}    = 1 if $is_required;
+    $opts{description} = $prop_schema->{description} if defined $prop_schema->{description};
+    $opts{default}     = $prop_schema->{default}     if exists $prop_schema->{default};
+    $opts{nullable}    = 1 if $prop_schema->{nullable};
+    $opts{preserve_unknown} = 1 if $prop_schema->{'x-kubernetes-preserve-unknown-fields'};
+
+    my $kind = _scalar_kind($type_spec);
+    # A schema decoded from JSON carries a boolean default as a
+    # JSON::PP::Boolean (or similar) blessed scalar ref, which fails the
+    # field's own Bool constraint at class-generation time (_k8s's own
+    # default-vs-type check). Normalize it the one way the distribution
+    # normalizes every other Bool value rather than duplicating that rule
+    # here (IO::K8s::Resource::_normalize_bool's own comment: "The one
+    # boolean normalization in the distribution").
+    $opts{default} = IO::K8s::Resource::_normalize_bool($opts{default})
+        if $kind && $kind eq 'Bool' && exists $opts{default};
+    if ($kind && $kind ne 'Bool') {
+        my $src = ($prop_schema->{type} // '') eq 'array' ? ($prop_schema->{items} // {}) : $prop_schema;
+        if (ref $src->{enum} eq 'ARRAY' && @{ $src->{enum} }) {
+            my %seen;
+            $seen{$_}++ for @{ $src->{enum} };
+            $opts{enum} = $src->{enum} if keys %seen == @{ $src->{enum} };
+        }
+        if ($kind eq 'Int' || $kind eq 'Num') {
+            $opts{minimum} = $src->{minimum} if defined $src->{minimum};
+            $opts{maximum} = $src->{maximum} if defined $src->{maximum};
+        } elsif (defined $src->{pattern}) {
+            my $re = eval { my $p = $src->{pattern}; qr/$p/ };
+            $opts{pattern} = $re if $re;
+        }
+    }
+    return %opts ? \%opts : undef;
 }
 
 # Ensure parent packages exist
