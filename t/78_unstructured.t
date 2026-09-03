@@ -100,4 +100,29 @@ subtest 'a registered Kind is unaffected by unknown_kinds' => sub {
     isa_ok($pod, 'IO::K8s::Api::Core::V1::Pod');
 };
 
+subtest "strict => 1 exempts only the unstructured fallback, not a registered Kind" => sub {
+    my $k8s = IO::K8s->new(strict => 1, unknown_kinds => 'unstructured');
+
+    # The whole point of the fallback: an unresolvable Kind's undeclared
+    # fields (spec, status, ...) must not trip strict, or the fallback that
+    # exists to preserve them would die on the very data it preserves.
+    my $obj;
+    lives_ok { $obj = $k8s->inflate($unknown_cr) }
+        'strict + unstructured: an unresolvable Kind still does not die';
+    isa_ok($obj, 'IO::K8s::Unstructured');
+    is_deeply($obj->TO_JSON, $unknown_cr, 'and still round-trips byte-identically');
+
+    # The exemption must be scoped to the fallback alone: a REGISTERED Kind
+    # (Pod) with a bogus field still dies under strict, same as without
+    # unknown_kinds set at all.
+    throws_ok {
+        $k8s->inflate({
+            apiVersion => 'v1', kind => 'Pod',
+            metadata   => { name => 'x' },
+            spec       => { containers => [], bogus => 1 },
+        });
+    } qr/^Unknown field 'bogus' for IO::K8s::Api::Core::V1::PodSpec$/m,
+        'strict + unstructured: a registered Kind with an unknown field still dies';
+};
+
 done_testing;

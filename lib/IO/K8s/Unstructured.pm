@@ -43,10 +43,14 @@ and the document's C<apiVersion>/C<kind> resolves to no registered class
 L<IO::K8s/unknown_kinds>. Bare C<IO::K8s> keeps failing closed by default;
 this class is never built without the caller opting in.
 
-Combining C<< unknown_kinds => 'unstructured' >> with C<< strict => 1 >> is
-untested and not recommended: C<strict> would make the very fields this
-class exists to preserve die instead, on every document that carries any
-field beyond C<apiVersion>/C<kind>/C<metadata>.
+C<< strict => 1 >> is exempted for this fallback specifically: L<IO::K8s>
+localizes C<$IO::K8s::Resource::STRICT> for the whole C<inflate>/
+C<new_object> call, but this class has nothing else declared to check a
+field against -- every field beyond C<apiVersion>/C<kind>/C<metadata> is
+precisely what it exists to preserve, so C<strict> would otherwise make it
+die on the very data it is supposed to keep. A registered Kind with an
+unexpected field still dies under C<strict> as normal; only the
+already-unresolvable-Kind fallback this class represents is exempt.
 
 =cut
 

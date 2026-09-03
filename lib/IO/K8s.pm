@@ -1011,8 +1011,17 @@ sub new_object {
 # land on their own typed attributes; everything else preserved through
 # FROM_HASH's normal D1 handling (an undeclared constructor key is kept in
 # _unknown_fields and re-emitted by TO_JSON).
+#
+# strict => 1 is deliberately exempted here: inflate/new_object localize
+# $IO::K8s::Resource::STRICT for the whole call, but Unstructured never
+# declares spec/status/etc, so every field beyond apiVersion/kind/metadata
+# would trip strict on the one class whose entire purpose is preserving
+# them. The exemption is scoped to this fallback alone -- a registered
+# Kind (a Pod with a bogus field, say) still dies under strict, since this
+# sub is only ever reached once resolution has already failed.
 sub _unstructured_from_struct {
     my ($self, $struct) = @_;
+    local $IO::K8s::Resource::STRICT = 0;
     return IO::K8s::Unstructured->FROM_HASH($struct);
 }
 
@@ -1557,6 +1566,33 @@ One carve-out: L<IO::K8s::List>, the envelope a list Kind inflates to,
 does not compose L<IO::K8s::Role::Resource>. Its own top-level keys are
 neither preserved nor checked under C<strict> -- only the objects inside
 C<items> are, each through its own class (k99).
+
+=head2 unknown_kinds
+
+Optional. String, default C<''>. Governs what L</inflate> and L</new_object>
+do when a document's C<apiVersion>/C<kind> (or an explicit C<api_version>
+argument) amount to a GVK request that resolves to no registered class --
+built-in, CRD-registered via C<add()>/C<add_crd()>, or AutoGen'd from
+C<openapi_spec>. With the default C<''> this keeps failing closed exactly as
+without the option, dying with:
+
+    Cannot resolve Kubernetes GVK: kind '<kind>', apiVersion '<apiVersion>'
+
+With C<< unknown_kinds => 'unstructured' >>, that failure instead builds an
+L<IO::K8s::Unstructured> from the document: C<apiVersion>, C<kind> and
+C<metadata> land on typed attributes, everything else round-trips through
+the C<_unknown_fields> bag (D1) exactly as an undeclared field on any other
+class does.
+
+    my $k8s = IO::K8s->new(unknown_kinds => 'unstructured');
+    my $obj = $k8s->inflate($document);   # an IO::K8s::Unstructured, not a die
+
+Any value other than the literal string C<'unstructured'> -- including one
+left unset -- keeps the fail-closed default; this is strictly opt-in. C<<
+strict => 1 >> combined with this option still dies on a registered Kind
+with an unexpected field the normal way; the C<Unstructured> envelope itself
+is exempt from C<strict>, since every field beyond
+C<apiVersion>/C<kind>/C<metadata> is precisely what it exists to preserve.
 
 =head2 openapi_spec
 
