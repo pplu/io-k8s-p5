@@ -152,6 +152,23 @@ Options:
                        Kind, e.g. "Middleware::Spec::RateLimit") to the
                        package name to use (e.g. "RateLimit") -- the
                        upstream Go type names (D6).
+  --render            Like --suggest, but for EVERY served GVK of the
+                       provider (not only reported gaps) -- the full D5
+                       render, always through the provider's overlay (see
+                       --overlay) when one exists. Same stdout/stderr rule.
+  --render-dir PATH   Write the --render output under PATH instead of
+                       printing (PATH must not be inside lib/).
+  --check             Render every served GVK to memory and compare each
+                       rendered file against the checked-in
+                       lib/IO/K8s/<Provider>/<Version>/<File>.pm: MATCH,
+                       DIFFERS (a short hand-rolled diff), MISSING IN LIB,
+                       or NOT RENDERED (a file under the provider directory
+                       the render does not produce -- see
+                       ignore_unrendered in the exceptions file for a kept
+                       back-compat track). Exits 1 if anything differs.
+  --overlay FILE      Overlay YAML for --render/--check (default:
+                       maint/crd-render/<Provider>.yaml when it exists;
+                       requires exactly one --provider).
   --help              This message
 
 For each provider, fetches its upstream CustomResourceDefinition manifests at
@@ -177,6 +194,8 @@ sub parse_args {
         'exceptions=s', 'lib=s', 'cache-dir=s', 'no-cache',
         'verbose', 'output=s', 'format=s', 'help|h',
         'suggest' => \$opt{suggest}, 'suggest-dir=s' => \$opt{suggest_dir}, 'names=s' => \$opt{names},
+        'render' => \$opt{render}, 'render-dir=s' => \$opt{render_dir},
+        'check' => \$opt{check}, 'overlay=s' => \$opt{overlay},
     ) or usage(1);
     usage(0) if $opt{help};
     if ($opt{format} !~ /^(text|json)$/) {
@@ -193,18 +212,34 @@ sub parse_args {
     if (defined $opt{dir} && @providers != 1) {
         die "crd-drift-check: --dir/--spec requires exactly one --provider\n";
     }
+    if (defined $opt{overlay} && @providers != 1) {
+        die "crd-drift-check: --overlay requires exactly one --provider\n";
+    }
+    if (defined $opt{overlay} && !-f $opt{overlay}) {
+        die "crd-drift-check: --overlay file not found: $opt{overlay}\n";
+    }
     if ($opt{suggest_dir}) {
         $opt{suggest_dir} = _canon_abs($opt{suggest_dir});
-        # The write target stays the lexical form (a --suggest-dir may not
-        # exist yet); the guard compares symlink-resolved forms so a
-        # symlink into lib/ can't sneak past a lexical-only check.
-        my $suggest_real = _resolve_path($opt{suggest_dir});
-        my $lib_real      = _resolve_path($opt{lib});
-        die "crd-drift-check: --suggest-dir must not point inside lib/\n"
-            if $suggest_real eq $lib_real || index($suggest_real, "$lib_real/") == 0;
+        _die_if_inside_lib($opt{suggest_dir}, $opt{lib}, '--suggest-dir');
+    }
+    if ($opt{render_dir}) {
+        $opt{render_dir} = _canon_abs($opt{render_dir});
+        _die_if_inside_lib($opt{render_dir}, $opt{lib}, '--render-dir');
     }
     $opt{provider} = \@providers;
     return \%opt;
+}
+
+# Shared by --suggest-dir and --render-dir: the write target stays the
+# lexical form (either may not exist yet); the guard compares
+# symlink-resolved forms so a symlink into lib/ can't sneak past a
+# lexical-only check. See _resolve_path's own comment above for why.
+sub _die_if_inside_lib {
+    my ($path, $lib, $flag) = @_;
+    my $real     = _resolve_path($path);
+    my $lib_real = _resolve_path($lib);
+    die "crd-drift-check: $flag must not point inside lib/\n"
+        if $real eq $lib_real || index($real, "$lib_real/") == 0;
 }
 
 # ---------------------------------------------------------------------------
@@ -445,16 +480,29 @@ sub require_class {
 }
 
 # The shipped `spec` field set for a class, or undef when spec is modeled
-# opaquely (a { Str => 1 } hash, a free-form object, or simply absent). Only
-# an inline struct (is_inline_struct) exposes upstream-comparable field
-# names -- read from the auto-generated inner struct class's registry entry,
-# using each attribute's wire json_key.
+# opaquely (a { Str => 1 } hash, a free-form object, or simply absent).
+# Two shapes expose upstream-comparable field names, both read off the
+# nested class's own registry entry using each attribute's wire json_key:
+#
+#   - an inline struct (is_inline_struct) -- the k93-era case, an anonymous
+#     `{ field => TypeSpec, ... }` the k8s DSL generated a struct for; or
+#   - (A3, D5/D7) a plain object reference (is_object, not an inline
+#     struct) whose class lives under IO::K8s::<Provider>:: -- the emitter
+#     output's own case, where `spec` is typed as a NAMED nested class
+#     ('Traefik::V1alpha1::MiddlewareSpec') rather than an anonymous one.
+#     Scoped to the provider's own namespace so a spec reusing a shipped
+#     CORE class (Meta::V1::LabelSelector, say -- D5's reuse_core) is not
+#     mistaken for that Kind's own field list.
 sub shipped_spec_fields {
-    my ($class) = @_;
+    my ($class, $provider) = @_;
     my $reg  = \%IO::K8s::Resource::_attr_registry;
     my $info = $reg->{$class}{spec} or return undef;
-    return undef unless $info->{is_inline_struct};
+    return undef unless $info->{is_object};
     my $inner = $info->{class} or return undef;
+    unless ($info->{is_inline_struct}) {
+        return undef
+            unless defined $provider && index($inner, "IO::K8s::$provider\::") == 0;
+    }
     my $inner_attrs = $reg->{$inner} // {};
     my %fields;
     for my $aname (keys %$inner_attrs) {
@@ -477,6 +525,7 @@ sub load_exceptions {
     $data->{ignore_stale_kinds}   //= [];
     $data->{ignore_missing_fields} //= [];
     $data->{ignore_extra_fields}   //= [];
+    $data->{ignore_unrendered}     //= [];
     return $data;
 }
 
@@ -499,6 +548,21 @@ sub field_excepted {
     for my $e (@$entries) {
         next unless ref $e eq 'HASH';
         next unless ($e->{gvk} // '') eq $gvk && ($e->{field} // '') eq $field;
+        next if defined $e->{provider} && $e->{provider} ne $provider;
+        return (1, $e->{reason});
+    }
+    return (0, undef);
+}
+
+# --check's NOT RENDERED exceptions match on provider + path, where `path`
+# is the same lib/-relative string --check itself reports and render_gvk's
+# own file keys already use ("IO/K8s/<Provider>/<Version>/<File>.pm") --
+# one canonical form throughout, nothing to translate between.
+sub unrendered_excepted {
+    my ($provider, $path, $entries) = @_;
+    for my $e (@$entries) {
+        next unless ref $e eq 'HASH';
+        next unless ($e->{path} // '') eq $path;
         next if defined $e->{provider} && $e->{provider} ne $provider;
         return (1, $e->{reason});
     }
@@ -570,7 +634,7 @@ sub check_provider {
     for my $gvk (sort keys %$upstream) {
         my $class = $shipped->{$gvk} or next;
         my $u = $upstream->{$gvk};
-        my $shipped_fields = shipped_spec_fields($class);
+        my $shipped_fields = shipped_spec_fields($class, $provider);
 
         if (!defined $shipped_fields) {
             # spec modeled opaquely: field coverage not individually verified.
@@ -712,64 +776,220 @@ sub load_names {
     return $map;
 }
 
-sub suggest_for {
-    my ($opt, $result, $upstream, $names) = @_;
+# The per-Kind overlay slice for one provider (A2's shape: `base:`, `kinds:`
+# with per-Kind `with`/`extra`/`names`), from --overlay when given or from
+# maint/crd-render/<Provider>.yaml otherwise. A missing default file is the
+# normal case until a provider's Phase B task writes one -- returns {}, not
+# an error; a missing --overlay is already fatal in parse_args, so reaching
+# here with one set means the file exists.
+sub load_overlay {
+    my ($opt, $provider) = @_;
+    my $path = defined $opt->{overlay}
+        ? $opt->{overlay}
+        : File::Spec->catfile($DIST_ROOT, 'maint', 'crd-render', "$provider.yaml");
+    return {} unless -f $path;
+    require YAML::PP;
+    my $data = YAML::PP->new->load_file($path);
+    die "crd-drift-check: overlay file $path must be a YAML map\n" unless ref $data eq 'HASH';
+    $data->{kinds} //= {};
+    return $data;
+}
+
+# One served GVK, rendered through the emitter -- the shared core of
+# --suggest (a reported gap only) and --render (every GVK): generate the
+# AutoGen classes for $u->{doc} into a fresh throwaway namespace, then
+# render $root with $overlay (the Kind's own `kinds.<Kind>` slice, already
+# sliced out by the caller) and any --names D6 override.
+sub render_gvk {
+    my ($opt, $provider, $u, $overlay) = @_;
     require IO::K8s::CRD;
     require IO::K8s::CRD::Emitter;
+    state $ns_counter = 0;
+    my $ns = 'IO::K8s::_CRDRENDER_' . ++$ns_counter;
+    # reuse_core on (D5, and IO::K8s::CRD->generate's own default) -- a
+    # nested schema shaped exactly like a shipped core class is typed as
+    # that class rather than a per-provider copy.
+    my $classes = IO::K8s::CRD->generate($u->{doc}, $ns, reuse_core => 1);
+    my $root = $classes->{"$u->{group}/$u->{version}"} or return {};
+
+    # A --names key is written relative to the Kind (the Kind's own
+    # generated class IS $root, e.g. '...::Middleware'), so a key of
+    # 'Middleware::Spec::RateLimit' names the nested class
+    # '$root::Spec::RateLimit' -- the leading 'Middleware::' names the
+    # Kind, it is not repeated inside $root. Strip it before joining.
+    my $names = $opt->{_names_map} // {};
+    my %class_names;
+    for my $key (grep { $_ ne $u->{kind} } keys %$names) {
+        (my $suffix = $key) =~ s/^\Q$u->{kind}\E:://;
+        $class_names{"$root\::$suffix"} = $names->{$key};
+    }
+    my $emitter = IO::K8s::CRD::Emitter->new(
+        base    => "IO::K8s::$provider\::" . ucfirst($u->{version}),
+        names   => \%class_names,
+        overlay => $overlay // {},
+    );
+    return $emitter->render($root);
+}
+
+sub suggest_for {
+    my ($opt, $result, $upstream) = @_;
     my @gvks = map { $_->[0] } @{ $result->{opaque_spec} }, @{ $result->{missing_field} };
     my %seen;
     my %files;
-    my $n = 0;
+    my $overlay = load_overlay($opt, $result->{provider});
     for my $gvk (grep { !$seen{$_}++ } @gvks) {
         my $u = $upstream->{$gvk} or next;
-        my $ns = 'IO::K8s::_SUGGEST_' . ++$n;
-        my $classes = IO::K8s::CRD->generate($u->{doc}, $ns);
-        my $root = $classes->{"$u->{group}/$u->{version}"} or next;
-        # A --names key is written relative to the Kind (the Kind's own
-        # generated class IS $root, e.g. '...::Middleware'), so a key of
-        # 'Middleware::Spec::RateLimit' names the nested class
-        # '$root::Spec::RateLimit' -- the leading 'Middleware::' names the
-        # Kind, it is not repeated inside $root. Strip it before joining.
-        my %class_names;
-        for my $key (grep { $_ ne $u->{kind} } keys %$names) {
-            (my $suffix = $key) =~ s/^\Q$u->{kind}\E:://;
-            $class_names{"$root\::$suffix"} = $names->{$key};
-        }
-        my $emitter = IO::K8s::CRD::Emitter->new(
-            base  => "IO::K8s::$result->{provider}::" . ucfirst($u->{version}),
-            names => \%class_names,
-        );
-        my $rendered = $emitter->render($root);
+        my $kind_overlay = $overlay->{kinds}{$u->{kind}} // {};
+        my $rendered = render_gvk($opt, $result->{provider}, $u, $kind_overlay);
         $files{$_} = $rendered->{$_} for keys %$rendered;
     }
     return \%files;
 }
 
-sub emit_suggestions {
-    my ($opt, $files) = @_;
-    return unless %$files;
+# --render's own GVK set: every served GVK the manifests describe, not only
+# a reported gap.
+sub render_for {
+    my ($opt, $provider, $upstream) = @_;
+    my $overlay = load_overlay($opt, $provider);
+    my %files;
+    for my $gvk (sort keys %$upstream) {
+        my $u = $upstream->{$gvk};
+        my $kind_overlay = $overlay->{kinds}{$u->{kind}} // {};
+        my $rendered = render_gvk($opt, $provider, $u, $kind_overlay);
+        $files{$_} = $rendered->{$_} for keys %$rendered;
+    }
+    return \%files;
+}
+
+sub _report_out {
+    my ($opt) = @_;
     # --format json keeps stdout a parseable JSON document (see main below,
-    # which prints the report there); everything --suggest would otherwise
-    # print -- the rendered source, or the "wrote N files" confirmation --
-    # goes to stderr instead when that format is active, and to stdout the
-    # same as ever otherwise. See usage().
-    my $out = $opt->{format} eq 'json' ? \*STDERR : \*STDOUT;
-    if ($opt->{suggest_dir}) {
+    # which prints the report there); everything --suggest/--render/--check
+    # would otherwise print goes to stderr instead when that format is
+    # active, and to stdout the same as ever otherwise. See usage().
+    return $opt->{format} eq 'json' ? \*STDERR : \*STDOUT;
+}
+
+sub emit_files {
+    my ($opt, $files, $dir, $label) = @_;
+    return unless %$files;
+    my $out = _report_out($opt);
+    if ($dir) {
         require File::Path;
         require File::Basename;
         for my $rel (sort keys %$files) {
-            my $path = "$opt->{suggest_dir}/$rel";
+            my $path = "$dir/$rel";
             File::Path::make_path(File::Basename::dirname($path));
             open my $fh, '>:encoding(UTF-8)', $path or die "crd-drift-check: cannot write $path: $!\n";
             print $fh $files->{$rel};
             close $fh;
         }
-        print $out "\n--- suggest: wrote " . scalar(keys %$files) . " file(s) under $opt->{suggest_dir}\n";
+        print $out "\n--- $label: wrote " . scalar(keys %$files) . " file(s) under $dir\n";
         return;
     }
     for my $rel (sort keys %$files) {
         print $out "\n#### $rel\n", $files->{$rel};
     }
+}
+
+# ---------------------------------------------------------------------------
+# --check: rendered output vs. the checked-in lib/ tree.
+# ---------------------------------------------------------------------------
+
+# A hand-rolled "first differing line and context" report -- not a real
+# diff algorithm, just the common prefix/suffix trimmed off both sides so
+# the interesting middle is what's left, formatted unified-ish ('-'/'+')
+# and capped to 40 lines. Sufficient for a maint loop; Text::Diff is not a
+# dependency of this distribution and this doesn't need one.
+sub _diff_lines {
+    my ($have, $want) = @_;
+    my @a = split /\n/, $have, -1;
+    my @b = split /\n/, $want, -1;
+    my $pre = 0;
+    $pre++ while $pre < @a && $pre < @b && $a[$pre] eq $b[$pre];
+    my $suf = 0;
+    $suf++ while $suf < (@a - $pre) && $suf < (@b - $pre)
+        && $a[$#a - $suf] eq $b[$#b - $suf];
+    my @out = (sprintf('@@ first difference at line %d @@', $pre + 1));
+    push @out, "-$_" for @a[$pre .. $#a - $suf];
+    push @out, "+$_" for @b[$pre .. $#b - $suf];
+    my $total = @out;
+    if ($total > 40) {
+        @out = @out[0 .. 39];
+        push @out, sprintf('... (%d more line(s) omitted)', $total - 40);
+    }
+    return @out;
+}
+
+# Renders every served GVK of $provider (already computed in $rendered, a
+# provider->file map from render_for) and diffs each file against
+# lib/IO/K8s/<Provider>/. Returns { provider, rows => [...], bad => 0|1 }.
+sub check_for {
+    my ($opt, $provider, $rendered, $exceptions) = @_;
+
+    my $provider_dir = File::Spec->catdir($opt->{lib}, 'IO', 'K8s', $provider);
+    my %shipped;
+    if (-d $provider_dir) {
+        require File::Find;
+        File::Find::find({ no_chdir => 1, wanted => sub {
+            return unless -f $File::Find::name && /\.pm\z/;
+            (my $rel = $File::Find::name) =~ s{^\Q$opt->{lib}\E/}{};
+            $shipped{$rel} = 1;
+        } }, $provider_dir);
+    }
+
+    my @rows;
+    my $bad = 0;
+    for my $rel (sort keys %$rendered) {
+        delete $shipped{$rel};
+        my $lib_path = File::Spec->catfile($opt->{lib}, split m{/}, $rel);
+        if (!-f $lib_path) {
+            push @rows, { status => 'MISSING IN LIB', path => $rel };
+            $bad = 1;
+            next;
+        }
+        my $have = _slurp($lib_path);
+        my $want = $rendered->{$rel};
+        if ($have eq $want) {
+            push @rows, { status => 'MATCH', path => $rel };
+        } else {
+            push @rows, { status => 'DIFFERS', path => $rel, diff => [ _diff_lines($have, $want) ] };
+            $bad = 1;
+        }
+    }
+    for my $rel (sort keys %shipped) {
+        my ($ign, $reason) = unrendered_excepted($provider, $rel, $exceptions->{ignore_unrendered});
+        push @rows, { status => 'NOT RENDERED', path => $rel, excepted => $ign, reason => $reason };
+        $bad = 1 unless $ign;
+    }
+    return { provider => $provider, rows => \@rows, bad => $bad };
+}
+
+sub render_check_report {
+    my ($c) = @_;
+    my @out;
+    push @out, sprintf('########## %s --check (rendered vs lib/IO/K8s/%s) ##########', $c->{provider}, $c->{provider});
+    my %count;
+    for my $row (@{ $c->{rows} }) {
+        $count{ $row->{status} }++;
+        my $line = sprintf('  %-16s %s', $row->{status}, $row->{path});
+        $line .= '  -- ' . $row->{reason} if $row->{excepted} && defined $row->{reason};
+        push @out, $line;
+        push @out, "    $_" for @{ $row->{diff} // [] };
+    }
+    push @out, sprintf(
+        '--- SUMMARY: %d match, %d differ, %d missing in lib, %d not rendered ---',
+        $count{MATCH} // 0, $count{DIFFERS} // 0,
+        $count{'MISSING IN LIB'} // 0, $count{'NOT RENDERED'} // 0,
+    );
+    push @out, '';
+    return join("\n", @out) . "\n";
+}
+
+sub render_check_unresolved {
+    my ($provider) = @_;
+    return "########## $provider --check ##########\n"
+        . "  skipped: upstream source unresolved -- no openAPIV3Schema to render against\n\n";
 }
 
 # ---------------------------------------------------------------------------
@@ -779,6 +999,9 @@ sub emit_suggestions {
 my $opt = parse_args();
 load_lib($opt->{lib});
 my $exceptions = load_exceptions($opt->{exceptions});
+# Loaded once, up front: render_gvk reads it for every --suggest/--render
+# GVK regardless of which of those flags (or neither) is actually set.
+$opt->{_names_map} = load_names($opt->{names});
 
 my @results = map { check_provider($opt, $_, $exceptions) } @{ $opt->{provider} };
 
@@ -808,12 +1031,47 @@ if ($opt->{output}) {
 }
 
 if ($opt->{suggest} || $opt->{suggest_dir}) {
-    my $names = load_names($opt->{names});
     my %files;
     for my $r (@results) {
         my $upstream = $upstream_by_provider{ $r->{provider} } or next;
-        my $f = suggest_for($opt, $r, $upstream, $names);
+        my $f = suggest_for($opt, $r, $upstream);
         $files{$_} = $f->{$_} for keys %$f;
     }
-    emit_suggestions($opt, \%files);
+    emit_files($opt, \%files, $opt->{suggest_dir}, 'suggest');
 }
+
+# --render and --check both need the full render (every served GVK, not
+# only a reported gap) -- computed once per provider here and reused by
+# whichever of the two flags is set, rather than rendering twice.
+my %rendered_by_provider;
+if ($opt->{render} || $opt->{render_dir} || $opt->{check}) {
+    for my $r (@results) {
+        my $upstream = $upstream_by_provider{ $r->{provider} } or next;
+        $rendered_by_provider{ $r->{provider} } = render_for($opt, $r->{provider}, $upstream);
+    }
+}
+
+if ($opt->{render} || $opt->{render_dir}) {
+    my %files;
+    for my $provider (keys %rendered_by_provider) {
+        my $f = $rendered_by_provider{$provider};
+        $files{$_} = $f->{$_} for keys %$f;
+    }
+    emit_files($opt, \%files, $opt->{render_dir}, 'render');
+}
+
+my $check_failed = 0;
+if ($opt->{check}) {
+    my $out = _report_out($opt);
+    for my $r (@results) {
+        if (!$upstream_by_provider{ $r->{provider} }) {
+            print $out render_check_unresolved($r->{provider});
+            next;
+        }
+        my $c = check_for($opt, $r->{provider}, $rendered_by_provider{ $r->{provider} }, $exceptions);
+        $check_failed = 1 if $c->{bad};
+        print $out render_check_report($c);
+    }
+}
+
+exit(1) if $check_failed;

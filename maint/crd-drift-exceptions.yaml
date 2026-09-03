@@ -99,3 +99,14 @@ ignore_missing_fields: []
 # fields kept for older provider releases, or upstream-removed fields kept
 # for back-compat.
 ignore_extra_fields: []
+
+# --check's NOT RENDERED status (A3, k95): a file under
+# lib/IO/K8s/<Provider>/ that --render's current pass does not produce --
+# typically a back-compat class for a GVK already excused above via
+# ignore_stale_kinds, whose upstream CRD is gone so there is nothing left
+# to render it from. `path` is lib/-relative
+# ("IO/K8s/<Provider>/<Version>/<File>.pm"), matching what --check itself
+# reports. Empty until a provider's Phase B task actually converts it to
+# full-depth rendering and finds a kept file the render legitimately can't
+# reproduce.
+ignore_unrendered: []
