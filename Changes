@@ -2,6 +2,36 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::AutoGen types inline objects (D10, k94). A type: object
+    with properties -- which is how every CRD schema is written below its
+    top level -- now becomes a nested class named after its place in the
+    parent (<Kind>::Spec, <Kind>::Spec::Limit, ...Item for array items,
+    ...Value for map values) instead of an opaque hash, so field options,
+    strict and the unknown-field bag reach every level. Hash-style access
+    on such a field keeps working (a Moo object is a blessed hash);
+    property-less objects and additionalProperties-only maps stay opaque.
+
+  - New IO::K8s::CRD and IO::K8s->add_crd (D10, k94): load a
+    CustomResourceDefinition (object, hashref, YAML/JSON text, path, or a
+    list of those), generate one class per served version, register every
+    version under its domain-qualified key and the storage version under
+    the bare Kind -- through add(), so a provider merged earlier keeps the
+    short name.
+
+  - New IO::K8s::CRD::Emitter renders generated classes as house-style
+    source files from the attribute registry (fields, options, required,
+    descriptions as =attr POD, a name map for upstream Go type names).
+    maint/crd-drift-check.pl --suggest prints those files for every
+    OPAQUE SPEC / MISSING FIELD Kind; --suggest-dir writes them, and
+    refuses a directory inside lib/.
+
+  - IO::K8s::AutoGen checks x-kubernetes-int-or-string before the type
+    dispatch (k94). A property that marks Kubernetes' IntOrString union
+    this way and carries no type of its own -- the structural-schema
+    convention -- previously fell through to Str; found while building
+    IO::K8s::CRD::Emitter, whose registry-type assertion is stricter than
+    a Str field's own round-trip.
+
   - The k8s DSL takes per-field options (D3 of the CRD design, k93):
     k8s replicas => Int, { minimum => 0, maximum => 10, default => 1 },
     or name => [ Type, { ... } ] inside an inline struct. required,

@@ -681,7 +681,11 @@ bound, or a C<minimum> exceeding C<maximum>; a C<pattern> on a non-string
 field or one that does not compile as a Perl regex; and a C<default> that
 fails the field's own type (C<k8s: 'default' for ... fails the field's own
 type: <message>>), checked once at class-load time rather than discovered
-later when C<to_crd> emits it.
+later when C<to_crd> emits it. An object-bearing field -- a referenced
+class, an inline struct, or an array or map of objects -- is exempt from
+that last check: no plain hash or array default can ever satisfy an
+C<InstanceOf> constraint, so there is nothing useful to check, and the
+default is recorded as given.
 
 The registry (C<_k8s_attr_info>) keeps C<required> as a plain C<1> (absent
 when not required, matching the pre-D3 shape) and every other given option,

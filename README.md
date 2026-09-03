@@ -304,6 +304,18 @@ without executing code.
 
 ## Custom Resource Definitions (CRDs)
 
+```perl
+# From the cluster's own CRD manifest -- one class per served version,
+# nested objects typed, constraints enforced:
+my $k8s = IO::K8s->new;
+$k8s->add_crd('knobs.opts.example.com.yaml');   # path, YAML/JSON text, hashref or CRD object
+my $knob = $k8s->new_object('Knob', metadata => { name => 'k' }, spec => { mode => 'fast' });
+```
+
+The same classes can be rendered as checked-in source with
+`IO::K8s::CRD::Emitter`, which is what `maint/crd-drift-check.pl --suggest`
+prints for the bundled providers' gaps.
+
 Write your own CRD classes using `IO::K8s::APIObject`:
 
 ```perl

@@ -1397,6 +1397,22 @@ on demand:
 Auto-generated classes are placed in a unique namespace per IO::K8s instance
 (e.g., C<IO::K8s::_AUTOGEN_abc123::...>) to avoid collisions.
 
+=head2 From a CustomResourceDefinition manifest
+
+Loading a CRD manifest directly -- see L</add_crd> -- generates one class
+per served version and goes further than the OpenAPI-spec path above: every
+inline C<type: object> schema below the top level, which is how a CRD
+schema is written everywhere below its Kind, becomes its own nested class
+named after its place in the parent (C<< <Kind>::<Prop> >>, with an
+C<Item> / C<Value> suffix for array items and map values) instead of an
+opaque hash of strings, so field options and the unknown-field bag apply at
+every level. Hash-style access on such a field still works -- a Moo object
+is a blessed hash keyed by attribute name -- so code that reads
+C<< $obj->{spec}{mode} >> does not need to change either way. Only a
+property-less object and an C<additionalProperties>-only map (nothing
+underneath to attach options to) stay opaque. L<IO::K8s::CRD::Emitter>
+renders the same classes as checked-in source.
+
 =head2 Explicit generation with IO::K8s::AutoGen
 
 For more control, use L<IO::K8s::AutoGen> directly:

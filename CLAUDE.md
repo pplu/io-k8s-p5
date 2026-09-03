@@ -26,6 +26,8 @@ for back-compat, an API track intentionally not backported — add a categorised
 that file with a one-line reason. New entries should reference the karr ticket or commit
 that established the call. `maint/spec-drift-check.pl --verbose` lists what is currently
 suppressed; the exception file is the source of truth, not the script's runtime memory.
+`maint/crd-drift-check.pl`'s `--suggest` prints the classes `IO::K8s::CRD::Emitter` renders
+for a reported gap, `--suggest-dir` writes them outside `lib/`.
 
 `maint/spec-drift-check.pl --help` for the full flag list.
 
