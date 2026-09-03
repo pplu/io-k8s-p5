@@ -1,0 +1,37 @@
+---
+class: standard
+completed: 2026-09-03T20:22:44Z
+created: 2026-09-03T19:38:23Z
+id: 108
+priority: medium
+started: 2026-09-03T20:22:44Z
+status: done
+tags:
+- core
+- serialization
+- cilium
+title: IO::K8s::Role::Resource's json encoder attribute collides with a real upstream
+  field literally named 'json'
+updated: 2026-09-03T20:22:44Z
+---
+
+IO::K8s::Role::Resource declares `has json => (is => "ro", lazy => 1, builder => "_build_json")` -- the shared JSON::MaybeXS-family encoder used internally by to_json() (`$self->json->encode($self->TO_JSON)`, Role/Resource.pm ~line 353).
+
+Cilium (cilium.io/v2alpha1, CiliumGatewayClassConfig -> spec.telemetry.accessLogs[]) has a real upstream field literally named `json` (`AccessLogs.json map[string]string`, Envoy access-log format spec). Rendered faithfully per D5/D6, IO::K8s::Cilium::V2alpha1::AccessLogs declares `k8s json => { Str => 1 }, { default => {...} };`.
+
+Root cause is in Resource.pm _k8s(): the DSL always registers the field in %_attr_registry (so TO_JSON/FROM_HASH know about it), but only calls Moo's has() to actually create the attribute `return if $caller->can($attr_name)` skips attribute creation when the name is already provided by a composed role. For AccessLogs, the role's own `has json` (the encoder) wins the attribute slot outright; the k8s-declared type/default for the upstream field is registered but never actually backed by a real attribute.
+
+Effects, confirmed by direct repro:
+1. `AccessLogs->new(format=>"JSON")` (json field left to its schema default) -- ->json returns the Cpanel::JSON::XS encoder instance, not the schema default map. The declared `default` is silently inert (has() was never called for this attribute, so no Moo-level default ever applies).
+2. `AccessLogs->new(format=>"JSON", json=>{...})` -- the hashref is accepted as a constructor arg (both the role attribute and the registry mark `json` as a known init arg) and overwrites the role's attribute slot. `->json` now returns that hashref. Any later call to `->to_json`/`->to_yaml` on this object dies: "Can't call method \"encode\" on unblessed reference" at Role/Resource.pm line 353, because `$self->json->encode(...)` expects an encoder object.
+3. FROM_HASH/inflate on real upstream data that populates `json` hits the same path as #2 -- an object round-tripped from a real CiliumGatewayClassConfig manifest with a populated accessLogs[].json becomes permanently unable to serialize itself.
+
+Confirmed via lib/IO/K8s/Resource.pm `_k8s()` (`return if $caller->can($attr_name)` before the `has(...)` call) and lib/IO/K8s/Role/Resource.pm lines ~12-15 (`has json => ...`) / ~350-353 (`to_json`). No existing DSL lever renames the Perl attribute while keeping the wire key (`_sanitize_attr_name` only fires on non-identifier characters; "json" is already legal). `IO::K8s::Cilium::V2alpha1::AccessLogs` is the ONLY class in the whole registry with a field literally named `json` (grep confirmed) -- first time this collision has been hit.
+
+Suggested fix directions (not prescribing): rename Role::Resource's internal encoder attribute to something implementation-private (e.g. `_json_encoder`) and update its handful of internal call sites, keeping `json`/`to_json`/`to_yaml` as the public methods they already are; or have `_k8s()` croak loudly instead of silently skipping `has()` when a role-provided attribute of the same name is NOT semantically the same field (hard to detect automatically, so probably the encoder rename is simpler and lower-risk). Either is a core (Phase A-adjacent) change outside a CRD-provider task's authorized scope -- filed per task B-Cilium's STOP-and-report-collision instruction rather than worked around unilaterally in lib/IO/K8s/Cilium/.
+
+Workaround shipped alongside this ticket: IO::K8s::Cilium::V2alpha1::AccessLogs.pm is kept rendered faithfully (the k8s DSL field is NOT removed or hand-altered -- doing so would silently drop a real upstream field from TO_JSON, worse than the current crash). t/42_registry_synthesis_roundtrip.t's generic sweep excludes AccessLogs's `json` field specifically (comment references this ticket); t/07_cilium.t carries a dedicated TODO-marked regression test reproducing the exact crash so the bug stays visible.
+
+Update: effect #1 above understates the severity. TO_JSON() reads $self->json unconditionally for the registered field regardless of whether a value was ever set, so a bare AccessLogs->new(format=>"JSON")->to_json (json field untouched) ALSO dies -- "encountered object Cpanel::JSON::XS=SCALAR(...), but neither allow_blessed, convert_blessed nor allow_tags settings are enabled" -- because the lazily-built encoder itself gets embedded as the field value and JSON::MaybeXS refuses to serialize an arbitrary blessed object. So to_json/to_yaml is broken on every AccessLogs instance unconditionally, not only when the field is explicitly populated; same for any parent object that recurses into a populated accessLogs[] (Telemetry, CiliumGatewayClassConfigSpec, CiliumGatewayClassConfig). Landed alongside cilium.io/v2alpha1 (commit 9e2bfb7b): t/07_cilium.t carries a TODO regression test, t/42_registry_synthesis_roundtrip.t excludes AccessLogs plus Telemetry.accessLogs (its one referrer) from the generic sweep, Changes and lib/IO/K8s/Cilium.pm POD document it.
+
+Controller: bumping to HIGH -- a shipped bundled class (Cilium AccessLogs) that dies on to_json/to_yaml unconditionally is a serialization-correctness defect, not medium. Scheduled as its own core task within step 4 before the final branch merge; encoder-rename direction (_json_encoder) preferred.
