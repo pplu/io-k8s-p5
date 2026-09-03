@@ -43,6 +43,7 @@ use warnings;
 use v5.10;
 use FindBin;
 use File::Spec;
+use File::Find;
 use File::Path qw(make_path);
 use Getopt::Long qw(GetOptions);
 use JSON::PP;
@@ -479,6 +480,36 @@ sub require_class {
     return;
 }
 
+# shipped_view() above only requires the resource_map's Kind-root classes.
+# For a D5/D7-style provider, a Kind's `spec` is a NAMED nested class in its
+# own file (e.g. IngressRoute's spec => '+IO::K8s::Traefik::V1alpha1::
+# IngressRouteSpec') that resource_map never lists -- so without this,
+# shipped_spec_fields() reads %IO::K8s::Resource::_attr_registry for a class
+# that was never require()d, its registry entry doesn't exist, and every
+# field is falsely reported MISSING (k105). Mirrors t/34_registry_guard.t /
+# spec-drift-check.pl's load_registry: walk + require every .pm, but scoped
+# to this provider's own subtree so an unrelated provider's tree stays
+# unloaded. A provider with no per-Kind subdirectory yet (nothing beyond the
+# resource_map roots) is a silent no-op, not an error.
+sub require_provider_tree {
+    my ($lib_dir, $provider) = @_;
+    my $provider_dir = File::Spec->catdir($lib_dir, 'IO', 'K8s', $provider);
+    return unless -d $provider_dir;
+
+    my @pm_paths;
+    find(
+        { wanted => sub { push @pm_paths, $File::Find::name if /\.pm$/ }, no_chdir => 1 },
+        $provider_dir,
+    );
+    for my $path (sort @pm_paths) {
+        my $rel = File::Spec->abs2rel($path, $lib_dir);
+        $rel =~ s{\\}{/}g;    # require() wants forward slashes regardless of OS
+        eval { require $rel; 1 }
+            or warn "crd-drift-check: failed to load $rel: $@";
+    }
+    return;
+}
+
 # The shipped `spec` field set for a class, or undef when spec is modeled
 # opaquely (a { Str => 1 } hash, a free-form object, or simply absent).
 # Two shapes expose upstream-comparable field names, both read off the
@@ -580,6 +611,11 @@ sub check_provider {
     my $version = eval { $pkg->upstream_version } // '(unknown)';
     my $sources = eval { $pkg->crd_sources };
     die "crd-drift-check: $pkg has no crd_sources method\n" unless ref $sources eq 'HASH';
+
+    # Populate the registry for every nested class under this provider (k105)
+    # before shipped_view()/shipped_spec_fields() read it -- not just the
+    # resource_map roots shipped_view() requires on its own.
+    require_provider_tree($opt->{lib}, $provider);
 
     my $shipped = shipped_view($provider);
     my $result  = {
