@@ -84,12 +84,25 @@ see C<$MAX_CLASS_NAME> there) is rendered from C<< IO::K8s::AutoGen::class_path
 class's own (possibly hashed) name -- this emitter's own C<base> is
 normally much shorter than the AutoGen namespace prefix that forced the
 shortening, so the joined package name here often fits fine even when
-AutoGen's did not. Only when the joined name would itself run past 200
-characters does the emitted package fall back to C<< <Kind>_<10 hex chars>
->>, the hex digits a C<sha1_hex> of the field path; give such a class a
-proper name via L</names> instead of relying on that fallback.
+AutoGen's did not. Only when the joined name would itself run past
+C<$MAX_PACKAGE_SUFFIX> characters, or C<base> is itself long enough that
+the full package name would, does the emitted package fall back to
+C<< <Kind>_<10 hex chars> >>, the hex digits a C<sha1_hex> of the field
+path; give such a class a proper name via L</names> instead of relying on
+that fallback.
 
 =cut
+
+# Bounds only the suffix this method appends below `base` -- AutoGen's own
+# $MAX_CLASS_NAME bounds the full namespace-qualified name IT generates,
+# which this has no control over and does not need to duplicate.
+my $MAX_PACKAGE_SUFFIX = 200;
+
+# A filesystem path component -- and much tooling that shells out to a file
+# name -- tops out around 255 bytes. A long `base` plus an otherwise-short
+# suffix can still cross that even when the suffix alone passes the check
+# above, so the joined package name as a whole is capped too.
+my $MAX_PACKAGE_LENGTH = 255;
 
 sub package_for {
     my ($self, $class) = @_;
@@ -105,10 +118,12 @@ sub package_for {
     }
 
     my $joined = join '', $kind, split /::/, $path;
-    if (length($joined) > 200) {
+    my $full   = $self->base . '::' . $joined;
+    if (length($joined) > $MAX_PACKAGE_SUFFIX || length($full) > $MAX_PACKAGE_LENGTH) {
         $joined = $kind . '_' . substr(sha1_hex($path), 0, 10);
+        $full   = $self->base . '::' . $joined;
     }
-    return $self->base . '::' . $joined;
+    return $full;
 }
 
 =method render
@@ -243,11 +258,59 @@ sub _escape_pattern_body {
             my $rest = substr($pattern, pos($pattern));
             $out .= ($rest eq '' || $rest =~ /\A[)|]/) ? '$' : '\\$';
         }
+        elsif (ord($c) > 0x7F) {
+            # A codepoint above ASCII, interpolated raw into 'qr/.../ ',
+            # only round-trips through this emitted .pm file when it is
+            # BOTH saved to disk as UTF-8 bytes AND compiled under 'use
+            # utf8' -- neither of which this method controls once the
+            # caller has the rendered source in hand. \x{HEX} means the
+            # same codepoint either way: a schema pattern like
+            # '^[0-9]+\x{b5}s$' matches '100\x{b5}s' (100, MICRO SIGN, s)
+            # exactly like the generated class does, independent of that
+            # pragma. See render()'s own use-utf8/=encoding decision for
+            # the one place non-ASCII text still goes into the file
+            # unescaped: a schema's free-form 'description', in POD.
+            $out .= sprintf('\x{%x}', ord($c));
+        }
         else {
             $out .= $c;
         }
     }
     return $out;
+}
+
+# A double-quoted Perl string literal that stays ASCII-only regardless of
+# what $str holds: '\', '"', '$' and '@' are escaped so the double-quoted
+# form -- unlike Data::Dumper's default single-quoted style, this one DOES
+# interpolate -- carries nothing but the literal value, and every character
+# above ASCII becomes \x{HEX}, the same escape and the same reason as
+# _escape_pattern_body above. Single-quoted Perl strings cannot carry a
+# \x{...} escape at all (only \\ and \' mean anything inside them), which is
+# why a value that needs this can't just be tacked onto Data::Dumper's
+# normal single-quoted output.
+sub _quote_utf8_string {
+    my ($str) = @_;
+    (my $escaped = $str) =~ s{ ([\\"\$\@]) | ([^\x00-\x7F]) }{
+        defined $1 ? "\\$1" : sprintf('\x{%x}', ord($2))
+    }gex;
+    return qq{"$escaped"};
+}
+
+# One scalar option value (an enum member, or `default`), rendered via
+# Data::Dumper's own single-quoted style for anything ASCII -- byte-for-byte
+# what every rendered file already produced -- or, for anything that is
+# not, via _quote_utf8_string above.
+sub _scalar_literal {
+    my ($value) = @_;
+    return _quote_utf8_string($value)
+        if !ref($value) && defined($value) && $value =~ /[^\x00-\x7F]/;
+    local $Data::Dumper::Terse    = 1;
+    local $Data::Dumper::Indent   = 0;
+    local $Data::Dumper::Sortkeys = 1;
+    local $Data::Dumper::Useqq    = 0;
+    my $dumped = Data::Dumper::Dumper($value);
+    $dumped =~ s/^\s+|\s+$//g;
+    return $dumped;
 }
 
 # A Perl literal for an option value. A Regexp is rendered as qr/.../, read
@@ -268,24 +331,30 @@ sub _literal {
         $flags =~ s/u//g if defined $flags;
         return "qr/$body/" . ($flags // '');
     }
-    # The qw() shorthand only for a list of genuinely bareword-safe values
-    # (D6-friendly enum members like Always/IfNotPresent): word characters,
-    # dots, colons, dashes and slashes, and never empty. An enum entry that
-    # is the empty string -- a real, if unusual, upstream value -- would
-    # otherwise vanish: 'qw( Always IfNotPresent)' from ('', 'Always',
-    # 'IfNotPresent') silently drops the '', and the emitted class would
-    # then reject a value the generated one accepts. Data::Dumper below
-    # renders '' (and anything else outside the safe set) correctly.
-    if (ref $value eq 'ARRAY' && @$value && !grep { ref $_ || $_ !~ /\A[\w.:\/-]+\z/ } @$value) {
-        return '[qw(' . join(' ', @$value) . ')]';
+    if (ref $value eq 'ARRAY' && @$value) {
+        # The qw() shorthand only for a list of genuinely bareword-safe
+        # values (D6-friendly enum members like Always/IfNotPresent): word
+        # characters, dots, colons, dashes and slashes -- ASCII only, never
+        # empty. An enum entry that is the empty string -- a real, if
+        # unusual, upstream value -- would otherwise vanish: 'qw( Always
+        # IfNotPresent)' from ('', 'Always', 'IfNotPresent') silently drops
+        # the '', and the emitted class would then reject a value the
+        # generated one accepts. A non-ASCII entry is excluded the same
+        # way even though Perl's \w matches a Unicode letter like 'µ' when
+        # the string carries the UTF8 flag (as one loaded from a CRD
+        # manifest does) -- qw() has no escape syntax at all, so a raw
+        # non-ASCII byte inside it would be exactly the bug this emitter
+        # exists to avoid.
+        my $qw_safe = !grep { ref $_ || !defined $_ || $_ !~ /\A[\w.:\/-]+\z/ || $_ =~ /[^\x00-\x7F]/ } @$value;
+        return '[qw(' . join(' ', @$value) . ')]' if $qw_safe;
+        # Not qw()-safe: render element by element rather than handing the
+        # whole arrayref to Data::Dumper, so a non-ASCII element can switch
+        # to the double-quoted \x{HEX} form on its own while its ASCII
+        # siblings keep Dumper's ordinary single-quoted style -- Dumper has
+        # no way to quote just one element of a list differently.
+        return '[' . join(',', map { _scalar_literal($_) } @$value) . ']';
     }
-    local $Data::Dumper::Terse    = 1;
-    local $Data::Dumper::Indent   = 0;
-    local $Data::Dumper::Sortkeys = 1;
-    local $Data::Dumper::Useqq    = 0;
-    my $dumped = Data::Dumper::Dumper($value);
-    $dumped =~ s/^\s+|\s+$//g;
-    return $dumped;
+    return _scalar_literal($value);
 }
 
 my @OPTION_ORDER = qw( required enum minimum maximum pattern default nullable preserve_unknown );
@@ -339,7 +408,7 @@ sub _pod_safe {
 
 sub _render_class {
     my ($self, $class) = @_;
-    my $info  = IO::K8s::Role::Resource::_k8s_attr_info($class);
+    my $info  = $class->_k8s_attr_info;
     my $attrs = $class->_k8s_attributes;
     my $is_top = $class->can('_is_resource') ? 1 : 0;
     my $package = $self->package_for($class);
@@ -400,6 +469,23 @@ sub _render_class {
     }
     else {
         $use = 'use IO::K8s::Resource;';
+    }
+
+    # Every value that could carry non-ASCII text -- a pattern, an enum
+    # member, a default -- is already rendered ASCII-only above (\x{HEX}
+    # escapes; see _escape_pattern_body / _quote_utf8_string). The one place
+    # non-ASCII text still reaches this file unescaped is a schema's
+    # free-form 'description', left verbatim in POD (the # ABSTRACT comment
+    # above, or an =attr block) by design -- descriptions are documentation,
+    # not data a client-side check runs against, so there is nothing to
+    # protect by mangling them. 'use utf8' and '=encoding UTF-8' are added
+    # together, only when that happens: the former is Perl's own rule for a
+    # literal non-ASCII byte anywhere in a file it compiles (POD included),
+    # the latter is what a POD viewer needs to decode that text correctly.
+    # An all-ASCII file -- the overwhelming majority -- carries neither.
+    if (grep { /[^\x00-\x7F]/ } ($header, $use, @lines, @pod)) {
+        $header .= "\nuse utf8;";
+        unshift @pod, "=encoding UTF-8\n\n=cut\n";
     }
 
     my $source = join "\n", $header, $use, '', @lines, '', @pod, '1;', '';

@@ -189,6 +189,68 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
     }
 };
 
+# k94 review (Important 2): a codepoint above ASCII interpolated raw into
+# 'qr/.../ ' or a quoted literal only round-trips through the emitted .pm
+# file under conditions this emitter does not control (the file saved as
+# UTF-8 bytes AND compiled under 'use utf8') -- \x{HEX} escapes make a
+# pattern/enum/default correct independent of that. A schema's free-form
+# 'description' is the one place non-ASCII text still lands in the file
+# unescaped (verbatim, in POD, by design), and it is the only thing that
+# should trigger 'use utf8' + '=encoding UTF-8' in the rendered source.
+# t/data/crd-utf8.yaml is loaded from a real file (through
+# IO::K8s::CRD->load's ':encoding(UTF-8)' read), not built as a Perl
+# literal in this test, so its strings carry the UTF8 flag the same way a
+# real CRD manifest's do -- the bug this guards against (Perl's \w matching
+# a Unicode letter like 'µ' only when that flag is set) would not
+# reproduce against an unflagged literal.
+subtest 'non-ASCII patterns, enum values and descriptions render UTF-8-safely' => sub {
+    my ($u_crd) = @{ IO::K8s::CRD->load("$FindBin::Bin/data/crd-utf8.yaml") };
+    my $u_classes = IO::K8s::CRD->generate($u_crd, 'IO::K8s::_AUTOGEN_utf8emit');
+    my $u_root = $u_classes->{'utf8.example.com/v1'};
+    my $u_emitter = IO::K8s::CRD::Emitter->new(base => 'TestUtf8::V1');
+    my $u_files = $u_emitter->render($u_root);
+
+    is_deeply([ sort keys %$u_files ], [
+        'TestUtf8/V1/Utf8Thing.pm',
+        'TestUtf8/V1/Utf8ThingSpec.pm',
+        'TestUtf8/V1/Utf8ThingSpecExtra.pm',
+    ], 'one file per class');
+
+    for my $path (sort keys %$u_files) {
+        ok(eval "$u_files->{$path}\n1;", "compiles: $path") or diag "$path:\n" . $u_files->{$path} . "\n$@";
+    }
+
+    my $spec_src = $u_files->{'TestUtf8/V1/Utf8ThingSpec.pm'};
+    like($spec_src, qr/^k8s interval\s+=> Str, \{ pattern => qr\/\^\[0-9\]\+\\x\{b5\}s\$\/ \};$/m,
+        'the µ in the pattern renders as \x{HEX}, not a raw byte');
+    like($spec_src, qr/^k8s mode\s+=> Str, \{ enum => \['safe',"\\x\{b5\}s"\] \};$/m,
+        'the µ-only enum member switches to a double-quoted \x{HEX} literal; its ASCII sibling keeps single quotes');
+    unlike($spec_src, qr/^use utf8;$/m, 'no description anywhere in this class -- the pattern/enum are already ASCII-safe -- so no use utf8');
+    unlike($spec_src, qr/^=encoding/m, '...and no =encoding either');
+
+    my $extra_src = $u_files->{'TestUtf8/V1/Utf8ThingSpecExtra.pm'};
+    like($extra_src, qr/^use utf8;$/m, "the ü in this class's field description triggers use utf8");
+    like($extra_src, qr/^our \$VERSION = '1\.108';\nuse utf8;$/m, 'use utf8 lands right after the VERSION line');
+    like($extra_src, qr/^=encoding UTF-8$/m, '...and =encoding UTF-8');
+    like($extra_src, qr/^=attr note\n\nNote with a \x{fc} character in its description\.\n/m,
+        'the description keeps its real ü character, verbatim, not escaped');
+
+    my $hand = IO::K8s->new; $hand->add({ Utf8Thing => '+TestUtf8::V1::Utf8Thing' });
+    my $gen  = IO::K8s->new; $gen->add({ Utf8Thing => "+$u_root" });
+    for my $value ("100\x{b5}s", '100ms', 'bogus') {
+        my $doc = { apiVersion => 'utf8.example.com/v1', kind => 'Utf8Thing', metadata => { name => 'u' }, spec => { interval => $value } };
+        my $hand_lived = eval { $hand->inflate($doc); 1 };
+        my $gen_lived  = eval { $gen->inflate($doc); 1 };
+        is(!!$hand_lived, !!$gen_lived, "interval matching '$value': emitted and generated classes agree");
+    }
+    for my $value ('safe', "\x{b5}s", 'bogus') {
+        my $doc = { apiVersion => 'utf8.example.com/v1', kind => 'Utf8Thing', metadata => { name => 'u' }, spec => { mode => $value } };
+        my $hand_lived = eval { $hand->inflate($doc); 1 };
+        my $gen_lived  = eval { $gen->inflate($doc); 1 };
+        is(!!$hand_lived, !!$gen_lived, "mode '$value': emitted and generated classes agree");
+    }
+};
+
 # k94/long names: cert-manager's CRDs inline a full PodTemplateSpec several
 # levels into a Challenge/ClusterIssuer 'spec', and the path-derived name
 # for the deepest levels ran past Perl's 251-character identifier limit

@@ -495,8 +495,16 @@ sub _schema_to_type_spec {
     # holds a plain IntOrString value like '10Gi' exactly as well as an
     # IntOrStr-typed one does. The swagger v2 `format: int-or-string`
     # convention below still works for a schema that keeps `type: string`.
+    #
+    # Unlike the nullable/preserve_unknown checks in _field_options (Minor 6
+    # of the k93 review, deliberately left unwrapped: a schema property is
+    # always a plain scalar or JSON boolean there), this call sits ahead of
+    # the type dispatch below rather than after it -- a malformed value here
+    # must not abort class generation outright, so it is wrapped in eval and
+    # treated as false, falling through to the ordinary `type`-based
+    # dispatch instead.
     return 'IntOrStr'
-        if IO::K8s::Resource::_normalize_bool($schema->{'x-kubernetes-int-or-string'});
+        if eval { IO::K8s::Resource::_normalize_bool($schema->{'x-kubernetes-int-or-string'}) };
 
     my $type = $schema->{type} // '';
 
@@ -975,7 +983,11 @@ Returns true if the class was auto-generated.
 
 =head2 clear_cache()
 
-Clear the generated class cache.
+Clear the generated class cache. Classes generated before the call keep
+working -- their packages already exist and nothing here touches them --
+but regenerating the same names into the same namespace afterward is
+unsupported: Moo cannot rebuild an existing package, and L</class_path> /
+L</class_root> forget what they knew about the classes this cleared.
 
 =head2 generated_classes()
 

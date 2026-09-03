@@ -154,7 +154,7 @@ subtest 'add_crd registers every served version and the storage short name' => s
     is($reg->{Knob}{storage}, 'opts.example.com/v1', 'storage version');
     my $v1  = $reg->{Knob}{'opts.example.com/v1'};
     my $v1a = $reg->{Knob}{'opts.example.com/v1alpha1'};
-    like($v1,  qr/^IO::K8s::_AUTOGEN_[0-9a-f]+::opts::example::com::v1::Knob$/, 'v1 class in the instance namespace');
+    like($v1,  qr/^IO::K8s::_AUTOGEN_[0-9a-f]+::_CRD::opts::example::com::v1::Knob$/, 'v1 class in the instance namespace, under the ::_CRD sub-namespace');
     like($v1a, qr/::v1alpha1::Knob$/, 'v1alpha1 class');
     is($k8s->expand_class('Knob'), $v1, 'short name -> storage version');
     is($k8s->expand_class('Knob', 'opts.example.com/v1alpha1'), $v1a, 'qualified lookup -> other version');
@@ -213,6 +213,84 @@ subtest 'two instances do not share generated classes' => sub {
     my $a = IO::K8s->new; my $b = IO::K8s->new;
     my $ra = $a->add_crd($fixture); my $rb = $b->add_crd($fixture);
     isnt($ra->{Knob}{'opts.example.com/v1'}, $rb->{Knob}{'opts.example.com/v1'}, 'different namespaces');
+};
+
+subtest 'a CRD class never aliases an openapi_spec class for the same GVK' => sub {
+    # Both IO::K8s::CRD->generate and the openapi_spec AutoGen path build a
+    # class name from nothing but the namespace + group/version/Kind (see
+    # IO::K8s::AutoGen::get_or_generate) -- never from the schema. Without
+    # the ::_CRD sub-namespace (see the generate() POD) the two would build
+    # the IDENTICAL class name for opts.example.com/v1/Knob, AutoGen's
+    # per-class-name cache would return whichever one ran first, and
+    # add_crd would report success while silently discarding the CRD's own
+    # schema.
+    my $swagger_def = {
+        type => 'object',
+        'x-kubernetes-group-version-kind' => [ { group => 'opts.example.com', version => 'v1', kind => 'Knob' } ],
+        properties => {
+            spec => { type => 'object', properties => { fromSpec => { type => 'string' } } },
+        },
+    };
+    my $k8s = IO::K8s->new(openapi_spec => { definitions => { 'opts.example.com.v1.Knob' => $swagger_def } });
+
+    # Force the openapi_spec-derived class to be generated FIRST, under
+    # this instance's bare _autogen_namespace.
+    my $swagger_class = $k8s->expand_class('Knob', 'opts.example.com/v1');
+    ok($swagger_class->_k8s_attr_info->{spec}, 'swagger class generated');
+
+    my $reg = $k8s->add_crd($fixture);
+    my $crd_class = $reg->{Knob}{'opts.example.com/v1'};
+    isnt($crd_class, $swagger_class, 'the CRD class is a distinct package from the swagger-derived one');
+
+    my $spec_attrs = $crd_class->_k8s_attr_info->{spec}{class}->_k8s_attr_info;
+    ok(exists $spec_attrs->{$_}, "CRD spec declares '$_'") for qw( mode replicas limit routes );
+    ok(!exists $spec_attrs->{fromSpec}, "CRD spec does not carry the swagger definition's 'fromSpec'");
+
+    my $knob = $k8s->new_object('Knob', metadata => { name => 'k', namespace => 'd' }, spec => { mode => 'fast' });
+    is(ref($knob), $crd_class, "new_object('Knob') resolves to the CRD's own class (D13: +Class registration wins over AutoGen)");
+};
+
+subtest 'served_versions does not autovivify a missing schema key' => sub {
+    my ($crd) = @{ IO::K8s::CRD->load($fixture) };
+    my %no_schema_key_crd = %$crd;
+    # v0 (index 2) carries no 'schema' key at all here, not merely an empty
+    # one -- a plain '$v->{schema}{openAPIV3Schema}' read would autovivify
+    # $v->{schema} into {} as a side effect of the read.
+    my @versions = map { +{ %$_ } } @{ $crd->{spec}{versions} };
+    delete $versions[2]{schema};
+    $versions[2]{served} = 1;   # so it is actually walked
+    $no_schema_key_crd{spec} = { %{ $crd->{spec} }, versions => \@versions };
+
+    ok(!exists $versions[2]{schema}, 'no schema key before the call');
+    my $served = IO::K8s::CRD->served_versions(\%no_schema_key_crd);
+    is_deeply(
+        (grep { $_->{name} eq 'v0' } @$served)[0]{schema},
+        { type => 'object' },
+        'the default schema is still returned for the missing-key version',
+    );
+    ok(!exists $versions[2]{schema}, 'the caller\'s version hashref did not gain a schema key as a side effect');
+};
+
+subtest 'add_crd merges version entries when two CRDs share a Kind across groups' => sub {
+    my ($crd) = @{ IO::K8s::CRD->load($fixture) };
+    my %other_group_crd = %$crd;
+    $other_group_crd{metadata} = { %{ $crd->{metadata} }, name => 'knobs.other.example.com' };
+    $other_group_crd{spec} = { %{ $crd->{spec} }, group => 'other.example.com' };
+
+    # One add_crd call, two CRDs sharing the bare Kind 'Knob' across
+    # different groups -- the case the old '$registered{$kind} = $classes'
+    # (plain overwrite) lost the first CRD's versions for.
+    my $k8s = IO::K8s->new;
+    my $reg = $k8s->add_crd($fixture, \%other_group_crd);
+
+    is_deeply(
+        [ sort grep { $_ ne 'storage' } keys %{ $reg->{Knob} } ],
+        [ sort qw( opts.example.com/v1 opts.example.com/v1alpha1 other.example.com/v1 other.example.com/v1alpha1 ) ],
+        'both CRDs\' served versions are present under the shared Kind',
+    );
+    is($reg->{Knob}{storage}, 'opts.example.com/v1', 'storage stays the FIRST registration\'s, mirroring add()\'s first-registration-wins');
+    is($k8s->expand_class('Knob'), $reg->{Knob}{'opts.example.com/v1'}, 'the bare Kind resolves to the first registration\'s storage class');
+    is($k8s->expand_class('other.example.com/v1/Knob'), $reg->{Knob}{'other.example.com/v1'}, 'the second group\'s version is still reachable, qualified');
 };
 
 done_testing;

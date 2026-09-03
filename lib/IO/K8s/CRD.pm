@@ -131,7 +131,11 @@ sub served_versions {
             name        => $v->{name},
             api_version => "$group/$v->{name}",
             storage     => _flag($v->{storage}, 'storage', $i),
-            schema      => $v->{schema}{openAPIV3Schema} // { type => 'object' },
+            # A plain '$v->{schema}{openAPIV3Schema}' would autovivify
+            # $v->{schema} into {} on a version that has none, silently
+            # mutating the caller's manifest hashref -- ref() first, so a
+            # missing/undef 'schema' is read without creating it.
+            schema      => (ref $v->{schema} eq 'HASH' ? $v->{schema}{openAPIV3Schema} : undef) // { type => 'object' },
         };
     }
     croak "IO::K8s::CRD: no served version in the CRD for $crd->{spec}{names}{kind}" unless @out;
@@ -150,15 +154,28 @@ fixtures) the last served version is used. Each class carries the CRD's
 C<kind>, C<names.plural> and scope, and every object with C<properties>
 below it is a nested class (see L<IO::K8s::AutoGen>).
 
-L<IO::K8s::AutoGen> caches by class name, and the class name is derived
-from C<$namespace> plus the group/version/Kind (see
-L<IO::K8s::AutoGen/get_or_generate>) -- not from the schema. Calling
-C<generate> a second time for the same group/version/Kind under the same
-C<$namespace> returns the class generated the first time, silently, even
-when the schema in C<$crd> has since changed. Iterating on an edited
-manifest needs a fresh C<$namespace> (in practice: a fresh L<IO::K8s>
-instance, since L<IO::K8s/add_crd> always passes its own
-C<_autogen_namespace>).
+Classes are generated under C<$namespace\::_CRD>, never C<$namespace>
+itself. L<IO::K8s::AutoGen> caches by class name, and the class name is
+derived from the namespace plus the group/version/Kind (see
+L<IO::K8s::AutoGen/get_or_generate>) -- not from the schema, and not
+differently for a CRD manifest than for an C<openapi_spec> definition of
+the same GVK. Under a shared namespace the two paths would therefore build
+the identical class name for the identical GVK and alias in AutoGen's
+cache: whichever ran first would win the slot, and the CRD's own
+schema-derived class would silently be discarded (or would silently
+clobber the C<openapi_spec> one) while C<< $k8s->add_crd >> still reported
+success. The C<::_CRD> sub-namespace rules that out.
+
+Calling C<generate> a second time for the same group/version/Kind under
+the same C<$namespace> returns the class generated the first time,
+silently, even when the schema in C<$crd> has since changed -- the
+sub-namespace does not change that, it only stops the CRD path from
+colliding with a different one. Iterating on an edited manifest needs a
+fresh C<$namespace> (in practice: a fresh L<IO::K8s> instance, since
+L<IO::K8s/add_crd> always passes its own C<_autogen_namespace>). Generated
+classes live for the life of the process regardless -- see
+L<IO::K8s/add_crd>'s POD for what that costs a long-running caller that
+reloads manifests in a loop.
 
 =cut
 
@@ -169,6 +186,11 @@ sub generate {
     my $kind  = $spec->{names}{kind};
     my $namespaced = ($spec->{scope} // 'Namespaced') eq 'Namespaced' ? 1 : 0;
 
+    # See the POD above: a sub-namespace of our own so a CRD-derived class
+    # can never alias with one AutoGen would build straight from an
+    # openapi_spec definition of the same GVK under the caller's namespace.
+    my $crd_namespace = "$namespace\::_CRD";
+
     my %out;
     my $fallback;
     for my $v (@{ $class->served_versions($crd) }) {
@@ -178,7 +200,7 @@ sub generate {
             'x-kubernetes-group-version-kind' => [ { group => $group, version => $v->{name}, kind => $kind } ],
         };
         $out{ $v->{api_version} } = IO::K8s::AutoGen::get_or_generate(
-            $def_name, $schema, {}, $namespace,
+            $def_name, $schema, {}, $crd_namespace,
             api_version     => $v->{api_version},
             kind            => $kind,
             resource_plural => $spec->{names}{plural},

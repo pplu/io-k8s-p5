@@ -236,22 +236,25 @@ sub _is_type_tiny {
     return blessed($obj) && $obj->isa('Type::Tiny');
 }
 
-# Sanitize JSON field names into valid Perl identifiers for Moo attributes
-# $ref -> _ref, $schema -> _schema, x-kubernetes-foo -> x_kubernetes_foo,
-# x.y/z -> x_y_z. '.' and '/' matter beyond cosmetics: `has` is always
-# called with an `isa` type constraint here (see _k8s below), which routes
-# through Sub::Quote's inlined accessor generation, and that dies naming
-# the attribute as an invalid sub name for either character -- the same
-# failure IO::K8s::AutoGen::_class_segments exists to avoid for package
-# segments, just one call site over (the attribute name here, not a class
-# name). A CRD schema is free to use either character in a property key;
-# the original is preserved on the wire via the caller's existing
-# json_key/init_arg mapping below whenever this changes the name.
+# Sanitize JSON field names into valid Perl identifiers for Moo attributes:
+# every character outside [A-Za-z0-9_] becomes '_' -- $ref -> _ref,
+# $schema -> _schema, x-kubernetes-foo -> x_kubernetes_foo, x.y/z -> x_y_z,
+# and the same for any other character a schema's property key happens to
+# carry, not only the '-', '.' and '/' realistic CRD schemas mostly produce.
+# This matters beyond cosmetics: `has` is always called with an `isa` type
+# constraint here (see _k8s below), which routes through Sub::Quote's
+# inlined accessor generation, and that dies naming the attribute as an
+# invalid sub name for any of these characters -- the same failure
+# IO::K8s::AutoGen::_class_segments exists to avoid for package segments,
+# just one call site over (the attribute name here, not a class name; the
+# two use the same blanket rule). A CRD schema is free to use any of these
+# characters in a property key; the original is preserved on the wire via
+# the caller's existing json_key/init_arg mapping below whenever this
+# changes the name.
 sub _sanitize_attr_name {
     my ($name) = @_;
     return $name unless $name =~ /[^a-zA-Z0-9_]/;
-    (my $safe = $name) =~ s/^\$/_/;
-    $safe =~ s{[-./]}{_}g;
+    (my $safe = $name) =~ s/[^A-Za-z0-9_]/_/g;
     return $safe;
 }
 

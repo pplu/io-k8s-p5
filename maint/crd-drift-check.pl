@@ -141,9 +141,13 @@ Options:
   --output PATH       Also write the report to this file
   --suggest           After the report, print the class source the emitter
                        renders for every OPAQUE SPEC and MISSING FIELD Kind
-                       (never touches lib/).
+                       (never touches lib/). With --format json this goes to
+                       stderr instead of stdout, so stdout stays a single
+                       parseable JSON document.
   --suggest-dir PATH  Write those files under PATH instead of printing
                        (PATH must not be inside the distribution's lib/).
+                       The "wrote N file(s)" confirmation follows the same
+                       stdout/stderr rule as --suggest above.
   --names FILE        YAML map of generated-class path (relative to the
                        Kind, e.g. "Middleware::Spec::RateLimit") to the
                        package name to use (e.g. "RateLimit") -- the
@@ -231,21 +235,48 @@ sub qualify_class {
 sub http_get {
     my ($url) = @_;
     require HTTP::Tiny;
+    require Encode;
     my $ua  = HTTP::Tiny->new(agent => $UA_STRING, timeout => 90);
     my $res = $ua->get($url);
     die sprintf("crd-drift-check: GET %s failed: %s %s\n",
         $url, $res->{status} // '?', $res->{reason} // '?')
         unless $res->{success};
-    return $res->{content};
+    # HTTP::Tiny hands back raw response bytes, not a decoded character
+    # string. Decoding once here -- before the caller both caches it (via
+    # the '>:encoding(UTF-8)' write in load_manifests) and parses it --
+    # means those bytes are only ever UTF-8-encoded once: writing an
+    # UNdecoded byte string through an ':encoding(UTF-8)' filehandle
+    # re-encodes each byte as if it were a Latin-1 codepoint, doubling the
+    # encoding for any non-ASCII character (a manifest's 'µs' pattern, say)
+    # and corrupting it on disk (k94 review).
+    return Encode::decode('UTF-8', $res->{content});
 }
 
 sub _slurp {
     my ($path) = @_;
-    open my $fh, '<:encoding(UTF-8)', $path
+    open my $fh, '<:raw', $path
         or die "crd-drift-check: cannot read $path: $!\n";
     local $/;
-    my $content = <$fh>;
+    my $bytes = <$fh>;
     close $fh;
+    require Encode;
+    my $content = Encode::decode('UTF-8', $bytes);
+
+    # A cache file written before the http_get fix above holds bytes that
+    # were UTF-8-encoded twice: e.g. 'µ' (correctly, bytes C2 B5) written
+    # through ':encoding(UTF-8)' without ever having been decoded first
+    # becomes, on disk, the UTF-8 encoding of the two CHARACTERS U+00C2 and
+    # U+00B5 -- always C3 82 C2 B5 for ANY originally-2-byte UTF-8
+    # character, since every codepoint a UTF-8 lead byte can produce
+    # (U+00C2-U+00DF) maps to that same C3 lead byte once misread as
+    # Latin-1 and re-encoded. That "\xC3" immediately followed by a
+    # continuation byte (\x80-\xBF) in the RAW bytes is therefore a
+    # reliable, character-independent double-encoding signature -- decode
+    # the raw bytes as UTF-8 a second time to undo it. A freshly (correctly)
+    # cached file never matches, so this is a no-op there.
+    if ($bytes =~ /\xC3[\x80-\xBF]/) {
+        $content = Encode::decode('UTF-8', Encode::encode('iso-8859-1', $content));
+    }
     return $content;
 }
 
@@ -690,6 +721,12 @@ sub suggest_for {
 sub emit_suggestions {
     my ($opt, $files) = @_;
     return unless %$files;
+    # --format json keeps stdout a parseable JSON document (see main below,
+    # which prints the report there); everything --suggest would otherwise
+    # print -- the rendered source, or the "wrote N files" confirmation --
+    # goes to stderr instead when that format is active, and to stdout the
+    # same as ever otherwise. See usage().
+    my $out = $opt->{format} eq 'json' ? \*STDERR : \*STDOUT;
     if ($opt->{suggest_dir}) {
         require File::Path;
         require File::Basename;
@@ -700,11 +737,11 @@ sub emit_suggestions {
             print $fh $files->{$rel};
             close $fh;
         }
-        print "\n--- suggest: wrote " . scalar(keys %$files) . " file(s) under $opt->{suggest_dir}\n";
+        print $out "\n--- suggest: wrote " . scalar(keys %$files) . " file(s) under $opt->{suggest_dir}\n";
         return;
     }
     for my $rel (sort keys %$files) {
-        print "\n#### $rel\n", $files->{$rel};
+        print $out "\n#### $rel\n", $files->{$rel};
     }
 }
 

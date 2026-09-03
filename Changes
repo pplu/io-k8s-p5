@@ -10,20 +10,56 @@ Revision history for IO-K8s
     strict and the unknown-field bag reach every level. Hash-style access
     on such a field keeps working (a Moo object is a blessed hash);
     property-less objects and additionalProperties-only maps stay opaque.
+    A direct Class->new(spec => { ... }) on such a generated class now
+    fails its type constraint (a plain hashref no longer satisfies an
+    object-typed field); inflate/new_object/FROM_HASH still coerce a
+    hashref into the right nested class as before. This applies to any
+    AutoGen class with a typed nested object, including one built from a
+    live cluster's /openapi/v2, not only to a class IO::K8s::CRD generated
+    from a CRD manifest. IO::K8s::AutoGen::class_description / class_path
+    / class_root are new public functions (used by IO::K8s::CRD::Emitter
+    below). IO::K8s::Resource::_sanitize_attr_name now maps every
+    character outside [A-Za-z0-9_] to '_', not only '-', '.' and '/': a
+    property key with any other odd character becomes an attribute
+    instead of dying at class load.
 
   - New IO::K8s::CRD and IO::K8s->add_crd (D10, k94): load a
     CustomResourceDefinition (object, hashref, YAML/JSON text, path, or a
     list of those), generate one class per served version, register every
     version under its domain-qualified key and the storage version under
     the bare Kind -- through add(), so a provider merged earlier keeps the
-    short name.
+    short name. Generated classes live under a "::_CRD" sub-namespace of
+    the instance's own AutoGen namespace, never the bare namespace itself:
+    without it, a CRD manifest and an openapi_spec definition for the same
+    GVK would build the identical class name and alias in AutoGen's
+    per-class-name cache, silently discarding whichever generated second
+    while add_crd still reported success. Two CRDs that share a bare Kind
+    across groups now merge under that Kind in add_crd's return value
+    (every version from both present, storage kept from the FIRST
+    registration) instead of the second overwriting the first outright.
 
   - New IO::K8s::CRD::Emitter renders generated classes as house-style
     source files from the attribute registry (fields, options, required,
     descriptions as =attr POD, a name map for upstream Go type names).
     maint/crd-drift-check.pl --suggest prints those files for every
     OPAQUE SPEC / MISSING FIELD Kind; --suggest-dir writes them, and
-    refuses a directory inside lib/.
+    refuses a directory inside lib/. A pattern, enum member or default
+    carrying a character above ASCII (Traefik's "^[0-9]+\xB5s$", say)
+    renders as a \x{HEX}-escaped, ASCII-only Perl literal rather than the
+    raw character, which used to interpolate straight into the file and
+    silently reject a value the generated class accepted; a schema
+    description carrying such a character stays verbatim in POD, and the
+    file gains "use utf8;" plus "=encoding UTF-8" only when it needs to.
+
+  - maint/crd-drift-check.pl decodes a fetched manifest as UTF-8 once,
+    before caching it, instead of writing the raw response bytes through
+    an ':encoding(UTF-8)' filehandle -- doing that to undecoded bytes
+    double-encoded every non-ASCII character on disk (Traefik's "µs"
+    became four garbled bytes in the cache). A cache file written before
+    this fix is detected and corrected on read rather than needing to be
+    deleted. --suggest's rendered source (and --suggest-dir's "wrote N
+    file(s)" confirmation) now goes to stderr instead of stdout when
+    --format json is active, so stdout stays one parseable JSON document.
 
   - IO::K8s::AutoGen caps a path-derived nested class name at 200
     characters instead of risking "Identifier too long": cert-manager's
@@ -39,7 +75,8 @@ Revision history for IO-K8s
     rather than from its own (possibly hashed) name, so the emitted
     source usually keeps the readable package name even where AutoGen's
     own namespace-qualified one had to be hashed; only when the emitted
-    name would itself exceed 200 characters does it fall back the same
+    name would itself exceed 200 characters, or a long "base" would push
+    the full joined package name past 255, does it fall back the same
     way, and a names entry still overrides either.
 
   - IO::K8s::AutoGen checks x-kubernetes-int-or-string before the type
@@ -47,7 +84,9 @@ Revision history for IO-K8s
     this way and carries no type of its own -- the structural-schema
     convention -- previously fell through to Str; found while building
     IO::K8s::CRD::Emitter, whose registry-type assertion is stricter than
-    a Str field's own round-trip.
+    a Str field's own round-trip. A malformed value there is treated as
+    false (falls through to the ordinary type-based dispatch) rather than
+    aborting class generation.
 
   - The k8s DSL takes per-field options (D3 of the CRD design, k93):
     k8s replicas => Int, { minimum => 0, maximum => 10, default => 1 },
