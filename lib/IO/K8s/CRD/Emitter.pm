@@ -9,6 +9,7 @@ use Digest::SHA qw( sha1_hex );
 use re ();
 use Types::Standard qw( Str HashRef );
 use IO::K8s::AutoGen ();
+use IO::K8s::Resource ();
 use IO::K8s::Role::Resource ();
 
 =head1 SYNOPSIS
@@ -48,7 +49,21 @@ Hashref from a generated class name to the bare package name it should get
 under L</base>: C<< { 'IO::K8s::_AUTOGEN_x::...::Middleware::Spec::RateLimit' => 'RateLimit' } >>.
 Classes not listed get their path joined: C<Middleware::Spec::RateLimit>
 becomes C<MiddlewareSpecRateLimit>. This is where the upstream Go type
-names (D6) come in.
+names (D6) come in. Checked before L</overlay>'s own C<names> map.
+
+=attr overlay
+
+The per-Kind slice of a provider's C<maint/crd-render/E<lt>ProviderE<gt>.yaml>
+(the render-side counterpart of L</names>): a hashref with C<with> (arrayref
+of role class names composed on one C<with> line), C<extra> (arrayref of
+verbatim source lines rendered right after the C<with> line) and C<names>
+(a map from the LOGICAL class path below the Kind -- what
+L<IO::K8s::AutoGen/class_path> returns, e.g. C<Spec>, C<Spec::RateLimit> --
+to the bare Go type name), applied while rendering the root Kind passed to
+L</render>. C<with> defaults to C<['IO::K8s::Role::Namespaced']> when the
+root class composes that role and C<[]> otherwise, when not given. This
+attribute holds one Kind's overlay, not the whole provider file -- slicing
+C<< $provider_overlay->{kinds}{$kind} >> out of the YAML is the caller's job.
 
 =attr version
 
@@ -58,24 +73,33 @@ The C<$VERSION> line to write. Defaults to this distribution's.
 
 has base    => (is => 'ro', isa => Str, required => 1);
 has names   => (is => 'ro', isa => HashRef, default => sub { {} });
+has overlay => (is => 'ro', isa => HashRef, default => sub { {} });
 has version => (is => 'ro', isa => Str, default => sub { $VERSION });
 
-# Reverse of IO::K8s::Resource's class-prefix map: a stock class is written
-# the short way the hand-written classes use ('Core::V1::PodTemplateSpec').
-my @SHORT_PREFIXES = (
-    [ 'IO::K8s::Apimachinery::Pkg::Apis::Meta'                          => 'Meta' ],
-    [ 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions'       => 'Apiextensions' ],
-    [ 'IO::K8s::KubeAggregator::Pkg::Apis::Apiregistration'             => 'KubeAggregator' ],
-    [ 'IO::K8s::Api'                                                    => '' ],
-);
+# The reverse of IO::K8s::Resource's class-prefix map (full namespace ->
+# short prefix), longest full namespace first so a more specific prefix
+# ('IO::K8s::Api::Core') is tried before a shorter one that would also
+# match as a '::'-bounded prefix. Built once per emitter instance -- the
+# map itself never changes mid-render.
+has _prefix_pairs => (is => 'lazy', init_arg => undef);
+
+sub _build__prefix_pairs {
+    my $prefixes = IO::K8s::Resource::class_prefixes();
+    return [
+        sort { length($b->[1]) <=> length($a->[1]) }
+        map  { [ $_, $prefixes->{$_} ] } keys %$prefixes
+    ];
+}
 
 =method package_for
 
     my $package = $emitter->package_for($generated_class);
 
-The package a generated class is rendered as: L</names> when listed,
-otherwise L</base> plus the class's path segments below its Kind joined
-together (the Kind itself for the root).
+The package a generated class is rendered as: L</names> when listed there
+by the generated class's own (possibly hash-shortened) Perl name, else
+L</overlay>'s C<names> when listed there by logical path, otherwise
+L</base> plus the class's path segments below its Kind joined together
+(the Kind itself for the root).
 
 A class deep enough that L<IO::K8s::AutoGen> had to shorten its own
 namespace-qualified Perl name (past its 251-character identifier limit --
@@ -84,12 +108,13 @@ see C<$MAX_CLASS_NAME> there) is rendered from C<< IO::K8s::AutoGen::class_path
 class's own (possibly hashed) name -- this emitter's own C<base> is
 normally much shorter than the AutoGen namespace prefix that forced the
 shortening, so the joined package name here often fits fine even when
-AutoGen's did not. Only when the joined name would itself run past
+AutoGen's did not. That same logical path is what L</overlay>'s C<names>
+map is keyed by. Only when the joined name would itself run past
 C<$MAX_PACKAGE_SUFFIX> characters, or C<base> is itself long enough that
 the full package name would, does the emitted package fall back to
 C<< <Kind>_<10 hex chars> >>, the hex digits a C<sha1_hex> of the field
-path; give such a class a proper name via L</names> instead of relying on
-that fallback.
+path; give such a class a proper name via L</names> or L</overlay> instead
+of relying on that fallback.
 
 =cut
 
@@ -115,6 +140,14 @@ sub package_for {
     my $path = IO::K8s::AutoGen::class_path($class);
     unless (defined $path) {
         ($path = $class) =~ s/^\Q$root\E(?:::)?//;
+    }
+
+    # overlay.names is keyed by that same logical path, not by $class --
+    # unlike L</names>, an overlay is written once per Kind against the
+    # upstream Go types and has no way to know what (possibly shortened)
+    # Perl name AutoGen happened to give a class this run.
+    if (length $path and my $overlay_names = $self->overlay->{names}) {
+        return $self->base . '::' . $overlay_names->{$path} if $overlay_names->{$path};
     }
 
     my $joined = join '', $kind, split /::/, $path;
@@ -174,12 +207,24 @@ sub _is_generated {
 sub _class_ref {
     my ($self, $class) = @_;
     return "'+" . $self->package_for($class) . "'" if $self->_is_generated($class);
-    for my $pair (@SHORT_PREFIXES) {
-        my ($full, $short) = @$pair;
+
+    # IO::K8s::Resource::class_prefixes(), longest full namespace first --
+    # see _build__prefix_pairs.
+    for my $pair (@{ $self->_prefix_pairs }) {
+        my ($short, $full) = @$pair;
         next unless index($class, "$full\::") == 0;
-        my $rest = substr($class, length($full) + 2);
-        return "'" . ($short ? "$short\::$rest" : $rest) . "'";
+        return "'$short\::" . substr($class, length($full) + 2) . "'";
     }
+
+    # class_prefixes() only carries the groups with their own entry
+    # (Core, Apps, Meta, ...); a shipped IO::K8s::Api::<X> subgroup with no
+    # entry of its own (e.g. Apiserverinternal) still renders the short way
+    # a hand-written class under it would, by dropping just the common
+    # IO::K8s::Api:: prefix -- the same fallback the old @SHORT_PREFIXES
+    # catch-all gave it.
+    return "'" . substr($class, length('IO::K8s::Api::')) . "'"
+        if index($class, 'IO::K8s::Api::') == 0;
+
     return "'+$class'";
 }
 
@@ -464,7 +509,17 @@ sub _render_class {
                 "    resource_plural => '$plural';",
               )
             : ("use IO::K8s::APIObject api_version => '" . $class->api_version . "';");
-        push @use_lines, "with 'IO::K8s::Role::Namespaced';" if $class->does('IO::K8s::Role::Namespaced');
+
+        # overlay: with/extra, for the root Kind only. 'with' defaults to
+        # Namespaced when the class composes it and to no roles otherwise
+        # -- an overlay entry (including an explicit empty list) always
+        # wins over that default.
+        my $with = $self->overlay->{with};
+        $with = [ $class->does('IO::K8s::Role::Namespaced') ? 'IO::K8s::Role::Namespaced' : () ]
+            unless defined $with;
+        push @use_lines, "with " . join(', ', map { "'$_'" } @$with) . ';' if @$with;
+        push @use_lines, @{ $self->overlay->{extra} // [] };
+
         $use = join "\n", @use_lines;
     }
     else {

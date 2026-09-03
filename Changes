@@ -672,6 +672,23 @@ Revision history for IO-K8s
     metadata counts as part of the shape for an embedded type but not for
     a top-level Kind.
 
+  - The bundled CRD providers (Cilium, Traefik, CertManager, GatewayAPI,
+    K3s, AgentSandbox, and the reserved PrometheusOperator, VolumeSnapshot,
+    ExternalSecrets) join IO::K8s::Resource's class-prefix map, so a
+    provider class is written the short way a core class is
+    ('Traefik::V1alpha1::MiddlewareSpec' like 'Core::V1::PodSpec') instead
+    of always spelling out '+IO::K8s::Traefik::V1alpha1::MiddlewareSpec';
+    the new IO::K8s::Resource::class_prefixes() exposes the map read-only.
+    IO::K8s::CRD::Emitter renders those short references (longest matching
+    namespace first) and gains an overlay attribute -- the per-Kind slice
+    of a provider's forthcoming maint/crd-render/<Provider>.yaml -- that
+    supplies the root class's with roles (one with line, defaulting to
+    Namespaced when the Kind is one and to no roles otherwise), verbatim
+    extra source lines right after it, and a names map from a nested
+    class's logical path (IO::K8s::AutoGen::class_path) to its bare
+    (upstream Go) package name, checked after the existing class-name-keyed
+    names map.
+
 1.107     2026-08-15 15:37:52Z
 
   - Resolve resource_map short-name keys on the explicit-apiVersion path

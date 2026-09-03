@@ -52,6 +52,21 @@ my %_class_prefix = (
     'Meta'           => 'IO::K8s::Apimachinery::Pkg::Apis::Meta',
     'Apiextensions'  => 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions',
     'KubeAggregator' => 'IO::K8s::KubeAggregator::Pkg::Apis::Apiregistration',
+    # Bundled CRD providers (step 4, k95/D6): a provider class is written
+    # the same short way a core class is ('Traefik::V1alpha1::Middleware'
+    # like 'Core::V1::Pod'), not '+IO::K8s::Traefik::V1alpha1::Middleware'.
+    # PrometheusOperator, VolumeSnapshot and ExternalSecrets have no shipped
+    # classes yet -- the prefixes are reserved ahead of their provider tasks
+    # so the emitter can start rendering short names for them immediately.
+    'Cilium'             => 'IO::K8s::Cilium',
+    'Traefik'            => 'IO::K8s::Traefik',
+    'CertManager'        => 'IO::K8s::CertManager',
+    'GatewayAPI'         => 'IO::K8s::GatewayAPI',
+    'K3s'                => 'IO::K8s::K3s',
+    'AgentSandbox'       => 'IO::K8s::AgentSandbox',
+    'PrometheusOperator' => 'IO::K8s::PrometheusOperator',
+    'VolumeSnapshot'     => 'IO::K8s::VolumeSnapshot',
+    'ExternalSecrets'    => 'IO::K8s::ExternalSecrets',
 );
 
 # Type flag lookup table
@@ -230,6 +245,15 @@ sub _expand_class {
     # Default: assume it's under IO::K8s::Api
     return "IO::K8s::Api::$short";
 }
+
+# A read-only view of %_class_prefix (short prefix -> full namespace),
+# keyed the same as the map _expand_class walks above. This started as a
+# lexical 'my' with a single reader inside this file; IO::K8s::CRD::Emitter
+# is the first outside consumer, building the REVERSE map (full namespace
+# -> short prefix) from it so a rendered class reference uses the short
+# form a hand-written class would ('Traefik::V1alpha1::Middleware',
+# 'Core::V1::PodTemplateSpec') instead of always spelling out '+Full::Name'.
+sub class_prefixes { \%_class_prefix }
 
 sub _is_type_tiny {
     my ($obj) = @_;
