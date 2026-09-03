@@ -2,6 +2,46 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - AgentSandbox v1beta1 modeled to full depth (D5, k95): 28 classes across
+    the 4 served Kinds (Sandbox, SandboxClaim, SandboxTemplate,
+    SandboxWarmPool), named after the upstream kubernetes-sigs/agent-sandbox
+    v1.0.0 Go types (api/v1beta1/sandbox_types.go, extensions/api/v1beta1/
+    *.go), checked in under IO::K8s::AgentSandbox::V1beta1::*. A Go type
+    shared across Kinds via agent-sandbox's inlined SandboxBlueprint
+    (PodTemplate, PodMetadata, PersistentVolumeClaimTemplate,
+    EmbeddedObjectMetadata) is one class, not a copy per Kind; conditions
+    reuse Meta::V1::Condition (reuse_core). podTemplate.spec is a literal
+    corev1.PodSpec field, but the CRD schema is one field short of what
+    Core::V1::PodSpec ships (evictionResponders, added upstream after
+    agent-sandbox's vendored client-go snapshot), so reuse_core correctly
+    declines it and its own single-key sub-structs (os, readinessGates,
+    schedulingGates, schedulingGroup, imagePullSecrets items) stay nested
+    classes -- all named after their real corev1 Go types (PodSpec, PodOS,
+    PodReadinessGate, PodSchedulingGate, PodSchedulingGroup,
+    LocalObjectReference) regardless, matching how GatewayAPI/CertManager
+    already name their own single-key LocalObjectReference occurrences.
+    SandboxClaim.status.sandbox is a genuine Go-name collision (its type is
+    also spelled SandboxStatus, in a different upstream Go package than the
+    Sandbox Kind's own SandboxStatus) resolved by keeping the emitter's own
+    Kind-prefixed default name instead of the bare Go name. This also fixes
+    two fields the earlier opaque model guessed wrong: SandboxClaim's env
+    is upstream's array of {name, value, containerName} EnvVar structs, not
+    a bare string map, and SandboxTemplate/SandboxClaim/Sandbox's
+    volumeClaimTemplates items are agent-sandbox's trimmed
+    PersistentVolumeClaimTemplate (metadata + Core::V1::
+    PersistentVolumeClaimSpec), not a full Core::V1::PersistentVolumeClaim.
+    v1alpha1 has no manifest left at v1.0.0 (upstream ships no api/v1alpha1
+    directory at this tag) so it stays hand-checked-in as-is, unmodeled
+    below the top level, excused from `crd-drift-check.pl --check` via four
+    new ignore_unrendered entries (D7 back-compat, k88). t/67_strict.t's
+    "inline-struct coercer path is covered" and t/68_specbuilder_objects.t's
+    "k90: spec_set on a modeled spec" subtests, which used AgentSandbox's
+    v1beta1 Sandbox as their opaque-inline-struct fixture, were updated:
+    the former now targets the v1alpha1 track (the distribution's one
+    remaining inline-struct example) with a v1beta1-only field as the
+    "unknown" one, the latter merges a valid operatingMode enum value now
+    that the full-depth field actually constrains it.
+
   - Gateway API modeled to full depth (D5/D7, k95): 143 classes across 14
     served GVKs (10 Kinds at gateway.networking.k8s.io/v1 -- the storage
     version of every Kind but ReferenceGrant -- plus, per D7's "every

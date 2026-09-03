@@ -76,12 +76,26 @@ names covering 4 CRD kinds:
 
 =back
 
+The C<v1beta1> track (D5/D6) is modeled to full depth: C<spec> and, where upstream
+declares one, C<status> are typed field-by-field, nested classes carry their upstream
+Go type names, and embedded core types (C<Core::V1::PersistentVolumeClaimSpec>,
+C<Meta::V1::Condition>, C<Networking::V1::NetworkPolicyIngressRule>/
+C<EgressRule>, ...) are referenced rather than re-modeled. 28 classes across the 4
+Kinds: 24 further C<IO::K8s::AgentSandbox::V1beta1::*> classes below the 4 Kind roots,
+one per upstream Go structure. A Go type shared across Kinds (C<PodTemplate>,
+C<PodMetadata>, C<PersistentVolumeClaimTemplate>, C<EmbeddedObjectMetadata> --
+C<Sandbox> and C<SandboxTemplate> both embed agent-sandbox's C<SandboxBlueprint>
+inline) is one shared class, not a copy per Kind.
+
 Each kind ships two API versions on disk — C<v1alpha1> (served through the v0.5.x
-line and B<removed upstream at v1.0.0>) and C<v1beta1> (the current, and now only,
-upstream-served version). The C<v1alpha1> classes are B<kept here as back-compat> for
-clusters still on agent-sandbox v0.5.x. The short-name C<resource_map> below resolves
-to the C<v1beta1> class for each kind; the C<v1alpha1> classes remain available for
-direct use by their full class name (C<IO::K8s::AgentSandbox::V1alpha1::*>) or via
+line and B<removed upstream at v1.0.0>: agent-sandbox's v1.0.0 tag ships no
+C<api/v1alpha1> directory at all, so there is no manifest left to render it from) and
+C<v1beta1> (the current, and now only, upstream-served version). The C<v1alpha1>
+classes are B<kept here as back-compat> for clusters still on agent-sandbox v0.5.x,
+unmodeled below the top level (D7) and excused from C<maint/crd-drift-check.pl --check>
+via C<ignore_unrendered>. The short-name C<resource_map> below resolves to the
+C<v1beta1> class for each kind; the C<v1alpha1> classes remain available for direct use
+by their full class name (C<IO::K8s::AgentSandbox::V1alpha1::*>) or via
 domain-qualified lookup (e.g. C<agents.x-k8s.io/v1alpha1/Sandbox>).
 
 AgentSandbox manages isolated, stateful, singleton workloads for AI agent runtimes.
