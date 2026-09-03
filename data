@@ -1,0 +1,31 @@
+---
+class: standard
+completed: 2026-09-03T11:28:55Z
+created: 2026-09-03T01:26:00Z
+id: 94
+priority: high
+started: 2026-09-03T11:28:55Z
+status: done
+tags:
+- crd
+- autogen
+- maint
+title: 'CRD step 3: IO::K8s::CRD -- add_crd from a CRD manifest, class-source emitter
+  API, crd-drift-check --suggest (D10)'
+updated: 2026-09-03T11:29:00Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D10). Plan: to be written once step 2 has landed.
+
+- $k8s->add_crd($crd | $hashref | $yaml_or_json_text | $path): one class per served version in the instance AutoGen namespace (openAPIV3Schema -> k8s DSL, extending the AutoGen mapping), domain-qualified keys for every version, short name on the storage version.
+- IO::K8s::CRD::Emitter (name to be settled in the plan): the same class set as Perl source files -- DSL block + POD skeleton -- for users who check classes in and for our own step-4 work. Nested Go type names are supplied by a caller-provided name map (D6).
+- maint/crd-drift-check.pl --suggest prints those blocks for every reported gap; never writes lib/.
+Depends on: k93. Unblocks: k95 (providers to full depth), k97 (Kubernetes::REST), k98 (new providers).
+
+Correction of the dependency line: unblocks k95 (providers to full depth), kubernetes-rest 24 (Kubernetes::REST step 6) and, via k95, k97 (new providers).
+
+From step 2 (2026-09-03): IO::K8s::AutoGen maps an inline nested 'type: object' with 'properties' to an opaque { Str => 1 } hash by design -- only $ref'd definitions become classes (t/04, t/57 depend on it). CRD openAPIV3Schema inlines everything, so add_crd must generate a class (inline struct or named nested class per D6) for every nested object with properties, otherwise the D3 field options below the top level never apply. Also: a schema default of JSON true/false on a boolean must be normalized (AutoGen does so via _normalize_bool since e5017837).
+
+Step-3 Task 2 review: re-running add_crd for the same group/version/Kind on one IO::K8s instance returns the cached AutoGen class even if the manifest changed (class cache is by name). Documented in IO::K8s::CRD/add_crd POD; a fresh instance regenerates. Step 6's ensure_crd should decide whether to bust the cache (e.g. a per-call namespace suffix + map override) -- noted on kubernetes-rest 24.
+
+Merged to master as d6b321f6..dba6a754 (fast-forward, 2026-09-03): nested classes everywhere AutoGen runs, IO::K8s::CRD + add_crd (CRD sub-namespace), IO::K8s::CRD::Emitter (UTF-8-safe, name map, 200-char cap), crd-drift-check --suggest/--suggest-dir/--names (symlink-aware lib/ guard). 1452 emitted files across four providers compile. Step 4 plan: docs/superpowers/plans/2026-09-03-crd-step4-providers-full-depth.md.
