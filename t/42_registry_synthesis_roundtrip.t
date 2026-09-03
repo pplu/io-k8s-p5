@@ -197,12 +197,14 @@ sub union_bare_value {
 # shipped D3 field has turned out to need: HTTP-status-code-shaped
 # (100/404/500/8080), DNS-label-shaped (a/b), Go-duration-shaped (1h),
 # IPv4/IPv6-address-shaped (10.0.0.1, Cilium's peerAddress/ip fields, k95),
-# CIDR-shaped (10.0.0.0/24, Cilium's destinationCIDRs/excludedCIDRs), and
-# BGP-community-triple-shaped (65000:1:1, Cilium's BGPCommunities.large).
-# Every call site below greps this same pool for the first entry that
-# satisfies the field's own pattern rather than assuming one fixed shape --
-# a value the field's own constraint rejects isn't a valid instance of it.
-my @PATTERN_CANDIDATES = ('100', '404', '500', '8080', 'a', 'b', '1h', '10.0.0.1', '10.0.0.0/24', '65000:1:1');
+# CIDR-shaped (10.0.0.0/24, Cilium's destinationCIDRs/excludedCIDRs),
+# BGP-community-triple-shaped (65000:1:1, Cilium's BGPCommunities.large), and
+# absolute-URL-shaped (https://example.com, Gateway API's
+# SubjectAltName.uri and HTTPCORSFilter.allowOrigins, k95). Every call site
+# below greps this same pool for the first entry that satisfies the field's
+# own pattern rather than assuming one fixed shape -- a value the field's
+# own constraint rejects isn't a valid instance of it.
+my @PATTERN_CANDIDATES = ('100', '404', '500', '8080', 'a', 'b', '1h', '10.0.0.1', '10.0.0.0/24', '65000:1:1', 'https://example.com');
 
 sub synth_scalar {
     my ($info, $attr) = @_;

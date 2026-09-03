@@ -1,36 +1,25 @@
 package IO::K8s::GatewayAPI::V1::GRPCRoute;
-# ABSTRACT: Gateway API gRPC routing rules
+# ABSTRACT: GRPCRoute provides a way to route gRPC requests.
 our $VERSION = '1.108';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1',
     resource_plural => 'grpcroutes';
 with 'IO::K8s::Role::Namespaced', 'IO::K8s::Role::Routable';
-
 sub _route_format { 'gateway' }
 
-k8s spec   => { Str => 1 };
-k8s status => { Str => 1 };
+k8s spec   => '+IO::K8s::GatewayAPI::V1::GRPCRouteSpec', { required => 'schema' };
+k8s status => '+IO::K8s::GatewayAPI::V1::GRPCRouteStatus';
 
-1;
+=attr spec
 
-__END__
-
-=head1 DESCRIPTION
-
-Represents a GRPCRoute resource from the Kubernetes Gateway API (C<gateway.networking.k8s.io/v1>). A GRPCRoute defines gRPC routing rules including service and method matching for routing gRPC traffic. GRPCRoute is a namespaced resource that attaches to Gateway listeners. The C<spec> and C<status> fields are opaque hashrefs containing the Gateway API structure.
-
-=seealso
-
-=over
-
-=item * L<IO::K8s::GatewayAPI> - Gateway API module namespace
-
-=item * L<https://gateway-api.sigs.k8s.io/api-types/grpcroute/> - Upstream GRPCRoute documentation
-
-=item * L<IO::K8s::GatewayAPI::V1::Gateway> - Gateway that serves this route
-
-=item * L<IO::K8s::GatewayAPI::V1::HTTPRoute> - HTTP routing alternative
-
-=back
+Spec defines the desired state of GRPCRoute.
 
 =cut
+
+=attr status
+
+Status defines the current state of GRPCRoute.
+
+=cut
+
+1;

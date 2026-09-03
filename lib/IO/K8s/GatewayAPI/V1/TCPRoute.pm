@@ -1,34 +1,24 @@
 package IO::K8s::GatewayAPI::V1::TCPRoute;
-# ABSTRACT: Gateway API raw TCP routing rules
+# ABSTRACT: TCPRoute provides a way to route TCP requests.
 our $VERSION = '1.108';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1',
     resource_plural => 'tcproutes';
 with 'IO::K8s::Role::Namespaced';
 
-k8s spec   => { Str => 1 };
-k8s status => { Str => 1 };
+k8s spec   => '+IO::K8s::GatewayAPI::V1::TCPRouteSpec', { required => 'schema' };
+k8s status => '+IO::K8s::GatewayAPI::V1::TCPRouteStatus';
 
-1;
+=attr spec
 
-__END__
-
-=head1 DESCRIPTION
-
-Represents a TCPRoute resource from the Kubernetes Gateway API (C<gateway.networking.k8s.io/v1>). A TCPRoute routes raw L4 TCP traffic purely by C<parentRef> and listener port, forwarding to backends via C<rules[].backendRefs>. Unlike HTTPRoute/GRPCRoute/TLSRoute it has no hostname field to match on, so it does not consume L<IO::K8s::Role::Routable> (whose C<add_hostname> assumes a C<spec.hostnames> field). TCPRoute is a namespaced resource that attaches to Gateway listeners. The C<spec> and C<status> fields are opaque hashrefs containing the Gateway API structure.
-
-=seealso
-
-=over
-
-=item * L<IO::K8s::GatewayAPI> - Gateway API module namespace
-
-=item * L<https://gateway-api.sigs.k8s.io/api-types/tcproute/> - Upstream TCPRoute documentation
-
-=item * L<IO::K8s::GatewayAPI::V1::Gateway> - Gateway that serves this route
-
-=item * L<IO::K8s::GatewayAPI::V1::UDPRoute> - Raw UDP routing counterpart
-
-=back
+Spec defines the desired state of TCPRoute.
 
 =cut
+
+=attr status
+
+Status defines the current state of TCPRoute.
+
+=cut
+
+1;

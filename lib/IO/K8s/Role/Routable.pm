@@ -150,7 +150,14 @@ sub add_path_match {
     my $type = $opts{type} // 'Prefix';
     my $format = $self->_route_format;
     if ($format eq 'gateway') {
-        $self->spec_push('rules.-1.matches', { path => { type => $type, value => $path } });
+        # This role's own vocabulary (Prefix/Exact/Regex, documented above)
+        # is not the Gateway API HTTPPathMatch.type enum (Exact/PathPrefix/
+        # RegularExpression, k95/D5) -- translate it the same way the
+        # 'traefik' branch below translates it into Traefik's match syntax.
+        my $gw_type = $type eq 'Prefix' ? 'PathPrefix'
+                    : $type eq 'Regex'  ? 'RegularExpression'
+                    : $type;    # 'Exact' is spelled the same in both vocabularies
+        $self->spec_push('rules.-1.matches', { path => { type => $gw_type, value => $path } });
     } elsif ($format eq 'traefik') {
         my $match = $type eq 'Prefix' ? "PathPrefix(`$path`)"
                   : $type eq 'Exact'  ? "Path(`$path`)"

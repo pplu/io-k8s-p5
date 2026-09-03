@@ -15,41 +15,36 @@
 
 # Upstream GVKs the providers deliberately do not ship a class for.
 #
-# GatewayAPI tracks the current GA (v1) version of each Standard-channel
-# Kind. Upstream still SERVES older, mostly deprecated versions of those
-# same Kinds inside the multi-version Standard CRDs (v1beta1 Gateway/
-# GatewayClass/HTTPRoute, v1alpha2/v1alpha3 route + BackendTLSPolicy
-# tracks), but the provider maps each short name to its v1 storage version
-# only -- the same current-version scope its POD documents, and the reason
-# ReferenceGrant (whose storage version is v1beta1) is the one Kind shipped
-# at an older version. These are deprecated served versions of Kinds that
-# ARE shipped at v1, not unshipped Kinds. Revisit if a v1beta1/v1alphaN
-# back-compat track is ever added (as AgentSandbox ships v1alpha1).
+# GatewayAPI (k95, task B-GatewayAPI): the standard-channel manifests at
+# v1.6.1 list a v1alpha2 or v1alpha3 entry inside the multi-version CRDs for
+# TCPRoute, UDPRoute, TLSRoute and BackendTLSPolicy, but every one of them
+# has `served: false` -- upstream graduated each to v1 and left the old
+# schema in the manifest only for conversion/history, the apiserver never
+# serves it, and IO::K8s::CRD->generate (served_versions) already skips
+# them. These five entries exist only because maint/crd-drift-check.pl's
+# parse_crds reads every versions[] entry regardless of served (Phase A,
+# frozen), so an unserved-but-listed version would otherwise misreport as a
+# missing Kind; there is nothing to model. (v1beta1 Gateway/GatewayClass/
+# HTTPRoute WAS a third case here before k95 -- those three ARE served at
+# v1beta1 and now have real classes at lib/IO/K8s/GatewayAPI/V1beta1/,
+# reachable via their domain-qualified resource_map keys; satisfied,
+# removed. See lib/IO/K8s/GatewayAPI.pm.)
 ignore_missing_kinds:
   - provider: GatewayAPI
-    gvk: gateway.networking.k8s.io/v1beta1/Gateway
-    reason: "k82: deprecated older served version of Gateway; provider ships the v1 (GA/storage) class only"
-  - provider: GatewayAPI
-    gvk: gateway.networking.k8s.io/v1beta1/GatewayClass
-    reason: "k82: deprecated older served version of GatewayClass; provider ships the v1 (GA/storage) class only"
-  - provider: GatewayAPI
-    gvk: gateway.networking.k8s.io/v1beta1/HTTPRoute
-    reason: "k82: deprecated older served version of HTTPRoute; provider ships the v1 (GA/storage) class only"
-  - provider: GatewayAPI
     gvk: gateway.networking.k8s.io/v1alpha2/TCPRoute
-    reason: "k82: deprecated older served version of TCPRoute; provider ships the v1 (GA/storage) class only"
+    reason: "k95: served: false at v1.6.1 (graduated to v1); nothing upstream serves to model"
   - provider: GatewayAPI
     gvk: gateway.networking.k8s.io/v1alpha2/UDPRoute
-    reason: "k82: deprecated older served version of UDPRoute; provider ships the v1 (GA/storage) class only"
+    reason: "k95: served: false at v1.6.1 (graduated to v1); nothing upstream serves to model"
   - provider: GatewayAPI
     gvk: gateway.networking.k8s.io/v1alpha2/TLSRoute
-    reason: "k82: deprecated older served version of TLSRoute; provider ships the v1 (GA/storage) class only"
+    reason: "k95: served: false at v1.6.1 (graduated to v1); nothing upstream serves to model"
   - provider: GatewayAPI
     gvk: gateway.networking.k8s.io/v1alpha3/TLSRoute
-    reason: "k82: deprecated older served version of TLSRoute; provider ships the v1 (GA/storage) class only"
+    reason: "k95: served: false at v1.6.1 (graduated to v1); nothing upstream serves to model"
   - provider: GatewayAPI
     gvk: gateway.networking.k8s.io/v1alpha3/BackendTLSPolicy
-    reason: "k82: deprecated older served version of BackendTLSPolicy; provider ships the v1 (GA/storage) class only"
+    reason: "k95: served: false at v1.6.1 (graduated to v1); nothing upstream serves to model"
 
 # Shipped GVKs (resource_map classes) intentionally kept with no matching
 # upstream CRD at the pinned upstream_version: back-compat tracks for

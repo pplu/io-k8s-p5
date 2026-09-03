@@ -166,12 +166,13 @@ subtest 'spec_array and spec_hash vivify and return the container' => sub {
 };
 
 subtest 'plain hash specs behave as before' => sub {
-    # Traefik's IngressRoute and Cilium's CiliumNetworkPolicy both went to
-    # full-depth typed modeling (k95/D5) and no longer serve as a
-    # plain-opaque-hash example -- Gateway API's GatewayClass
-    # (k8s spec => { Str => 1 }) still does.
-    require IO::K8s::GatewayAPI::V1::GatewayClass;
-    my $gc = IO::K8s::GatewayAPI::V1::GatewayClass->new(
+    # Traefik's IngressRoute, Cilium's CiliumNetworkPolicy and Gateway API's
+    # GatewayClass all went to full-depth typed modeling (k95/D5) in turn
+    # and no longer serve as a plain-opaque-hash example -- K3s's HelmChart
+    # (k8s spec => { Str => 1 }; K3s CRDs are schemaless upstream, so it
+    # stays opaque by design, not as a pending-modeling gap) still does.
+    require IO::K8s::K3s::V1::HelmChart;
+    my $gc = IO::K8s::K3s::V1::HelmChart->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => 'r'),
     );
     $gc->spec_set('rules.-1.match', 'Host(`a`)');

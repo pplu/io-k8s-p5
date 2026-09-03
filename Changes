@@ -2,6 +2,54 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Gateway API modeled to full depth (D5/D7, k95): 143 classes across 14
+    served GVKs (10 Kinds at gateway.networking.k8s.io/v1 -- the storage
+    version of every Kind but ReferenceGrant -- plus, per D7's "every
+    served version gets a class", the v1beta1 tracks upstream still serves
+    for Gateway, GatewayClass, HTTPRoute and ReferenceGrant), named after
+    the upstream kubernetes-sigs/gateway-api v1.6.1 Go types, checked in
+    under IO::K8s::GatewayAPI::V1::* / ::V1beta1::*. v1beta1 Gateway/
+    GatewayClass/HTTPRoute are literal Go type aliases of their v1
+    counterparts (`type Gateway v1.Gateway`, `type GatewaySpec =
+    v1.GatewaySpec`, ...), so one overlay entry per Kind renders both
+    version trees correctly; each tree gets its own class files (D6: a
+    shared type is one class only within a version directory). A Go type
+    reused across Kinds or fields within one version (ParentReference
+    across every route Kind's parentRefs/status.parents, HTTPHeaderFilter
+    shared by HTTPRouteFilter and GRPCRouteFilter, BackendTLSPolicy's
+    PolicyStatus/PolicyAncestorStatus from policy_types.go) is one class,
+    not a copy per occurrence; LabelSelector- and Condition-shaped fields
+    reuse Meta::V1::LabelSelector/Condition (reuse_core). The v1alpha2/
+    v1alpha3 route and BackendTLSPolicy tracks in the same standard-channel
+    manifests are listed but `served: false` at v1.6.1 (graduated to v1) --
+    IO::K8s::CRD->generate already skips them, nothing to model; the
+    corresponding maint/crd-drift-exceptions.yaml ignore_missing_kinds
+    reasons were corrected to say so (they previously said "deprecated
+    served version", which was wrong for these five). The three
+    ignore_missing_kinds entries for v1beta1 Gateway/GatewayClass/HTTPRoute
+    are removed, satisfied by the new classes; short names still resolve
+    to the v1 storage version, v1beta1 reachable only via its
+    domain-qualified resource_map key (matching ReferenceGrant's existing
+    v1/v1beta1 pattern, reversed). Fixed in IO::K8s::Role::Routable::
+    add_path_match's 'gateway' branch: the role's own Prefix/Exact/Regex
+    vocabulary was passed straight through as HTTPPathMatch.type, which
+    only ever coincidentally worked while spec was opaque -- it now
+    translates 'Prefix' to Gateway API's own 'PathPrefix' and 'Regex' to
+    'RegularExpression', matching the enum the modeled class actually
+    declares. Constructing spec/status (or any nested field) via a raw
+    ->new(spec => { ... }) no longer coerces the hashref (k100,
+    pre-existing); build via new_object/inflate, or seed a typed spec
+    through spec_set/spec_push/spec_merge, which do coerce -- t/
+    17_role_routable.t's Gateway API subtests were updated to that pattern.
+    t/68_specbuilder_objects.t's "plain hash specs behave as before" fixture
+    moved from GatewayAPI::V1::GatewayClass (now typed) to K3s::V1::
+    HelmChart, the remaining genuinely-opaque-by-design example (K3s CRDs
+    are schemaless upstream). t/42_registry_synthesis_roundtrip.t's shared
+    pattern-candidate pool gained an absolute-URL-shaped candidate
+    (https://example.com) for SubjectAltName.uri and HTTPCORSFilter.
+    allowOrigins, benefiting any future D3-using provider with the same
+    shape.
+
   - IO::K8s::AutoGen types inline objects (D10, k94). A type: object
     with properties -- which is how every CRD schema is written below its
     top level -- now becomes a nested class named after its place in the
