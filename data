@@ -1,0 +1,60 @@
+---
+class: standard
+completed: 2026-09-03T20:01:25Z
+created: 2026-09-03T18:51:10Z
+id: 107
+priority: high
+started: 2026-09-03T20:01:25Z
+status: done
+tags:
+- crd
+- tooling
+title: crd-drift-check.pl parse_crds() autovivifies a phantom spec property for Kinds
+  with no spec schema
+updated: 2026-09-03T20:01:25Z
+---
+
+maint/crd-drift-check.pl parse_crds() (around line 432) reads:
+
+    my $spec_props = $schema->{properties}{spec}{properties};
+
+For any CRD Kind whose openAPIV3Schema.properties has NO "spec" key at all
+(not empty, literally absent -- e.g. Cilium v1.20.1s CiliumEndpoint
+{apiVersion,kind,metadata,status}, CiliumIdentity
+{apiVersion,kind,metadata,security-labels}, CiliumEndpointSlice v2alpha1
+{apiVersion,kind,metadata,endpoints,namespace}), this chained hash read
+autovivifies $schema->{properties}{spec} into an empty hashref {} as a Perl
+side effect of the intermediate dereference -- even though it is only being
+read, never assigned. $spec_props itself still comes out undef/0 (has_spec_schema
+correctly 0), so the PLAIN REPORT (--provider X) is unaffected. But $schema is
+the SAME hashref later handed to IO::K8s::CRD->generate() for --render/
+--render-dir/--check (render_gvk() reuses $u->{doc} from parse_crds, never
+re-parsing the manifest) -- so the corrupted properties now has a
+properties.spec => {} entry that never existed upstream. AutoGen renders
+that as a spurious `k8s spec => Str;` attribute with no upstream basis
+("invents a field").
+
+Repro (confirmed against Cilium v1.20.1 cached manifests in this worktree,
+crd-step4 branch):
+
+  perl maint/crd-drift-check.pl --provider Cilium --dir spec/crd/Cilium/v1.20.1 \
+    --render-dir /tmp/out
+  cat /tmp/out/IO/K8s/Cilium/V2/CiliumEndpoint.pm
+  # -> k8s spec => Str;  (upstream CiliumEndpoint has NO spec property at all)
+
+Confirmed via a standalone script that loads the manifest directly and calls
+IO::K8s::CRD->generate() without going through parse_crds() at all: no
+phantom spec field, status renders correctly and fully.
+
+Fix: in parse_crds(), read spec existence without the chained autoviv, e.g.
+
+    my $spec_schema = $schema->{properties} && exists $schema->{properties}{spec}
+        ? $schema->{properties}{spec} : undef;
+    my $spec_props = $spec_schema ? $spec_schema->{properties} : undef;
+
+or operate on a shallow-cloned $schema before this read so the mutation
+(if any) never reaches the shared doc. Blocks a clean --check MATCH for any
+current/future D5 provider that has a Kind with no spec property at all
+(Cilium: CiliumEndpoint, CiliumIdentity, CiliumEndpointSlice worked around
+by hand in task B-Cilium, documented in maint/crd-render/Cilium.yaml and the
+task report -- 3 files expected DIFFERS until this is fixed).
