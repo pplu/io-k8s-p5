@@ -109,4 +109,15 @@ ignore_extra_fields: []
 # reports. Empty until a provider's Phase B task actually converts it to
 # full-depth rendering and finds a kept file the render legitimately can't
 # reproduce.
-ignore_unrendered: []
+#
+# Cilium (task B-Cilium, k95): CiliumExternalWorkload and
+# CiliumBGPPeeringPolicy are the two ignore_stale_kinds back-compat classes
+# above (k78) -- their upstream CRDs are gone, so --render has nothing left
+# to reproduce them from; both stay hand-checked-in as-is.
+ignore_unrendered:
+  - provider: Cilium
+    path: IO/K8s/Cilium/V2/CiliumExternalWorkload.pm
+    reason: "k78: removed from upstream Cilium; class kept for older clusters via its domain-qualified key, nothing left upstream to render it from"
+  - provider: Cilium
+    path: IO/K8s/Cilium/V2alpha1/CiliumBGPPeeringPolicy.pm
+    reason: "k78: removed from upstream Cilium; class kept for older clusters via its domain-qualified key, nothing left upstream to render it from"

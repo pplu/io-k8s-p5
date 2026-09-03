@@ -752,11 +752,38 @@ Revision history for IO-K8s
     security-labels is a genuine free-form string map. IO::K8s::Role::
     NetworkPolicy's Cilium builders (select_pods, allow_ingress_from_pods,
     deny_all_ingress, ...) needed no changes -- they already only used the
-    coercing spec_set/spec_push paths. cilium.io/v2alpha1 stays opaque
-    pending a follow-up task. Constructing spec/status (or any nested
-    field) via a raw ->new(spec => { ... }) no longer coerces the hashref
-    (k100, pre-existing); build via new_object/inflate, or seed a typed
-    spec through spec_set/spec_push/spec_merge, which do coerce.
+    coercing spec_set/spec_push paths. Constructing spec/status (or any
+    nested field) via a raw ->new(spec => { ... }) no longer coerces the
+    hashref (k100, pre-existing); build via new_object/inflate, or seed a
+    typed spec through spec_set/spec_push/spec_merge, which do coerce.
+
+  - Cilium cilium.io/v2alpha1 modeled to full depth (D5, k95): the five
+    v2alpha1-only Kinds (CiliumDatapathPlugin, CiliumEndpointSlice,
+    CiliumGatewayClassConfig, CiliumL2AnnouncementPolicy, CiliumPodIPPool)
+    plus the seven BGP/CIDR/LoadBalancerIPPool Kinds still served at
+    v2alpha1 for older clusters (back-compat, k78) are now typed object
+    graphs -- 63 classes total (12 Kinds + 50 nested; an 8th back-compat
+    Kind, CiliumBGPPeeringPolicy, has no upstream manifest left to render
+    and stays hand-maintained as-is). The seven shared BGP/CIDR/
+    LoadBalancerIPPool Kinds reuse the exact overlay entry their v2 render
+    uses -- IO::K8s::CRD::Emitter resolves nested-class names per version
+    directory, so the same upstream Go type never ends up shared *across*
+    v2/v2alpha1, only within one. CiliumEndpointSlice is a third Kind
+    (with CiliumEndpoint and CiliumIdentity from v2) with no spec field
+    upstream at all; its endpoints is still fully typed
+    (IO::K8s::Cilium::V2alpha1::CoreCiliumEndpoint). Constructing spec/
+    status (or any nested field) via a raw ->new(spec => { ... }) no
+    longer coerces the hashref (k100, pre-existing); build via
+    new_object/inflate, or seed a typed spec through spec_set/spec_push/
+    spec_merge, which do coerce. Filed as karr #108: IO::K8s::Cilium::
+    V2alpha1::AccessLogs (nested under CiliumGatewayClassConfig's
+    spec.telemetry.accessLogs[]) has a real upstream field literally
+    named json, which collides with IO::K8s::Role::Resource's own json
+    attribute (the shared JSON encoder); to_json/to_yaml on any
+    AccessLogs instance currently dies. The class is kept rendered
+    faithfully rather than hand-altered to hide this -- fixing it needs a
+    core change outside this task's scope. t/07_cilium.t carries a TODO
+    regression test for it.
 
 1.107     2026-08-15 15:37:52Z
 

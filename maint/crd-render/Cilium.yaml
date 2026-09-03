@@ -465,3 +465,44 @@ kinds:
   CiliumNodeConfig:
     names:
       Spec: CiliumNodeConfigSpec
+
+  # --- cilium.io/v2alpha1 (task B-Cilium, second commit) ---
+  # These five Kinds are v2alpha1-only (no v2 track): pkg/k8s/apis/
+  # cilium.io/v2alpha1/{cdpp_types,gatewayclassconfig_types,ippool_types,
+  # l2announcement_types,types}.go. The seven BGP/CIDR/LoadBalancerIPPool
+  # Kinds above are served at BOTH cilium.io/v2 and cilium.io/v2alpha1 from
+  # the same upstream CRD file (k78/k83 back-compat) and reuse the SAME
+  # `kinds.<Kind>` overlay entry already written above for their v2 render --
+  # render_gvk() picks `base` (IO::K8s::Cilium::V2 vs ::V2alpha1) per served
+  # version automatically, so nothing more was needed there; verified by
+  # --render-dir producing no unmapped (default-named) file for any of the
+  # seven when rendering the v2alpha1 GVKs.
+  CiliumDatapathPlugin:
+    names:
+      Spec: CiliumDatapathPluginSpec
+  CiliumEndpointSlice:
+    names:
+      EndpointsItem: CoreCiliumEndpoint
+      EndpointsItem::Encryption: EncryptionSpec
+      EndpointsItem::Named_portsItem: Port
+      EndpointsItem::Networking: EndpointNetworking
+      EndpointsItem::Networking::AddressingItem: AddressPair
+  CiliumGatewayClassConfig:
+    names:
+      Spec: CiliumGatewayClassConfigSpec
+      Spec::Envoy: EnvoyConfig
+      Spec::HttpOptions: HTTPOptions
+      Spec::HttpOptions::GrpcWebTranslation: GRPCWebTranslationConfig
+      Spec::Service: ServiceConfig
+      Spec::Telemetry: Telemetry
+      Spec::Telemetry::AccessLogsItem: AccessLogs
+      Status: CiliumGatewayClassConfigStatus
+  CiliumL2AnnouncementPolicy:
+    names:
+      Spec: CiliumL2AnnouncementPolicySpec
+      Status: CiliumL2AnnouncementPolicyStatus
+  CiliumPodIPPool:
+    names:
+      Spec: IPPoolSpec
+      Spec::Ipv4: IPv4PoolSpec
+      Spec::Ipv6: IPv6PoolSpec

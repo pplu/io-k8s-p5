@@ -128,8 +128,25 @@ Kind. C<CiliumEndpoint> and C<CiliumIdentity> are the two Kinds with no
 C<spec> field upstream at all — C<CiliumEndpoint>'s C<status> is still fully
 typed (L<IO::K8s::Cilium::V2::EndpointStatus>), C<CiliumIdentity>'s
 C<security-labels> is a genuine free-form string map upstream (no per-key
-schema to model further). C<cilium.io/v2alpha1> is still opaque pending a
-follow-up task.
+schema to model further).
+
+C<cilium.io/v2alpha1> is modeled to full depth the same way -- 12 Kinds
+(the five v2alpha1-only Kinds plus the seven BGP/CIDR/LoadBalancerIPPool
+back-compat tracks, which share the very C<kinds.E<lt>KindE<gt>> overlay
+entry the C<cilium.io/v2> render of the same Kind uses -- the version
+directory alone disambiguates, so a Go type is never accidentally shared
+I<across> C<v2>/C<v2alpha1>), under C<IO::K8s::Cilium::V2alpha1::*>.
+C<CiliumEndpointSlice> is the third and last Kind with no C<spec> field
+upstream; its C<endpoints> is still fully typed
+(L<IO::K8s::Cilium::V2alpha1::CoreCiliumEndpoint>).
+
+B<Known issue (karr #108):> L<IO::K8s::Cilium::V2alpha1::AccessLogs>
+(nested under C<CiliumGatewayClassConfig>'s
+C<spec.telemetry.accessLogs[]>) has a real upstream field literally named
+C<json>, which collides with L<IO::K8s::Role::Resource>'s own C<json>
+attribute (the shared JSON encoder C<to_json>/C<to_yaml> use internally).
+C<to_json>/C<to_yaml> on any C<AccessLogs> instance currently die; every
+other field of C<CiliumGatewayClassConfig> is unaffected.
 
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.

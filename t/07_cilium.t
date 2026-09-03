@@ -838,4 +838,145 @@ subtest 'full depth round-trip: CiliumEndpoint (status-only, no spec upstream) /
     is($identity->TO_JSON->{'security-labels'}{'k8s:app'}, 'web', 'TO_JSON round-trips security-labels');
 };
 
+# --- Full depth round-trip (D5, k95, task B-Cilium): cilium.io/v2alpha1 ---
+# The five Kinds native to this track (the seven BGP/CIDR/LoadBalancerIPPool
+# back-compat tracks share their classes with the cilium.io/v2 render
+# already exercised above, so are not re-tested here).
+
+subtest 'full depth round-trip: CiliumDatapathPlugin' => sub {
+    my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+    my $cddp = $k8s->new_object('CiliumDatapathPlugin',
+        metadata => { name => 'my-plugin' },
+        spec => { attachmentPolicy => 'BestEffort', version => '1.0.0' },
+    );
+    isa_ok($cddp->spec, 'IO::K8s::Cilium::V2alpha1::CiliumDatapathPluginSpec');
+    is($cddp->TO_JSON->{spec}{attachmentPolicy}, 'BestEffort', 'TO_JSON attachmentPolicy');
+    my $re = $k8s->inflate($k8s->object_to_json($cddp));
+    is($re->spec->version, '1.0.0', 'JSON round-trip preserves version');
+};
+
+subtest 'full depth round-trip: CiliumGatewayClassConfig' => sub {
+    my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+    my $gcc = $k8s->new_object('CiliumGatewayClassConfig',
+        metadata => { name => 'gw-config', namespace => 'default' },
+        spec => {
+            description => 'shared gateway class config',
+            service     => { type => 'LoadBalancer', externalTrafficPolicy => 'Local' },
+            httpOptions => { grpcWebTranslation => { enabled => 1 } },
+            telemetry   => { accessLogs => [{ format => 'JSON', targets => ['HTTP'] }] },
+            envoy       => { serverHeaderTransformation => 'PASS_THROUGH' },
+        },
+        status => { conditions => [{
+            type => 'Accepted', status => 'True', reason => 'Accepted',
+            message => 'config accepted', lastTransitionTime => '2026-01-01T00:00:00Z',
+        }] },
+    );
+    isa_ok($gcc->spec, 'IO::K8s::Cilium::V2alpha1::CiliumGatewayClassConfigSpec');
+    isa_ok($gcc->spec->service, 'IO::K8s::Cilium::V2alpha1::ServiceConfig');
+    isa_ok($gcc->spec->httpOptions, 'IO::K8s::Cilium::V2alpha1::HTTPOptions');
+    isa_ok($gcc->spec->httpOptions->grpcWebTranslation, 'IO::K8s::Cilium::V2alpha1::GRPCWebTranslationConfig');
+    isa_ok($gcc->spec->telemetry, 'IO::K8s::Cilium::V2alpha1::Telemetry');
+    isa_ok($gcc->spec->telemetry->accessLogs->[0], 'IO::K8s::Cilium::V2alpha1::AccessLogs');
+    isa_ok($gcc->spec->envoy, 'IO::K8s::Cilium::V2alpha1::EnvoyConfig');
+    isa_ok($gcc->status, 'IO::K8s::Cilium::V2alpha1::CiliumGatewayClassConfigStatus');
+    isa_ok($gcc->status->conditions->[0], 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::Condition');
+    is($gcc->TO_JSON->{spec}{telemetry}{accessLogs}[0]{format}, 'JSON', 'TO_JSON deep telemetry.accessLogs format');
+};
+
+subtest 'full depth round-trip: CiliumL2AnnouncementPolicy' => sub {
+    my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+    my $l2 = $k8s->new_object('CiliumL2AnnouncementPolicy',
+        metadata => { name => 'l2-policy' },
+        spec => {
+            nodeSelector    => { matchLabels => { 'l2-announce' => 'true' } },
+            serviceSelector => {},
+            loadBalancerIPs => 1,
+            interfaces      => ['eth0', 'eth1'],
+        },
+    );
+    isa_ok($l2->spec, 'IO::K8s::Cilium::V2alpha1::CiliumL2AnnouncementPolicySpec');
+    isa_ok($l2->spec->nodeSelector, 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector');
+    is_deeply($l2->spec->interfaces, ['eth0', 'eth1'], 'interfaces preserved');
+    ok($l2->TO_JSON->{spec}{loadBalancerIPs}, 'TO_JSON loadBalancerIPs true');
+};
+
+subtest 'full depth round-trip: CiliumPodIPPool' => sub {
+    my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+    my $pool = $k8s->new_object('CiliumPodIPPool',
+        metadata => { name => 'ipv4-pool' },
+        spec => {
+            ipv4 => { cidrs => ['10.10.0.0/16'], maskSize => 24 },
+            ipv6 => { cidrs => ['fd00::/104'], maskSize => 120 },
+        },
+    );
+    isa_ok($pool->spec, 'IO::K8s::Cilium::V2alpha1::IPPoolSpec');
+    isa_ok($pool->spec->ipv4, 'IO::K8s::Cilium::V2alpha1::IPv4PoolSpec');
+    isa_ok($pool->spec->ipv6, 'IO::K8s::Cilium::V2alpha1::IPv6PoolSpec');
+    is($pool->spec->ipv4->maskSize, 24, 'ipv4 maskSize');
+    my $re = $k8s->inflate($k8s->object_to_json($pool));
+    is($re->spec->ipv6->cidrs->[0], 'fd00::/104', 'JSON round-trip preserves ipv6 cidrs');
+};
+
+subtest 'full depth round-trip: CiliumEndpointSlice (no spec upstream, like CiliumEndpoint)' => sub {
+    my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+    my $ces = $k8s->new_object('CiliumEndpointSlice',
+        metadata  => { name => 'ces-abc' },
+        namespace => 'default',
+        endpoints => [{
+            name       => 'pod-abc123',
+            id         => 5,
+            'pod-uid'  => 'uid-1',
+            networking => { node => '10.0.0.5', addressing => [{ ipv4 => '10.1.2.3' }] },
+            encryption => { key => 0 },
+            'named-ports' => [{ name => 'http', port => 8080, protocol => 'TCP' }],
+            'service-account' => 'default',
+        }],
+    );
+
+    ok(!$ces->can('spec'), 'CiliumEndpointSlice has no spec attribute (upstream v1.20.1 declares none -- k107)');
+    isa_ok($ces->endpoints->[0], 'IO::K8s::Cilium::V2alpha1::CoreCiliumEndpoint');
+    isa_ok($ces->endpoints->[0]->networking, 'IO::K8s::Cilium::V2alpha1::EndpointNetworking');
+    isa_ok($ces->endpoints->[0]->networking->addressing->[0], 'IO::K8s::Cilium::V2alpha1::AddressPair');
+    isa_ok($ces->endpoints->[0]->encryption, 'IO::K8s::Cilium::V2alpha1::EncryptionSpec');
+    isa_ok($ces->endpoints->[0]->named_ports->[0], 'IO::K8s::Cilium::V2alpha1::Port');
+
+    my $json = $ces->TO_JSON;
+    ok(!exists $json->{spec}, 'TO_JSON emits no spec key (upstream has none)');
+    is($json->{endpoints}[0]{'pod-uid'}, 'uid-1', 'TO_JSON deep endpoints pod-uid (hyphenated wire key)');
+
+    my $re = $k8s->inflate($k8s->object_to_json($ces));
+    isa_ok($re, 'IO::K8s::Cilium::V2alpha1::CiliumEndpointSlice');
+    is($re->endpoints->[0]->networking->addressing->[0]->ipv4, '10.1.2.3',
+        'JSON round-trip preserves deep networking.addressing.ipv4');
+};
+
+subtest 'known bug (k108): AccessLogs.json collides with the Role::Resource json encoder attribute' => sub {
+    # IO::K8s::Cilium::V2alpha1::AccessLogs (nested under
+    # CiliumGatewayClassConfig.spec.telemetry.accessLogs[]) is the one class
+    # in the whole registry with a real upstream field literally named
+    # `json` (Envoy access-log format spec, map[string]string). It is
+    # rendered faithfully -- `k8s json => { Str => 1 }, {...}` -- but
+    # IO::K8s::Role::Resource already provides its own `has json` (the
+    # shared JSON encoder to_json() calls), and Resource.pm's _k8s() skips
+    # creating a second attribute when the class already can($attr_name).
+    # So this field's attribute slot IS the encoder: passing a value for it
+    # at construction overwrites the encoder, and to_json()/to_yaml() on
+    # that object then dies. Not fixable from lib/IO/K8s/Cilium/ -- the
+    # real fix is a core (Role::Resource.pm / Resource.pm) change, out of
+    # this CRD-provider task's scope. See karr #108 for the full analysis
+    # and suggested fix direction. This test documents the CURRENT (broken)
+    # behavior with TODO so the bug stays visible without failing the suite.
+    local $TODO = 'k108: AccessLogs.json collides with the Role::Resource json encoder attribute';
+
+    my $al = IO::K8s::Cilium::V2alpha1::AccessLogs->new(
+        format  => 'JSON',
+        json    => { authority => '%REQUEST_HEADER(:AUTHORITY)%' },
+        targets => ['HTTP'],
+        text    => 'unused-in-json-format',
+    );
+    my $json = eval { $al->to_json };
+    ok(!$@, 'to_json does not die once AccessLogs.json is set (k108)')
+        or diag("died: $@");
+};
+
 done_testing;

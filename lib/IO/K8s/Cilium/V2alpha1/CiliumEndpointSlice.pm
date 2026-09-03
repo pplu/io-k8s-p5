@@ -1,28 +1,25 @@
 package IO::K8s::Cilium::V2alpha1::CiliumEndpointSlice;
-# ABSTRACT: Cilium endpoint slice for scalable endpoint tracking
+# ABSTRACT: CiliumEndpointSlice contains a group of CoreCiliumendpoints.
 our $VERSION = '1.108';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2alpha1',
     resource_plural => 'ciliumendpointslices';
 
-k8s endpoints => { Str => 1 };
+k8s endpoints => ['+IO::K8s::Cilium::V2alpha1::CoreCiliumEndpoint'], { required => 'schema' };
+k8s namespace => Str;
 
-1;
+=attr endpoints
 
-__END__
-
-=head1 DESCRIPTION
-
-This cluster-scoped resource aggregates multiple CiliumEndpoints for improved scalability in large clusters, reducing the number of individual endpoint objects the API server must handle. It uses API version C<cilium.io/v2alpha1>. The C<endpoints> field contains opaque CRD-specific data structures managed by the Cilium operator.
-
-=seealso
-
-=over
-
-=item * L<IO::K8s::Cilium> - Main Cilium CRD namespace
-
-=item * L<https://docs.cilium.io/en/stable/internals/cilium-operator/> - Upstream Cilium operator and endpoint slice documentation
-
-=back
+Endpoints is a list of coreCEPs packed in a CiliumEndpointSlice
 
 =cut
+
+=attr namespace
+
+Namespace indicate as CiliumEndpointSlice namespace.
+All the CiliumEndpoints within the same namespace are put together
+in CiliumEndpointSlice.
+
+=cut
+
+1;
