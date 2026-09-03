@@ -13,14 +13,13 @@ IO::K8s::AutoGen::clear_cache();
 
 require JSON::PP;
 
-# 'spec' is a $ref to a sibling definition, not inlined -- a bare
-# `type: object` with its own `properties` and no `$ref`/`additionalProperties`
-# is, by AutoGen's existing design, an opaque hash-of-strings (t/04_autogen.t
-# and t/57_autogen_k55_60.t both read it back as a plain hashref,
-# $obj->spec->{field}). The $ref shape below is what a real swagger v2 host
-# actually produces for a nested type and is what _schema_to_type_spec's
-# existing $ref path already turns into a typed nested class via
-# get_or_generate -- exactly the class this test needs to inspect.
+# 'spec' is a $ref to a sibling definition, not inlined. Since step 3 (D10,
+# k94) an inline `type: object` with its own `properties` is ALSO a typed
+# nested class, not an opaque hash-of-strings -- this fixture keeps the
+# $ref shape anyway because that is what a real swagger v2 host actually
+# produces for a nested type, and is what _schema_to_type_spec's existing
+# $ref path already turns into a typed nested class via get_or_generate --
+# exactly the class this test needs to inspect.
 my $spec_def = {
     type => 'object',
     required => [ 'mode' ],

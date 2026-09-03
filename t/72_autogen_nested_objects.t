@@ -119,8 +119,14 @@ subtest 'nested classes are cached per parent, not regenerated' => sub {
     my $again = IO::K8s::AutoGen::get_or_generate('com.example.nest.v1.Widget', $schema, {}, $ns,
         api_version => 'nest.example.com/v1', kind => 'Widget', resource_plural => 'widgets', is_namespaced => 1);
     is($again, $class, 'same Kind class');
-    my @nested = grep { /^\Q$class\E::/ } IO::K8s::AutoGen::generated_classes();
-    is(scalar @nested, 5, 'Spec, Limit, RoutesItem, WeightsValue, X_extra -- each once');
+    my @nested = sort grep { /^\Q$class\E::/ } IO::K8s::AutoGen::generated_classes();
+    my @expected = sort
+        "$class\::Spec",
+        "$class\::Spec::Limit",
+        "$class\::Spec::RoutesItem",
+        "$class\::Spec::WeightsValue",
+        "$class\::Spec::X_extra";
+    is_deeply(\@nested, \@expected, 'exactly the five expected nested classes exist');
 };
 
 # Carried over from the step-2 final re-review: _field_options normalized a
@@ -139,6 +145,15 @@ subtest 'array-of-Bool default is normalized per element, not left to die on the
                 items   => { type => 'boolean' },
                 default => [ JSON::PP::true(), JSON::PP::false() ],
             },
+            # A malformed element (an arrayref, not anything _normalize_bool
+            # can mean true/false for) must drop the whole default rather
+            # than kill class generation -- the same "malformed default is
+            # dropped" rule every other option in _field_options follows.
+            flags2 => {
+                type    => 'array',
+                items   => { type => 'boolean' },
+                default => [ JSON::PP::true(), [1] ],
+            },
         },
     };
     my $flag_class;
@@ -150,6 +165,50 @@ subtest 'array-of-Bool default is normalized per element, not left to die on the
     my $info = $flag_class->_k8s_attr_info;
     is_deeply($info->{flags}{options}{default}, [ 1, 0 ],
         'the recorded default is normalized to plain 0/1 per element');
+    ok(!exists $info->{flags2}{options}{default},
+        'a default with a non-boolean element is dropped entirely, not partially normalized');
+};
+
+# k56 line, reached from a name collision instead of an unresolved $ref: two
+# schema keys that sanitize + ucfirst to the same class segment must not
+# silently share a class -- `routes` (array of objects, gets an `Item`
+# suffix) and a sibling plain-object field `routesItem` both want
+# `...::RoutesItem`. Generating the class anyway would type the second field
+# as the first field's class and drop it on every inflate/TO_JSON round-trip
+# in the default non-strict mode -- exactly the failure _croak_unresolved_ref
+# exists to prevent. Uses its own def name / namespace: _generate_class marks
+# the parent class generated before the property loop runs, so a croak
+# partway through leaves a half-built parent cached under that name, which
+# must not collide with any other subtest's class.
+subtest 'k94 collision: two schema keys collapsing to the same nested class name croak (fail closed)' => sub {
+    IO::K8s::AutoGen::clear_cache();
+    my $collide_schema = {
+        type => 'object',
+        properties => {
+            spec => {
+                type => 'object',
+                properties => {
+                    routes => {
+                        type  => 'array',
+                        items => {
+                            type       => 'object',
+                            properties => { match => { type => 'string' } },
+                        },
+                    },
+                    routesItem => {
+                        type       => 'object',
+                        properties => { totallyDifferent => { type => 'integer' } },
+                    },
+                },
+            },
+        },
+    };
+    throws_ok {
+        IO::K8s::AutoGen::get_or_generate(
+            'test.example.v1.Collider72', $collide_schema, {}, 'IO::K8s::_AUTOGEN_karr72collide',
+        );
+    } qr/class name .*::RoutesItem is already taken by field 'routes'/,
+        'a name collision between two schema keys croaks instead of silently reusing the first field\'s class';
 };
 
 done_testing;

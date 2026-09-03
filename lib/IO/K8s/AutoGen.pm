@@ -296,6 +296,26 @@ sub _class_segment {
     return ucfirst(IO::K8s::Resource::_sanitize_attr_name($json_key));
 }
 
+# The field name that generated a given nested class name. Needed to fail
+# closed on a name collision: two schema keys can sanitize + ucfirst to the
+# same class segment -- an array-of-objects field `routes` (its items get
+# an `Item` suffix) and a sibling plain-object field `routesItem` both
+# produce `...::RoutesItem`; so would a `weights` map (`Value` suffix)
+# alongside a sibling `weightsValue`, or `x-extra` next to `x_extra`, or
+# `Foo` next to `foo`. The class name already encodes the suffix, so the
+# bare field name is enough to tell two different owners apart -- and it
+# has to be the bare name, not "$field_name$suffix", because that compound
+# form is itself ambiguous: `routes` + the `Item` suffix and the plain
+# field `routesItem` concatenate to the identical string, which would defeat
+# the very check meant to catch that exact pair. Without this, the `unless
+# ($_generated{$class})` guard below would silently keep the FIRST field's
+# class for the SECOND -- the second field ends up typed as the first
+# field's class, and inflating real data for it drops the field on every
+# round-trip in the default non-strict mode. Never generate a class that
+# silently drops a field -- the same rule _croak_unresolved_ref enforces for
+# an unresolved $ref (k56), reached here from a name collision instead.
+my %_nested_origin;
+
 # An inline `type: object` with its own properties becomes a nested class
 # named after its place in the parent -- <Parent>::<Prop>, plus an Item /
 # Value suffix for array items and map values -- generated in the parent's
@@ -308,10 +328,19 @@ sub _class_segment {
 sub _nested_class {
     my ($parent_class, $field_name, $suffix, $schema, $all_defs, $namespace) = @_;
     my $class = $parent_class . '::' . _class_segment($field_name) . ($suffix // '');
-    unless ($_generated{$class}) {
-        my $def_name = class_to_def($parent_class) . '.' . _class_segment($field_name) . ($suffix // '');
-        _generate_class($class, $def_name, $schema, $all_defs, $namespace);
+    if ($_generated{$class}) {
+        my $existing = $_nested_origin{$class};
+        if (!defined($existing) || $existing ne $field_name) {
+            croak "Cannot generate a nested class for field '$field_name' of $parent_class: "
+                . "its class name $class is already taken by field '"
+                . (defined $existing ? $existing : '?')
+                . "' -- two schema keys collapse to the same class segment; rename one of them";
+        }
+        return $class;
     }
+    $_nested_origin{$class} = $field_name;
+    my $def_name = class_to_def($parent_class) . '.' . _class_segment($field_name) . ($suffix // '');
+    _generate_class($class, $def_name, $schema, $all_defs, $namespace);
     return $class;
 }
 
@@ -632,6 +661,7 @@ sub _ensure_package_exists {
 # Clear generated class cache (mainly for testing)
 sub clear_cache {
     %_generated = ();
+    %_nested_origin = ();
 }
 
 # List all generated classes
