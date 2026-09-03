@@ -249,11 +249,7 @@ sub _generate_class {
         : ();
 
     # D5: reuse a shipped core class for a nested object/items/
-    # additionalProperties schema of exactly its shape, default on. $class
-    # itself is never a reused core class here -- this function only runs
-    # for a class actually being generated (reuse ends the recursion
-    # before _generate_class is ever called for it) -- so every field of
-    # $class is typed with no parent core context (undef).
+    # additionalProperties schema of exactly its shape, default on.
     my $reuse_core = exists $opts{reuse_core} ? ($opts{reuse_core} ? 1 : 0) : 1;
 
     # Generate attributes using k8s DSL
@@ -264,7 +260,7 @@ sub _generate_class {
     for my $prop (sort keys %$properties) {
         next if $role_supplied{$prop};
         my $prop_schema = $properties->{$prop};
-        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class, $reuse_core, undef);
+        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class, $reuse_core);
         next unless defined $type_spec;  # Skip unsupported types
 
         my $opts = _field_options($prop_schema, $type_spec, $required{$prop});
@@ -470,38 +466,57 @@ sub _has_properties {
 # inline the types they embed (a LabelSelector, a PodTemplateSpec), and
 # modeling them again would give every provider its own copy of PodSpec.
 #
-# The index is built once from the shipped class files. A field's own
-# already-resolved parent (rule 1 below) settles ambiguity authoritatively;
-# absent that, an unambiguous shape (rule 2) is reused outright.
+# The index is built once from the shipped class files, keyed by JSON key
+# NAME only -- core_class_for_shape lists every candidate a key set could
+# mean, without regard to type. _core_class_for below is the actual reuse
+# decision, and needs more than a name match to be safe:
 #
-# Several shipped classes sharing a shape (rule 3) are resolved by
-# preference (Meta::V1, then Core::V1, then alphabetically) ONLY when every
-# candidate sits at the SAME preference rank -- e.g. {name,value} matches
-# three unrelated Core::V1 leaf structs (HTTPHeader, PodDNSConfigOption,
-# Sysctl), all in the one API area core/v1 alone already narrows a CRD
-# field to, so picking the alphabetically-first is a safe tie-break.
-# {key,operator,values} matches LabelSelectorRequirement and
-# FieldSelectorRequirement (Meta::V1) as well as NodeSelectorRequirement
-# (Core::V1) -- candidates split across preference ranks, which means the
-# shape crosses genuinely unrelated API areas (a label selector vs. a node
-# selector) rather than sitting within one; the preference order exists to
-# prefer apimachinery's own canonical types over domain-specific ones with
-# an accidental resemblance, not to arbitrate between them, so a rank split
-# stays a nested class rather than guess -- D5's own "162 times, ambiguous"
-# case, even though these three classes' registries happen to be
-# byte-for-byte identical.
+#   1. A schema shape under two keys is never reused. A single shared key
+#      name ({value}, {name}, ...) is common enough by accident that
+#      requiring at least two narrows out most of it for free.
+#
+#   2. Every remaining candidate must be TYPE-compatible with the schema,
+#      key by key (see %_TYPE_COMPAT below) -- a schema string field can't
+#      reuse a class that declares the same-named field as an array, for
+#      instance. This is checked before anything else, since a name match
+#      alone says nothing about the wire shape.
+#
+#   3. Exactly one type-compatible candidate -> reuse it.
+#
+#   4. Several do -- reused only when they are wire-identical: the same
+#      type flags (NOT required-ness -- a field being optional on one
+#      shipped class and mandatory on another doesn't change what value it
+#      holds) and the same referenced class per key, where a key has one.
+#      {name,value} matches HTTPHeader, PodDNSConfigOption and Sysctl --
+#      three unrelated Core::V1 leaf structs, wire-identical (two required
+#      Str fields on two of them, two optional Str fields on the third, but
+#      Str either way) -- reused as the preferred one (Meta::V1, then
+#      Core::V1, then alphabetical: HTTPHeader). {key,operator,values}
+#      matches LabelSelectorRequirement, FieldSelectorRequirement (both
+#      Meta::V1) and NodeSelectorRequirement (Core::V1) -- also
+#      wire-identical despite spanning two API areas -- reused as
+#      LabelSelectorRequirement, by a wide margin the most common shape a
+#      provider CRD's inline schema turns out to match (138 LabelSelector
+#      copies, 162 of this bare triple, per the step-4 drift measurement).
+#      A shape shared by candidates that are NOT wire-identical (an
+#      optional field naming a different type, a different value type
+#      under the same key) stays a nested class rather than guess.
+#
+# A class's own `metadata` is part of its shape only for an embedded type
+# (PodTemplateSpec: {metadata,spec}, a real schema-visible field) -- never
+# for a top-level Kind (Pod: {spec,status}), whose `metadata` is supplied
+# by IO::K8s::Role::APIObject outside the schema's own properties (see
+# _generate_class's %role_supplied) and so never appears in a CRD's own
+# inline schema for that Kind.
 # ---------------------------------------------------------------------------
 
 my %_core_shapes;      # "k1,k2,..." -> [ classes, preference-ordered ]
 my $_core_indexed = 0;
 
-# Preference order, both for core_class_for_shape's listing and for the
-# several-candidates rule above: LabelSelector / LabelSelectorRequirement
-# first -- by a wide margin the most common shape a provider CRD's inline
-# schema turns out to match (138 LabelSelector copies, 162 of the bare
-# {key,operator,values} triple, per the step-4 drift measurement) -- then
-# the rest of apimachinery's Meta::V1, then core/v1, then everything else
-# alphabetically.
+# Preference order for core_class_for_shape's listing and for picking among
+# several wire-identical candidates: LabelSelector / LabelSelectorRequirement
+# first (see above), then the rest of apimachinery's Meta::V1, then
+# core/v1, then everything else alphabetically.
 my @CORE_PREFERENCE = (
     'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector',
     'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::',
@@ -531,7 +546,11 @@ sub _index_core_shapes {
         $class =~ s/\.pm\z//;
         eval { Module::Runtime::use_module($class); 1 } or next;
         my $info = IO::K8s::Role::Resource::_k8s_attr_info($class);
-        my @keys = sort map { $info->{$_}{json_key} // $_ } grep { $_ ne 'metadata' } keys %$info;
+        # See the block comment above: metadata is part of the shape for an
+        # embedded type, not for a top-level Kind (Role::APIObject supplies
+        # it outside the schema there).
+        my @attrs = $class->can('_is_resource') ? grep { $_ ne 'metadata' } keys %$info : keys %$info;
+        my @keys = sort map { $info->{$_}{json_key} // $_ } @attrs;
         next unless @keys;
         push @{ $_core_shapes{ join ',', @keys } }, $class;
     }
@@ -543,7 +562,8 @@ sub _index_core_shapes {
 # Every shipped class whose key set is exactly \@json_keys, preference
 # ordered. Diagnostic / listing use as well as the reuse decision below;
 # building the class-name-only class from a plain ARRAY (JSON key names,
-# not schema fragments) keeps it usable without a schema in hand.
+# not schema fragments) keeps it usable without a schema in hand. Name
+# match only -- see _core_class_for for the type-aware reuse decision.
 sub core_class_for_shape {
     my ($keys) = @_;
     _index_core_shapes();
@@ -551,39 +571,99 @@ sub core_class_for_shape {
     return @{ $_core_shapes{$shape} // [] };
 }
 
+# The JSON-schema "kind" a property's type dispatches on for reuse-safety
+# purposes -- string / integer / number / boolean / array / object.
+# Mirrors _schema_to_type_spec's own dispatch (including its
+# x-kubernetes-int-or-string check and its Str fallback for anything
+# unmodeled) without generating anything, since _core_class_for needs this
+# for a schema fragment it may end up NOT typing as an object at all.
+sub _schema_type_kind {
+    my ($schema) = @_;
+    return 'string' if eval { IO::K8s::Resource::_normalize_bool($schema->{'x-kubernetes-int-or-string'}) };
+    my $type = $schema->{type} // '';
+    return 'integer' if $type eq 'integer';
+    return 'number'  if $type eq 'number';
+    return 'boolean' if $type eq 'boolean';
+    return 'array'   if $type eq 'array';
+    return 'object'  if $type eq 'object';
+    return 'string';  # 'string', '', and anything unmodeled alike (k42's own Str fallback)
+}
+
+# Registry type flags compatible with each schema kind (rule 2 above).
+# 'array'/'object' match by prefix/membership rather than an exhaustive
+# list -- see _flag_compatible.
+my %_TYPE_COMPAT = (
+    string  => { map { $_ => 1 } qw( is_str is_int_or_string is_quantity is_time ) },
+    integer => { map { $_ => 1 } qw( is_int is_int_or_string ) },
+    number  => { map { $_ => 1 } qw( is_num ) },
+    boolean => { map { $_ => 1 } qw( is_bool ) },
+);
+
+sub _flag_compatible {
+    my ($kind, $flag) = @_;
+    return 1 if $kind eq 'array'  && $flag =~ /^is_array_of_/;
+    return 1 if $kind eq 'object' && ($flag eq 'is_object' || $flag eq 'is_inline_struct' || $flag =~ /^is_hash_of_/);
+    return $_TYPE_COMPAT{$kind} ? !!$_TYPE_COMPAT{$kind}{$flag} : 0;
+}
+
+# Does $registry_entry (one candidate's _k8s_attr_info entry for a key)
+# hold a type flag compatible with $kind? Every k8s()-registered attribute
+# carries exactly one "is_*" classifying flag (is_object plus
+# is_inline_struct together for an inline struct -- either one matches
+# 'object'), so one match is enough.
+sub _entry_compatible {
+    my ($entry, $kind) = @_;
+    return !!grep { /^is_/ && $entry->{$_} && _flag_compatible($kind, $_) } keys %$entry;
+}
+
+# Do every one of @candidates agree, key by key, on type flags (ignoring
+# required-ness) and on the referenced class where a key has one? Assumes
+# @candidates already share the identical JSON key set (core_class_for_shape
+# guarantees that) -- compared by JSON key, not by each candidate's own
+# (possibly differently-sanitized) Perl attribute name.
+sub _wire_identical {
+    my ($keys, @candidates) = @_;
+    return 1 if @candidates <= 1;
+    my @by_json = map {
+        my $info = IO::K8s::Role::Resource::_k8s_attr_info($_);
+        my %j; $j{ $info->{$_}{json_key} // $_ } = $info->{$_} for keys %$info;
+        \%j;
+    } @candidates;
+    for my $key (@$keys) {
+        my %sig;
+        for my $j (@by_json) {
+            my $e = $j->{$key} // {};
+            my @flags = sort grep { /^is_/ && $e->{$_} } keys %$e;
+            $sig{ join('|', @flags) . '#' . ($e->{class} // '') } = 1;
+        }
+        return 0 if keys %sig > 1;
+    }
+    return 1;
+}
+
 # The class to reuse for a nested object schema, or undef.
 sub _core_class_for {
-    my ($schema, $parent_core, $field_name) = @_;
+    my ($schema) = @_;
     return undef unless _has_properties($schema);
     my @keys = sort keys %{ $schema->{properties} };
+    return undef if @keys < 2;  # a single shared key name is too common to trust
     my @candidates = core_class_for_shape(\@keys);
     return undef unless @candidates;
 
-    # Rule 1 (parent context): the enclosing object was itself already
-    # reused as core class $parent_core -- its OWN registry already says
-    # what type this field is, an authoritative fact rather than a guess
-    # among @candidates. Only trusted when that type is itself one of the
-    # shape's candidates (a schema author is free to trim or extend a
-    # field beyond what the parent core class declares).
-    if ($parent_core) {
-        my $pinfo = IO::K8s::Role::Resource::_k8s_attr_info($parent_core);
-        my ($attr) = grep { ($pinfo->{$_}{json_key} // $_) eq $field_name } keys %$pinfo;
-        if (defined $attr && $pinfo->{$attr}{class}) {
-            my $typed = $pinfo->{$attr}{class};
-            return $typed if grep { $_ eq $typed } @candidates;
-        }
-    }
-
-    # Rule 2 (unique shape): exactly one shipped class has this key set.
+    # Type-compatibility filter: drop any candidate that types some key
+    # incompatibly with what the schema itself says that key is.
+    @candidates = grep {
+        my $info = IO::K8s::Role::Resource::_k8s_attr_info($_);
+        my %by_json; $by_json{ $info->{$_}{json_key} // $_ } = $info->{$_} for keys %$info;
+        !grep { !_entry_compatible($by_json{$_}, _schema_type_kind($schema->{properties}{$_})) } @keys;
+    } @candidates;
+    return undef unless @candidates;
     return $candidates[0] if @candidates == 1;
 
-    # Rule 3: several do. core_class_for_shape already sorted @candidates
-    # by preference, so $candidates[0] is the winner IF every candidate
-    # sits at the same preference rank -- see the block comment above for
-    # why a rank split refuses instead of picking one.
-    my $best_rank = _core_rank($candidates[0]);
-    return undef if grep { _core_rank($_) != $best_rank } @candidates;
-    return $candidates[0];
+    # Several type-compatible candidates: reuse the preferred one only if
+    # they are wire-identical (already preference-sorted by
+    # core_class_for_shape, and filtering above preserves that order).
+    return _wire_identical(\@keys, @candidates) ? $candidates[0] : undef;
 }
 
 # Convert OpenAPI schema to k8s() type spec
@@ -593,13 +673,9 @@ sub _core_class_for {
 # choked on, because the caller sees neither (the k42 diagnostic line).
 #
 # $reuse_core (D5, default 1) turns the object / array-items /
-# additionalProperties reuse check on or off. $parent_core is the core
-# class $class itself was reused as, when it was -- always undef here,
-# since this function is only ever reached for a class AutoGen is actually
-# generating, which by definition was NOT reused (see _core_class_for's
-# rule 1 for the one place a non-undef parent_core matters).
+# additionalProperties reuse check on or off (see _core_class_for).
 sub _schema_to_type_spec {
-    my ($schema, $all_defs, $namespace, $field_name, $class, $reuse_core, $parent_core) = @_;
+    my ($schema, $all_defs, $namespace, $field_name, $class, $reuse_core) = @_;
     $reuse_core = 1 unless defined $reuse_core;
 
     my $where = "field '" . $field_name . "' of " . $class;
@@ -681,7 +757,7 @@ sub _schema_to_type_spec {
             }
             _croak_unresolved_ref($ref, "the items of $where");
         }
-        if ($reuse_core and my $core = _core_class_for($items, $parent_core, $field_name)) {
+        if ($reuse_core and my $core = _core_class_for($items)) {
             return [ "+$core" ];
         }
         if (_has_properties($items)) {
@@ -706,7 +782,7 @@ sub _schema_to_type_spec {
     }
     elsif ($type eq 'object') {
         if (_has_properties($schema)) {
-            if ($reuse_core and my $core = _core_class_for($schema, $parent_core, $field_name)) {
+            if ($reuse_core and my $core = _core_class_for($schema)) {
                 return "+$core";
             }
             return '+' . _nested_class($class, $field_name, undef, $schema, $all_defs, $namespace, $reuse_core);
@@ -721,7 +797,7 @@ sub _schema_to_type_spec {
                 }
                 _croak_unresolved_ref($ref, "the additionalProperties of $where");
             }
-            if ($reuse_core and my $core = _core_class_for($addl, $parent_core, $field_name)) {
+            if ($reuse_core and my $core = _core_class_for($addl)) {
                 return { "+$core" => 1 };
             }
             if (_has_properties($addl)) {
@@ -1081,13 +1157,35 @@ a new nested one (D5, C<reuse_core>, default on): a CRD's inline
 C<LabelSelector> or C<HTTPHeader>-shaped struct becomes the real IO::K8s
 class rather than a per-provider copy. C<get_or_generate>'s C<< reuse_core
 => 0 >> option turns this off and restores the pre-D5 behavior (every
-inline object becomes its own nested class, per D10 above). Ambiguity is
-resolved conservatively: several shipped classes sharing a shape are
-reused only when they all sit at the same L</core_class_for_shape>
-preference rank -- a rank split (e.g. C<{key,operator,values}> matching
-both C<LabelSelectorRequirement> and C<NodeSelectorRequirement>) means the
-shape crosses genuinely unrelated API areas, and the field stays a
-generated nested class rather than guess between them.
+inline object becomes its own nested class, per D10 above).
+
+A name match alone is not enough to reuse a class -- it only decides which
+classes L</core_class_for_shape> lists as candidates. The reuse decision
+applies three further checks: a shape under two keys is never reused (a
+single shared key name -- C<{value}>, C<{name}>, ... -- is common enough by
+accident that this alone rules out most of it); every remaining candidate
+must be type-compatible with the schema, key by key (a schema C<string>
+field can't reuse a class that declares the same-named field as an array,
+for instance -- see L</core_class_for_shape> below for the full
+compatibility table); and where several candidates survive that filter,
+they are reused as the preferred one (apimachinery's C<LabelSelector>
+family first, then the rest of C<Meta::V1>, then C<Core::V1>, then
+alphabetically) only when they are wire-identical -- the same type per key
+(ignoring required-ness: a field being optional on one shipped class and
+mandatory on another doesn't change what value it holds) and the same
+referenced class per key, where a key has one. C<{name,value}> matches
+three unrelated Core::V1 leaf structs -- C<HTTPHeader>, C<PodDNSConfigOption>,
+C<Sysctl> -- wire-identical despite one of the three having two optional
+fields where the other two have two required ones, so it reuses the
+preferred one, C<HTTPHeader>. C<{key,operator,values}> matches
+C<LabelSelectorRequirement> and C<FieldSelectorRequirement> (C<Meta::V1>)
+as well as C<NodeSelectorRequirement> (C<Core::V1>) -- also wire-identical
+despite spanning two API areas -- so it reuses C<LabelSelectorRequirement>.
+A shape shared by candidates that are NOT wire-identical -- an optional
+field naming a different referenced class, e.g. C<{metadata,spec}>
+matching C<PodTemplateSpec>, C<JobTemplateSpec>,
+C<ResourceClaimTemplateSpec> and others, each with C<spec> typed
+differently -- stays a nested class rather than guess which one is meant.
 
 =head1 FUNCTIONS
 
@@ -1194,10 +1292,28 @@ Every shipped core / apimachinery class (under C<IO::K8s::Api> and
 C<IO::K8s::Apimachinery>) whose own key set is exactly C<@json_keys>, most
 preferred first (apimachinery's C<LabelSelector>, then the rest of
 C<Meta::V1>, then C<Core::V1>, then alphabetically). Empty when no shipped
-class has that exact shape. This is the same index D5's C<reuse_core>
-reuse decision consults (see above); the index is built once, lazily, on
-first call, by loading every class under those two trees, so the first
-call in a process is dominated by that one-time load cost rather than by
-anything this function itself does.
+class has that exact shape. A class's own C<metadata> counts as part of
+its shape only when the class is an embedded type (C<PodTemplateSpec>:
+C<{metadata,spec}>, a real schema-visible field); a top-level Kind's
+C<metadata> is supplied by L<IO::K8s::Role::APIObject> outside the
+schema's own properties and is dropped, so e.g. C<Pod>'s indexed shape is
+C<{spec,status}>. This is a name match only, by key set alone -- it says
+nothing about whether reusing any listed class is actually safe for a
+given schema; that is D5's C<reuse_core> reuse decision (see above), which
+consults this same index but additionally requires a type-compatible
+candidate (a per-key check against the schema: C<string> -- including
+C<x-kubernetes-int-or-string> and C<format: date-time> -- matches
+C<is_str>/C<is_int_or_string>/C<is_quantity>/C<is_time>; C<integer>
+matches C<is_int> or C<is_int_or_string>; C<number> matches C<is_num>;
+C<boolean> matches C<is_bool>; C<array> matches any C<is_array_of_*>;
+C<object>, whether the schema property has C<properties> of its own or is
+a map, matches C<is_object>, C<is_inline_struct> or any C<is_hash_of_*>),
+and -- when several type-compatible candidates remain -- requires them to
+be wire-identical before picking the preferred one.
+
+The index is built once, lazily, on first call, by loading every class
+under those two trees, so the first call in a process is dominated by
+that one-time load cost rather than by anything this function itself
+does.
 
 =cut

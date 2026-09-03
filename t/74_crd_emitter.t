@@ -283,12 +283,8 @@ subtest 'a path-derived name past 200 chars still renders, with its own fallback
         },
     };
 
-    # reuse_core => 0: the leaf's lone {value} property is otherwise an
-    # exact shape match for the shipped Resource::V1::Counter and would be
-    # reused instead of exercising the shortening this subtest is about.
     my $deep_root = IO::K8s::AutoGen::get_or_generate('com.example.deep.v1.Deep', $schema, {}, 'IO::K8s::_AUTOGEN_karr_deepemit',
-        api_version => 'deep.example.com/v1', kind => 'Deep', resource_plural => 'deeps', is_namespaced => 1,
-        reuse_core => 0);
+        api_version => 'deep.example.com/v1', kind => 'Deep', resource_plural => 'deeps', is_namespaced => 1);
 
     my $deepest = $deep_root->_k8s_attr_info->{spec}{class}->_k8s_attr_info->{branch}{class};
     $deepest = $deepest->_k8s_attr_info->{$_}{class} for @keys;

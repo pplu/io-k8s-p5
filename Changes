@@ -654,14 +654,23 @@ Revision history for IO-K8s
     the real IO::K8s class rather than a per-provider copy. On by default;
     IO::K8s::CRD->generate and IO::K8s->add_crd (as a trailing options
     hashref, e.g. add_crd($path, { reuse_core => 0 })) turn it off. A
-    shape shared by several shipped classes at the same preference rank
-    (Meta::V1, then core/v1, then alphabetically) is resolved that way;
-    split across ranks -- a coincidental match between unrelated API
-    areas, such as {key,operator,values} matching both
-    LabelSelectorRequirement and NodeSelectorRequirement -- it stays a
-    generated nested class rather than guess. New
+    shape under two keys is never reused, and every candidate must be
+    type-compatible with the schema key by key; several surviving
+    candidates are resolved to the preferred one (LabelSelector family,
+    then the rest of Meta::V1, then core/v1, then alphabetically) only
+    when they are wire-identical (same type per key, ignoring
+    required-ness, and the same referenced class per key) -- {name,value}
+    reuses HTTPHeader over PodDNSConfigOption/Sysctl, {key,operator,values}
+    reuses LabelSelectorRequirement over FieldSelectorRequirement/
+    NodeSelectorRequirement even though it spans two API areas. A shape
+    shared by candidates that are NOT wire-identical, such as
+    {metadata,spec} (PodTemplateSpec, JobTemplateSpec,
+    ResourceClaimTemplateSpec and others each type spec differently),
+    stays a nested class rather than guess. New
     IO::K8s::AutoGen::core_class_for_shape(\@json_keys) lists shipped
-    classes matching a given key set, preference-ordered.
+    classes matching a given key set (name only, preference-ordered) --
+    metadata counts as part of the shape for an embedded type but not for
+    a top-level Kind.
 
 1.107     2026-08-15 15:37:52Z
 
