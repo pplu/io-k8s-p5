@@ -1432,6 +1432,11 @@ L</struct_to_object>; L</load> and L</load_yaml> inherit it because both
 build on C<inflate>/C<new_object>. It applies for the duration of that one
 call, including every nested object it constructs along the way.
 
+One carve-out: L<IO::K8s::List>, the envelope a list Kind inflates to,
+does not compose L<IO::K8s::Role::Resource>. Its own top-level keys are
+neither preserved nor checked under C<strict> -- only the objects inside
+C<items> are, each through its own class (k99).
+
 =head2 openapi_spec
 
 Optional. The OpenAPI v2 specification from a Kubernetes cluster. When provided,

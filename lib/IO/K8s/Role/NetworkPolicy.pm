@@ -455,9 +455,11 @@ implement, returning either C<'core'> or C<'cilium'>.
 Core K8s operations build typed L<IO::K8s::Api::Networking::V1::NetworkPolicySpec>
 objects (with the canonical C<from>/C<to>/C<ports> shape and the
 C<policyTypes> field maintained automatically); Cilium operations write
-plain hashrefs (C<fromEndpoints>/C<toEndpoints>/C<fromCIDR>/C<toCIDR>).
-The two paths live in the same role because most consumers either commit
-fully to core K8s or fully to Cilium and do not switch mid-flow.
+their rules (C<fromEndpoints>/C<toEndpoints>/C<fromCIDR>/C<toCIDR>) through
+L<IO::K8s::Role::SpecBuilder>, so a plain-hash Cilium C<spec> gets plain
+hashrefs and a modeled one gets its declared rule class either way. The two
+paths live in the same role because most consumers either commit fully to
+core K8s or fully to Cilium and do not switch mid-flow.
 
 CIDR-accepting methods (C<allow_ingress_from_cidrs>, C<allow_egress_to_cidrs>)
 validate each input through L<IO::K8s::Types::Net/IPAddress> semantics and

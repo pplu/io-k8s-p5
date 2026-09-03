@@ -5,12 +5,24 @@
 use strict;
 use warnings;
 use Test::More;
+use Test::Exception;
 use JSON::PP ();
+use JSON::MaybeXS ();
 
 use IO::K8s;
 use IO::K8s::Api::Core::V1::Pod;
 use IO::K8s::Api::Core::V1::PodSpec;
 use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
+
+# A subclass built with `use parent`, not `use Moo` -- it has no constructor
+# maker of its own, so Moo->_constructor_maker_for(__PACKAGE__) returns undef
+# and _collect_known_init_args must walk up the ISA to find the specs for
+# `json` and `_unknown_fields` (both a plain `has` in Role::Resource, not a
+# k8s-registered attribute) instead of treating them as unknown.
+{
+    package TestUF::Sub;
+    use parent -norequire, 'IO::K8s::Api::Core::V1::Pod';
+}
 
 my $k8s = IO::K8s->new;
 
@@ -100,6 +112,36 @@ subtest 'JSON round-trip through to_json / from_json keeps the field' => sub {
     my $pod = $k8s->new_object('Pod', metadata => { name => 'r' }, spec => { containers => [], extra => [ 'a' ] });
     my $again = IO::K8s::Api::Core::V1::Pod->from_json($pod->to_json);
     is_deeply($again->TO_JSON->{spec}{extra}, [ 'a' ], 'survives a full serialize/parse cycle');
+};
+
+subtest 'a use-parent subclass with no Moo constructor of its own still knows json/_unknown_fields' => sub {
+    my $obj = TestUF::Sub->new(
+        metadata        => meta('sub'),
+        json            => JSON::MaybeXS->new(utf8 => 1),
+        _unknown_fields => { a => 1 },
+        bogus           => 2,
+    );
+    is_deeply($obj->_unknown_fields, { a => 1, bogus => 2 },
+        'json and _unknown_fields are recognised as known init args; only bogus lands in the bag');
+    ok(!exists $obj->TO_JSON->{json}, 'the json encoder object never reaches the wire');
+    is($obj->TO_JSON->{a}, 1, 'the pre-seeded bag entry still round-trips');
+
+    local $IO::K8s::Resource::STRICT = 1;
+    lives_ok {
+        TestUF::Sub->new(
+            metadata        => meta('sub2'),
+            json            => JSON::MaybeXS->new(utf8 => 1),
+            _unknown_fields => { a => 1 },
+        );
+    } 'json and _unknown_fields alone live under strict, even with no own constructor maker';
+    throws_ok {
+        TestUF::Sub->new(
+            metadata        => meta('sub3'),
+            json            => JSON::MaybeXS->new(utf8 => 1),
+            _unknown_fields => { a => 1 },
+            bogus           => 2,
+        );
+    } qr/^Unknown field 'bogus' for TestUF::Sub$/m, 'a genuinely unknown key still dies under strict, naming it';
 };
 
 done_testing;

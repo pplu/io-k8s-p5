@@ -34,9 +34,10 @@ Revision history for IO-K8s
     instead of replacing it, spec_set through a defined scalar
     intermediate croaks instead of clobbering it, and spec_set('a.5', ...)
     on an empty array croaks instead of autovivifying the holes in
-    between. Every failure inside a walk is re-raised with the spec path
-    in front (k101); a class with required attributes cannot be
-    vivified, since it would have to be constructed with none.
+    between. Every failure raised while walking or vivifying begins with
+    the spec path and carries no internal file/line (k101); a class with
+    required attributes cannot be vivified, since it would have to be
+    constructed with none.
 
   - README: the AgentSandbox example no longer passes spec.replicas, a
     field neither the class nor upstream agent-sandbox v1.0.0 has (k91).

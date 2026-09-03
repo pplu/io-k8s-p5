@@ -15,7 +15,7 @@ use Module::Runtime qw(use_module);
 # '$ref' reaches _ref). A field an object does not declare lives in its
 # _unknown_fields bag (D1) and is reachable like any other key.
 #
-# Before 1.109 every method assumed spec was a hashref: on a modeled spec
+# Before 1.108 every method assumed spec was a hashref: on a modeled spec
 # spec_set replaced the struct with {} and wrote into an orphan (k90).
 # ---------------------------------------------------------------------------
 
@@ -31,13 +31,24 @@ use Module::Runtime qw(use_module);
 # its own single trailing "at CALLER line N." to the re-raised message;
 # that one is correct (it points at the caller of the spec_* method) and
 # is left alone.
+#
+# Detecting failure from eval's own return value, not from $@'s truthiness,
+# matters here: $code->() can legitimately `die 0` or `die ""`, and either
+# one sets $@ to a value that is itself FALSE, so a bare `unless $@` check
+# would read that as success and hand back an undef $result as if nothing
+# had gone wrong. Stringifying $@ only inside this block, once eval's own
+# return value has confirmed a failure, also avoids coercing an exception
+# object to a string before it is known there is one to report.
 sub _sb_guard {
     my ($path, $what, $code) = @_;
-    my $result = eval { $code->() };
-    return $result unless $@;
-    (my $err = $@) =~ s/ at \S+ line \d+\.?//g;
-    $err =~ s/\s+\z//;
-    croak "spec path '$path': $what: $err";
+    my $result;
+    unless (eval { $result = $code->(); 1 }) {
+        my $err = "$@";
+        $err =~ s/ at \S+ line \d+\.?//g;
+        $err =~ s/\s+\z//;
+        croak "spec path '$path': $what: $err";
+    }
+    return $result;
 }
 
 sub _sb_is_obj { blessed($_[0]) && $_[0]->can('_k8s_attr_info') }
@@ -496,11 +507,14 @@ while storing into it), and C<spec_array>/C<spec_hash> finding a
 non-array or scalar value already at the path. C<spec_merge> bypasses
 the path machinery entirely and shallow-merges into the top level only.
 
-The role is composed automatically by L<IO::K8s::APIObject> on any class
-that did not pass C<api_version> as an import parameter (i.e. on every
-built-in Kubernetes kind). CRD classes declared via
-C<use IO::K8s::APIObject api_version =E<gt> ..., ...> get it the same way;
-classes built by L<IO::K8s::AutoGen> at runtime also receive it.
+The role is composed automatically by L<IO::K8s::APIObject> only on CRD
+classes -- ones declared via
+C<use IO::K8s::APIObject api_version =E<gt> ..., ...>. The built-in
+Kubernetes kinds, whose C<use IO::K8s::APIObject> carries no C<api_version>
+parameter, do not get it. Classes built by L<IO::K8s::AutoGen> at runtime
+do not receive it either -- AutoGen composes L<IO::K8s::Role::APIObject>
+directly rather than going through this import, so the CRD branch that
+adds SpecBuilder never runs for them.
 
 =head1 SEE ALSO
 

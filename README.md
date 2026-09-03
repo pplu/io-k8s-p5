@@ -54,6 +54,8 @@ my $json = $k8s->object_to_json($svc);
 my $struct = $k8s->object_to_struct($pod);
 ```
 
+Constructor keys no attribute declares are kept, not dropped: `TO_JSON` re-emits them so a manifest written against a newer upstream schema round-trips instead of losing fields (at every nesting level, across `new_object`, `inflate`, `json_to_object`, `struct_to_object`, `load` and `load_yaml`). Pass `strict => 1` to the constructor -- `IO::K8s->new(strict => 1)` -- to turn an unknown field into a fatal `Unknown field '<name>' for <class>` at construction instead.
+
 ### Multi-version dispatch
 
 `inflate()` resolves a `kind` to the right class by inspecting the

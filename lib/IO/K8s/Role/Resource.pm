@@ -4,6 +4,7 @@ our $VERSION = '1.108';
 use v5.10;
 use Moo::Role;
 use Moo ();
+use mro ();
 use Types::Standard qw(HashRef);
 use JSON::MaybeXS ();
 use Scalar::Util qw(blessed);
@@ -40,11 +41,16 @@ my %_known_init_args_cache;
 
 # Every constructor key a class accepts: the JSON key of each k8s-registered
 # attribute (json_key when the Perl name was sanitized), the init_arg of every
-# Moo attribute declared with a plain `has` (metadata from Role::APIObject,
-# json, _unknown_fields itself), and apiVersion/kind on a top-level object,
-# which Role::APIObject supplies as methods rather than attributes. The Moo
-# side is read from the constructor maker -- the same view
-# MooX::StrictConstructor uses; Moo has no public accessor for it.
+# Moo attribute declared with a plain `has` anywhere in the class's ancestry
+# (metadata from Role::APIObject, json, _unknown_fields itself), and
+# apiVersion/kind on a top-level object, which Role::APIObject supplies as
+# methods rather than attributes. The Moo side is read from each ancestor's
+# own constructor maker -- the same view MooX::StrictConstructor uses; Moo
+# has no public accessor for it -- because all_attribute_specs only ever
+# returns a class's *own* specs, never its parents'. A subclass created
+# without `use Moo` (e.g. `use parent -norequire, 'IO::K8s::Api::...::Pod'`)
+# has no constructor maker of its own at all, so the walk covers the whole
+# linear ISA via mro::get_linear_isa rather than looking at $class alone.
 sub _known_init_args {
     my ($class) = @_;
     return $_known_init_args_cache{$class} //= _collect_known_init_args($class);
@@ -57,7 +63,8 @@ sub _collect_known_init_args {
     for my $attr (keys %$info) {
         $known{ $info->{$attr}{json_key} // $attr } = 1;
     }
-    if (my $maker = Moo->_constructor_maker_for($class)) {
+    for my $ancestor (@{ mro::get_linear_isa($class) }) {
+        my $maker = Moo->_constructor_maker_for($ancestor) or next;
         my $specs = $maker->all_attribute_specs;
         for my $name (keys %$specs) {
             my $spec = $specs->{$name};
@@ -199,6 +206,13 @@ An instance created through L<IO::K8s> with C<< strict => 1 >> turns this
 into a fatal error instead: any key that would otherwise land in the bag
 dies as C<Unknown field 'E<lt>nameE<gt>' for E<lt>classE<gt>>, again at every
 nesting level, for the duration of that call.
+
+One carve-out: L<IO::K8s::List>, the generic envelope a list Kind
+(C<PodList>, a bare C<kind: List>, ...) inflates to, does not compose this
+role. Its own top-level keys besides C<items>/C<metadata>/C<item_class> are
+neither preserved nor checked, under C<strict> or otherwise -- only the
+objects inside C<items> are, each through its own class's composition of
+this role (k99).
 
 =method TO_JSON
 
