@@ -103,11 +103,15 @@ subtest 'spec_set chaining' => sub {
 # --- spec_push ---
 
 subtest 'spec_push' => sub {
+    # 'rules' is not a field IO::K8s::Cilium::V2::Rule declares (D5) --
+    # spec_push routes an undeclared key into the class's _unknown_fields
+    # bag (D1), which is what this subtest actually exercises, not an
+    # opaque spec. No seed needed: spec_push auto-vivifies a typed spec
+    # from nothing (k90).
     my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
             name => 'test-policy',
         ),
-        spec => { rules => [] },
     );
 
     $cnp->spec_push('rules', { action => 'allow' });
@@ -124,7 +128,6 @@ subtest 'spec_push creates array if missing' => sub {
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
             name => 'test-policy',
         ),
-        spec => {},
     );
 
     $cnp->spec_push('rules', { action => 'allow' });

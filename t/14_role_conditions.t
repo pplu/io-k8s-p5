@@ -5,17 +5,21 @@ use warnings;
 use Test::More;
 use Test::Exception;
 
-use IO::K8s::Cilium::V2::CiliumNetworkPolicy;
-use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
+use IO::K8s;
+use IO::K8s::Cilium;
 
-# CRD classes have opaque hashref status ({ Str => 1 }),
-# which is the most flexible way to test HasConditions.
+# CiliumNetworkPolicy's status is now a typed CiliumNetworkPolicyStatus (D5,
+# task B-Cilium), so every subtest builds through $k8s->new_object -- the
+# coercing path (k100: a direct ->new(status => {...}) does not inflate
+# nested hashrefs into typed objects) -- and reads a returned condition
+# through its accessors rather than as a raw hashref, since it is now a
+# blessed Core::V1::NamespaceCondition (reuse_core), not a plain hash.
 
-subtest 'conditions from opaque hashref status' => sub {
-    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
-        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
-            name => 'test-policy',
-        ),
+my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
+
+subtest 'conditions from typed status' => sub {
+    my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+        metadata => { name => 'test-policy' },
         status => {
             conditions => [
                 { type => 'Ready',       status => 'True',  message => 'all good' },
@@ -27,6 +31,7 @@ subtest 'conditions from opaque hashref status' => sub {
 
     my $conds = $cnp->conditions;
     is(scalar @$conds, 3, 'conditions returns all 3');
+    isa_ok($conds->[0], 'IO::K8s::Api::Core::V1::NamespaceCondition', 'reused core NamespaceCondition (reuse_core, D5)');
 
     ok($cnp->is_ready, 'is_ready true when Ready=True');
     ok($cnp->is_condition_true('Initialized'), 'Initialized is True');
@@ -34,8 +39,8 @@ subtest 'conditions from opaque hashref status' => sub {
     ok(!$cnp->is_condition_true('NonExistent'), 'non-existent condition is false');
 
     my $cond = $cnp->get_condition('Ready');
-    is(ref $cond, 'HASH', 'get_condition returns hashref');
-    is($cond->{status}, 'True', 'condition status');
+    isa_ok($cond, 'IO::K8s::Api::Core::V1::NamespaceCondition', 'get_condition returns the typed object');
+    is($cond->status, 'True', 'condition status');
 
     is($cnp->condition_message('Ready'), 'all good', 'condition_message');
     is($cnp->condition_message('Degraded'), 'no issues', 'condition_message for false');
@@ -43,10 +48,8 @@ subtest 'conditions from opaque hashref status' => sub {
 };
 
 subtest 'is_ready checks Available too' => sub {
-    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
-        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
-            name => 'test-policy',
-        ),
+    my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+        metadata => { name => 'test-policy' },
         status => {
             conditions => [
                 { type => 'Available',  status => 'True', message => 'deployment available' },
@@ -59,10 +62,8 @@ subtest 'is_ready checks Available too' => sub {
 };
 
 subtest 'is_ready false when neither Ready nor Available' => sub {
-    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
-        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
-            name => 'test-policy',
-        ),
+    my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+        metadata => { name => 'test-policy' },
         status => {
             conditions => [
                 { type => 'Progressing', status => 'True', message => 'still progressing' },
@@ -74,10 +75,8 @@ subtest 'is_ready false when neither Ready nor Available' => sub {
 };
 
 subtest 'no status' => sub {
-    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
-        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
-            name => 'test-policy',
-        ),
+    my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+        metadata => { name => 'test-policy' },
     );
 
     my $conds = $cnp->conditions;
@@ -87,11 +86,9 @@ subtest 'no status' => sub {
 };
 
 subtest 'status without conditions' => sub {
-    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
-        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
-            name => 'test-policy',
-        ),
-        status => { phase => 'Active' },
+    my $cnp = $k8s->new_object('CiliumNetworkPolicy',
+        metadata => { name => 'test-policy' },
+        status => { derivativePolicies => {} },
     );
 
     my $conds = $cnp->conditions;

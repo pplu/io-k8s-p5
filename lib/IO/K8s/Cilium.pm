@@ -111,6 +111,26 @@ domain-qualified back-compat keys for v2alpha1 BGP/CIDR/LB tracks and
 CiliumExternalWorkload) covering C<cilium.io/v2> and C<cilium.io/v2alpha1>,
 matching upstream Cilium v1.20.1.
 
+C<cilium.io/v2> is modeled to full depth: every Kind's C<spec> (and, where
+upstream declares one, C<status>) is a typed object graph of further
+C<IO::K8s::Cilium::V2::*> classes, one per upstream Go structure, named
+after the upstream Go types (L<IO::K8s::Cilium::V2::CiliumNetworkPolicy>'s
+C<spec> is an L<IO::K8s::Cilium::V2::Rule>, whose C<egress> is an array of
+L<IO::K8s::Cilium::V2::EgressRule>, and so on down) rather than an opaque
+hashref — 17 Kinds, 121 further classes. Embedded core types
+(C<Meta::V1::LabelSelector>, C<Core::V1::NamespaceCondition>, ...) are
+referenced, not re-modeled. C<policy/api.Rule> — the shared policy engine
+struct upstream embeds literally the same in both C<CiliumNetworkPolicy> and
+C<CiliumClusterwideNetworkPolicy>, at both their C<spec> (one C<Rule>) and
+C<specs> (C<Rule[]>) fields — is one shared
+L<IO::K8s::Cilium::V2::Rule|IO::K8s::Cilium::V2::Rule> class, not a copy per
+Kind. C<CiliumEndpoint> and C<CiliumIdentity> are the two Kinds with no
+C<spec> field upstream at all — C<CiliumEndpoint>'s C<status> is still fully
+typed (L<IO::K8s::Cilium::V2::EndpointStatus>), C<CiliumIdentity>'s
+C<security-labels> is a genuine free-form string map upstream (no per-key
+schema to model further). C<cilium.io/v2alpha1> is still opaque pending a
+follow-up task.
+
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.
 

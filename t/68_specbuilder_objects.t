@@ -166,17 +166,18 @@ subtest 'spec_array and spec_hash vivify and return the container' => sub {
 };
 
 subtest 'plain hash specs behave as before' => sub {
-    # Traefik's IngressRoute went to full-depth typed modeling (k95/D5) and
-    # no longer serves as a plain-opaque-hash example -- Cilium's
-    # CiliumNetworkPolicy (k8s spec => { Str => 1 }) still does.
-    require IO::K8s::Cilium::V2::CiliumNetworkPolicy;
-    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
+    # Traefik's IngressRoute and Cilium's CiliumNetworkPolicy both went to
+    # full-depth typed modeling (k95/D5) and no longer serve as a
+    # plain-opaque-hash example -- Gateway API's GatewayClass
+    # (k8s spec => { Str => 1 }) still does.
+    require IO::K8s::GatewayAPI::V1::GatewayClass;
+    my $gc = IO::K8s::GatewayAPI::V1::GatewayClass->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => 'r'),
     );
-    $cnp->spec_set('rules.-1.match', 'Host(`a`)');
-    $cnp->spec_push('rules.-1.services', { name => 'svc', port => 80 });
-    is_deeply($cnp->spec, { rules => [ { match => 'Host(`a`)', services => [ { name => 'svc', port => 80 } ] } ] }, 'hash path with -1 vivification');
-    is_deeply($cnp->spec_array('entryPoints'), [], 'spec_array on a hash spec');
+    $gc->spec_set('rules.-1.match', 'Host(`a`)');
+    $gc->spec_push('rules.-1.services', { name => 'svc', port => 80 });
+    is_deeply($gc->spec, { rules => [ { match => 'Host(`a`)', services => [ { name => 'svc', port => 80 } ] } ] }, 'hash path with -1 vivification');
+    is_deeply($gc->spec_array('entryPoints'), [], 'spec_array on a hash spec');
 };
 
 subtest 'spec_set croaks with the spec path when vivifying a required-attribute class (k101)' => sub {

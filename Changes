@@ -737,6 +737,27 @@ Revision history for IO-K8s
     the first shipped fields of that exact shape; benefits every future
     D3-using provider, not only this one.
 
+  - Cilium cilium.io/v2 modeled to full depth (D5, k95): all 17 Kinds'
+    spec/status fields are now typed object graphs -- 138 classes total
+    (17 Kinds + 121 nested), named after the upstream cilium/cilium
+    v1.20.1 Go types, checked in under IO::K8s::Cilium::V2::*.
+    policy/api.Rule -- the shared policy engine struct upstream embeds the
+    literal same in both CiliumNetworkPolicy and
+    CiliumClusterwideNetworkPolicy, at both spec (one Rule) and specs
+    (Rule[]) -- is one shared class, not a copy per Kind or per field; the
+    whole Rule family (EndpointSelector reuses Meta::V1::LabelSelector,
+    reuse_core) follows the same sharing. CiliumEndpoint and CiliumIdentity
+    are the two Kinds with no spec field upstream at all;
+    CiliumEndpoint's status is still fully typed, CiliumIdentity's
+    security-labels is a genuine free-form string map. IO::K8s::Role::
+    NetworkPolicy's Cilium builders (select_pods, allow_ingress_from_pods,
+    deny_all_ingress, ...) needed no changes -- they already only used the
+    coercing spec_set/spec_push paths. cilium.io/v2alpha1 stays opaque
+    pending a follow-up task. Constructing spec/status (or any nested
+    field) via a raw ->new(spec => { ... }) no longer coerces the hashref
+    (k100, pre-existing); build via new_object/inflate, or seed a typed
+    spec through spec_set/spec_push/spec_merge, which do coerce.
+
 1.107     2026-08-15 15:37:52Z
 
   - Resolve resource_map short-name keys on the explicit-apiVersion path

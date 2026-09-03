@@ -181,6 +181,17 @@ sub union_bare_value {
 # Synthetic scalar values, one per registry type flag
 # ============================================================================
 
+# Shared candidate pool for every 'pattern'-constrained scalar shape a
+# shipped D3 field has turned out to need: HTTP-status-code-shaped
+# (100/404/500/8080), DNS-label-shaped (a/b), Go-duration-shaped (1h),
+# IPv4/IPv6-address-shaped (10.0.0.1, Cilium's peerAddress/ip fields, k95),
+# CIDR-shaped (10.0.0.0/24, Cilium's destinationCIDRs/excludedCIDRs), and
+# BGP-community-triple-shaped (65000:1:1, Cilium's BGPCommunities.large).
+# Every call site below greps this same pool for the first entry that
+# satisfies the field's own pattern rather than assuming one fixed shape --
+# a value the field's own constraint rejects isn't a valid instance of it.
+my @PATTERN_CANDIDATES = ('100', '404', '500', '8080', 'a', 'b', '1h', '10.0.0.1', '10.0.0.0/24', '65000:1:1');
+
 sub synth_scalar {
     my ($info, $attr) = @_;
     my $opts = $info->{options} // {};
@@ -205,23 +216,33 @@ sub synth_scalar {
         # IntOrStr must survive whichever form the caller gave it - toggle
         # between a numeric-looking string and a real string so both forms
         # get exercised across the sweep. A 'pattern' constraint (Traefik's
-        # duration/percentage-shaped IntOrStr fields) is arbitrary and not
-        # guaranteed to accept free text, so stick to the digit-only form
-        # that such patterns are written to match, skipping the toggle.
-        return '8080' if $opts->{pattern};
+        # duration/percentage-shaped IntOrStr fields, Cilium's ICMPField.type
+        # which accepts either a 0-255 code or a named ICMP type, k95) is
+        # arbitrary and not guaranteed to accept free text OR the unchecked
+        # '8080' this used to hardcode regardless of whether it matched --
+        # search the same candidate pool as the plain-Str branch below and
+        # fall back to the toggle only when nothing in it satisfies the
+        # pattern.
+        if ($opts->{pattern}) {
+            my @ok = grep { $_ =~ $opts->{pattern} } @PATTERN_CANDIDATES;
+            return $ok[0] if @ok;
+        }
         return ($ios_toggle++ % 2) ? '8080' : 'http';
     }
     return '100m'                  if $info->{is_quantity};
     return '2024-01-01T00:00:00Z'  if $info->{is_time};
     # A plain (non-array, non-IntOrStr) Str field can carry its own
     # 'pattern' too -- cert-manager's embedded Gateway API ParentReference
-    # (group/kind/namespace/sectionName, all DNS-label-shaped) and
+    # (group/kind/namespace/sectionName, all DNS-label-shaped),
     # CertificateRenewalWindows.windowDuration (a Go-duration-shaped
-    # string) are the first shipped fields of this exact shape. Same
-    # reasoning as the is_array_of_str candidate-list above: an
-    # unconstrained "synthetic-$attr" isn't a valid instance of the field.
+    # string), and Cilium's IP/CIDR/BGP-community-shaped fields (k95:
+    # CiliumBGPPeer.peerAddress, Frontend.ip, CiliumEgressGatewayPolicySpec
+    # .destinationCIDRs, BGPCommunities.large) are the shipped fields of
+    # this exact shape. Same reasoning as the is_array_of_str candidate-list
+    # below: an unconstrained "synthetic-$attr" isn't a valid instance of
+    # the field.
     if ($opts->{pattern}) {
-        my @ok = grep { $_ =~ $opts->{pattern} } ('100', '404', '500', '8080', 'a', 'b', '1h');
+        my @ok = grep { $_ =~ $opts->{pattern} } @PATTERN_CANDIDATES;
         return $ok[0] if @ok;
     }
     return "synthetic-$attr";      # is_str, and the generic fallback
@@ -274,7 +295,7 @@ sub synth_value {
     if ($info->{is_array_of_str}) {
         return [ @{ $opts->{enum} }[ 0, $#{ $opts->{enum} } ? 1 : 0 ] ] if $opts->{enum};
         if ($opts->{pattern}) {
-            my @ok = grep { $_ =~ $opts->{pattern} } ('100', '404', '500', '8080', 'a', 'b');
+            my @ok = grep { $_ =~ $opts->{pattern} } @PATTERN_CANDIDATES;
             return [ @ok[ 0, $#ok ? 1 : 0 ] ] if @ok;
         }
         return [ 'a', 'b' ];
