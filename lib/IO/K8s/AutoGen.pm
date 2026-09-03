@@ -288,6 +288,41 @@ sub _croak_unresolved_ref {
         . "every round-trip";
 }
 
+# The class segment for a nested class: the JSON key, sanitized the way the
+# DSL sanitizes attribute names, then ucfirst'd. `x-extra` -> `X_extra`,
+# `$ref` -> `_ref`.
+sub _class_segment {
+    my ($json_key) = @_;
+    return ucfirst(IO::K8s::Resource::_sanitize_attr_name($json_key));
+}
+
+# An inline `type: object` with its own properties becomes a nested class
+# named after its place in the parent -- <Parent>::<Prop>, plus an Item /
+# Value suffix for array items and map values -- generated in the parent's
+# namespace and cached like every other generated class. Before 1.108 such
+# an object was an opaque hash, so a CRD's spec, which every CRD schema
+# inlines, carried no typing below the top level (k94). Hash-style access on
+# the result keeps working: a Moo object is a blessed hash keyed by
+# attribute name. Property-less objects and additionalProperties-only maps
+# are not touched here; they stay opaque (k55).
+sub _nested_class {
+    my ($parent_class, $field_name, $suffix, $schema, $all_defs, $namespace) = @_;
+    my $class = $parent_class . '::' . _class_segment($field_name) . ($suffix // '');
+    unless ($_generated{$class}) {
+        my $def_name = class_to_def($parent_class) . '.' . _class_segment($field_name) . ($suffix // '');
+        _generate_class($class, $def_name, $schema, $all_defs, $namespace);
+    }
+    return $class;
+}
+
+sub _has_properties {
+    my ($schema) = @_;
+    return ref $schema eq 'HASH'
+        && ($schema->{type} // '') eq 'object'
+        && ref $schema->{properties} eq 'HASH'
+        && %{ $schema->{properties} };
+}
+
 # Convert OpenAPI schema to k8s() type spec
 #
 # $field_name and $class are diagnostic context only: everything this
@@ -353,6 +388,9 @@ sub _schema_to_type_spec {
             }
             _croak_unresolved_ref($ref, "the items of $where");
         }
+        if (_has_properties($items)) {
+            return [ '+' . _nested_class($class, $field_name, 'Item', $items, $all_defs, $namespace) ];
+        }
         # Type::Tiny objects rather than the barewords: inside an arrayref
         # the DSL reads a plain string as a class name for everything except
         # 'Str' and 'Int', so ['Bool'] would ask for an array of
@@ -371,6 +409,9 @@ sub _schema_to_type_spec {
         return [ Str ];  # string, and the default for anything unmodelled
     }
     elsif ($type eq 'object') {
+        if (_has_properties($schema)) {
+            return '+' . _nested_class($class, $field_name, undef, $schema, $all_defs, $namespace);
+        }
         my $addl = $schema->{additionalProperties};
         if (ref $addl eq 'HASH') {
             if (my $ref = $addl->{'$ref'}) {
@@ -380,6 +421,9 @@ sub _schema_to_type_spec {
                     return { "+$ref_class" => 1 };
                 }
                 _croak_unresolved_ref($ref, "the additionalProperties of $where");
+            }
+            if (_has_properties($addl)) {
+                return { '+' . _nested_class($class, $field_name, 'Value', $addl, $all_defs, $namespace) => 1 };
             }
             return { Str => 1 };  # Hash of strings
         }
@@ -495,9 +539,35 @@ sub _field_options {
     # default-vs-type check). Normalize it the one way the distribution
     # normalizes every other Bool value rather than duplicating that rule
     # here (IO::K8s::Resource::_normalize_bool's own comment: "The one
-    # boolean normalization in the distribution").
-    $opts{default} = IO::K8s::Resource::_normalize_bool($opts{default})
-        if $kind && $kind eq 'Bool' && exists $opts{default};
+    # boolean normalization in the distribution"). $kind is 'Bool' for both
+    # the scalar Bool field and the [Bool] array field (_scalar_kind reads
+    # through the array wrapper), but the default's own shape differs: a
+    # [Bool] default is itself an arrayref of JSON booleans, and
+    # _normalize_bool only accepts a scalar or scalar ref -- handing it the
+    # arrayref whole would die and kill class generation over an entirely
+    # legal default. Normalize per element instead, and drop the default
+    # (rather than refuse generation) if any element cannot mean true/false,
+    # the same "malformed default is dropped" rule every other option here
+    # follows (carried over from the step-2 final re-review).
+    if ($kind && $kind eq 'Bool' && exists $opts{default}) {
+        if (ref $type_spec eq 'ARRAY') {
+            my @normalized;
+            if (ref $opts{default} eq 'ARRAY') {
+                for my $elem (@{ $opts{default} }) {
+                    my $n = eval { IO::K8s::Resource::_normalize_bool($elem) };
+                    last if $@;
+                    push @normalized, $n;
+                }
+            }
+            if (ref $opts{default} eq 'ARRAY' && @normalized == @{ $opts{default} }) {
+                $opts{default} = \@normalized;
+            } else {
+                delete $opts{default};
+            }
+        } else {
+            $opts{default} = IO::K8s::Resource::_normalize_bool($opts{default});
+        }
+    }
     if ($kind && $kind ne 'Bool') {
         my $src = ($prop_schema->{type} // '') eq 'array' ? ($prop_schema->{items} // {}) : $prop_schema;
         if (ref $src->{enum} eq 'ARRAY' && @{ $src->{enum} } && !grep { !defined } @{ $src->{enum} }) {
@@ -650,12 +720,15 @@ where either bound is not a number or C<minimum> exceeds C<maximum>; and a
 C<default> the field cannot hold -- the wrong type, or a value outside its
 own enum or range.
 
-A nested object's own properties get field options only where this module
-turns that object into a typed class, i.e. one that C<$ref>s a sibling
-definition; an inline C<type: object> schema with its own C<properties>
-and no C<$ref>/C<additionalProperties> is still the existing opaque hash
-of strings, with no per-property typed class underneath to attach options
-to. Scalar properties carry their options at every level regardless (k94).
+An inline C<type: object> schema with its own non-empty C<properties> also
+becomes a typed class now (D10, k94), named after its place in the parent --
+C<< <Parent>::<Prop> >>, with an C<Item> / C<Value> suffix for array items
+and map values shaped the same way -- so its properties get field options
+exactly like a class built from a C<$ref>. Only a property-less C<type:
+object> and an C<additionalProperties>-only map (no C<properties> of their
+own) stay the existing opaque hash of strings, with nothing underneath to
+attach options to. Scalar properties carry their options at every level
+regardless.
 
 =head1 FUNCTIONS
 

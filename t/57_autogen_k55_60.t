@@ -210,8 +210,12 @@ subtest 'k56/k60: a GVK class\'s own metadata $ref is skipped before lookup -- t
         );
     } 'schema-GVK class with an unresolvable metadata $ref generates without dying';
 
+    # D10: spec (`type: object` with properties) is now a typed nested class
+    # rather than the opaque hash it used to be, so it needs an instance of
+    # that class -- incidental to what this subtest actually pins (the
+    # metadata $ref skip), but construction still has to match the shape.
     my $obj_a = $class_a->new(
-        spec     => { domain => 'a.example.com' },
+        spec     => "${class_a}::Spec"->new(domain => 'a.example.com'),
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => 'site-a'),
     );
     isa_ok($obj_a->metadata, 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta',
@@ -232,7 +236,7 @@ subtest 'k56/k60: a GVK class\'s own metadata $ref is skipped before lookup -- t
     } 'opts-GVK class with an unresolvable metadata $ref generates without dying';
 
     my $obj_b = $class_b->new(
-        spec     => { domain => 'b.example.com' },
+        spec     => "${class_b}::Spec"->new(domain => 'b.example.com'),
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => 'site-b'),
     );
     is($obj_b->TO_JSON->{apiVersion}, 'homelab.example.com/v1', 'apiVersion comes from the opt');
@@ -335,8 +339,10 @@ subtest 'k60: GVK properties excluded from the registry (schema-GVK path)' => su
 
     ok(!$class->can('apiVersion'), 'apiVersion has no accessor at all on a GVK class');
 
+    # D10: spec is a typed nested class now, not the opaque hash it used to
+    # be -- incidental to what this subtest pins (the GVK-property exclusion).
     my $obj = $class->new(
-        spec     => { domain => 'x.example.com' },
+        spec     => "${class}::Spec"->new(domain => 'x.example.com'),
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => 'site'),
     );
 
@@ -381,7 +387,7 @@ subtest 'k60: GVK properties excluded from the registry (opts-only path -- --api
     ok(!exists $info->{kind}, 'opts path: no kind entry either');
     ok(!$class->can('apiVersion'), 'opts path: apiVersion has no accessor');
 
-    my $obj = $class->new(spec => { schedule => '0 2 * * *' });
+    my $obj = $class->new(spec => "${class}::Spec"->new(schedule => '0 2 * * *'));
     is($obj->TO_JSON->{apiVersion}, 'homelab.example.com/v1', 'TO_JSON apiVersion comes from the opt');
     is($obj->TO_JSON->{kind}, 'BackupSchedule60', 'TO_JSON kind comes from the opt');
     throws_ok { $obj->apiVersion('nope/v1') }
