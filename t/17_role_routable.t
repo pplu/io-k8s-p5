@@ -12,19 +12,25 @@ use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
 
 # --- Traefik IngressRoute ---
 
+# Traefik's IngressRouteSpec is a full-depth typed class (k95/D5) as of
+# this suite: 'spec' is an IngressRouteSpec/Route object graph, not an
+# opaque hashref, so these subtests seed via spec_push (which coerces,
+# same as add_hostname/add_backend/... themselves do through
+# IO::K8s::Role::SpecBuilder) rather than a raw ->new(spec => {...}) --
+# direct ->new does not coerce a hashref into a named nested class (k100).
+
 subtest 'traefik: add_hostname' => sub {
     my $ir = IO::K8s::Traefik::V1alpha1::IngressRoute->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
             name => 'test-route',
         ),
-        spec => {},
     );
 
     $ir->add_hostname('example.com', 'www.example.com');
-    my $routes = $ir->spec->{routes};
+    my $routes = $ir->spec->routes;
     ok($routes, 'routes created');
-    like($routes->[0]{match}, qr/Host\(`example\.com`\)/, 'host match rule');
-    like($routes->[0]{match}, qr/Host\(`www\.example\.com`\)/, 'second host');
+    like($routes->[0]->match, qr/Host\(`example\.com`\)/, 'host match rule');
+    like($routes->[0]->match, qr/Host\(`www\.example\.com`\)/, 'second host');
 };
 
 subtest 'traefik: add_backend' => sub {
@@ -32,16 +38,16 @@ subtest 'traefik: add_backend' => sub {
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
             name => 'test-route',
         ),
-        spec => { routes => [{ match => 'Host(`example.com`)', kind => 'Rule', services => [] }] },
     );
+    $ir->spec_push('routes', { match => 'Host(`example.com`)', kind => 'Rule', services => [] });
 
     $ir->add_backend('api-v1', port => 8080, weight => 90);
     $ir->add_backend('api-v2', port => 8080, weight => 10);
-    my $services = $ir->spec->{routes}[0]{services};
+    my $services = $ir->spec->routes->[0]->services;
     is(scalar @$services, 2, 'two backends');
-    is($services->[0]{name}, 'api-v1', 'first backend name');
-    is($services->[0]{weight}, 90, 'first backend weight');
-    is($services->[1]{name}, 'api-v2', 'second backend name');
+    is($services->[0]->name, 'api-v1', 'first backend name');
+    is($services->[0]->weight, 90, 'first backend weight');
+    is($services->[1]->name, 'api-v2', 'second backend name');
 };
 
 subtest 'traefik: add_path_match' => sub {
@@ -49,11 +55,11 @@ subtest 'traefik: add_path_match' => sub {
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
             name => 'test-route',
         ),
-        spec => { routes => [{}] },
     );
+    $ir->spec_push('routes', {});
 
     $ir->add_path_match('/api', type => 'Prefix');
-    is($ir->spec->{routes}[0]{match}, 'PathPrefix(`/api`)', 'prefix path match');
+    is($ir->spec->routes->[0]->match, 'PathPrefix(`/api`)', 'prefix path match');
 };
 
 subtest 'traefik: add_header_match' => sub {
@@ -61,12 +67,12 @@ subtest 'traefik: add_header_match' => sub {
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
             name => 'test-route',
         ),
-        spec => { routes => [{ match => 'Host(`example.com`)' }] },
     );
+    $ir->spec_push('routes', { match => 'Host(`example.com`)' });
 
     $ir->add_header_match('X-Version' => 'v2');
-    like($ir->spec->{routes}[0]{match}, qr/Header\(`X-Version`, `v2`\)/, 'header match appended');
-    like($ir->spec->{routes}[0]{match}, qr/Host\(`example\.com`\)/, 'original match preserved');
+    like($ir->spec->routes->[0]->match, qr/Header\(`X-Version`, `v2`\)/, 'header match appended');
+    like($ir->spec->routes->[0]->match, qr/Host\(`example\.com`\)/, 'original match preserved');
 };
 
 # --- Gateway API HTTPRoute ---

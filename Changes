@@ -689,6 +689,25 @@ Revision history for IO-K8s
     (upstream Go) package name, checked after the existing class-name-keyed
     names map.
 
+  - Traefik modeled to full depth (D5, k95): all 10 traefik.io/v1alpha1
+    Kinds' spec fields are now typed object graphs -- 86 classes total (10
+    Kinds + 76 nested), named after the upstream traefik/traefik v3.7.12
+    Go types, checked in under IO::K8s::Traefik::V1alpha1::*. A shared Go
+    type used by several Kinds (Service, ServerHealthCheck, Sticky,
+    Cookie, IPStrategy, ProxyProtocol, RootCA, Spiffe, Domain,
+    Certificate, ...) is one class, not a copy per Kind; a middleware
+    reference, TLS option/store reference and similar {name, namespace}
+    shapes reuse Core::V1::SecretReference (reuse_core) instead of a
+    provider-local class. None of the 10 Kinds declares a status
+    subresource upstream, so IngressRoute/Middleware/.../TraefikService no
+    longer have a status field at all -- constructing with status => {...}
+    now keeps the value in the unknown-fields bag (re-emitted on the wire)
+    rather than a real attribute, same as any other undeclared key.
+    Constructing spec (or any of its nested fields) via a raw
+    ->new(spec => { ... }) no longer coerces the hashref (k100, pre-
+    existing); build via new_object/inflate, or seed a typed spec through
+    spec_set/spec_push/spec_merge, which do coerce.
+
 1.107     2026-08-15 15:37:52Z
 
   - Resolve resource_map short-name keys on the explicit-apiVersion path

@@ -183,14 +183,32 @@ sub union_bare_value {
 
 sub synth_scalar {
     my ($info, $attr) = @_;
+    my $opts = $info->{options} // {};
     if ($info->{is_bool}) {
         return ($bool_toggle++ % 2) ? JSON::MaybeXS::true() : JSON::MaybeXS::false();
     }
-    return 7                       if $info->{is_int};
+    # D3 value constraints (k8s DSL per-field option hash, k95 CRD full-depth
+    # providers are the first shipped classes to actually declare them):
+    # enum/minimum/maximum are enforced client-side (Types::Standard), so a
+    # synthetic value that ignores them isn't a valid instance of the field
+    # and struct_to_object rightly rejects it -- that is the constraint
+    # working, not a bug in the class under test. enum wins over the
+    # type-based synthesis below regardless of scalar kind.
+    return $opts->{enum}[0] if $opts->{enum};
+    if ($info->{is_int}) {
+        my $v = 7;
+        $v = $opts->{minimum} if defined $opts->{minimum} && $v < $opts->{minimum};
+        $v = $opts->{maximum} if defined $opts->{maximum} && $v > $opts->{maximum};
+        return $v;
+    }
     if ($info->{is_int_or_string}) {
         # IntOrStr must survive whichever form the caller gave it - toggle
         # between a numeric-looking string and a real string so both forms
-        # get exercised across the sweep.
+        # get exercised across the sweep. A 'pattern' constraint (Traefik's
+        # duration/percentage-shaped IntOrStr fields) is arbitrary and not
+        # guaranteed to accept free text, so stick to the digit-only form
+        # that such patterns are written to match, skipping the toggle.
+        return '8080' if $opts->{pattern};
         return ($ios_toggle++ % 2) ? '8080' : 'http';
     }
     return '100m'                  if $info->{is_quantity};
@@ -235,9 +253,31 @@ sub object_field_value {
 
 sub synth_value {
     my ($info, $attr, $mode, $depth, $class) = @_;
+    my $opts = $info->{options} // {};
 
-    return [ 'a', 'b' ] if $info->{is_array_of_str};
-    return [ 1, 2, 3 ]  if $info->{is_array_of_int};
+    # Per-element D3 constraints on an array of scalars (k8s tags => [Str],
+    # { enum => [...] } / { pattern => ... }) -- same reasoning as
+    # synth_scalar's enum/minimum/maximum handling: a value the field's own
+    # constraint rejects isn't a valid instance, so pick one that satisfies
+    # it instead of the unconstrained default.
+    if ($info->{is_array_of_str}) {
+        return [ @{ $opts->{enum} }[ 0, $#{ $opts->{enum} } ? 1 : 0 ] ] if $opts->{enum};
+        if ($opts->{pattern}) {
+            my @ok = grep { $_ =~ $opts->{pattern} } ('100', '404', '500', '8080', 'a', 'b');
+            return [ @ok[ 0, $#ok ? 1 : 0 ] ] if @ok;
+        }
+        return [ 'a', 'b' ];
+    }
+    if ($info->{is_array_of_int}) {
+        my @vals = (1, 2, 3);
+        @vals = map {
+            my $v = $_;
+            $v = $opts->{minimum} if defined $opts->{minimum} && $v < $opts->{minimum};
+            $v = $opts->{maximum} if defined $opts->{maximum} && $v > $opts->{maximum};
+            $v;
+        } @vals if defined $opts->{minimum} || defined $opts->{maximum};
+        return \@vals;
+    }
     return [ 1, 0, 1 ]  if $info->{is_array_of_bool};    # the exact DeviceAttribute.bools shape
     return { 'sample-key' => 'sample-value' } if $info->{is_hash_of_str};
     # Typed value maps -- the { TypeName => 1 } DSL form (k63). Each value

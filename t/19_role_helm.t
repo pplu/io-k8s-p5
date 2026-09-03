@@ -204,8 +204,16 @@ subtest 'middlewareTCP: rate_limit' => sub {
         ),
     );
 
+    # Traefik's TCP middleware CRD has no rateLimit field (k95/D5 full-depth
+    # modeling confirms this against upstream: MiddlewareTCPSpec only has
+    # inFlightConn/ipAllowList/ipWhiteList) -- MiddlewareBuilder's rate_limit
+    # is an HTTP-only method that MiddlewareTCP still composes (k106), so the
+    # write lands in the typed MiddlewareTCPSpec's _unknown_fields bag rather
+    # than a real attribute. It still round-trips onto the wire faithfully,
+    # which is what this asserts, rather than a same-named hash key that no
+    # longer exists once spec is a typed object instead of an opaque hashref.
     $mw->rate_limit(average => 50);
-    is($mw->spec->{rateLimit}{average}, 50, 'TCP rate limit');
+    is($mw->spec->TO_JSON->{rateLimit}{average}, 50, 'TCP rate limit (unknown-fields round-trip)');
 };
 
 done_testing;

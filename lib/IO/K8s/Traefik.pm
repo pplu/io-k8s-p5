@@ -67,7 +67,18 @@ __END__
 =head1 DESCRIPTION
 
 Resource map provider for L<Traefik|https://traefik.io/> Custom Resource
-Definitions. Registers 10 CRD classes for C<traefik.io/v1alpha1>.
+Definitions. Registers 10 CRD classes for C<traefik.io/v1alpha1>, modeled to
+full depth: C<spec> (and, where upstream declares one, C<status>) is a typed
+object graph of 76 further C<IO::K8s::Traefik::V1alpha1::*> classes, one per
+upstream Go structure, named after the upstream Go types
+(L<IO::K8s::Traefik::V1alpha1::Middleware|IO::K8s::Traefik::V1alpha1::Middleware>'s
+C<rateLimit> is an C<IO::K8s::Traefik::V1alpha1::RateLimit>, and so on down)
+rather than an opaque hashref. Embedded core types are referenced, not
+re-modeled — a route's C<middlewares>/C<parentRefs> are
+L<Core::V1::SecretReference|IO::K8s::Api::Core::V1::SecretReference>. A Go
+type used by more than one Kind (C<Service>, C<Sticky>, C<Cookie>,
+C<ServerHealthCheck>, C<IPStrategy>, ...) is one shared class, not a copy per
+Kind.
 
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Traefik') >> at runtime.

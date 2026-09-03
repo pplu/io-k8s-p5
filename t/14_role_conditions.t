@@ -6,7 +6,6 @@ use Test::More;
 use Test::Exception;
 
 use IO::K8s::Cilium::V2::CiliumNetworkPolicy;
-use IO::K8s::Traefik::V1alpha1::IngressRoute;
 use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
 
 # CRD classes have opaque hashref status ({ Str => 1 }),
@@ -44,9 +43,9 @@ subtest 'conditions from opaque hashref status' => sub {
 };
 
 subtest 'is_ready checks Available too' => sub {
-    my $ir = IO::K8s::Traefik::V1alpha1::IngressRoute->new(
+    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
-            name => 'test-route',
+            name => 'test-policy',
         ),
         status => {
             conditions => [
@@ -56,13 +55,13 @@ subtest 'is_ready checks Available too' => sub {
         },
     );
 
-    ok($ir->is_ready, 'is_ready true via Available condition');
+    ok($cnp->is_ready, 'is_ready true via Available condition');
 };
 
 subtest 'is_ready false when neither Ready nor Available' => sub {
-    my $ir = IO::K8s::Traefik::V1alpha1::IngressRoute->new(
+    my $cnp = IO::K8s::Cilium::V2::CiliumNetworkPolicy->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
-            name => 'test-route',
+            name => 'test-policy',
         ),
         status => {
             conditions => [
@@ -71,7 +70,7 @@ subtest 'is_ready false when neither Ready nor Available' => sub {
         },
     );
 
-    ok(!$ir->is_ready, 'is_ready false without Ready or Available');
+    ok(!$cnp->is_ready, 'is_ready false without Ready or Available');
 };
 
 subtest 'no status' => sub {
