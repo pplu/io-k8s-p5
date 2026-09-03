@@ -109,6 +109,12 @@ ignore_extra_fields: []
 # CiliumBGPPeeringPolicy are the two ignore_stale_kinds back-compat classes
 # above (k78) -- their upstream CRDs are gone, so --render has nothing left
 # to reproduce them from; both stay hand-checked-in as-is.
+#
+# AgentSandbox (task B-AgentSandbox, k95, D7): the entire v1alpha1 track
+# (Sandbox, SandboxClaim, SandboxTemplate, SandboxWarmPool) is the
+# ignore_stale_kinds back-compat superset above (k88) -- upstream v1.0.0
+# ships no v1alpha1 manifest at all (no api/v1alpha1 directory in the repo
+# at this tag) to render from, so all four stay hand-checked-in as-is.
 ignore_unrendered:
   - provider: Cilium
     path: IO/K8s/Cilium/V2/CiliumExternalWorkload.pm
@@ -116,3 +122,15 @@ ignore_unrendered:
   - provider: Cilium
     path: IO/K8s/Cilium/V2alpha1/CiliumBGPPeeringPolicy.pm
     reason: "k78: removed from upstream Cilium; class kept for older clusters via its domain-qualified key, nothing left upstream to render it from"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1alpha1/Sandbox.pm
+    reason: "k88: v1alpha1 removed upstream at agent-sandbox v1.0.0 (no api/v1alpha1 manifest left to render from); class kept for clusters still on v0.5.x"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1alpha1/SandboxClaim.pm
+    reason: "k88: v1alpha1 removed upstream at agent-sandbox v1.0.0 (no api/v1alpha1 manifest left to render from); class kept for clusters still on v0.5.x"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1alpha1/SandboxTemplate.pm
+    reason: "k88: v1alpha1 removed upstream at agent-sandbox v1.0.0 (no api/v1alpha1 manifest left to render from); class kept for clusters still on v0.5.x"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1alpha1/SandboxWarmPool.pm
+    reason: "k88: v1alpha1 removed upstream at agent-sandbox v1.0.0 (no api/v1alpha1 manifest left to render from); class kept for clusters still on v0.5.x"

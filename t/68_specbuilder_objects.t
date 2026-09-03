@@ -56,9 +56,12 @@ subtest 'k90: spec_set on a modeled spec keeps the spec' => sub {
     is($s->spec_get('shutdownPolicy'), 'Retain', 'spec_get reads through the struct');
     $s->spec_set('shutdownPolicy', 'Delete');
     is($s->TO_JSON->{spec}{shutdownPolicy}, 'Delete', 'spec_set writes through the struct');
-    isa_ok($s->spec, 'IO::K8s::AgentSandbox::V1beta1::Sandbox::_Spec', 'spec is still the struct');
-    $s->spec_merge(operatingMode => 'Standard');
-    is_deeply($s->TO_JSON->{spec}, { shutdownPolicy => 'Delete', operatingMode => 'Standard' }, 'spec_merge keeps existing fields');
+    # v1beta1 is now modeled to full depth (D5/D6, k95): spec is the named
+    # SandboxSpec class, not an anonymous inline struct, and operatingMode
+    # carries the real upstream enum (Running/Suspended) instead of a bare Str.
+    isa_ok($s->spec, 'IO::K8s::AgentSandbox::V1beta1::SandboxSpec', 'spec is still the struct');
+    $s->spec_merge(operatingMode => 'Suspended');
+    is_deeply($s->TO_JSON->{spec}, { shutdownPolicy => 'Delete', operatingMode => 'Suspended' }, 'spec_merge keeps existing fields');
 };
 
 subtest 'spec_get walks structs, objects and arrays' => sub {

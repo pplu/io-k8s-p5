@@ -50,13 +50,21 @@ throws_ok {
     'two unknown keys on one object: the die names the alphabetically first';
 
 subtest 'inline-struct coercer path is covered' => sub {
+    # AgentSandbox's v1beta1 track is modeled to full depth (D5/D6, k95) and
+    # coerces spec through the regular named-class path now; v1alpha1 (D7
+    # back-compat, unmodeled below the top level) is the distribution's
+    # remaining inline-struct example -- 'operatingMode' is a v1beta1-only
+    # field, so it is unknown on the v1alpha1 inline spec.
     my $sb = IO::K8s->new(strict => 1, with => ['IO::K8s::AgentSandbox']);
     throws_ok {
-        $sb->new_object('Sandbox',
-            metadata => { name => 'x', namespace => 'd' },
-            spec     => { replicas => 1, shutdownPolicy => 'Retain' },
+        $sb->struct_to_object(
+            'IO::K8s::AgentSandbox::V1alpha1::Sandbox',
+            {
+                metadata => { name => 'x', namespace => 'd' },
+                spec     => { operatingMode => 'Running', shutdownPolicy => 'Retain' },
+            },
         );
-    } qr/Unknown field 'replicas' for IO::K8s::AgentSandbox::V1beta1::Sandbox::_Spec/,
+    } qr/Unknown field 'operatingMode' for IO::K8s::AgentSandbox::V1alpha1::Sandbox::_Spec/,
         'the k91 example dies under strict';
 };
 
