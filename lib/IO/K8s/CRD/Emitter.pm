@@ -171,18 +171,30 @@ sub _type_source {
 }
 
 # A pattern string re-quoted into `qr/.../ ` source is interpolated by Perl
-# just like a double-quoted string: an unescaped '@' followed by a word
-# character or '{' tries to interpolate an array, and an unescaped '$' not
-# already meaning "end of string/group/alternative" tries to interpolate a
-# scalar -- '^[a-z]+@example\.com$' would die "Global symbol '@example'
-# requires explicit package name" at compile time. A '$' immediately before
-# the end of the string, ')' or '|' is left alone: those are the regex
-# anchor positions ("...$", "(...$)", "...$|...") a schema pattern
-# realistically uses, and escaping them there would turn the anchor into a
-# literal '$' character instead -- wrong regex, not just wrong Perl. Walks
-# the pattern one (possibly backslash-escaped) unit at a time so an
-# already-escaped character -- notably a pattern that came in as '\/api\/v1'
-# -- is left exactly as it was instead of gaining a second backslash.
+# just like a double-quoted string: an unescaped '@' tries to interpolate an
+# array -- '^[a-z]+@example\.com$' would die "Global symbol '@example'
+# requires explicit package name" at compile time -- and an unescaped '$'
+# not already meaning "end of string/group/alternative" tries to
+# interpolate a scalar. '@' is always escaped, unconditionally: '\@' means
+# a literal '@' in a regex no matter what follows it, so escaping it can
+# never change what the pattern matches, and it is the only way to rule out
+# every '@'-led interpolation form at once -- '@name', '@{...}', and
+# '@$name'/'@$' (an array deref through a scalar, including the
+# punctuation variable $) or $| that '@$' immediately before a bare ')' or
+# '|' would reach for). A narrower rule that only escaped '@' before a word
+# character or '{' missed exactly that last form: '(a@$)' left both the
+# '@' (not followed by \w/{) and the '$' (immediately before ')') bare,
+# and '@$)' interpolated away to nothing, silently turning the pattern
+# into '(a)'. '$' cannot be escaped unconditionally the same way -- unlike
+# '@', a bare '$' is meaningful in a regex (the end-of-string/line anchor),
+# so it is only escaped when it is NOT in one of the anchor positions
+# ("...$", "(...$)", "...$|...") a schema pattern realistically uses;
+# escaping it there would turn the anchor into a literal '$' character
+# instead of leaving it as an anchor -- wrong regex, not just wrong Perl.
+# Walks the pattern one (possibly backslash-escaped) unit at a time so an
+# already-escaped character -- notably a pattern that came in as
+# '\/api\/v1' -- is left exactly as it was instead of gaining a second
+# backslash.
 sub _escape_pattern_body {
     my ($pattern) = @_;
     my $out = '';
@@ -191,15 +203,15 @@ sub _escape_pattern_body {
             $out .= $1;
             next;
         }
-        my $c    = $2;
-        my $rest = substr($pattern, pos($pattern));
+        my $c = $2;
         if ($c eq '/') {
             $out .= '\\/';
         }
         elsif ($c eq '@') {
-            $out .= ($rest =~ /\A[\w{]/) ? '\\@' : '@';
+            $out .= '\\@';
         }
         elsif ($c eq '$') {
+            my $rest = substr($pattern, pos($pattern));
             $out .= ($rest eq '' || $rest =~ /\A[)|]/) ? '$' : '\\$';
         }
         else {

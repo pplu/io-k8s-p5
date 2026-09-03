@@ -105,10 +105,12 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
                         pattern     => '^[a-z]+@example\.com$',
                         description => "Contact address.\n=head1 not a real POD command\n\n\n\nTrailing paragraph.",
                     },
-                    path   => { type => 'string', pattern => '^\/api\/v1$' },
-                    single => { type => 'string', pattern => '^a$' },
-                    alt    => { type => 'string', pattern => '^(a|b)$' },
-                    mode   => { type => 'string', enum => [ '', 'Always', 'IfNotPresent' ] },
+                    path    => { type => 'string', pattern => '^\/api\/v1$' },
+                    single  => { type => 'string', pattern => '^a$' },
+                    alt     => { type => 'string', pattern => '^(a|b)$' },
+                    atparen => { type => 'string', pattern => '(a@$)' },
+                    atalt   => { type => 'string', pattern => '(a@$|b)' },
+                    mode    => { type => 'string', enum => [ '', 'Always', 'IfNotPresent' ] },
                 },
             },
         },
@@ -133,6 +135,10 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
         'a $ anchoring end-of-string is left alone');
     like($spec_src, qr/^k8s alt\s+=> Str, \{ pattern => qr\/\^\(a\|b\)\$\/ \};$/m,
         'a $ before the closing delimiter is left alone');
+    like($spec_src, qr/^k8s atparen\s+=> Str, \{ pattern => qr\/\(a\\\@\$\)\/ \};$/m,
+        'an @ immediately before a ) -anchored $ is still escaped, not just ones before \w or {');
+    like($spec_src, qr/^k8s atalt\s+=> Str, \{ pattern => qr\/\(a\\\@\$\|b\)\/ \};$/m,
+        'an @ immediately before a |-anchored $ is still escaped');
     like($spec_src, qr/^k8s mode\s+=> Str, \{ enum => \['',\s*'Always',\s*'IfNotPresent'\] \};$/m,
         'an enum containing the empty string renders as a Dumper list');
     unlike($spec_src, qr/qw\(/, 'no qw() form once one entry needs quoting');
@@ -159,6 +165,26 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
             my $hand_lived = eval { $hand->inflate($doc); 1 };
             my $orig_lived = eval { $orig->inflate($doc); 1 };
             is(!!$hand_lived, !!$orig_lived, "$field/$which ('$value'): emitted and generated classes agree");
+        }
+    }
+
+    # '(a@$)' and '(a@$|b)': the '@' sits directly before a '$' that is
+    # itself in an anchor position (before ')' or '|'), which a narrower
+    # "escape @ only before \w or {" rule left bare -- '@$)'/'@$|' then
+    # interpolated away to nothing, so the emitted class silently accepted
+    # values ('a', 'zzza') the generated class rejects. Same four values
+    # against both fields: only 'a@' should be accepted by '(a@$)', 'a@'
+    # and 'b' by '(a@$|b)' -- but the assertion is agreement, not a fixed
+    # accept/reject table, so a regression shows up either way.
+    for my $field (qw( atparen atalt )) {
+        for my $value ('a@', 'a', 'zzza', 'b') {
+            my $doc = {
+                apiVersion => 'esc.example.com/v1', kind => 'Escaper',
+                metadata => { name => 'e' }, spec => { $field => $value },
+            };
+            my $hand_lived = eval { $hand->inflate($doc); 1 };
+            my $orig_lived = eval { $orig->inflate($doc); 1 };
+            is(!!$hand_lived, !!$orig_lived, "$field ('$value'): emitted and generated classes agree");
         }
     }
 };
