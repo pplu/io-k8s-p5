@@ -213,8 +213,7 @@ $ir->spec_merge(entryPoints => ['web', 'websecure']);
 $ir->spec_delete('tls');
 ```
 
-Paths walk typed specs too: `-1` addresses the last (or a new) array
-element, and a hashref written into a typed slot is inflated.
+Paths walk typed specs too: `-1` addresses the last (or a new) array element, and a hashref written into a typed slot is inflated.
 
 Domain-specific builder roles provide fluent APIs for common tasks:
 

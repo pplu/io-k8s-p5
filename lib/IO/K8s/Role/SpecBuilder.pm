@@ -394,9 +394,10 @@ sub spec_merge {
 
 Removes the value at the dotted path C<$path>. For a hash parent the key
 is deleted; for a declared field on a typed node there is nothing to
-remove, so it is cleared to C<undef> through its accessor instead -- which
-croaks, through Moo's own required-attribute check, if that field is
-C<required>. For an array parent the indexed element is spliced out. If
+remove, so it is cleared to C<undef> through its accessor instead --
+which croaks on a C<required> field, because its type constraint is not
+C<Maybe>-wrapped and rejects C<undef> the same as any other bad value.
+For an array parent the indexed element is spliced out. If
 the path does not resolve -- C<spec> is unset, a parent is missing, or the
 terminal is undefined -- the call is a no-op. Returns C<$self> for
 chaining.
@@ -477,16 +478,23 @@ untyped node, or, on a typed node, whatever the attribute registry
 declares for that field (an inline struct or referenced class, an
 array/hash container), with a hashref handed to a typed slot inflated the
 same way C<FROM_HASH> does. C<spec_get> and C<spec_delete> never vivify.
-Every failure raised while walking or vivifying is re-raised with the
-spec path in front, with no internal file or line inside it (k101), as
-one of:
+
+Every failure raised while walking or vivifying begins with the spec
+path and carries no internal file or line (k101) -- C<spec path 'PATH':>
+in front of the reason, or, for a path that is itself empty, C<spec path
+'PATH' is empty> on its own. A Moo/Type::Tiny failure hit while vivifying
+or writing a declared field is re-raised with that prefix, such as:
 
     spec path 'PATH': cannot set 'SEG': ORIGINAL MESSAGE
     spec path 'PATH': cannot create CLASS for 'SEG': ORIGINAL MESSAGE
     spec path 'PATH': cannot clear 'SEG': ORIGINAL MESSAGE
 
-depending which step failed. C<spec_merge> bypasses the path machinery
-entirely and shallow-merges into the top level only.
+The walk's own checks use the same C<spec path 'PATH':> prefix for the
+failures they detect directly, too: an invalid or out-of-range array
+index, a scalar blocking further descent (whether hit while walking or
+while storing into it), and C<spec_array>/C<spec_hash> finding a
+non-array or scalar value already at the path. C<spec_merge> bypasses
+the path machinery entirely and shallow-merges into the top level only.
 
 The role is composed automatically by L<IO::K8s::APIObject> on any class
 that did not pass C<api_version> as an import parameter (i.e. on every
