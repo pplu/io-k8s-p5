@@ -328,6 +328,18 @@ has with => (
     default => sub { [] },
 );
 
+# Unknown-field policy for this instance's entry points (D1). 0: a field no
+# class declares is kept and emitted again by TO_JSON. 1: it dies naming the
+# class and the field. Applied by localizing $IO::K8s::Resource::STRICT in
+# inflate, new_object, json_to_object and struct_to_object, so it reaches
+# every nested constructor -- including the inline-struct coercers, which
+# never pass through _inflate_struct. load and load_yaml inherit it through
+# new_object / inflate.
+has strict => (
+    is      => 'ro',
+    default => sub { 0 },
+);
+
 # User namespaces to search for pre-built classes (checked before IO::K8s::)
 # e.g. ['MyProject::K8s'] will look for MyProject::K8s::HelmChart before IO::K8s::...
 has class_namespaces => (
@@ -756,6 +768,7 @@ sub load_class {
 
 sub json_to_object {
     my ($self, $class_or_json, $json) = @_;
+    local $IO::K8s::Resource::STRICT = $self->strict;
 
     # If only one argument, auto-detect class from kind
     if (!defined $json) {
@@ -770,6 +783,7 @@ sub json_to_object {
 
 sub struct_to_object {
     my ($self, $class_or_struct, $params) = @_;
+    local $IO::K8s::Resource::STRICT = $self->strict;
 
     # If only one argument (a hashref), auto-detect class from kind
     if (!defined $params && ref($class_or_struct) eq 'HASH') {
@@ -816,6 +830,7 @@ sub _struct_to_object_expanded {
 
 sub inflate {
     my ($self, $data) = @_;
+    local $IO::K8s::Resource::STRICT = $self->strict;
 
     # Accept both JSON string and hashref
     my $struct = ref($data) eq 'HASH' ? $data : $self->json->decode($data);
@@ -849,6 +864,7 @@ sub inflate {
 
 sub new_object {
     my ($self, $short_class, @args) = @_;
+    local $IO::K8s::Resource::STRICT = $self->strict;
 
     # Support:
     #   ->new_object('Pod', { ... })

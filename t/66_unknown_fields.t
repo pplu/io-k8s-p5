@@ -9,6 +9,7 @@ use JSON::PP ();
 
 use IO::K8s;
 use IO::K8s::Api::Core::V1::Pod;
+use IO::K8s::Api::Core::V1::PodSpec;
 use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
 
 my $k8s = IO::K8s->new;
@@ -76,6 +77,13 @@ subtest 'the bag does not alias the caller data (k54 line)' => sub {
     my $out = $pod->TO_JSON;
     $out->{extra}{deep} = 3;
     is($pod->TO_JSON->{extra}{deep}, 1, 'one-level copy on the way out');
+};
+
+subtest 'an explicit _unknown_fields hashref is copied, not aliased' => sub {
+    my $h = { extra => 1 };
+    my $pod = IO::K8s::Api::Core::V1::Pod->new(metadata => meta('z'), _unknown_fields => $h);
+    $h->{extra} = 2;
+    is($pod->TO_JSON->{extra}, 1, '_unknown_fields is copied on the way in, not aliased');
 };
 
 subtest 'inline struct keeps unknown keys (k91 part 2)' => sub {

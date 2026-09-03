@@ -3,6 +3,8 @@ package IO::K8s::Role::Resource;
 our $VERSION = '1.108';
 use v5.10;
 use Moo::Role;
+use Moo ();
+use Types::Standard qw(HashRef);
 use JSON::MaybeXS ();
 use Scalar::Util qw(blessed);
 
@@ -24,6 +26,7 @@ sub _build_json {
 # bag as a field of its own.
 has _unknown_fields => (
     is       => 'rw',
+    isa      => HashRef,
     init_arg => '_unknown_fields',
     default  => sub { {} },
 );
@@ -84,12 +87,20 @@ around BUILDARGS => sub {
     my $args  = $class->$orig(@args);
     my $known = _known_init_args($class);
     my %unknown;
-    for my $key (keys %$args) {
+    # sort: with several unknown keys, STRICT's die names a deterministic
+    # one instead of whichever `keys` happened to hash first.
+    for my $key (sort keys %$args) {
         next if $known->{$key};
         die "Unknown field '$key' for $class\n" if $IO::K8s::Resource::STRICT;
         my $value = delete $args->{$key};
         next unless defined $value;
         $unknown{$key} = _copy_one_level($value);
+    }
+    # A caller-supplied _unknown_fields hashref must not be aliased -- copy
+    # it one level, same depth as every other value crossing this boundary,
+    # before merging in whatever this pass collected.
+    if (exists $args->{_unknown_fields}) {
+        $args->{_unknown_fields} = _copy_one_level($args->{_unknown_fields});
     }
     if (%unknown) {
         my $bag = $args->{_unknown_fields} // {};
