@@ -16,11 +16,13 @@ Revision history for IO-K8s
     `values` field). Two opaque fields the pre-full-depth model guessed
     disappear because upstream's Go structs never had them: Addon has no
     `status` (`+genclient:noStatus`) and HelmChartConfig has no `status`
-    either. HelmManaged is unchanged. t/68_specbuilder_objects.t's "plain
-    hash specs behave as before" subtest, which used HelmChart as its
-    opaque-hash-spec fixture, now uses a small class local to the test file
-    instead, since every bundled provider's Kinds have gone to full-depth
-    typed modeling in turn and none is left to borrow.
+    either. Calling `->status` on Addon or HelmChartConfig now throws a
+    missing-method error instead of returning undef. HelmManaged is unchanged.
+    t/68_specbuilder_objects.t's "plain hash specs behave as before"
+    subtest, which used HelmChart as its opaque-hash-spec fixture, now uses a
+    small class local to the test file instead, since every bundled
+    provider's Kinds have gone to full-depth typed modeling in turn and
+    none is left to borrow.
 
   - AgentSandbox v1beta1 modeled to full depth (D5, k95): 28 classes across
     the 4 served Kinds (Sandbox, SandboxClaim, SandboxTemplate,
