@@ -211,4 +211,88 @@ subtest 'k94 collision: two schema keys collapsing to the same nested class name
         'a name collision between two schema keys croaks instead of silently reusing the first field\'s class';
 };
 
+# cert-manager's CRDs inline a full PodTemplateSpec several levels into a
+# Challenge/ClusterIssuer 'spec'; the path-derived name for the deepest
+# levels ran past Perl's 251-character limit on a fully qualified
+# identifier and killed class generation ("Identifier too long"). Two
+# sibling branches with an otherwise identical eight-level shape, differing
+# only in their first segment, exercise both the shortening itself and that
+# it does not collapse two different long paths into one class.
+subtest 'a path-derived name past 200 chars is shortened to <root>::_<10 hex chars>' => sub {
+    IO::K8s::AutoGen::clear_cache();
+
+    my @keys = map {
+        my $base = "level$_";
+        $base . ('x' x (30 - length($base)));
+    } 1 .. 8;
+    is(length($_), 30, "fixture key is 30 chars: $_") for @keys;
+
+    my $leaf = { type => 'object', properties => { value => { type => 'string' } } };
+    my $eight_deep = $leaf;
+    $eight_deep = { type => 'object', properties => { $_ => $eight_deep } } for reverse @keys;
+
+    my $schema = {
+        type => 'object',
+        'x-kubernetes-group-version-kind' => [ { group => 'deep.example.com', version => 'v1', kind => 'Deep' } ],
+        properties => {
+            apiVersion => { type => 'string' },
+            kind       => { type => 'string' },
+            metadata   => { type => 'object' },
+            spec => {
+                type => 'object',
+                properties => {
+                    brancha => $eight_deep,
+                    branchb => $eight_deep,
+                },
+            },
+        },
+    };
+
+    my $class;
+    lives_ok {
+        $class = IO::K8s::AutoGen::get_or_generate('com.example.deep.v1.Deep', $schema, {}, 'IO::K8s::_AUTOGEN_karr_deepnames',
+            api_version => 'deep.example.com/v1', kind => 'Deep', resource_plural => 'deeps', is_namespaced => 1);
+    } 'generation lives instead of dying "Identifier too long"';
+
+    my $spec_class = $class->_k8s_attr_info->{spec}{class};
+    my ($a_class, $b_class) = ($spec_class->_k8s_attr_info->{brancha}{class}, $spec_class->_k8s_attr_info->{branchb}{class});
+    for my $key (@keys) {
+        $a_class = $a_class->_k8s_attr_info->{$key}{class};
+        $b_class = $b_class->_k8s_attr_info->{$key}{class};
+    }
+
+    like($a_class, qr/::_[0-9a-f]{10}$/, 'the deepest class name is the shortened <root>::_<hash> form');
+    like($b_class, qr/::_[0-9a-f]{10}$/, "so is the sibling branch's");
+    isnt($a_class, $b_class, 'two structurally-identical deep paths under different branches do not collide');
+    is(substr($a_class, 0, length($class) + 2), "$class\::", 'the shortened name still sits under the root');
+
+    is(IO::K8s::AutoGen::class_root($a_class), $class, 'class_root recovers the Kind class from the deepest class');
+    is(IO::K8s::AutoGen::class_root($class), $class, 'a root is its own class_root');
+    ok(!defined(IO::K8s::AutoGen::class_path($class)), 'a root has no class_path');
+
+    my $path = IO::K8s::AutoGen::class_path($a_class);
+    like($path, qr/^Spec::Brancha::/, 'class_path is the true, unshortened logical path, never the hash');
+    like($path, qr/\Q@{[ ucfirst($keys[-1]) ]}\E$/, 'ending at the deepest key (sanitized + ucfirst)');
+    isnt($path, IO::K8s::AutoGen::class_path($b_class), "the two branches' logical paths differ too");
+    ok(length("$class\::$path") > 200, 'the logical name really is past the shortening threshold');
+
+    # A document with a value at the deepest level round-trips.
+    my $leaf_doc = { value => 'leaf-value' };
+    my $branch_doc = $leaf_doc;
+    $branch_doc = { $_ => $branch_doc } for reverse @keys;
+    my $k8s = IO::K8s->new;
+    $k8s->add({ Deep => "+$class" });
+    my $doc = {
+        apiVersion => 'deep.example.com/v1', kind => 'Deep',
+        metadata   => { name => 'd' },
+        spec       => { brancha => $branch_doc },
+    };
+    my $obj = $k8s->inflate($doc);
+    my $walked = $obj->spec->brancha;
+    $walked = $walked->{$_} for @keys;
+    isa_ok($walked, $a_class, 'inflate builds the shortened nested class all the way down');
+    is($walked->{value}, 'leaf-value', 'the deepest value is reachable through hash-style access');
+    is_deeply($obj->TO_JSON->{spec}, { brancha => $branch_doc }, 'the deep document round-trips through TO_JSON');
+};
+
 done_testing;

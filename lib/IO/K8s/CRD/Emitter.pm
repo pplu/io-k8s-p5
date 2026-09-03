@@ -5,6 +5,7 @@ use v5.10;
 use Moo;
 use Carp qw( croak );
 use Data::Dumper ();
+use Digest::SHA qw( sha1_hex );
 use re ();
 use Types::Standard qw( Str HashRef );
 use IO::K8s::AutoGen ();
@@ -76,15 +77,37 @@ The package a generated class is rendered as: L</names> when listed,
 otherwise L</base> plus the class's path segments below its Kind joined
 together (the Kind itself for the root).
 
+A class deep enough that L<IO::K8s::AutoGen> had to shorten its own
+namespace-qualified Perl name (past its 251-character identifier limit --
+see C<$MAX_CLASS_NAME> there) is rendered from C<< IO::K8s::AutoGen::class_path
+>>, the field path AutoGen records regardless of shortening, not from the
+class's own (possibly hashed) name -- this emitter's own C<base> is
+normally much shorter than the AutoGen namespace prefix that forced the
+shortening, so the joined package name here often fits fine even when
+AutoGen's did not. Only when the joined name would itself run past 200
+characters does the emitted package fall back to C<< <Kind>_<10 hex chars>
+>>, the hex digits a C<sha1_hex> of the field path; give such a class a
+proper name via L</names> instead of relying on that fallback.
+
 =cut
 
 sub package_for {
     my ($self, $class) = @_;
     my $root = $self->{_root} // croak 'package_for needs a render() first';
     return $self->base . '::' . $self->names->{$class} if $self->names->{$class};
-    (my $rel = $class) =~ s/^\Q$root\E(?:::)?//;
     my $kind = (split /::/, $root)[-1];
-    my $joined = join '', $kind, split /::/, $rel;
+
+    # The field path, independent of whatever (possibly hash-shortened)
+    # Perl name AutoGen gave the class -- see the POD above.
+    my $path = IO::K8s::AutoGen::class_path($class);
+    unless (defined $path) {
+        ($path = $class) =~ s/^\Q$root\E(?:::)?//;
+    }
+
+    my $joined = join '', $kind, split /::/, $path;
+    if (length($joined) > 200) {
+        $joined = $kind . '_' . substr(sha1_hex($path), 0, 10);
+    }
     return $self->base . '::' . $joined;
 }
 
@@ -117,13 +140,19 @@ sub render {
 }
 
 # A generated class is one this emitter renders; anything else is stock.
-# A plain index()==0 prefix test would also match a sibling whose name
-# merely starts with the same string -- root ...::V1::Knob would wrongly
-# claim ...::V1::KnobExtra as its own. Require the '::' boundary (or an
-# exact match on the root itself).
+# IO::K8s::AutoGen::class_root is authoritative when it knows the class --
+# it is exactly the bookkeeping _nested_class itself relies on, so it is
+# never fooled by a name merely looking related. Fall back to the string
+# prefix test for anything AutoGen has no record of (a stock class, or a
+# class from a namespace this emitter never generated) -- a plain
+# index()==0 test on its own would also match a sibling whose name merely
+# starts with the same string -- root ...::V1::Knob would wrongly claim
+# ...::V1::KnobExtra as its own -- so the fallback still requires the '::'
+# boundary (or an exact match on the root itself).
 sub _is_generated {
     my ($self, $class) = @_;
     my $root = $self->{_root};
+    return 1 if IO::K8s::AutoGen::class_root($class) eq $root;
     return $class eq $root || index($class, "$root\::") == 0;
 }
 

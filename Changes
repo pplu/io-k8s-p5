@@ -25,6 +25,23 @@ Revision history for IO-K8s
     OPAQUE SPEC / MISSING FIELD Kind; --suggest-dir writes them, and
     refuses a directory inside lib/.
 
+  - IO::K8s::AutoGen caps a path-derived nested class name at 200
+    characters instead of risking "Identifier too long": cert-manager's
+    CRDs inline a full PodTemplateSpec several levels into a
+    ClusterIssuer/Challenge spec, and the resulting name ran past Perl's
+    251-character limit on a fully qualified identifier, which made
+    IO::K8s::CRD->generate -- and maint/crd-drift-check.pl --suggest --
+    fail closed for all three affected Kinds. A name that would exceed
+    the cap is replaced with <root>::_<10 hex chars> (a SHA-1 of the full
+    logical name); the logical path survives the shortening and is
+    recoverable via the new IO::K8s::AutoGen::class_path / class_root.
+    IO::K8s::CRD::Emitter renders such a class from that recovered path
+    rather than from its own (possibly hashed) name, so the emitted
+    source usually keeps the readable package name even where AutoGen's
+    own namespace-qualified one had to be hashed; only when the emitted
+    name would itself exceed 200 characters does it fall back the same
+    way, and a names entry still overrides either.
+
   - IO::K8s::AutoGen checks x-kubernetes-int-or-string before the type
     dispatch (k94). A property that marks Kubernetes' IntOrString union
     this way and carries no type of its own -- the structural-schema

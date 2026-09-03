@@ -5,12 +5,21 @@ use v5.10;
 use strict;
 use warnings;
 use Carp qw(croak);
+use Digest::SHA qw( sha1_hex );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype looks_like_number);
 use Types::Standard qw( Bool Int Str );
 
 # Cache of generated classes
 my %_generated;
+
+# Perl's own limit on a fully qualified identifier is 251 characters. A
+# path-derived nested class name (see _nested_class below) is kept while it
+# fits under this, lower threshold -- the headroom accounts for a
+# '::_Spec'-style segment a caller might append to an already-long name, and
+# for the shortened '::_<hash>' form itself, which must never in turn need
+# shortening.
+my $MAX_CLASS_NAME = 200;
 
 # Class-level schema description, keyed by generated class name. AutoGen
 # itself never reads this -- it exists for IO::K8s::CRD::Emitter, which has
@@ -351,7 +360,40 @@ sub _class_segment {
 # round-trip in the default non-strict mode. Never generate a class that
 # silently drops a field -- the same rule _croak_unresolved_ref enforces for
 # an unresolved $ref (k56), reached here from a name collision instead.
+#
+# Keyed on the FULL logical name (root + the whole '::'-joined path below
+# it), never on a class's own (possibly hash-shortened) Perl name: two
+# different long paths must never be treated as "the same nested class"
+# just because a name collision detector happened to look at the shortened
+# form, which -- being a 40-bit truncated hash -- is a much smaller space
+# than the paths it stands in for.
 my %_nested_origin;
+
+# Every nested class AutoGen has generated, keyed by its actual (possibly
+# shortened) Perl class name:
+#   %_root_of   -> the top-level generated class (the Kind class) the
+#                  nesting started from. A root has no entry here;
+#                  class_root() falls back to the class itself.
+#   %_class_path -> the '::'-joined path below that root
+#                  ('Spec::Acme::SolversItem::...'), recorded regardless of
+#                  whether the class name itself had to be shortened. A
+#                  root, or a class AutoGen did not generate as nested, has
+#                  no entry; class_path() returns undef for those.
+my %_root_of;
+my %_class_path;
+
+# The Perl class name for a nested class at logical path $path below $root:
+# the path-derived name (identical to what pre-1.109 AutoGen always used)
+# while it fits under $MAX_CLASS_NAME, otherwise <root>::_<10 hex chars>
+# from a SHA-1 of the full logical name -- deterministic, so the same
+# (root, path) always yields the same class, and short enough that it can
+# never itself need shortening (root plus a fixed 13-character suffix).
+sub _class_for_path {
+    my ($root, $path) = @_;
+    my $logical_name = "$root\::$path";
+    return $logical_name if length($logical_name) <= $MAX_CLASS_NAME;
+    return $root . '::_' . substr(sha1_hex($logical_name), 0, 10);
+}
 
 # An inline `type: object` with its own properties becomes a nested class
 # named after its place in the parent -- <Parent>::<Prop>, plus an Item /
@@ -362,21 +404,36 @@ my %_nested_origin;
 # the result keeps working: a Moo object is a blessed hash keyed by
 # attribute name. Property-less objects and additionalProperties-only maps
 # are not touched here; they stay opaque (k55).
+#
+# A schema nested deep enough (cert-manager's CRDs inline a full
+# PodTemplateSpec under a solver, itself several levels into a Challenge)
+# makes the path-derived name run past Perl's 251-character identifier
+# limit; see $MAX_CLASS_NAME and _class_for_path above.
 sub _nested_class {
     my ($parent_class, $field_name, $suffix, $schema, $all_defs, $namespace) = @_;
-    my $class = $parent_class . '::' . _class_segment($field_name) . ($suffix // '');
-    if ($_generated{$class}) {
-        my $existing = $_nested_origin{$class};
-        if (!defined($existing) || $existing ne $field_name) {
+
+    my $root = $_root_of{$parent_class} // $parent_class;
+    my $parent_path = $_class_path{$parent_class};
+    my $segment = _class_segment($field_name) . ($suffix // '');
+    my $path = defined($parent_path) ? "$parent_path\::$segment" : $segment;
+    my $logical_name = "$root\::$path";
+
+    if (exists $_nested_origin{$logical_name}) {
+        my $existing = $_nested_origin{$logical_name};
+        if ($existing ne $field_name) {
             croak "Cannot generate a nested class for field '$field_name' of $parent_class: "
-                . "its class name $class is already taken by field '"
-                . (defined $existing ? $existing : '?')
-                . "' -- two schema keys collapse to the same class segment; rename one of them";
+                . "its class name $logical_name is already taken by field '$existing' "
+                . "-- two schema keys collapse to the same class segment; rename one of them";
         }
-        return $class;
+        return _class_for_path($root, $path);
     }
-    $_nested_origin{$class} = $field_name;
-    my $def_name = class_to_def($parent_class) . '.' . _class_segment($field_name) . ($suffix // '');
+    $_nested_origin{$logical_name} = $field_name;
+
+    my $class = _class_for_path($root, $path);
+    $_root_of{$class} = $root;
+    $_class_path{$class} = $path;
+
+    my $def_name = class_to_def($parent_class) . '.' . $segment;
     _generate_class($class, $def_name, $schema, $all_defs, $namespace);
     return $class;
 }
@@ -714,6 +771,8 @@ sub clear_cache {
     %_generated = ();
     %_nested_origin = ();
     %_descriptions = ();
+    %_root_of = ();
+    %_class_path = ();
 }
 
 # The schema `description` a generated class was built from, or undef when
@@ -721,6 +780,25 @@ sub clear_cache {
 sub class_description {
     my ($class) = @_;
     return $_descriptions{$class};
+}
+
+# The top-level generated class (the Kind class) a nested class's naming
+# started from, or $class itself when it already is one -- a root is never
+# recorded in %_root_of, so this always falls back correctly. See
+# IO::K8s::CRD::Emitter, which needs the true root to decide whether a
+# reachable class belongs to the tree it is currently rendering.
+sub class_root {
+    my ($class) = @_;
+    return $_root_of{$class} // $class;
+}
+
+# The '::'-joined path a nested class sits at below its root
+# ('Spec::Acme::SolversItem::...'), recorded even when the class's own Perl
+# name had to be shortened (see $MAX_CLASS_NAME). undef for a root class, or
+# for any class AutoGen did not generate through _nested_class.
+sub class_path {
+    my ($class) = @_;
+    return $_class_path{$class};
 }
 
 # List all generated classes
@@ -819,6 +897,18 @@ own) stay the existing opaque hash of strings, with nothing underneath to
 attach options to. Scalar properties carry their options at every level
 regardless.
 
+A path-derived nested class name that would run past Perl's 251-character
+limit on a fully qualified identifier (cert-manager's CRDs inline a full
+C<PodTemplateSpec> several levels into a C<Challenge>'s C<spec>, and the
+namespace prefix an AutoGen instance generates under adds still more) is
+shortened instead of failing class generation: C<< <root>::_<10 hex chars>
+>>, the root being the top-level generated class (the Kind) the nesting
+started from and the hex digits a C<Digest::SHA::sha1_hex> of the full,
+unshortened logical name. The logical path is not lost -- L</class_path>
+and L</class_root> recover it -- and a name collision between two
+different schema keys is still detected against that full logical name,
+never against the (much smaller) space of possibly-shortened names.
+
 =head1 FUNCTIONS
 
 =head2 get_or_generate($def_name, $schema, $all_defs, $namespace)
@@ -896,5 +986,19 @@ List all generated class names.
 The schema C<description> a generated class was built from, or C<undef>
 when the schema carried none. Used by L<IO::K8s::CRD::Emitter> to fill in
 a rendered class's C<# ABSTRACT> line.
+
+=head2 class_root($class)
+
+The top-level generated class (the Kind class) C<$class>'s nesting started
+from, or C<$class> itself when it already is a root -- including when
+C<$class> is not something AutoGen generated at all. Never C<undef>.
+
+=head2 class_path($class)
+
+The C<::>-joined field path C<$class> sits at below its L</class_root>
+(C<Spec::Acme::SolversItem::...>), recorded even when C<$class>'s own Perl
+name had to be shortened past Perl's identifier limit. C<undef> for a root
+class or for a class AutoGen did not generate through nested-object
+handling.
 
 =cut

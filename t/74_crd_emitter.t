@@ -189,4 +189,73 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
     }
 };
 
+# k94/long names: cert-manager's CRDs inline a full PodTemplateSpec several
+# levels into a Challenge/ClusterIssuer 'spec', and the path-derived name
+# for the deepest levels ran past Perl's 251-character identifier limit
+# inside AutoGen's own (namespace-prefixed) class names. This emitter's own
+# `base` is normally much shorter than that namespace prefix, so its joined
+# package name usually still fits within 200 characters even when AutoGen's
+# own name did not (see t/72's subtest for that case) -- this schema is
+# deep enough that even the emitter's own joined name runs past 200,
+# exercising its <Kind>_<hash> fallback too.
+subtest 'a path-derived name past 200 chars still renders, with its own fallback and a names override' => sub {
+    IO::K8s::AutoGen::clear_cache();
+
+    my @keys = map {
+        my $base = "level$_";
+        $base . ('x' x (30 - length($base)));
+    } 1 .. 8;
+
+    my $leaf = { type => 'object', properties => { value => { type => 'string' } } };
+    my $eight_deep = $leaf;
+    $eight_deep = { type => 'object', properties => { $_ => $eight_deep } } for reverse @keys;
+
+    my $schema = {
+        type => 'object',
+        'x-kubernetes-group-version-kind' => [ { group => 'deep.example.com', version => 'v1', kind => 'Deep' } ],
+        properties => {
+            apiVersion => { type => 'string' },
+            kind       => { type => 'string' },
+            metadata   => { type => 'object' },
+            spec => { type => 'object', properties => { branch => $eight_deep } },
+        },
+    };
+
+    my $deep_root = IO::K8s::AutoGen::get_or_generate('com.example.deep.v1.Deep', $schema, {}, 'IO::K8s::_AUTOGEN_karr_deepemit',
+        api_version => 'deep.example.com/v1', kind => 'Deep', resource_plural => 'deeps', is_namespaced => 1);
+
+    my $deepest = $deep_root->_k8s_attr_info->{spec}{class}->_k8s_attr_info->{branch}{class};
+    $deepest = $deepest->_k8s_attr_info->{$_}{class} for @keys;
+    like($deepest, qr/::_[0-9a-f]{10}$/, 'AutoGen itself had to shorten the deepest class');
+
+    my $emitter = IO::K8s::CRD::Emitter->new(base => 'TestDeepEmit::V1');
+    my $deep_files = $emitter->render($deep_root);
+    for my $path (sort keys %$deep_files) {
+        ok(eval "$deep_files->{$path}\n1;", "compiles: $path") or diag "$path:\n" . $deep_files->{$path} . "\n$@";
+    }
+
+    my $deepest_package = $emitter->package_for($deepest);
+    like($deepest_package, qr/^TestDeepEmit::V1::Deep_[0-9a-f]{10}$/,
+        "the emitter's own joined name also runs past 200 chars, so it falls back to <Kind>_<hash> too");
+
+    my $doc = { value => 'leaf-value' };
+    $doc = { $_ => $doc } for reverse @keys;
+    my $full_doc = {
+        apiVersion => 'deep.example.com/v1', kind => 'Deep',
+        metadata   => { name => 'd' },
+        spec       => { branch => $doc },
+    };
+    my $hand = IO::K8s->new; $hand->add({ Deep => '+TestDeepEmit::V1::Deep' });
+    my $gen  = IO::K8s->new; $gen->add({ Deep => "+$deep_root" });
+    is_deeply($hand->inflate($full_doc)->TO_JSON, $gen->inflate($full_doc)->TO_JSON,
+        'the emitted (hash-fallback-named) class round-trips the same document as the generated one');
+
+    # A names entry for the deepest class is honoured -- under a different
+    # base, so its package names do not collide with the ones just eval'd.
+    my $emitter2 = IO::K8s::CRD::Emitter->new(base => 'TestDeepNamed::V1', names => { $deepest => 'DeepLeaf' });
+    my $named_files = $emitter2->render($deep_root);
+    ok(exists $named_files->{'TestDeepNamed/V1/DeepLeaf.pm'}, 'a names entry for the deepest class is honoured');
+    is($emitter2->package_for($deepest), 'TestDeepNamed::V1::DeepLeaf', 'package_for reflects the name map, not the fallback');
+};
+
 done_testing;
