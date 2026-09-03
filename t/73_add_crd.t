@@ -102,6 +102,51 @@ subtest 'generate: scope Cluster does not compose Role::Namespaced' => sub {
     ok(!$storage_class->does('IO::K8s::Role::Namespaced'), 'Cluster-scoped generated class is not Namespaced');
 };
 
+subtest 'add_crd: a hyphenated API group and an odd nested JSON key generate valid packages' => sub {
+    # cert-manager.io's own group is 'acme.cert-manager.io': every segment
+    # of def_to_class's ::-joined package name must be a bare identifier,
+    # and a hyphen is not one (D10 follow-up, the crd-drift-check --suggest
+    # run over CertManager).
+    my ($crd) = @{ IO::K8s::CRD->load($fixture) };
+    my %hyphen_crd = %$crd;
+    $hyphen_crd{metadata} = { %{ $crd->{metadata} }, name => 'knobs.acme.cert-manager.io' };
+    $hyphen_crd{spec} = { %{ $crd->{spec} }, group => 'acme.cert-manager.io' };
+
+    # Give the storage version's spec an oddly-named nested object property
+    # too: '.' and '/' are as invalid in a nested class's own package
+    # segment as '-' is in the group.
+    my @versions = map { +{ %$_ } } @{ $crd->{spec}{versions} };
+    for my $v (@versions) {
+        next unless $v->{name} eq 'v1';
+        $v->{schema} = { %{ $v->{schema} } };
+        my $oapi = { %{ $v->{schema}{openAPIV3Schema} } };
+        $oapi->{properties} = { %{ $oapi->{properties} } };
+        $oapi->{properties}{spec} = { %{ $oapi->{properties}{spec} } };
+        $oapi->{properties}{spec}{properties} = {
+            %{ $oapi->{properties}{spec}{properties} },
+            'x.y/z' => { type => 'object', properties => { a => { type => 'string' } } },
+        };
+        $v->{schema}{openAPIV3Schema} = $oapi;
+    }
+    $hyphen_crd{spec}{versions} = \@versions;
+
+    my $k8s = IO::K8s->new;
+    my $reg;
+    lives_ok { $reg = $k8s->add_crd(\%hyphen_crd) } 'add_crd lives for a hyphenated API group';
+    my $storage_class = $reg->{Knob}{ $reg->{Knob}{storage} };
+    like($storage_class, qr/::acme::cert_manager::io::v1::Knob$/, 'the hyphen in the group sanitizes to an underscore in the package');
+    is($storage_class->api_version, 'acme.cert-manager.io/v1', 'api_version keeps the original hyphen -- only the package name is sanitized');
+    is($k8s->expand_class('acme.cert-manager.io/v1/Knob'), $storage_class, 'expand_class resolves the hyphenated, domain-qualified GVK string');
+
+    my $knob = $k8s->new_object('Knob',
+        metadata => { name => 'k', namespace => 'd' },
+        spec     => { mode => 'fast', 'x.y/z' => { a => 'v' } },
+    );
+    my $spec_attr_info = ref($knob->spec)->_k8s_attr_info;
+    like($spec_attr_info->{x_y_z}{class}, qr/::X_y_z$/, 'x.y/z -> a nested class named ::X_y_z');
+    is_deeply($knob->TO_JSON->{spec}{'x.y/z'}, { a => 'v' }, 'the odd key round-trips on the wire under its original JSON key');
+};
+
 subtest 'add_crd registers every served version and the storage short name' => sub {
     my $k8s = IO::K8s->new;
     my $reg = $k8s->add_crd($fixture);

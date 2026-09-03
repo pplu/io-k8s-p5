@@ -22,18 +22,44 @@ my %_descriptions;
 # Default namespace for auto-generated classes
 our $DEFAULT_NAMESPACE = 'IO::K8s::_AUTOGEN';
 
+# Sanitize one or more strings into safe Perl package-name segments: every
+# character outside [A-Za-z0-9_] becomes '_', and a segment that would
+# start with a digit gets a leading '_' (a bareword identifier can't start
+# with one). Each argument becomes exactly one output segment -- splitting
+# a def_name or an api_version into segments is the caller's job (see
+# def_to_class and _class_name_for below); _class_segment passes a whole
+# JSON key through as a single segment on purpose, since a key containing
+# '.' or '/' is one field name, not a request for sub-packages.
+#
+# A hyphenated API group ('cert-manager.io') is the case this exists for:
+# left alone, 'acme.cert-manager.io' becomes the package segment
+# 'cert-manager', which Perl parses as a subtraction ('cert' MINUS
+# 'manager'), not an identifier -- def_to_class died building the package,
+# not on anything IO::K8s::CRD did wrong.
+sub _class_segments {
+    return map {
+        my $s = $_;
+        $s =~ s/[^A-Za-z0-9_]/_/g;
+        $s = "_$s" if $s =~ /^[0-9]/;
+        $s;
+    } @_;
+}
+
 # Convert OpenAPI definition name to Perl class name
 # With namespace 'MyProject::K8s':
 #   helm.cattle.io.v1.HelmChart -> MyProject::K8s::helm::cattle::io::v1::HelmChart
 sub def_to_class {
     my ($def_name, $namespace) = @_;
     $namespace //= $DEFAULT_NAMESPACE;
-    my $class = $def_name;
-    $class =~ s/\./::/g;
-    return "${namespace}::$class";
+    return join('::', $namespace, _class_segments(split /\./, $def_name));
 }
 
-# Convert Perl class name back to OpenAPI definition name
+# Convert Perl class name back to OpenAPI definition name. Lossy on
+# purpose: def_to_class/_class_segments sanitize each package segment (a
+# hyphen becomes '_', among other substitutions), and that cannot be
+# undone here. Used only for diagnostics and to build a nested class's
+# synthetic def_name (_nested_class) -- never to look a definition back up
+# in $all_defs.
 sub class_to_def {
     my ($class) = @_;
     # Strip any _AUTOGEN namespace prefix
@@ -80,13 +106,12 @@ sub _class_name_for {
     my $gvk = $schema->{'x-kubernetes-group-version-kind'};
     return $class unless ref($gvk) eq 'ARRAY' && @$gvk > 1;
 
-    # / and . are not valid in a package name, and a trailing segment must
-    # be a bare identifier; map group/version to ::-separated segments the
-    # same way def_to_class maps def_names.
-    my $suffix = $api_version;
-    $suffix =~ s{/}{::}g;
-    $suffix =~ s{\.}{::}g;
-    return "${class}::${suffix}";
+    # / and . are not valid in a package name, and every segment must be a
+    # bare identifier; map group/version to sanitized ::-separated segments
+    # the same way def_to_class maps def_names (see _class_segments) -- a
+    # hyphenated group in the api_version needs the same treatment here.
+    my @segments = _class_segments(split m{[./]}, $api_version);
+    return "${class}::" . join('::', @segments);
 }
 
 # Wire apiVersion a GVK entry represents: group/version, or bare version
@@ -296,12 +321,16 @@ sub _croak_unresolved_ref {
         . "every round-trip";
 }
 
-# The class segment for a nested class: the JSON key, sanitized the way the
-# DSL sanitizes attribute names, then ucfirst'd. `x-extra` -> `X_extra`,
-# `$ref` -> `_ref`.
+# The class segment for a nested class: the whole JSON key sanitized into
+# one package-identifier segment (see _class_segments above), then
+# ucfirst'd. `x-extra` -> `X_extra`, `$ref` -> `_ref`, `x.y/z` -> `X_y_z`
+# -- unlike def_to_class/_class_name_for the key is never split on '.' or
+# '/' first: it is one field name, not a request for sub-packages, and a
+# key containing either used to reach package creation unsanitized and die
+# there with a message that named neither the field nor the class.
 sub _class_segment {
     my ($json_key) = @_;
-    return ucfirst(IO::K8s::Resource::_sanitize_attr_name($json_key));
+    return ucfirst((_class_segments($json_key))[0]);
 }
 
 # The field name that generated a given nested class name. Needed to fail
