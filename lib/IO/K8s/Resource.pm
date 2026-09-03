@@ -9,7 +9,8 @@ use Package::Stash;
 use Types::Standard qw( ArrayRef Bool HashRef InstanceOf Int Maybe Num Str );
 use IO::K8s::Types qw( IntOrStr Quantity Time );
 use IO::K8s::Role::Resource ();
-use Scalar::Util qw(blessed reftype);
+use Scalar::Util qw( blessed reftype looks_like_number );
+use Carp qw( croak );
 
 # Registry: class -> attr -> { type, class, is_array, is_hash, is_bool, is_int }
 # Use 'our' to make it a proper package variable accessible via symbol table
@@ -87,6 +88,91 @@ my %HASH_VALUE_TYPES = (
     Time     => { isa => Time,     flag => 'is_hash_of_time' },
     IntOrStr => { isa => IntOrStr, flag => 'is_hash_of_int_or_string' },
 );
+
+# Field options a declaration may carry (D3): the third argument
+# (`k8s name => Type, { ... }`) or, inside an inline struct, the two-element
+# form `name => [ Type, { ... } ]`. The legacy 'required' marker and the
+# `Type!` suffix still work and mean { required => 1 }. Everything here is
+# recorded in the registry for to_crd; enum, minimum, maximum and pattern
+# are also enforced at construction, the way { Quantity => 1 } validates
+# its values -- a bad value fails here instead of at the API server.
+# default is deliberately NOT applied client-side: defaulting is the API
+# server's job, and a client default would change the wire output.
+my %FIELD_OPTIONS = map { $_ => 1 } qw(
+    required default enum minimum maximum pattern description nullable
+    preserve_unknown
+);
+my %NUMERIC_KIND = (Int => 1, Num => 1);
+my %STRING_KIND  = (Str => 1, IntOrStr => 1, Quantity => 1, Time => 1);
+
+# The value constraints as child types of the field's base type, so a
+# failure names the rule ("is not one of", "is below the minimum") rather
+# than an anonymous intersection. $kind is the scalar type name the field
+# is built on (Str, Int, Num, Bool, IntOrStr, Quantity, Time).
+sub _constrain {
+    my ($base, $kind, $opts, $where) = @_;
+    my $type = $base;
+
+    if (exists $opts->{enum}) {
+        croak "k8s: 'enum' for $where must be a non-empty arrayref"
+            unless ref $opts->{enum} eq 'ARRAY' && @{ $opts->{enum} };
+        croak "k8s: 'enum' is not allowed on a Bool field ($where)" if $kind eq 'Bool';
+        my %allowed = map { $_ => 1 } @{ $opts->{enum} };
+        my $list = join ', ', @{ $opts->{enum} };
+        $type = $type->create_child_type(
+            display_name => $type->display_name . '[enum]',
+            constraint   => sub { defined $_ && exists $allowed{$_} },
+            message      => sub { "Value \"$_\" is not one of: $list" },
+        );
+    }
+
+    if (exists $opts->{minimum} || exists $opts->{maximum}) {
+        croak "k8s: 'minimum' and 'maximum' need an Int or Num field, not $kind ($where)"
+            unless $NUMERIC_KIND{$kind};
+        my ($min, $max) = @{$opts}{qw(minimum maximum)};
+        for my $bound ($min, $max) {
+            croak "k8s: 'minimum' and 'maximum' for $where must be numbers"
+                if defined $bound && !looks_like_number($bound);
+        }
+        $type = $type->create_child_type(
+            display_name => $type->display_name . '[range]',
+            constraint   => sub {
+                (!defined $min || $_ >= $min) && (!defined $max || $_ <= $max)
+            },
+            message      => sub {
+                defined $min && $_ < $min
+                    ? "Value \"$_\" is below the minimum $min"
+                    : "Value \"$_\" is above the maximum $max";
+            },
+        );
+    }
+
+    if (exists $opts->{pattern}) {
+        croak "k8s: 'pattern' needs a string field, not $kind ($where)"
+            unless $STRING_KIND{$kind};
+        my $re = ref $opts->{pattern} eq 'Regexp'
+            ? $opts->{pattern}
+            : eval { my $p = $opts->{pattern}; qr/$p/ };
+        croak "k8s: 'pattern' for $where does not compile: $@" unless $re;
+        $type = $type->create_child_type(
+            display_name => $type->display_name . '[pattern]',
+            constraint   => sub { defined $_ && $_ =~ $re },
+            message      => sub { "Value \"$_\" does not match the pattern $re" },
+        );
+    }
+
+    return $type;
+}
+
+# Options that only make sense on a scalar-bearing field. Object, struct
+# and opaque container fields reject them at class load.
+sub _reject_value_options {
+    my ($opts, $where) = @_;
+    croak "k8s: 'enum' needs a scalar field ($where)" if exists $opts->{enum};
+    croak "k8s: 'minimum' and 'maximum' need a scalar field ($where)"
+        if exists $opts->{minimum} || exists $opts->{maximum};
+    croak "k8s: 'pattern' needs a scalar field ($where)" if exists $opts->{pattern};
+}
 
 sub import {
     my $class = shift;
@@ -192,99 +278,130 @@ sub _generate_inline_struct {
 }
 
 sub _k8s {
-    my ($class, $caller, $name, $type_spec, $required_marker) = @_;
+    my ($class, $caller, $name, $type_spec, $marker) = @_;
 
-    my $json_key = $name;
+    my $json_key  = $name;
     my $attr_name = _sanitize_attr_name($name);
+    my $where     = "field '$name' of $caller";
 
-    # Ensure the registry entry exists
-    $_attr_registry{$caller} = {} unless exists $_attr_registry{$caller};
+    # Inline-struct form: name => [ Type, { options } ]. Exactly two elements
+    # with a hashref second is unambiguous -- every array type spec ([Str],
+    # ['Core::V1::Container'], [ {} ], [ [] ]) has one element.
+    if (ref $type_spec eq 'ARRAY' && @$type_spec == 2 && ref $type_spec->[1] eq 'HASH') {
+        ($type_spec, $marker) = @$type_spec;
+    }
 
-    my %info;
-    my $isa;
-    my $required = $required_marker && $required_marker eq 'required' ? 1 : 0;
+    my %opts;
+    if (ref $marker eq 'HASH') {
+        %opts = %$marker;
+    } elsif (defined $marker && $marker eq 'required') {
+        $opts{required} = 1;
+    } elsif (defined $marker) {
+        croak "k8s: third argument for $where must be 'required' or a hashref of field options, got '$marker'";
+    }
+    for my $key (sort keys %opts) {
+        croak "k8s: unknown field option '$key' for $where (known: "
+            . join(', ', sort keys %FIELD_OPTIONS) . ')'
+            unless $FIELD_OPTIONS{$key};
+    }
+    my $required = delete $opts{required} ? 1 : 0;
 
-    # Check for ! suffix on strings (legacy/alternative required syntax)
+    # `!` suffix on strings (legacy/alternative required syntax)
     if (!ref $type_spec && !_is_type_tiny($type_spec) && $type_spec =~ s/!$//) {
         $required = 1;
     } elsif (ref $type_spec eq 'ARRAY' && !ref($type_spec->[0]) && $type_spec->[0] =~ s/!$//) {
         $required = 1;
     }
 
+    # Ensure the registry entry exists
+    $_attr_registry{$caller} = {} unless exists $_attr_registry{$caller};
+
+    # Every branch below sets $inner, the type of a present value; the
+    # Maybe wrapping for an optional field happens once at the end.
+    my %info;
+    my $inner;
+
     # Handle Type::Tiny objects directly (Str, Int, Bool, IntOrStr, Quantity, Time)
     if (_is_type_tiny($type_spec)) {
-        my $flags = $TYPE_FLAGS{$type_spec->name};
+        my $kind  = $type_spec->name;
+        my $flags = $TYPE_FLAGS{$kind};
         if ($flags) {
-            %info = %$flags;
-            $isa = $required ? $type_spec : Maybe[$type_spec];
+            %info  = %$flags;
+            $inner = _constrain($type_spec, $kind, \%opts, $where);
         }
     } elsif (!ref $type_spec) {
         if (my $flags = $TYPE_FLAGS{$type_spec}) {
             %info = %$flags;
             my $base = $STR_ISA_MAP{$type_spec} // Str;
-            $isa = $required ? $base : Maybe[$base];
+            $inner = _constrain($base, $type_spec, \%opts, $where);
         } else {
             my $full_class = _expand_class($type_spec);
             $info{is_object} = 1;
             $info{class} = $full_class;
-            $isa = $required ? InstanceOf[$full_class] : Maybe[InstanceOf[$full_class]];
+            _reject_value_options(\%opts, $where);
+            $inner = InstanceOf[$full_class];
         }
     } elsif (ref $type_spec eq 'ARRAY') {
-        my $inner = $type_spec->[0];
+        my $elem = $type_spec->[0];
         # [ {} ] / [ [] ] -- an array of opaque hashes or opaque arrays, for a
         # schema whose items are `type: object` / `type: array` with no further
         # structure (k66). Validated as arrays of the right container
         # shape; the contents pass through untyped, the same one-level-copy
         # opaque handling a free-form HashRef gets in TO_JSON / _inflate_struct.
-        if (ref $inner eq 'HASH') {
+        if (ref $elem eq 'HASH') {
             $info{is_array_of_hash} = 1;
-            $isa = $required ? ArrayRef[HashRef] : Maybe[ArrayRef[HashRef]];
-        } elsif (ref $inner eq 'ARRAY') {
+            _reject_value_options(\%opts, $where);
+            $inner = ArrayRef[HashRef];
+        } elsif (ref $elem eq 'ARRAY') {
             $info{is_array_of_array} = 1;
-            $isa = $required ? ArrayRef[ArrayRef] : Maybe[ArrayRef[ArrayRef]];
+            _reject_value_options(\%opts, $where);
+            $inner = ArrayRef[ArrayRef];
         # Handle [Str] with Type::Tiny object
-        } elsif (_is_type_tiny($inner)) {
-            my $type_name = $inner->name;
-            if ($type_name eq 'Str') {
+        } elsif (_is_type_tiny($elem)) {
+            my $kind = $elem->name;
+            if ($kind eq 'Str') {
                 $info{is_array_of_str} = 1;
-            } elsif ($type_name eq 'Int') {
+            } elsif ($kind eq 'Int') {
                 $info{is_array_of_int} = 1;
-            } elsif ($type_name eq 'Bool') {
+            } elsif ($kind eq 'Bool') {
                 $info{is_array_of_bool} = 1;
             }
-            $isa = $required ? ArrayRef[$inner] : Maybe[ArrayRef[$inner]];
-        } elsif ($inner eq 'Str') {
+            $inner = ArrayRef[ _constrain($elem, $kind, \%opts, $where) ];
+        } elsif ($elem eq 'Str') {
             $info{is_array_of_str} = 1;
-            $isa = $required ? ArrayRef[Str] : Maybe[ArrayRef[Str]];
-        } elsif ($inner eq 'Int') {
+            $inner = ArrayRef[ _constrain(Str, 'Str', \%opts, $where) ];
+        } elsif ($elem eq 'Int') {
             $info{is_array_of_int} = 1;
-            $isa = $required ? ArrayRef[Int] : Maybe[ArrayRef[Int]];
+            $inner = ArrayRef[ _constrain(Int, 'Int', \%opts, $where) ];
         } else {
-            my $full_class = _expand_class($inner);
+            my $full_class = _expand_class($elem);
             $info{is_array_of_objects} = 1;
             $info{class} = $full_class;
-            $isa = $required ? ArrayRef[InstanceOf[$full_class]] : Maybe[ArrayRef[InstanceOf[$full_class]]];
+            _reject_value_options(\%opts, $where);
+            $inner = ArrayRef[InstanceOf[$full_class]];
         }
     } elsif (ref $type_spec eq 'HASH') {
         my @keys = keys %$type_spec;
         if (@keys == 1 && !ref($type_spec->{$keys[0]}) && $type_spec->{$keys[0]} eq '1') {
             # Hash-of-X pattern: { TypeName => 1 }
-            my $inner = $keys[0];
-            if ($inner eq 'Str') {
+            my $vkind = $keys[0];
+            if ($vkind eq 'Str') {
                 $info{is_hash_of_str} = 1;
                 # Use plain HashRef without inner constraint - K8s has nested hashes
                 # in fields like fieldsV1, annotations, labels which can have any structure
-                $isa = $required ? HashRef : Maybe[HashRef];
-            } elsif (my $vt = $HASH_VALUE_TYPES{$inner}) {
+                _reject_value_options(\%opts, $where);
+                $inner = HashRef;
+            } elsif (my $vt = $HASH_VALUE_TYPES{$vkind}) {
                 # { Quantity => 1 } and friends: a typed value map. Each value
                 # is validated against the scalar type (k63).
                 $info{$vt->{flag}} = 1;
-                $isa = $required ? HashRef[$vt->{isa}] : Maybe[HashRef[$vt->{isa}]];
+                $inner = HashRef[ _constrain($vt->{isa}, $vkind, \%opts, $where) ];
             } else {
-                my $full_class = _expand_class($inner);
+                my $full_class = _expand_class($vkind);
                 $info{is_hash_of_objects} = 1;
                 $info{class} = $full_class;
-                $isa = $required ? HashRef[InstanceOf[$full_class]] : Maybe[HashRef[InstanceOf[$full_class]]];
+                _reject_value_options(\%opts, $where);
+                $inner = HashRef[InstanceOf[$full_class]];
             }
         } else {
             # Inline struct: { field => TypeSpec, ... }
@@ -293,10 +410,24 @@ sub _k8s {
             $info{is_object} = 1;
             $info{is_inline_struct} = 1;
             $info{class} = $inner_class;
-            $isa = $required ? InstanceOf[$inner_class] : Maybe[InstanceOf[$inner_class]];
+            _reject_value_options(\%opts, $where);
+            $inner = InstanceOf[$inner_class];
         }
     }
 
+    croak "k8s: cannot interpret the type of $where" unless defined $inner;
+
+    # A default that the field's own type rejects is a declaration error,
+    # not something to discover when to_crd emits it.
+    if (exists $opts{default} && !$inner->check($opts{default})) {
+        croak "k8s: 'default' for $where fails the field's own type: "
+            . $inner->get_message($opts{default});
+    }
+
+    my $isa = $required ? $inner : Maybe[$inner];
+
+    $info{required} = 1 if $required;
+    $info{options}  = { %opts } if %opts;
 
     # Store json_key when it differs from the Perl attribute name
     $info{json_key} = $json_key if $attr_name ne $json_key;
