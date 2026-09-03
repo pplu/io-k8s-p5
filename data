@@ -1,0 +1,24 @@
+---
+class: standard
+completed: 2026-09-03T05:04:23Z
+created: 2026-09-02T23:25:47Z
+id: 91
+priority: medium
+started: 2026-09-03T05:04:23Z
+status: done
+tags:
+- crd
+- docs
+- agentsandbox
+title: README/POD AgentSandbox example passes spec.replicas, which the modeled v1beta1
+  Sandbox class silently drops
+updated: 2026-09-03T05:04:23Z
+---
+
+README.md "AgentSandbox" section (and the same SYNOPSIS shape in the provider POD) shows
+
+  spec => { replicas => 1, shutdownPolicy => "Retain" }
+
+IO::K8s::AgentSandbox::V1beta1::Sandbox models spec as an inline struct without a replicas field, so Moo discards the key on construction and to_json emits spec => { shutdownPolicy => "Retain" }. Verified 2026-09-03 on master (1.108). Upstream agent-sandbox v1.0.0 Sandbox has no spec.replicas either, so the example is wrong, not the class.
+
+Two parts: (1) fix the example; (2) decide whether an inline-struct spec should reject unknown keys instead of dropping them silently -- the same fail-closed line the k56/k57 AutoGen fixes drew. Part (2) is being settled in the CRD design grill.
