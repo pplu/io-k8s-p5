@@ -12,6 +12,13 @@ use Types::Standard qw( Bool Int Str );
 # Cache of generated classes
 my %_generated;
 
+# Class-level schema description, keyed by generated class name. AutoGen
+# itself never reads this -- it exists for IO::K8s::CRD::Emitter, which has
+# no other way to recover a schema's `description` once the class is built
+# (the k8s DSL only records per-field descriptions, not one for the class
+# as a whole).
+my %_descriptions;
+
 # Default namespace for auto-generated classes
 our $DEFAULT_NAMESPACE = 'IO::K8s::_AUTOGEN';
 
@@ -157,6 +164,7 @@ sub _generate_class {
 
     return if $_generated{$class};
     $_generated{$class} = 1;  # Mark early to prevent recursion
+    $_descriptions{$class} = $schema->{description} if defined $schema->{description};
 
     # Ensure parent packages exist
     _ensure_package_exists($class);
@@ -389,6 +397,20 @@ sub _schema_to_type_spec {
         }
         _croak_unresolved_ref($ref, $where);
     }
+
+    # A structural CRD schema marks Kubernetes' IntOrString union type with
+    # this extension, almost always instead of `type` rather than alongside
+    # it (the pruning rules for x-kubernetes-int-or-string require either no
+    # `type` or an `anyOf`) -- checked before the type dispatch below, which
+    # would otherwise read the type-less shape as "unknown type" and fall
+    # back to Str. Found via IO::K8s::CRD::Emitter's stronger assertion on
+    # the registry type flag (t/74_crd_emitter.t): t/73_add_crd.t's own
+    # same-named subtest passed regardless, since a Str-typed attribute
+    # holds a plain IntOrString value like '10Gi' exactly as well as an
+    # IntOrStr-typed one does. The swagger v2 `format: int-or-string`
+    # convention below still works for a schema that keeps `type: string`.
+    return 'IntOrStr'
+        if IO::K8s::Resource::_normalize_bool($schema->{'x-kubernetes-int-or-string'});
 
     my $type = $schema->{type} // '';
 
@@ -662,6 +684,14 @@ sub _ensure_package_exists {
 sub clear_cache {
     %_generated = ();
     %_nested_origin = ();
+    %_descriptions = ();
+}
+
+# The schema `description` a generated class was built from, or undef when
+# the schema had none. See IO::K8s::CRD::Emitter, the only consumer.
+sub class_description {
+    my ($class) = @_;
+    return $_descriptions{$class};
 }
 
 # List all generated classes
@@ -831,5 +861,11 @@ Clear the generated class cache.
 =head2 generated_classes()
 
 List all generated class names.
+
+=head2 class_description($class)
+
+The schema C<description> a generated class was built from, or C<undef>
+when the schema carried none. Used by L<IO::K8s::CRD::Emitter> to fill in
+a rendered class's C<# ABSTRACT> line.
 
 =cut
