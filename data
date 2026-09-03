@@ -1,0 +1,29 @@
+---
+class: standard
+completed: 2026-09-03T05:04:18Z
+created: 2026-09-02T23:25:33Z
+id: 90
+priority: high
+started: 2026-09-03T05:04:18Z
+status: done
+tags:
+- crd
+- specbuilder
+- bug
+title: 'SpecBuilder wipes a modeled (inline-struct) spec: spec_set/spec_merge on AgentSandbox
+  Sandbox serialise spec as {}'
+updated: 2026-09-03T05:04:18Z
+---
+
+Reproduced 2026-09-03 on master (1.108):
+
+  my $k=IO::K8s->new(with=>["IO::K8s::AgentSandbox"]);
+  my $s=$k->new_object("Sandbox", metadata=>{name=>"x",namespace=>"d"}, spec=>{shutdownPolicy=>"Retain"});
+  $s->spec_set("shutdownPolicy","Delete");
+  print $s->to_json;   # spec is {} -- Retain is gone, Delete never arrived
+
+Cause: SpecBuilder (applied to every CRD class by IO::K8s::APIObject) assumes spec is a plain hashref. On a class whose spec is an inline struct (k8s spec => { ... }), ref($self->spec) is the _Spec object, so spec_set does `$spec = {}; $self->spec($spec)` -- the writer coerces that empty hash into a fresh _Spec object and the subsequent write lands in the now-orphaned hash. spec_get returns undef for the same reason. spec_merge shows the same loss.
+
+Affects the 8 AgentSandbox classes today and every provider class that gets a modeled spec later. Builder roles (CertManaged, HelmManaged, MiddlewareBuilder, the cilium branch of NetworkPolicy) share the hash-only assumption.
+
+Found during the CRD design grill; resolution shape is being decided there (object-aware SpecBuilder vs. no SpecBuilder on modeled classes).
