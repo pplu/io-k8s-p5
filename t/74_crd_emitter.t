@@ -9,6 +9,7 @@ use Test::Exception;
 use FindBin;
 
 use IO::K8s;
+use IO::K8s::AutoGen;
 use IO::K8s::CRD;
 use IO::K8s::CRD::Emitter;
 
@@ -86,6 +87,80 @@ subtest 'the rendered source compiles and round-trips the same document' => sub 
     my $gen = do { my $g = IO::K8s->new; $g->add({ Knob => "+$root" }); $g->inflate($doc) };
     is_deeply($hand->TO_JSON, $gen->TO_JSON, 'emitted classes and generated classes agree on the wire');
     throws_ok { $k8s->inflate({ %$doc, spec => { mode => 'slow' } }) } qr/not one of: fast, safe/, 'constraints survive the round-trip into source';
+};
+
+subtest 'patterns needing escaping, an empty-string enum, and unfriendly descriptions render safely' => sub {
+    my $schema = {
+        type => 'object',
+        # No trailing '.': the multi-line-with-no-sentence-end case that used
+        # to leave a raw newline in the # ABSTRACT comment (uncompilable).
+        description => "A resource for exercising the emitter's escaping\nlogic across several lines",
+        'x-kubernetes-group-version-kind' => [ { group => 'esc.example.com', version => 'v1', kind => 'Escaper' } ],
+        properties => {
+            spec => {
+                type => 'object',
+                properties => {
+                    email => {
+                        type        => 'string',
+                        pattern     => '^[a-z]+@example\.com$',
+                        description => "Contact address.\n=head1 not a real POD command\n\n\n\nTrailing paragraph.",
+                    },
+                    path   => { type => 'string', pattern => '^\/api\/v1$' },
+                    single => { type => 'string', pattern => '^a$' },
+                    alt    => { type => 'string', pattern => '^(a|b)$' },
+                    mode   => { type => 'string', enum => [ '', 'Always', 'IfNotPresent' ] },
+                },
+            },
+        },
+    };
+    my $gen = IO::K8s::AutoGen::get_or_generate('com.example.esc.v1.Escaper', $schema, {}, 'IO::K8s::_AUTOGEN_esc',
+        api_version => 'esc.example.com/v1', kind => 'Escaper', resource_plural => 'escapers', is_namespaced => 1);
+    my $esc_files = IO::K8s::CRD::Emitter->new(base => 'TestEscape::V1')->render($gen);
+    for my $path (sort keys %$esc_files) {
+        ok(eval "$esc_files->{$path}\n1;", "compiles: $path") or diag "$path:\n" . $esc_files->{$path} . "\n$@";
+    }
+
+    like($esc_files->{'TestEscape/V1/Escaper.pm'},
+        qr/^# ABSTRACT: A resource for exercising the emitter's escaping logic across several lines$/m,
+        'a multi-line, period-less description collapses to one ABSTRACT line instead of interpolating raw');
+
+    my $spec_src = $esc_files->{'TestEscape/V1/EscaperSpec.pm'};
+    like($spec_src, qr/^k8s email\s+=> Str, \{ pattern => qr\/\^\[a-z\]\+\\\@example\\\.com\$\/ \};$/m,
+        'an @ that would interpolate is escaped');
+    like($spec_src, qr/^k8s path\s+=> Str, \{ pattern => qr\/\^\\\/api\\\/v1\$\/ \};$/m,
+        'an already-escaped slash is not double-escaped');
+    like($spec_src, qr/^k8s single\s+=> Str, \{ pattern => qr\/\^a\$\/ \};$/m,
+        'a $ anchoring end-of-string is left alone');
+    like($spec_src, qr/^k8s alt\s+=> Str, \{ pattern => qr\/\^\(a\|b\)\$\/ \};$/m,
+        'a $ before the closing delimiter is left alone');
+    like($spec_src, qr/^k8s mode\s+=> Str, \{ enum => \['',\s*'Always',\s*'IfNotPresent'\] \};$/m,
+        'an enum containing the empty string renders as a Dumper list');
+    unlike($spec_src, qr/qw\(/, 'no qw() form once one entry needs quoting');
+    like($spec_src,
+        qr/^=attr email\n\nContact address\.\nE<61>head1 not a real POD command\n\nTrailing paragraph\.\n/m,
+        'a description line starting with = is escaped and a blank-line run collapses to one');
+
+    my $hand = IO::K8s->new; $hand->add({ Escaper => '+TestEscape::V1::Escaper' });
+    my $orig = IO::K8s->new; $orig->add({ Escaper => "+$gen" });
+    my %cases = (
+        email  => { ok => 'a@example.com', bad => 'not-an-email' },
+        path   => { ok => '/api/v1',       bad => '/api/v2' },
+        single => { ok => 'a',             bad => 'b' },
+        alt    => { ok => 'a',             bad => 'c' },
+        mode   => { ok => '',              bad => 'Sometimes' },
+    );
+    for my $field (sort keys %cases) {
+        for my $which (qw( ok bad )) {
+            my $value = $cases{$field}{$which};
+            my $doc = {
+                apiVersion => 'esc.example.com/v1', kind => 'Escaper',
+                metadata => { name => 'e' }, spec => { $field => $value },
+            };
+            my $hand_lived = eval { $hand->inflate($doc); 1 };
+            my $orig_lived = eval { $orig->inflate($doc); 1 };
+            is(!!$hand_lived, !!$orig_lived, "$field/$which ('$value'): emitted and generated classes agree");
+        }
+    }
 };
 
 done_testing;

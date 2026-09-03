@@ -137,6 +137,8 @@ subtest 'objects from the registered classes are typed to full depth' => sub {
     isa_ok($knob->spec->limit, ref($knob) . '::Spec::Limit');
     isa_ok($knob->spec->routes->[0], ref($knob) . '::Spec::RoutesItem');
     is($knob->spec->size, '10Gi', 'x-kubernetes-int-or-string -> IntOrStr');
+    is($knob->spec->_k8s_attr_info->{size}{is_int_or_string}, 1,
+        'size is registered as IntOrStr at the registry level, not merely holding a string value');
     is_deeply($knob->TO_JSON->{spec}{extra}, { anything => 1 }, 'preserve-unknown object is opaque and round-trips');
     throws_ok { $k8s->new_object('Knob', metadata => { name => 'k' }, spec => { mode => 'slow' }) } qr/not one of: fast, safe/, 'enum';
     throws_ok { $k8s->new_object('Knob', metadata => { name => 'k' }, spec => { mode => 'fast', replicas => 9 }) } qr/above the maximum 5/, 'range';

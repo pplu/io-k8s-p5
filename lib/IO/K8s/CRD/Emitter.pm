@@ -117,9 +117,14 @@ sub render {
 }
 
 # A generated class is one this emitter renders; anything else is stock.
+# A plain index()==0 prefix test would also match a sibling whose name
+# merely starts with the same string -- root ...::V1::Knob would wrongly
+# claim ...::V1::KnobExtra as its own. Require the '::' boundary (or an
+# exact match on the root itself).
 sub _is_generated {
     my ($self, $class) = @_;
-    return index($class, $self->{_root}) == 0;
+    my $root = $self->{_root};
+    return $class eq $root || index($class, "$root\::") == 0;
 }
 
 sub _class_ref {
@@ -135,9 +140,10 @@ sub _class_ref {
 }
 
 # The DSL type spec for one registry entry, as source. Returns
-# ($source, $nested_class_or_undef).
+# ($source, $nested_class_or_undef). $class/$key are diagnostic context
+# only, for the croak below -- the caller already has both.
 sub _type_source {
-    my ($self, $info) = @_;
+    my ($self, $info, $class, $key) = @_;
     my $nested = $info->{class} && $self->_is_generated($info->{class}) ? $info->{class} : undef;
     return ($self->_class_ref($info->{class}), $nested)                if $info->{is_object};
     return ('[' . $self->_class_ref($info->{class}) . ']', $nested)    if $info->{is_array_of_objects};
@@ -161,7 +167,46 @@ sub _type_source {
     return ('IntOrStr') if $info->{is_int_or_string};
     return ('Quantity') if $info->{is_quantity};
     return ('Time')     if $info->{is_time};
-    croak 'IO::K8s::CRD::Emitter: registry entry with no recognizable type';
+    croak "IO::K8s::CRD::Emitter: registry entry with no recognizable type for field '$key' of $class";
+}
+
+# A pattern string re-quoted into `qr/.../ ` source is interpolated by Perl
+# just like a double-quoted string: an unescaped '@' followed by a word
+# character or '{' tries to interpolate an array, and an unescaped '$' not
+# already meaning "end of string/group/alternative" tries to interpolate a
+# scalar -- '^[a-z]+@example\.com$' would die "Global symbol '@example'
+# requires explicit package name" at compile time. A '$' immediately before
+# the end of the string, ')' or '|' is left alone: those are the regex
+# anchor positions ("...$", "(...$)", "...$|...") a schema pattern
+# realistically uses, and escaping them there would turn the anchor into a
+# literal '$' character instead -- wrong regex, not just wrong Perl. Walks
+# the pattern one (possibly backslash-escaped) unit at a time so an
+# already-escaped character -- notably a pattern that came in as '\/api\/v1'
+# -- is left exactly as it was instead of gaining a second backslash.
+sub _escape_pattern_body {
+    my ($pattern) = @_;
+    my $out = '';
+    while ($pattern =~ /\G(?:(\\.)|(.))/gs) {
+        if (defined $1) {
+            $out .= $1;
+            next;
+        }
+        my $c    = $2;
+        my $rest = substr($pattern, pos($pattern));
+        if ($c eq '/') {
+            $out .= '\\/';
+        }
+        elsif ($c eq '@') {
+            $out .= ($rest =~ /\A[\w{]/) ? '\\@' : '@';
+        }
+        elsif ($c eq '$') {
+            $out .= ($rest eq '' || $rest =~ /\A[)|]/) ? '$' : '\\$';
+        }
+        else {
+            $out .= $c;
+        }
+    }
+    return $out;
 }
 
 # A Perl literal for an option value. A Regexp is rendered as qr/.../, read
@@ -178,11 +223,19 @@ sub _literal {
     my ($value) = @_;
     if (ref $value eq 'Regexp') {
         my ($pattern, $flags) = re::regexp_pattern($value);
-        (my $body = $pattern) =~ s{/}{\\/}g;
+        my $body = _escape_pattern_body($pattern);
         $flags =~ s/u//g if defined $flags;
         return "qr/$body/" . ($flags // '');
     }
-    if (ref $value eq 'ARRAY' && @$value && !grep { ref $_ || /[\s'\\()]/ } @$value) {
+    # The qw() shorthand only for a list of genuinely bareword-safe values
+    # (D6-friendly enum members like Always/IfNotPresent): word characters,
+    # dots, colons, dashes and slashes, and never empty. An enum entry that
+    # is the empty string -- a real, if unusual, upstream value -- would
+    # otherwise vanish: 'qw( Always IfNotPresent)' from ('', 'Always',
+    # 'IfNotPresent') silently drops the '', and the emitted class would
+    # then reject a value the generated one accepts. Data::Dumper below
+    # renders '' (and anything else outside the safe set) correctly.
+    if (ref $value eq 'ARRAY' && @$value && !grep { ref $_ || $_ !~ /\A[\w.:\/-]+\z/ } @$value) {
         return '[qw(' . join(' ', @$value) . ')]';
     }
     local $Data::Dumper::Terse    = 1;
@@ -211,14 +264,36 @@ sub _options_source {
     return ', { ' . join(', ', @parts) . ' }';
 }
 
-# The class-level ABSTRACT text from a schema's `description`: the first
-# sentence (up to the first '. ' or the end of the string), the same way a
+# The class-level ABSTRACT text from a schema's `description`: every run of
+# whitespace (a multi-line description included -- a literal newline in a
+# `# ABSTRACT:` comment would not compile) collapsed to one space, then the
+# first sentence of that (up to the first '. ' or the end), the same way a
 # hand-written class's # ABSTRACT line is one line, not the whole paragraph.
+# Returns undef -- never an empty string -- for a missing or whitespace-only
+# description, so the caller's fallback triggers on truthiness.
 sub _first_sentence {
     my ($text) = @_;
+    return undef unless defined $text;
+    (my $flat = $text) =~ s/\s+/ /g;
+    $flat =~ s/\A\s+|\s+\z//g;
+    return undef unless length $flat;
+    my ($first) = $flat =~ /\A(.*?\.)(?:\s|\z)/;
+    return $first // $flat;
+}
+
+# A schema's free-form description lands in POD (the =attr block). Guard
+# against it breaking the surrounding document: a line starting with '='
+# would open a bogus POD command instead of just being text -- E<61> is the
+# POD escape for a literal '=' (ASCII 61) -- and a run of blank lines would
+# split the paragraph into several, an artifact of however the upstream
+# text happened to be wrapped rather than anything meaningful.
+sub _pod_safe {
+    my ($text) = @_;
     return $text unless defined $text;
-    my ($first) = $text =~ /\A(.*?\.)(?:\s|\z)/s;
-    return $first // $text;
+    $text =~ s/^[ \t]+$//gm;
+    $text =~ s/\n{3,}/\n\n/g;
+    $text =~ s/^=/E<61>/gm;
+    return $text;
 }
 
 sub _render_class {
@@ -236,40 +311,55 @@ sub _render_class {
     # un-idiomatic duplicate line no template class carries.
     my %skip = $is_top ? (metadata => 1) : ();
 
+    # The printed field name -- quoted when it is not a bareword-safe Perl
+    # identifier -- is what actually lines up in the source, so the column
+    # width is measured on it, not on the (possibly shorter, unquoted) raw
+    # JSON key.
+    my %name = map {
+        my $key = $info->{$_}{json_key} // $_;
+        ($_ => ($key =~ /^[A-Za-z_]\w*$/ ? $key : "'$key'"));
+    } grep { !$skip{$_} } @$attrs;
+
     my @nested;
     my (@lines, @pod);
     my $width = 0;
     for my $attr (@$attrs) {
         next if $skip{$attr};
-        my $key = $info->{$attr}{json_key} // $attr;
-        $width = length $key if length $key > $width;
+        $width = length $name{$attr} if length $name{$attr} > $width;
     }
     for my $attr (@$attrs) {
         next if $skip{$attr};
         my $i   = $info->{$attr};
         my $key = $i->{json_key} // $attr;
-        my ($type, $nested) = $self->_type_source($i);
+        my ($type, $nested) = $self->_type_source($i, $class, $key);
         push @nested, $nested if $nested;
-        my $name = $key =~ /^[A-Za-z_]\w*$/ ? $key : "'$key'";
-        push @lines, sprintf("k8s %-*s => %s%s;", $width, $name, $type, _options_source($i));
-        my $desc = $i->{options}{description} // 'No description in the upstream schema.';
+        push @lines, sprintf("k8s %-*s => %s%s;", $width, $name{$attr}, $type, _options_source($i));
+        my $desc = _pod_safe($i->{options}{description}) // 'No description in the upstream schema.';
         push @pod, "=attr $key\n\n$desc\n\n=cut\n";
     }
 
     my $abstract = _first_sentence(IO::K8s::AutoGen::class_description($class))
-        // ($is_top ? $class->kind : (split /::/, $package)[-1]);
+        || ($is_top ? $class->kind : (split /::/, $package)[-1]);
     my $header = join "\n",
         "package $package;",
         "# ABSTRACT: $abstract",
         "our \$VERSION = '" . $self->version . "';";
-    my $use = $is_top
-        ? join("\n",
-            'use IO::K8s::APIObject',
-            "    api_version     => '" . $class->api_version . "',",
-            "    resource_plural => '" . ($class->resource_plural // '') . "';",
-            ($class->does('IO::K8s::Role::Namespaced') ? "with 'IO::K8s::Role::Namespaced';" : ()),
-          )
-        : 'use IO::K8s::Resource;';
+    my $use;
+    if ($is_top) {
+        my $plural = $class->resource_plural;
+        my @use_lines = (defined $plural && length $plural)
+            ? (
+                'use IO::K8s::APIObject',
+                "    api_version     => '" . $class->api_version . "',",
+                "    resource_plural => '$plural';",
+              )
+            : ("use IO::K8s::APIObject api_version => '" . $class->api_version . "';");
+        push @use_lines, "with 'IO::K8s::Role::Namespaced';" if $class->does('IO::K8s::Role::Namespaced');
+        $use = join "\n", @use_lines;
+    }
+    else {
+        $use = 'use IO::K8s::Resource;';
+    }
 
     my $source = join "\n", $header, $use, '', @lines, '', @pod, '1;', '';
     return ($source, @nested);
