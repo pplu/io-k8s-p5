@@ -145,10 +145,15 @@ sub served_versions {
 =method generate
 
     my $classes = IO::K8s::CRD->generate($crd, $namespace);
+    my $classes = IO::K8s::CRD->generate($crd, $namespace, reuse_core => 0);
 
 Generates one L<IO::K8s::AutoGen> class per served version under
 C<$namespace> and returns C<< { $api_version => $class, ..., storage =>
-$api_version } >>. The storage version is the one the manifest marks; when
+$api_version } >>. C<%opts> is forwarded to
+L<IO::K8s::AutoGen/get_or_generate> as-is; C<reuse_core> (D5, default 1) is
+the option most callers touch, controlling whether a nested schema that
+matches a shipped core class's shape is typed as that class instead of a
+generated nested one. The storage version is the one the manifest marks; when
 none is marked (an invalid manifest, but a common one in hand-written
 fixtures) the last served version is used. Each class carries the CRD's
 C<kind>, C<names.plural> and scope, and every object with C<properties>
@@ -180,7 +185,7 @@ reloads manifests in a loop.
 =cut
 
 sub generate {
-    my ($class, $crd, $namespace) = @_;
+    my ($class, $crd, $namespace, %opts) = @_;
     my $spec  = $crd->{spec};
     my $group = $spec->{group};
     my $kind  = $spec->{names}{kind};
@@ -205,6 +210,7 @@ sub generate {
             kind            => $kind,
             resource_plural => $spec->{names}{plural},
             is_namespaced   => $namespaced,
+            %opts,
         );
         # Track every served version as the fallback so the LAST one wins
         # when none is marked storage -- matching the POD above. An explicit

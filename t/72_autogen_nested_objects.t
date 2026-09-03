@@ -57,9 +57,16 @@ my $schema = {
     },
 };
 
+# reuse_core => 0: this file is about D10's own nested-class naming, not
+# D5's core-class reuse (t/75_reuse_core.t owns that) -- the fixture's
+# {value} leaf/map-value shapes are otherwise an exact match for the
+# shipped IO::K8s::Api::Resource::V1::Counter ({value => Quantity!}),
+# which would silently swap the expected nested classes below for that
+# unrelated core one.
 my $ns = 'IO::K8s::_AUTOGEN_nested';
 my $class = IO::K8s::AutoGen::get_or_generate('com.example.nest.v1.Widget', $schema, {}, $ns,
-    api_version => 'nest.example.com/v1', kind => 'Widget', resource_plural => 'widgets', is_namespaced => 1);
+    api_version => 'nest.example.com/v1', kind => 'Widget', resource_plural => 'widgets', is_namespaced => 1,
+    reuse_core => 0);
 
 subtest 'nested classes exist with path-derived names' => sub {
     my $spec = $class->_k8s_attr_info->{spec};
@@ -117,7 +124,8 @@ subtest 'inflate builds the nested objects and round-trips' => sub {
 
 subtest 'nested classes are cached per parent, not regenerated' => sub {
     my $again = IO::K8s::AutoGen::get_or_generate('com.example.nest.v1.Widget', $schema, {}, $ns,
-        api_version => 'nest.example.com/v1', kind => 'Widget', resource_plural => 'widgets', is_namespaced => 1);
+        api_version => 'nest.example.com/v1', kind => 'Widget', resource_plural => 'widgets', is_namespaced => 1,
+        reuse_core => 0);
     is($again, $class, 'same Kind class');
     my @nested = sort grep { /^\Q$class\E::/ } IO::K8s::AutoGen::generated_classes();
     my @expected = sort
@@ -248,10 +256,14 @@ subtest 'a path-derived name past 200 chars is shortened to <root>::_<10 hex cha
         },
     };
 
+    # reuse_core => 0: the leaf's lone {value} property is otherwise an
+    # exact shape match for the shipped Resource::V1::Counter and would be
+    # reused instead of exercising the shortening this subtest is about.
     my $class;
     lives_ok {
         $class = IO::K8s::AutoGen::get_or_generate('com.example.deep.v1.Deep', $schema, {}, 'IO::K8s::_AUTOGEN_karr_deepnames',
-            api_version => 'deep.example.com/v1', kind => 'Deep', resource_plural => 'deeps', is_namespaced => 1);
+            api_version => 'deep.example.com/v1', kind => 'Deep', resource_plural => 'deeps', is_namespaced => 1,
+            reuse_core => 0);
     } 'generation lives instead of dying "Identifier too long"';
 
     my $spec_class = $class->_k8s_attr_info->{spec}{class};

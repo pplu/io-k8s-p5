@@ -469,15 +469,29 @@ outright, and C<storage> stays whichever the FIRST registration reported,
 mirroring L</add>'s own first-registration-wins rule for a short-name
 collision.
 
+A trailing hashref of options is forwarded to L<IO::K8s::CRD/generate> (and
+from there to L<IO::K8s::AutoGen/get_or_generate>) for every CRD in this
+call:
+
+    $k8s->add_crd('crds/knobs.yaml', { reuse_core => 0 });
+
+Distinguished from a CRD document by the absence of a C<kind> key -- every
+CRD hashref L<IO::K8s::CRD/load> accepts has one -- so it must be the LAST
+argument and only one is read per call.
+
 =cut
 
 sub add_crd {
     my ($self, @inputs) = @_;
     require IO::K8s::CRD;
+    my %opts;
+    if (@inputs > 1 && ref $inputs[-1] eq 'HASH' && !exists $inputs[-1]{kind}) {
+        %opts = %{ pop @inputs };
+    }
     my %registered;
     for my $input (@inputs) {
         for my $crd (@{ IO::K8s::CRD->load($input) }) {
-            my $classes = IO::K8s::CRD->generate($crd, $self->_autogen_namespace);
+            my $classes = IO::K8s::CRD->generate($crd, $self->_autogen_namespace, %opts);
             my $kind    = $crd->{spec}{names}{kind};
             my $storage = $classes->{storage};
             my %map = map { ("$_/$kind" => '+' . $classes->{$_}) } grep { $_ ne 'storage' } keys %$classes;

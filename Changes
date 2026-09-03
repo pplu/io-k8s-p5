@@ -648,6 +648,21 @@ Revision history for IO-K8s
     named in full is still loaded on demand. All 78 short names in the
     default resource_map were exposed; reported from CPAN smokers.
 
+  - IO::K8s::AutoGen reuses a shipped core class for a nested schema of
+    exactly its shape (D5) instead of generating a new one: a CRD's inline
+    LabelSelector, HTTPHeader-shaped struct, and the like are now typed as
+    the real IO::K8s class rather than a per-provider copy. On by default;
+    IO::K8s::CRD->generate and IO::K8s->add_crd (as a trailing options
+    hashref, e.g. add_crd($path, { reuse_core => 0 })) turn it off. A
+    shape shared by several shipped classes at the same preference rank
+    (Meta::V1, then core/v1, then alphabetically) is resolved that way;
+    split across ranks -- a coincidental match between unrelated API
+    areas, such as {key,operator,values} matching both
+    LabelSelectorRequirement and NodeSelectorRequirement -- it stays a
+    generated nested class rather than guess. New
+    IO::K8s::AutoGen::core_class_for_shape(\@json_keys) lists shipped
+    classes matching a given key set, preference-ordered.
+
 1.107     2026-08-15 15:37:52Z
 
   - Resolve resource_map short-name keys on the explicit-apiVersion path

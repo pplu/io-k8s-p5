@@ -90,6 +90,10 @@ sub is_autogen {
 #   kind             => 'StaticWebSite'
 #   resource_plural  => 'staticwebsites'
 #   is_namespaced    => 1
+#   reuse_core       => 0|1 (default 1) -- type a nested object/items/
+#                      additionalProperties schema as a shipped core class
+#                      instead of a nested class when its shape matches
+#                      one (D5); see _core_class_for.
 sub get_or_generate {
     my ($def_name, $schema, $all_defs, $namespace, %opts) = @_;
 
@@ -244,6 +248,14 @@ sub _generate_class {
         ? (apiVersion => 1, kind => 1, metadata => 1)
         : ();
 
+    # D5: reuse a shipped core class for a nested object/items/
+    # additionalProperties schema of exactly its shape, default on. $class
+    # itself is never a reused core class here -- this function only runs
+    # for a class actually being generated (reuse ends the recursion
+    # before _generate_class is ever called for it) -- so every field of
+    # $class is typed with no parent core context (undef).
+    my $reuse_core = exists $opts{reuse_core} ? ($opts{reuse_core} ? 1 : 0) : 1;
+
     # Generate attributes using k8s DSL
     # Property names with special characters ($ref, x-kubernetes-*) are
     # automatically sanitized to valid Perl identifiers by _k8s(), with
@@ -252,7 +264,7 @@ sub _generate_class {
     for my $prop (sort keys %$properties) {
         next if $role_supplied{$prop};
         my $prop_schema = $properties->{$prop};
-        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class);
+        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class, $reuse_core, undef);
         next unless defined $type_spec;  # Skip unsupported types
 
         my $opts = _field_options($prop_schema, $type_spec, $required{$prop});
@@ -409,8 +421,14 @@ sub _class_for_path {
 # PodTemplateSpec under a solver, itself several levels into a Challenge)
 # makes the path-derived name run past Perl's 251-character identifier
 # limit; see $MAX_CLASS_NAME and _class_for_path above.
+#
+# $reuse_core carries forward unchanged (D5): a schema only reaches here
+# because its own shape did NOT match a shipped core class, but its
+# properties still get the same reuse_core treatment when this new class's
+# own fields are, in turn, typed.
 sub _nested_class {
-    my ($parent_class, $field_name, $suffix, $schema, $all_defs, $namespace) = @_;
+    my ($parent_class, $field_name, $suffix, $schema, $all_defs, $namespace, $reuse_core) = @_;
+    $reuse_core = 1 unless defined $reuse_core;
 
     my $root = $_root_of{$parent_class} // $parent_class;
     my $parent_path = $_class_path{$parent_class};
@@ -434,7 +452,7 @@ sub _nested_class {
     $_class_path{$class} = $path;
 
     my $def_name = class_to_def($parent_class) . '.' . $segment;
-    _generate_class($class, $def_name, $schema, $all_defs, $namespace);
+    _generate_class($class, $def_name, $schema, $all_defs, $namespace, reuse_core => $reuse_core);
     return $class;
 }
 
@@ -446,13 +464,143 @@ sub _has_properties {
         && %{ $schema->{properties} };
 }
 
+# ---------------------------------------------------------------------------
+# reuse_core (D5): a nested object whose property set is exactly the key set
+# of a shipped core / apimachinery class is typed as that class. CRD schemas
+# inline the types they embed (a LabelSelector, a PodTemplateSpec), and
+# modeling them again would give every provider its own copy of PodSpec.
+#
+# The index is built once from the shipped class files. A field's own
+# already-resolved parent (rule 1 below) settles ambiguity authoritatively;
+# absent that, an unambiguous shape (rule 2) is reused outright.
+#
+# Several shipped classes sharing a shape (rule 3) are resolved by
+# preference (Meta::V1, then Core::V1, then alphabetically) ONLY when every
+# candidate sits at the SAME preference rank -- e.g. {name,value} matches
+# three unrelated Core::V1 leaf structs (HTTPHeader, PodDNSConfigOption,
+# Sysctl), all in the one API area core/v1 alone already narrows a CRD
+# field to, so picking the alphabetically-first is a safe tie-break.
+# {key,operator,values} matches LabelSelectorRequirement and
+# FieldSelectorRequirement (Meta::V1) as well as NodeSelectorRequirement
+# (Core::V1) -- candidates split across preference ranks, which means the
+# shape crosses genuinely unrelated API areas (a label selector vs. a node
+# selector) rather than sitting within one; the preference order exists to
+# prefer apimachinery's own canonical types over domain-specific ones with
+# an accidental resemblance, not to arbitrate between them, so a rank split
+# stays a nested class rather than guess -- D5's own "162 times, ambiguous"
+# case, even though these three classes' registries happen to be
+# byte-for-byte identical.
+# ---------------------------------------------------------------------------
+
+my %_core_shapes;      # "k1,k2,..." -> [ classes, preference-ordered ]
+my $_core_indexed = 0;
+
+# Preference order, both for core_class_for_shape's listing and for the
+# several-candidates rule above: LabelSelector / LabelSelectorRequirement
+# first -- by a wide margin the most common shape a provider CRD's inline
+# schema turns out to match (138 LabelSelector copies, 162 of the bare
+# {key,operator,values} triple, per the step-4 drift measurement) -- then
+# the rest of apimachinery's Meta::V1, then core/v1, then everything else
+# alphabetically.
+my @CORE_PREFERENCE = (
+    'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector',
+    'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::',
+    'IO::K8s::Api::Core::V1::',
+);
+
+sub _core_rank {
+    my ($class) = @_;
+    for my $i (0 .. $#CORE_PREFERENCE) {
+        return $i if index($class, $CORE_PREFERENCE[$i]) == 0;
+    }
+    return scalar @CORE_PREFERENCE;
+}
+
+sub _index_core_shapes {
+    return if $_core_indexed++;
+    require File::Find;
+    require Module::Runtime;
+    require IO::K8s::Role::Resource;
+    (my $lib = $INC{'IO/K8s/AutoGen.pm'}) =~ s{/IO/K8s/AutoGen\.pm\z}{};
+    my @files;
+    File::Find::find(sub { push @files, $File::Find::name if /\.pm\z/ },
+        "$lib/IO/K8s/Api", "$lib/IO/K8s/Apimachinery");
+    for my $file (sort @files) {
+        (my $class = $file) =~ s{^\Q$lib\E/}{};
+        $class =~ s{/}{::}g;
+        $class =~ s/\.pm\z//;
+        eval { Module::Runtime::use_module($class); 1 } or next;
+        my $info = IO::K8s::Role::Resource::_k8s_attr_info($class);
+        my @keys = sort map { $info->{$_}{json_key} // $_ } grep { $_ ne 'metadata' } keys %$info;
+        next unless @keys;
+        push @{ $_core_shapes{ join ',', @keys } }, $class;
+    }
+    for my $shape (keys %_core_shapes) {
+        @{ $_core_shapes{$shape} } = sort { _core_rank($a) <=> _core_rank($b) || $a cmp $b } @{ $_core_shapes{$shape} };
+    }
+}
+
+# Every shipped class whose key set is exactly \@json_keys, preference
+# ordered. Diagnostic / listing use as well as the reuse decision below;
+# building the class-name-only class from a plain ARRAY (JSON key names,
+# not schema fragments) keeps it usable without a schema in hand.
+sub core_class_for_shape {
+    my ($keys) = @_;
+    _index_core_shapes();
+    my $shape = join ',', sort @$keys;
+    return @{ $_core_shapes{$shape} // [] };
+}
+
+# The class to reuse for a nested object schema, or undef.
+sub _core_class_for {
+    my ($schema, $parent_core, $field_name) = @_;
+    return undef unless _has_properties($schema);
+    my @keys = sort keys %{ $schema->{properties} };
+    my @candidates = core_class_for_shape(\@keys);
+    return undef unless @candidates;
+
+    # Rule 1 (parent context): the enclosing object was itself already
+    # reused as core class $parent_core -- its OWN registry already says
+    # what type this field is, an authoritative fact rather than a guess
+    # among @candidates. Only trusted when that type is itself one of the
+    # shape's candidates (a schema author is free to trim or extend a
+    # field beyond what the parent core class declares).
+    if ($parent_core) {
+        my $pinfo = IO::K8s::Role::Resource::_k8s_attr_info($parent_core);
+        my ($attr) = grep { ($pinfo->{$_}{json_key} // $_) eq $field_name } keys %$pinfo;
+        if (defined $attr && $pinfo->{$attr}{class}) {
+            my $typed = $pinfo->{$attr}{class};
+            return $typed if grep { $_ eq $typed } @candidates;
+        }
+    }
+
+    # Rule 2 (unique shape): exactly one shipped class has this key set.
+    return $candidates[0] if @candidates == 1;
+
+    # Rule 3: several do. core_class_for_shape already sorted @candidates
+    # by preference, so $candidates[0] is the winner IF every candidate
+    # sits at the same preference rank -- see the block comment above for
+    # why a rank split refuses instead of picking one.
+    my $best_rank = _core_rank($candidates[0]);
+    return undef if grep { _core_rank($_) != $best_rank } @candidates;
+    return $candidates[0];
+}
+
 # Convert OpenAPI schema to k8s() type spec
 #
 # $field_name and $class are diagnostic context only: everything this
 # function refuses has to name the class being generated and the field it
 # choked on, because the caller sees neither (the k42 diagnostic line).
+#
+# $reuse_core (D5, default 1) turns the object / array-items /
+# additionalProperties reuse check on or off. $parent_core is the core
+# class $class itself was reused as, when it was -- always undef here,
+# since this function is only ever reached for a class AutoGen is actually
+# generating, which by definition was NOT reused (see _core_class_for's
+# rule 1 for the one place a non-undef parent_core matters).
 sub _schema_to_type_spec {
-    my ($schema, $all_defs, $namespace, $field_name, $class) = @_;
+    my ($schema, $all_defs, $namespace, $field_name, $class, $reuse_core, $parent_core) = @_;
+    $reuse_core = 1 unless defined $reuse_core;
 
     my $where = "field '" . $field_name . "' of " . $class;
 
@@ -533,8 +681,11 @@ sub _schema_to_type_spec {
             }
             _croak_unresolved_ref($ref, "the items of $where");
         }
+        if ($reuse_core and my $core = _core_class_for($items, $parent_core, $field_name)) {
+            return [ "+$core" ];
+        }
         if (_has_properties($items)) {
-            return [ '+' . _nested_class($class, $field_name, 'Item', $items, $all_defs, $namespace) ];
+            return [ '+' . _nested_class($class, $field_name, 'Item', $items, $all_defs, $namespace, $reuse_core) ];
         }
         # Type::Tiny objects rather than the barewords: inside an arrayref
         # the DSL reads a plain string as a class name for everything except
@@ -555,7 +706,10 @@ sub _schema_to_type_spec {
     }
     elsif ($type eq 'object') {
         if (_has_properties($schema)) {
-            return '+' . _nested_class($class, $field_name, undef, $schema, $all_defs, $namespace);
+            if ($reuse_core and my $core = _core_class_for($schema, $parent_core, $field_name)) {
+                return "+$core";
+            }
+            return '+' . _nested_class($class, $field_name, undef, $schema, $all_defs, $namespace, $reuse_core);
         }
         my $addl = $schema->{additionalProperties};
         if (ref $addl eq 'HASH') {
@@ -567,8 +721,11 @@ sub _schema_to_type_spec {
                 }
                 _croak_unresolved_ref($ref, "the additionalProperties of $where");
             }
+            if ($reuse_core and my $core = _core_class_for($addl, $parent_core, $field_name)) {
+                return { "+$core" => 1 };
+            }
             if (_has_properties($addl)) {
-                return { '+' . _nested_class($class, $field_name, 'Value', $addl, $all_defs, $namespace) => 1 };
+                return { '+' . _nested_class($class, $field_name, 'Value', $addl, $all_defs, $namespace, $reuse_core) => 1 };
             }
             return { Str => 1 };  # Hash of strings
         }
@@ -917,6 +1074,21 @@ and L</class_root> recover it -- and a name collision between two
 different schema keys is still detected against that full logical name,
 never against the (much smaller) space of possibly-shortened names.
 
+A nested object -- or an array's C<items>, or a map's
+C<additionalProperties> -- whose property set exactly matches a shipped
+core or apimachinery class's own key set is typed as that class instead of
+a new nested one (D5, C<reuse_core>, default on): a CRD's inline
+C<LabelSelector> or C<HTTPHeader>-shaped struct becomes the real IO::K8s
+class rather than a per-provider copy. C<get_or_generate>'s C<< reuse_core
+=> 0 >> option turns this off and restores the pre-D5 behavior (every
+inline object becomes its own nested class, per D10 above). Ambiguity is
+resolved conservatively: several shipped classes sharing a shape are
+reused only when they all sit at the same L</core_class_for_shape>
+preference rank -- a rank split (e.g. C<{key,operator,values}> matching
+both C<LabelSelectorRequirement> and C<NodeSelectorRequirement>) means the
+shape crosses genuinely unrelated API areas, and the field stays a
+generated nested class rather than guess between them.
+
 =head1 FUNCTIONS
 
 =head2 get_or_generate($def_name, $schema, $all_defs, $namespace)
@@ -926,7 +1098,8 @@ Generate (or return cached) class for the given OpenAPI definition.
 Extra positional options after C<$namespace> pin the identity of a
 top-level object (C<< api_version => ..., kind => ..., resource_plural =>
 ..., is_namespaced => ... >>); the generated class then also composes
-L<IO::K8s::Role::APIObject>.
+L<IO::K8s::Role::APIObject>. C<< reuse_core => 0|1 >> (default 1) controls
+D5's core-class reuse; see above.
 
 When C<api_version> (or C<kind> / C<resource_plural>) is supplied, the
 generated class installs fixed-value methods for each. These are fixed
@@ -1012,5 +1185,19 @@ The C<::>-joined field path C<$class> sits at below its L</class_root>
 name had to be shortened past Perl's identifier limit. C<undef> for a root
 class or for a class AutoGen did not generate through nested-object
 handling.
+
+=head2 core_class_for_shape(\@json_keys)
+
+    my @classes = IO::K8s::AutoGen::core_class_for_shape([qw(key operator values)]);
+
+Every shipped core / apimachinery class (under C<IO::K8s::Api> and
+C<IO::K8s::Apimachinery>) whose own key set is exactly C<@json_keys>, most
+preferred first (apimachinery's C<LabelSelector>, then the rest of
+C<Meta::V1>, then C<Core::V1>, then alphabetically). Empty when no shipped
+class has that exact shape. This is the same index D5's C<reuse_core>
+reuse decision consults (see above); the index is built once, lazily, on
+first call, by loading every class under those two trees, so the first
+call in a process is dominated by that one-time load cost rather than by
+anything this function itself does.
 
 =cut
