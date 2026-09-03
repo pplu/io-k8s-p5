@@ -708,6 +708,35 @@ Revision history for IO-K8s
     existing); build via new_object/inflate, or seed a typed spec through
     spec_set/spec_push/spec_merge, which do coerce.
 
+  - cert-manager modeled to full depth (D5, k95): all 6 Kinds' spec/status
+    fields are now typed object graphs -- 77 classes total (6 Kinds + 71
+    nested), named after the upstream cert-manager/cert-manager v1.21.1
+    Go types, checked in under IO::K8s::CertManager::V1::*. Issuer and
+    ClusterIssuer embed the literal same Go type (cmapi.IssuerSpec /
+    IssuerStatus), so both Kinds share one spec/status class tree rather
+    than a copy each; a Go type used by several Kinds otherwise
+    (SecretKeySelector, IssuerReference, LocalObjectReference,
+    ServiceAccountRef, the whole ACMEChallengeSolver family) is likewise
+    one shared class. The ACME HTTP01 solver's inlined pod template is
+    cert-manager's own trimmed corev1.PodSpec subset, not the full
+    PodTemplateSpec, so it stays a nested class named after cert-manager's
+    own ACMEChallengeSolverHTTP01IngressPodTemplate/PodObjectMeta/PodSpec
+    Go types rather than reusing Core::V1::PodTemplateSpec; a Gateway API
+    HTTPRoute parentRef embedded by the same solver is named
+    ParentReference after its own upstream Go type. IO::K8s::Role::
+    CertManaged's fluent builders (for_domains, with_issuer, letsencrypt,
+    add_http01_solver, add_dns01_solver, ...) needed no changes -- they
+    already only used the coercing spec_set/spec_push paths. Constructing
+    spec (or any of its nested fields) via a raw ->new(spec => { ... })
+    no longer coerces the hashref (k100, pre-existing); build via
+    new_object/inflate, or seed a typed spec through spec_set/spec_push/
+    spec_merge, which do coerce. t/42_registry_synthesis_roundtrip.t's
+    synthetic-value generator gained a candidate-value branch for a plain
+    (non-array, non-IntOrStr) Str field with its own 'pattern' constraint
+    -- cert-manager's ParentReference and CertificateRenewalWindows are
+    the first shipped fields of that exact shape; benefits every future
+    D3-using provider, not only this one.
+
 1.107     2026-08-15 15:37:52Z
 
   - Resolve resource_map short-name keys on the explicit-apiVersion path

@@ -213,6 +213,17 @@ sub synth_scalar {
     }
     return '100m'                  if $info->{is_quantity};
     return '2024-01-01T00:00:00Z'  if $info->{is_time};
+    # A plain (non-array, non-IntOrStr) Str field can carry its own
+    # 'pattern' too -- cert-manager's embedded Gateway API ParentReference
+    # (group/kind/namespace/sectionName, all DNS-label-shaped) and
+    # CertificateRenewalWindows.windowDuration (a Go-duration-shaped
+    # string) are the first shipped fields of this exact shape. Same
+    # reasoning as the is_array_of_str candidate-list above: an
+    # unconstrained "synthetic-$attr" isn't a valid instance of the field.
+    if ($opts->{pattern}) {
+        my @ok = grep { $_ =~ $opts->{pattern} } ('100', '404', '500', '8080', 'a', 'b', '1h');
+        return $ok[0] if @ok;
+    }
     return "synthetic-$attr";      # is_str, and the generic fallback
 }
 

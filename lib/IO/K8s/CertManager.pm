@@ -58,7 +58,20 @@ __END__
 
 Resource map provider for L<cert-manager|https://cert-manager.io/> Custom
 Resource Definitions. Registers 6 CRD classes covering C<cert-manager.io/v1>
-and C<acme.cert-manager.io/v1>.
+and C<acme.cert-manager.io/v1>, modeled to full depth: C<spec> (and, where
+upstream declares one, C<status>) is a typed object graph of 71 further
+C<IO::K8s::CertManager::V1::*> classes, one per upstream Go structure, named
+after the upstream Go types
+(L<IO::K8s::CertManager::V1::Certificate|IO::K8s::CertManager::V1::Certificate>'s
+C<issuerRef> is an
+L<IO::K8s::CertManager::V1::IssuerReference|IO::K8s::CertManager::V1::IssuerReference>,
+and so on down) rather than an opaque hashref. Embedded core and Gateway API
+types are referenced, not re-modeled. A Go type used by more than one Kind
+(C<SecretKeySelector>, C<IssuerReference>, C<LocalObjectReference>,
+C<ServiceAccountRef>, the whole C<ACMEChallengeSolver> family) is one shared
+class, not a copy per Kind -- most notably C<IssuerSpec>/C<IssuerStatus>
+themselves, the literal same Go types embedded by both C<Issuer> and
+C<ClusterIssuer>, so those two Kinds share their entire spec/status tree.
 
 Not loaded by default — opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::CertManager') >> at runtime.
