@@ -440,6 +440,38 @@ sub add {
     return $self;
 }
 
+=method add_crd
+
+    my $registered = $k8s->add_crd('crds/knobs.yaml', $crd_object, \%crd_hash, ...);
+
+Loads each argument through L<IO::K8s::CRD/load>, generates one class per
+served version in this instance's AutoGen namespace, and registers them:
+every version under its domain-qualified key (C<group/version/Kind>), the
+storage version under the bare Kind -- through L</add>, so a class already
+holding the short name (a provider merged earlier) keeps it and the CRD's
+class stays reachable by its qualified key. Returns
+C<< { $Kind => { $api_version => $class, ..., storage => $api_version } } >>.
+
+=cut
+
+sub add_crd {
+    my ($self, @inputs) = @_;
+    require IO::K8s::CRD;
+    my %registered;
+    for my $input (@inputs) {
+        for my $crd (@{ IO::K8s::CRD->load($input) }) {
+            my $classes = IO::K8s::CRD->generate($crd, $self->_autogen_namespace);
+            my $kind    = $crd->{spec}{names}{kind};
+            my $storage = $classes->{storage};
+            my %map = map { ("$_/$kind" => '+' . $classes->{$_}) } grep { $_ ne 'storage' } keys %$classes;
+            $map{$kind} = '+' . $classes->{$storage};
+            $self->add(\%map);
+            $registered{$kind} = $classes;
+        }
+    }
+    return \%registered;
+}
+
 # Expand short class name to full class path
 # Supports:
 #   'Pod'                    -> lookup in resource_map -> IO::K8s::Api::Core::V1::Pod
