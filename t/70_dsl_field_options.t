@@ -33,6 +33,26 @@ use Test::Exception;
     };
 }
 
+# required (via the '!' suffix) and pattern together on one field.
+{
+    package TestOpt::ReqPattern;
+    use IO::K8s::Resource;
+
+    k8s x => 'Str!', { pattern => '^a' };
+}
+
+# Inline struct fields using the legacy '!' suffix through the
+# [ Type, {opts} ] and [ [Type], {opts} ] forms.
+{
+    package TestOpt::InlineReq;
+    use IO::K8s::Resource;
+
+    k8s outer => {
+        m => [ 'Str!', { enum => ['a'] } ],
+        n => [ ['Str!'], {} ],
+    };
+}
+
 # legacy and bang are unrelated required fields (declared only to exercise
 # the legacy 'required' marker and the '!' suffix in the registry subtest
 # below) -- every successful construction has to satisfy them too.
@@ -113,6 +133,19 @@ subtest 'TO_JSON of a class with options is unchanged' => sub {
     }, 'options leave serialization alone');
 };
 
+subtest "required ('!' suffix) and pattern combine on the same field" => sub {
+    throws_ok { TestOpt::ReqPattern->new } qr/Missing required arguments: x/, 'still required';
+    throws_ok { TestOpt::ReqPattern->new(x => 'zz') } qr/does not match the pattern/, 'still pattern-checked';
+    lives_ok { TestOpt::ReqPattern->new(x => 'ab') } 'both satisfied';
+};
+
+subtest "inline struct fields record required from the legacy '!' forms" => sub {
+    my $info = $IO::K8s::Resource::_attr_registry{'TestOpt::InlineReq::_Outer'};
+    is($info->{m}{required}, 1, "inline [ 'Str!', {opts} ] form: required recorded");
+    is($info->{n}{required}, 1, "inline [ ['Str!'], {opts} ] form: required recorded");
+    ok($info->{n}{is_array_of_str}, 'n keeps the array-of-str flag');
+};
+
 # --- load-time rejection -------------------------------------------------
 
 sub declare_dies {
@@ -148,6 +181,14 @@ subtest 'unknown or misplaced options die at class load, naming class and field'
         qr/k8s: 'pattern' needs a scalar field/, 'pattern on an opaque map');
     declare_dies(q{k8s x => [ {} ], { minimum => 1 }},
         qr/k8s: 'minimum' and 'maximum' need a scalar field/, 'range on an array of opaque hashes');
+    declare_dies(q{k8s x => Str, { pattern => undef }},
+        qr/k8s: field option 'pattern' for field 'x' of TestOpt::Bad\d+ must not be undef/, 'undef pattern');
+    declare_dies(q{k8s x => Int, { minimum => 10, maximum => 1 }},
+        qr/k8s: 'minimum' \(10\) must not exceed 'maximum' \(1\) for field 'x' of TestOpt::Bad\d+/, 'minimum exceeds maximum');
+    declare_dies(q{k8s x => Str, { enum => [qw(a a b)] }},
+        qr/k8s: 'enum' for field 'x' of TestOpt::Bad\d+ has duplicate entries/, 'duplicate enum entries');
+    declare_dies(q{k8s x => Str, { default => undef }},
+        qr/k8s: field option 'default' for field 'x' of TestOpt::Bad\d+ must not be undef/, 'undef default');
 };
 
 subtest 'schema-only options are accepted on any field' => sub {

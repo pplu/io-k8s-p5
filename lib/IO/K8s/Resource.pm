@@ -118,6 +118,8 @@ sub _constrain {
             unless ref $opts->{enum} eq 'ARRAY' && @{ $opts->{enum} };
         croak "k8s: 'enum' is not allowed on a Bool field ($where)" if $kind eq 'Bool';
         my %allowed = map { $_ => 1 } @{ $opts->{enum} };
+        croak "k8s: 'enum' for $where has duplicate entries"
+            unless @{ $opts->{enum} } == keys %allowed;
         my $list = join ', ', @{ $opts->{enum} };
         $type = $type->create_child_type(
             display_name => $type->display_name . '[enum]',
@@ -134,6 +136,8 @@ sub _constrain {
             croak "k8s: 'minimum' and 'maximum' for $where must be numbers"
                 if defined $bound && !looks_like_number($bound);
         }
+        croak "k8s: 'minimum' ($min) must not exceed 'maximum' ($max) for $where"
+            if defined $min && defined $max && $min > $max;
         $type = $type->create_child_type(
             display_name => $type->display_name . '[range]',
             constraint   => sub {
@@ -304,6 +308,15 @@ sub _k8s {
             . join(', ', sort keys %FIELD_OPTIONS) . ')'
             unless $FIELD_OPTIONS{$key};
     }
+    # An option present with an undef value is a declaration error, not a
+    # no-op: `pattern => $schema->{pattern}` on an upstream schema with no
+    # pattern would otherwise compile to a match-everything regex instead
+    # of simply not declaring the option, and the same silent trap applies
+    # to every other option (an undef default is not a JSON null we model).
+    for my $key (sort keys %opts) {
+        croak "k8s: field option '$key' for $where must not be undef"
+            unless defined $opts{$key};
+    }
     my $required = delete $opts{required} ? 1 : 0;
 
     # `!` suffix on strings (legacy/alternative required syntax)
@@ -427,7 +440,16 @@ sub _k8s {
     my $isa = $required ? $inner : Maybe[$inner];
 
     $info{required} = 1 if $required;
-    $info{options}  = { %opts } if %opts;
+    if (%opts) {
+        # A one-level copy: the registry must not alias a caller's arrayref
+        # (the common `enum => $schema->{enum}` idiom reads straight off a
+        # shared upstream structure) and later see it mutated out from under
+        # the constraint that was already built from it. A Regexp is
+        # immutable, so 'pattern' needs no copy.
+        my %stored = %opts;
+        $stored{enum} = [ @{ $stored{enum} } ] if exists $stored{enum};
+        $info{options} = \%stored;
+    }
 
     # Store json_key when it differs from the Perl attribute name
     $info{json_key} = $json_key if $attr_name ne $json_key;
