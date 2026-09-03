@@ -34,6 +34,8 @@ my $spec_def = {
         weird    => { type => 'string', pattern => '[' },
         flag     => { type => 'boolean', default => JSON::PP::true() },
         extra    => { type => 'object', 'x-kubernetes-preserve-unknown-fields' => JSON::PP::true(), nullable => JSON::PP::true() },
+        note     => { type => 'string', nullable => JSON::PP::true(), default => undef },
+        flagged  => { type => 'string', nullable => 'false' },
     },
 };
 
@@ -51,8 +53,11 @@ my $schema = {
 
 my $all_defs = { 'com.example.opts.v1.KnobSpec' => $spec_def };
 
-my $class = IO::K8s::AutoGen::get_or_generate('com.example.opts.v1.Knob', $schema, $all_defs, 'IO::K8s::_AUTOGEN_opts',
-    api_version => 'opts.example.com/v1', kind => 'Knob', resource_plural => 'knobs', is_namespaced => 1);
+my $class;
+lives_ok {
+    $class = IO::K8s::AutoGen::get_or_generate('com.example.opts.v1.Knob', $schema, $all_defs, 'IO::K8s::_AUTOGEN_opts',
+        api_version => 'opts.example.com/v1', kind => 'Knob', resource_plural => 'knobs', is_namespaced => 1);
+} 'class generation lives with a null default (nullable field) and mixed nullable spellings';
 my $spec_class = $class->_k8s_attr_info->{spec}{class};
 
 subtest 'registry of the generated spec class' => sub {
@@ -72,6 +77,9 @@ subtest 'registry of the generated spec class' => sub {
     ok(!exists $info->{flag}{options}{enum}, 'no value constraints on Bool');
     is($info->{extra}{options}{preserve_unknown}, 1, 'x-kubernetes-preserve-unknown-fields');
     is($info->{extra}{options}{nullable}, 1, 'nullable');
+    is($info->{note}{options}{nullable}, 1, 'note: nullable normalized from a JSON::PP::Boolean');
+    ok(!exists $info->{note}{options}{default}, 'note: a null default is no default at all');
+    ok(!exists $info->{flagged}{options}{nullable}, "flagged: the string 'false' is false, not truthy Perl");
     is($class->_k8s_attr_info->{spec}{required}, 1, 'top-level required list applies too');
 };
 

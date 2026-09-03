@@ -440,14 +440,27 @@ sub _scalar_kind {
 # client-side check is a convenience, the API server validates regardless,
 # and no data is lost (the k56 line is about data, not about checks). An
 # empty or duplicate enum is dropped the same way, for the same reason.
+#
+# `default: null` in a schema (common on a `nullable: true` field) decodes
+# to undef; that is treated as no default at all, not as a default of
+# undef, since the DSL's own field-option check refuses an undef value for
+# any option, and a null default carries no information for the
+# client-side check anyway.
 sub _field_options {
     my ($prop_schema, $type_spec, $is_required) = @_;
     my %opts;
     $opts{required}    = 1 if $is_required;
     $opts{description} = $prop_schema->{description} if defined $prop_schema->{description};
-    $opts{default}     = $prop_schema->{default}     if exists $prop_schema->{default};
-    $opts{nullable}    = 1 if $prop_schema->{nullable};
-    $opts{preserve_unknown} = 1 if $prop_schema->{'x-kubernetes-preserve-unknown-fields'};
+    $opts{default}     = $prop_schema->{default}     if defined $prop_schema->{default};
+    # nullable and x-kubernetes-preserve-unknown-fields are JSON booleans on
+    # the wire and so need the same normalization every other Bool value in
+    # the distribution gets (plain Perl truthiness would treat the string
+    # 'false' as true). A value _normalize_bool can't make sense of means
+    # "not set" here, not a fatal -- eval swallows the die.
+    $opts{nullable} = 1
+        if eval { IO::K8s::Resource::_normalize_bool($prop_schema->{nullable}) };
+    $opts{preserve_unknown} = 1
+        if eval { IO::K8s::Resource::_normalize_bool($prop_schema->{'x-kubernetes-preserve-unknown-fields'}) };
 
     my $kind = _scalar_kind($type_spec);
     # A schema decoded from JSON carries a boolean default as a
