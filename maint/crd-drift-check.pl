@@ -428,8 +428,10 @@ sub parse_crds {
             for my $ver (@{ $spec->{versions} // [] }) {
                 my $vname = $ver->{name} // next;
                 my $gvk   = "$group/$vname/$kind";
-                my $schema     = $ver->{schema}{openAPIV3Schema};
-                my $spec_props = $schema->{properties}{spec}{properties};
+                my $schema      = $ver->{schema}{openAPIV3Schema};
+                my $spec_schema = $schema->{properties} && exists $schema->{properties}{spec}
+                    ? $schema->{properties}{spec} : undef;
+                my $spec_props  = $spec_schema ? $spec_schema->{properties} : undef;
                 $by_gvk{$gvk} = {
                     kind            => $kind,
                     group           => $group,
