@@ -17,6 +17,7 @@
 - **`required` lists are recorded, not enforced**, on every generated class (`required => 'schema'`, the step-2 review's ruling): a cluster hands back `status: {}` for a fresh object whatever the status schema requires, and defaulted fields arrive absent.
 - **`add_crd` registers through `add()`**: qualified `"$group/$version/$Kind"` keys for every served version, the bare `Kind` for the storage version, first-wins on a short-name collision (a provider registered earlier keeps the short name -- D13's order). Returns `{ $Kind => { $api_version => $class, ..., storage => $api_version } }`.
 - **Descriptions go to POD, not to the `description` option**, in emitted source: the house format documents every field in an `=attr` block, and doubling the text into the DSL line would make the 1700 step-4 classes unreadable. `to_crd` (step 5) will read descriptions from the option for user-authored classes; feeding it from POD stays deferred as the spec says.
+- **Emitted source records `required` as `required => 'schema'`**, never as the enforcing marker: provider classes must inflate whatever the cluster returns (`status: {}` on a fresh object), exactly like the generated classes they are rendered from; `to_crd` still sees the field as required.
 - **The emitter never writes into `lib/`**: it returns `{ relative_path => source }`; `--suggest` prints, `--suggest-dir DIR` writes to a directory that must not be inside `lib/`.
 
 ## Global Constraints
@@ -812,7 +813,7 @@ subtest 'the root file is a house-style APIObject class' => sub {
     like($src, qr/^our \$VERSION = '1\.108';$/m, 'version line');
     like($src, qr/^use IO::K8s::APIObject\n    api_version     => 'opts\.example\.com\/v1',\n    resource_plural => 'knobs';$/m, 'APIObject import');
     like($src, qr/^with 'IO::K8s::Role::Namespaced';$/m, 'Namespaced');
-    like($src, qr/^k8s spec\s+=> '\+TestEmit::V1::KnobSpec', 'required';$/m, 'required object field, renamed');
+    like($src, qr/^k8s spec\s+=> '\+TestEmit::V1::KnobSpec', \{ required => 'schema' \};$/m, 'required object field, renamed, recorded not enforced');
     like($src, qr/^k8s status\s+=> '\+TestEmit::V1::KnobStatus';$/m, 'status');
     like($src, qr/^=attr spec\n/m, 'attr POD for spec');
     like($src, qr/\n1;\n\z/, 'ends with 1;');
@@ -822,7 +823,7 @@ subtest 'the root file is a house-style APIObject class' => sub {
 subtest 'field lines render every type form and the options' => sub {
     my $src = $files->{'TestEmit/V1/KnobSpec.pm'};
     like($src, qr/^use IO::K8s::Resource;$/m, 'nested class is a Resource');
-    like($src, qr/^k8s mode\s+=> Str, \{ required => 1, enum => \[qw\(fast safe\)\], default => 'safe' \};$/m, 'enum + default + required');
+    like($src, qr/^k8s mode\s+=> Str, \{ required => 'schema', enum => \[qw\(fast safe\)\], default => 'safe' \};$/m, 'enum + default + schema-required');
     like($src, qr/^k8s replicas\s+=> Int, \{ minimum => 0, maximum => 5 \};$/m, 'range');
     like($src, qr/^k8s limit\s+=> '\+TestEmit::V1::RateLimit';$/m, 'nested object via the name map');
     like($src, qr/^k8s routes\s+=> \['\+TestEmit::V1::KnobSpecRoutesItem'\];$/m, 'array of objects');
@@ -835,7 +836,7 @@ subtest 'field lines render every type form and the options' => sub {
     like($limit, qr/^package TestEmit::V1::RateLimit;\n# ABSTRACT: Rate limit applied to the knob\.$/m, 'ABSTRACT from the object description');
     like($limit, qr/^k8s period\s+=> Str, \{ pattern => qr\/\^\[0-9\]\+\[smh\]\$\/ \};$/m, 'pattern as qr//');
     my $item = $files->{'TestEmit/V1/KnobSpecRoutesItem.pm'};
-    like($item, qr/^k8s match\s+=> Str, 'required';$/m, "required alone renders the legacy marker");
+    like($item, qr/^k8s match\s+=> Str, \{ required => 'schema' \};$/m, 'required alone still renders the schema form');
 };
 
 subtest 'the rendered source compiles and round-trips the same document' => sub {
@@ -951,7 +952,7 @@ together (the Kind itself for the root).
 
 sub package_for {
     my ($self, $class) = @_;
-    my $root = $self->{_root} // croak 'package_for needs a render() in progress';
+    my $root = $self->{_root} // croak 'package_for needs a render() first';
     return $self->base . '::' . $self->names->{$class} if $self->names->{$class};
     (my $rel = $class) =~ s/^\Q$root\E(?:::)?//;
     my $kind = (split /::/, $root)[-1];
@@ -973,7 +974,7 @@ rendered.
 
 sub render {
     my ($self, $root) = @_;
-    local $self->{_root} = $root;
+    $self->{_root} = $root;   # kept after render() so package_for() stays usable
     my %files;
     my @todo = ($root);
     my %seen;
@@ -1057,13 +1058,17 @@ sub _literal {
 
 my @OPTION_ORDER = qw( required enum minimum maximum pattern default nullable preserve_unknown );
 
+# `required` is rendered as `required => 'schema'`: recorded for the CRD
+# schema, never enforced at construction -- the same policy AutoGen applies,
+# because a cluster returns `status: {}` for a fresh object whatever the
+# status schema requires. A hand-written class that wants enforcement
+# writes `'required'` itself.
 sub _options_source {
     my ($info) = @_;
     my %opts = %{ $info->{options} // {} };
     delete $opts{description};             # goes to POD
-    $opts{required} = 1 if $info->{required};
+    $opts{required} = 'schema' if $info->{required};
     return '' unless %opts;
-    return ", 'required'" if join(',', keys %opts) eq 'required';
     my @parts = map { "$_ => " . _literal($opts{$_}) } grep { exists $opts{$_} } @OPTION_ORDER;
     return ', { ' . join(', ', @parts) . ' }';
 }
