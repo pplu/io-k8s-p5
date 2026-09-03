@@ -1,0 +1,27 @@
+---
+class: standard
+completed: 2026-09-03T22:43:46Z
+created: 2026-09-03T01:26:05Z
+id: 95
+priority: high
+started: 2026-09-03T22:43:46Z
+status: done
+tags:
+- crd
+- providers
+title: 'CRD step 4: bundled providers to full depth with Go type names; Gateway API
+  served tracks; drift-check Tier 3 live (D5, D6, D7)'
+updated: 2026-09-03T22:43:46Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D5, D6, D7). Plan: to be written once step 3 has landed; one Sonnet-class io-k8s-worker per provider, sequential board updates.
+
+- Cilium, Traefik, CertManager, GatewayAPI, AgentSandbox, K3s: every nested structure its own class file with POD, named after the upstream Go type at the pinned version (K3s from k3s-io/helm-controller and k3s Go types -- schemaless CRDs upstream). Embedded core types referenced, not re-modeled. Builder roles re-checked against the modeled fields by hand.
+- GatewayAPI gains classes for the served v1beta1 / v1alpha2 / v1alpha3 tracks; the eight ignore_missing_kinds entries in maint/crd-drift-exceptions.yaml go away. Removed upstream tracks stay indefinitely (D7).
+- crd-drift-check Tier 3 (MISSING FIELD) and OPAQUE SPEC must report 0 for every provider afterwards; full suite plus t/25_real_world.t and t/26_build_verify.t both directions.
+Field counts at full depth (served spec only): Cilium 1000, Traefik 695, cert-manager 1413, Gateway API 646, AgentSandbox 2304 (mostly PodTemplateSpec) -- see the spec.
+Depends on: k94.
+
+Step-3 measurement (2026-09-03, emitter over the cached manifests): nested classes per provider at full depth -- CertManager 464, Cilium 619, Traefik 143, GatewayAPI 253 (AgentSandbox: top level already modeled, needs a --suggest-all style render). 557 of those 1479 (38%) have a key set identical to a shipped core/apimachinery class: LabelSelector 138, {key,operator,values} 162 (ambiguous: NodeSelectorRequirement / LabelSelectorRequirement / ...), metav1.Condition shape 28 (matched HPA condition first -- prefer Meta::V1), PodAffinityTerm 24, HTTPHeader 30, etc. D5 says reference embedded core types; plan a --reuse-core emitter option: key-set match -> candidate core classes, prefer Meta::V1 then Core::V1, emit the short class name instead of a nested class; ambiguous small shapes go through the D6 name map. Longest emitted names hit the 200-char cap (cert-manager's inlined PodTemplate) -- reuse-core removes most of those.
+
+Step 4 COMPLETE and merged to master (ff, HEAD 08ed3b0b). All 6 providers full-depth + approved: Traefik 86, cert-manager 77, Cilium ~201 (v2+v2alpha1), Gateway API 143 (D7 served tracks), AgentSandbox 28 (v1alpha1 back-compat), K3s 14 (hand-modeled). Phase A (reuse_core, emitter overlay+prefixes, drift-check --render/--check/--overlay) landed. 3 core bugs found+fixed+closed: k105, k107, k108. Final whole-branch review: Ready to merge. Merge-gate: prove -lr 6653 + dzil test 8101 green. Follow-ups open: k104 (precompute reuse_core index), k109 (restore provider-module POD narratives).
