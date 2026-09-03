@@ -23,12 +23,20 @@ use Module::Runtime qw(use_module);
 # its failure with the spec path in front: Moo and Type::Tiny name the
 # attribute, never the path the caller wrote, and a "Missing required
 # arguments" from a class the walk tried to vivify would otherwise be
-# reported against this file's line number (k101).
+# reported against this file's line number (k101). Type::Tiny's multi-line
+# validation errors put "at FILE line N" on the *first* line and then
+# append several explanation lines after it, so the strip below is
+# unanchored and global -- every embedded "at FILE line N" fragment goes,
+# wherever it sits, while the explanation lines stay. croak still appends
+# its own single trailing "at CALLER line N." to the re-raised message;
+# that one is correct (it points at the caller of the spec_* method) and
+# is left alone.
 sub _sb_guard {
     my ($path, $what, $code) = @_;
     my $result = eval { $code->() };
     return $result unless $@;
-    (my $err = $@) =~ s/ at \S+ line \d+\.?\n?\z//;
+    (my $err = $@) =~ s/ at \S+ line \d+\.?//g;
+    $err =~ s/\s+\z//;
     croak "spec path '$path': $what: $err";
 }
 

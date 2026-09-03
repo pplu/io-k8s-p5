@@ -181,6 +181,7 @@ subtest 'spec_set croaks with the spec path when vivifying a required-attribute 
     throws_ok { $w->spec_set('guarded.must', 'x') }
         qr/^spec path 'guarded\.must': cannot create TestSB::Guarded for 'guarded': Missing required arguments: must/,
         'vivifying a class with a required attribute croaks naming the path and the class';
+    unlike($@, qr/SpecBuilder\.pm line \d+/, 'no internal file/line leaks');
     $w->spec_set('guarded', TestSB::Guarded->new(must => 'x'));
     is($w->spec_get('guarded.must'), 'x', 'building the object first and assigning it works');
 };
@@ -190,6 +191,7 @@ subtest 'spec_set re-raises a type-constraint failure with the spec path (k101)'
     throws_ok { $w->spec_set('replicas', 'abc') }
         qr/^spec path 'replicas': cannot set 'replicas':.*Int/s,
         'the accessor failure is prefixed with the path and keeps the original Type::Tiny text';
+    unlike($@, qr/SpecBuilder\.pm line \d+/, 'no internal file/line leaks');
 };
 
 subtest 'spec_delete re-raises a clear failure with the spec path (k101)' => sub {
@@ -198,6 +200,7 @@ subtest 'spec_delete re-raises a clear failure with the spec path (k101)' => sub
     throws_ok { $w->spec_delete('guarded.must') }
         qr/^spec path 'guarded\.must': cannot clear 'must':/,
         'clearing a required attribute croaks naming the path';
+    unlike($@, qr/SpecBuilder\.pm line \d+/, 'no internal file/line leaks');
 };
 
 done_testing;
