@@ -23,8 +23,10 @@ Revision history for IO-K8s
     never a format string), so it round-trips as a plain Str; a typed
     value map (Int/Num/Bool/Quantity/Time/IntOrStr) round-trips to an
     opaque string map, since AutoGen's additionalProperties dispatch has
-    no scalar-type branch at all. A scalar or array Time-typed field is
-    lossless (format: date-time). IO::K8s::CRD->new(classes => [...],
+    no scalar-type branch at all. A scalar Time field is lossless
+    (format: date-time), but an array of Num, Quantity, Time or IntOrStr
+    round-trips to an array of Str, since AutoGen's array-items dispatch
+    reads only items.type. IO::K8s::CRD->new(classes => [...],
     storage => 'v1') assembles a multi-version CustomResourceDefinition
     from one class per version -- each served, only the named one
     storage:true, in the order given -- and crd_for_class/Class->to_crd is
