@@ -1,0 +1,22 @@
+---
+class: standard
+created: 2026-09-04T23:24:14Z
+id: 123
+priority: medium
+status: backlog
+tags:
+- autogen
+- bug
+title: 'AutoGen: _autogen_namespace kollidiert bei wiederverwendeter refaddr'
+updated: 2026-09-04T23:24:14Z
+---
+
+Gefunden in der load_class-Memoisierungsrunde (als Drittfall geprueft, nicht als Ziel gesucht). Vorbestehend, unabhaengig von der Memoisierung - base und cached verhalten sich identisch falsch, eine echte Kollision wurde dafuer erzwungen.
+
+IO::K8s::_autogen_namespace bildet den Namespace ueber sprintf("%x", 0 + $self), also die refaddr der Instanz. Perl vergibt die Adresse einer zerstoerten Instanz wieder. Zwei verschiedene IO::K8s-Objekte mit verschiedenen openapi_spec koennen darum auf denselben generierten Klassennamen fallen.
+
+Symptom bei erzwungener Kollision: die zweite Instanz bekommt die Attribute der ERSTEN Spec, und ein Feld, das nur in der zweiten Spec existiert, schlaegt fehl. Ursache ist AutoGens eigener %_generated-Cache zusammen mit dem %INC-Eintrag, den Moo fuer das generierte Package setzt - der zweite Generierungsversuch findet die Klasse als vorhanden vor und generiert nicht neu.
+
+Zu entscheiden: Namespace aus einem monoton wachsenden Zaehler statt der refaddr (einfach, macht generierte Klassennamen ueber Prozesslaeufe hinweg unvorhersehbar - fuer AutoGen-Klassen aber ohnehin kein Vertrag), oder Spec-Identitaet in den Namespace aufnehmen (Hash ueber die Spec), oder die Instanz am Leben halten. Erste Variante duerfte reichen.
+
+Praktische Relevanz gering: braucht zwei IO::K8s-Instanzen mit verschiedenen Specs, von denen die erste zerstoert wird, bevor die zweite entsteht. Aber es ist ein stiller Falschverhalten-Bug, kein Croak.
