@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-04T13:09:24Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T13:09:24Z
+created: 2026-09-04T00:16:49Z
+id: 111
+priority: low
+started: 2026-09-04T12:54:05Z
+status: done
+tags:
+- specbuilder
+- registry
+- follow-up
+title: SpecBuilder._sb_fresh does not recognize is_array_of_num/quantity/time/int_or_string
+  when auto-vivifying an empty array slot
+updated: 2026-09-04T13:09:24Z
+---
+
+Found while fixing k96 task-2 review (Class->to_crd croaking on IO::K8s::Api::Resource::V1::ResourceSlice, an [Quantity] array field). lib/IO/K8s/Resource.pm now records is_array_of_num/is_array_of_quantity/is_array_of_time/is_array_of_int_or_string for a [Num]/[Quantity]/[Time]/[IntOrStr] field (previously these had NO is_array_of_* flag at all). lib/IO/K8s/Role/SpecBuilder.pm _sb_fresh (~line 180) auto-vivifies an empty slot for spec_push/spec_array by grepping an explicit list of array flags: is_array_of_objects is_array_of_str is_array_of_int is_array_of_bool is_array_of_hash is_array_of_array -- the four new flags are not in it, so spec_push/spec_array on an unset [Quantity]/[Num]/[Time]/[IntOrStr] field still croaks "cannot descend through scalar field" even though the field is a real array. Not a regression from the to_crd fix (the field vivified identically badly before, just via "no flag matched" instead of "flag not in the list"), but now a live, reachable gap on real shipped classes (ResourceSlice DeviceCapacity.validValues, CapacityRequestPolicy.validValues, and any other [Quantity]/[Num]/[Time]/[IntOrStr] field). Fix: add the four flags to both grep lists in _sb_fresh (the array-shape list at minimum; check whether _sb_store/_sb_elem_class need the same for value coercion, though those are keyed off is_array_of_objects/is_hash_of_objects only, which is unaffected).
+
+Fix committet: 50a9e904. _sb_fresh deckt alle 10 Array-Flags ab; Test t/68. Suite 8235 PASS.
