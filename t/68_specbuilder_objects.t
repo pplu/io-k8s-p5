@@ -29,13 +29,17 @@ use IO::K8s;
     with 'IO::K8s::Role::Namespaced';
 
     k8s spec => {
-        replicas => Int,
-        tls      => { secretName => Str, options => { Str => 1 } },
-        routes   => ['+TestSB::Route'],
-        template => 'Core::V1::PodTemplateSpec',
-        labels   => { Str => 1 },
-        guarded  => '+TestSB::Guarded',
-        '$ref'   => Str,
+        replicas    => Int,
+        tls         => { secretName => Str, options => { Str => 1 } },
+        routes      => ['+TestSB::Route'],
+        template    => 'Core::V1::PodTemplateSpec',
+        labels      => { Str => 1 },
+        guarded     => '+TestSB::Guarded',
+        '$ref'      => Str,
+        nums        => [Num],
+        quantities  => [Quantity],
+        times       => [Time],
+        intOrStrs   => [IntOrStr],
     };
 }
 
@@ -219,6 +223,44 @@ subtest 'spec_delete re-raises a clear failure with the spec path (k101)' => sub
         qr/^spec path 'guarded\.must': cannot clear 'must':/,
         'clearing a required attribute croaks naming the path';
     unlike($@, qr/SpecBuilder\.pm line \d+/, 'no internal file/line leaks');
+};
+
+subtest 'k111: -1 vivification of [Num]/[Quantity]/[Time]/[IntOrStr] fields' => sub {
+    # _sb_fresh only reaches its array-shape grep when a segment must be
+    # vivified so the walk can descend PAST it -- which for a scalar-element
+    # array only happens when addressing an index into it while it is still
+    # unset, e.g. the 'routes.-1...' idiom the object-array test above uses.
+    # spec_push/spec_array never hit this: both always build [] directly for
+    # the FINAL segment of their own path, with no call into _sb_fresh, so a
+    # bare spec_push/spec_array on a freshly-unset top-level field already
+    # worked before this fix. Before the fix, _sb_fresh's array-shape grep
+    # list knew only is_array_of_objects/str/int/bool/hash/array, so
+    # '-1' addressed into an unset [Num]/[Quantity]/[Time]/[IntOrStr] field
+    # -- the four flags k96 added -- fell through to the "cannot descend
+    # through scalar field" croak even though the field is a genuine array.
+    my $w = widget();
+    is($w->spec_get('quantities'), undef, 'unset before vivification');
+    $w->spec_set('quantities.-1', '500m');
+    is_deeply($w->spec->quantities, ['500m'], "'-1' vivifies [Quantity] as an array and sets the new element");
+    is($w->TO_JSON->{spec}{quantities}[0], '500m', 'round-trips onto the wire');
+
+    $w->spec_set('nums.-1', 3.14);
+    is_deeply($w->spec->nums, [3.14], "'-1' vivifies [Num]");
+
+    $w->spec_set('times.-1', '2026-09-04T00:00:00Z');
+    is_deeply($w->spec->times, ['2026-09-04T00:00:00Z'], "'-1' vivifies [Time]");
+
+    $w->spec_set('intOrStrs.-1', '25%');
+    is_deeply($w->spec->intOrStrs, ['25%'], "'-1' vivifies [IntOrStr]");
+
+    # spec_push/spec_array on a still-unset field were never affected by the
+    # bug (see comment above), but are exercised here too since they are the
+    # ticket's named entry points -- on a second, independent field so this
+    # does not depend on the vivification above.
+    my $w2 = widget();
+    is_deeply($w2->spec_array('quantities'), [], 'spec_array on a fresh [Quantity] field returns []');
+    $w2->spec_push('quantities', '250m');
+    is_deeply($w2->spec->quantities, ['250m'], 'spec_push onto it appends');
 };
 
 done_testing;

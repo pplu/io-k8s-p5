@@ -180,6 +180,8 @@ sub _sb_fresh {
             return [] if grep { $info->{$_} } qw(
                 is_array_of_objects is_array_of_str is_array_of_int
                 is_array_of_bool is_array_of_hash is_array_of_array
+                is_array_of_num is_array_of_quantity is_array_of_time
+                is_array_of_int_or_string
             );
             return {} if grep { $info->{$_} } qw(
                 is_hash_of_str is_hash_of_objects is_hash_of_int is_hash_of_num

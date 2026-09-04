@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Fix IO::K8s::Role::SpecBuilder descending into an unset [Num]/[Quantity]/
+    [Time]/[IntOrStr] array field (k111): _sb_fresh's array-shape check omitted
+    the four is_array_of_num/quantity/time/int_or_string flags added in k96, so
+    spec_set('field.-1', ...) through such a field croaked "cannot descend
+    through scalar field" instead of vivifying it. Reachable on shipped
+    Api::Resource::*::ResourceSlice [Quantity] fields.
+
   - Three new bundled CRD providers (D8, k97), opt-in via
     IO::K8s->new(with => [...]) like the existing ones: IO::K8s::PrometheusOperator
     (monitoring.coreos.com, upstream v0.93.1 -- Prometheus, Alertmanager,
