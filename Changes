@@ -924,7 +924,7 @@ Revision history for IO-K8s
     status (or any nested field) via a raw ->new(spec => { ... }) no
     longer coerces the hashref (k100, pre-existing); build via
     new_object/inflate, or seed a typed spec through spec_set/spec_push/
-    spec_merge, which do coerce. Filed as karr #108: IO::K8s::Cilium::
+    spec_merge, which do coerce. Filed as k108: IO::K8s::Cilium::
     V2alpha1::AccessLogs (nested under CiliumGatewayClassConfig's
     spec.telemetry.accessLogs[]) has a real upstream field literally
     named json, which collided with IO::K8s::Role::Resource's own
@@ -935,7 +935,7 @@ Revision history for IO-K8s
     work like any other class.
 
   - IO::K8s::Role::Resource's internal JSON-encoder attribute is renamed
-    from json to _json_encoder (karr #108). It previously collided with
+    from json to _json_encoder (k108). It previously collided with
     any k8s-declared field literally named json -- Resource.pm's _k8s()
     skips creating a Moo attribute when the class already can($attr_name),
     so such a field's slot silently became the encoder instead, and
