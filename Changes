@@ -2,6 +2,21 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::Traefik::V1alpha1::MiddlewareTCP no longer composes
+    IO::K8s::Role::MiddlewareBuilder (k106). That role is HTTP-only -- verified
+    against traefik/traefik v3.7.12, MiddlewareTCPSpec has just
+    inFlightConn/ipAllowList/ipWhiteList -- so its setters configured options
+    Traefik never honours for a TCP middleware. Behaviour change: a call
+    like $tcp_mw->rate_limit(...) now dies with "Can't locate object method"
+    where it previously succeeded, writing the key into the typed spec's
+    _unknown_fields bag (correct on the wire, but no signal to the caller).
+    MiddlewareTCP composes the new IO::K8s::Role::MiddlewareTCPBuilder instead
+    (in_flight_conn, ip_allow_list, ip_white_list); the HTTP Middleware and
+    IO::K8s::Role::MiddlewareBuilder itself are unchanged. Nothing is removed,
+    so no IO::K8s::Deprecated stub is involved. New t/86 guards every with:
+    entry in maint/crd-render/*.yaml against the class's actual ->does(),
+    after the Traefik overlay was found still naming the old role.
+
   - Class->to_crd now emits openAPIV3Schema.pattern as ECMA262 rather than
     Perl regex text (k110). A qr// pattern loses its (?^u:...) wrapper and has
     \A/\z translated to ^/$; a Perl-only construct (a semantic /i/m/s/x flag,

@@ -149,10 +149,15 @@ __END__
 
 =head1 DESCRIPTION
 
-This role provides the fluent Traefik middleware builders documented in
-the README's Traefik section. Each method writes the corresponding block
-under the C<spec> key Traefik's C<Middleware> CRD expects, so the chain
-mirrors what a user would compose in YAML.
+This role provides the fluent Traefik B<HTTP> middleware builders
+documented in the README's Traefik section. Each method writes the
+corresponding block under the C<spec> key Traefik's C<Middleware> CRD
+expects, so the chain mirrors what a user would compose in YAML.
+
+It applies to the HTTP C<Middleware> kind only. Traefik's TCP middleware
+is a different, much smaller schema and honours none of these blocks, so
+it has a role of its own -- L<IO::K8s::Role::MiddlewareTCPBuilder>, which
+L<IO::K8s::Traefik::V1alpha1::MiddlewareTCP> composes.
 
 Each setter either replaces or extends its target block:
 
@@ -174,6 +179,7 @@ role composes on custom CRD classes too.
 
 =head1 SEE ALSO
 
-L<IO::K8s::Traefik>, L<IO::K8s::Role::SpecBuilder>, L<IO::K8s::APIObject>
+L<IO::K8s::Traefik>, L<IO::K8s::Role::MiddlewareTCPBuilder>,
+L<IO::K8s::Role::SpecBuilder>, L<IO::K8s::APIObject>
 
 =cut

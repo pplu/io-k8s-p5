@@ -70,6 +70,17 @@ sub meta { IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(name => $
 }
 
 {
+    package TestBR::MiddlewareTCP;
+    use IO::K8s::APIObject api_version => 'traefik.io/v1alpha1', resource_plural => 'middlewaretcps';
+    with 'IO::K8s::Role::Namespaced', 'IO::K8s::Role::MiddlewareTCPBuilder';
+    k8s spec => {
+        inFlightConn => { amount => Int },
+        ipAllowList  => { sourceRange => [Str] },
+        ipWhiteList  => { sourceRange => [Str] },
+    };
+}
+
+{
     package TestBR::WSvc;
     use IO::K8s::Resource;
     k8s name   => Str;
@@ -246,6 +257,21 @@ subtest 'MiddlewareBuilder on a modeled Middleware' => sub {
     ok($spec->{redirectScheme}{permanent}, 'permanent is true');
     is_deeply($spec->{headers}{customRequestHeaders}, { 'X-A' => '1', 'X-B' => '2' }, 'request headers accumulate');
     is_deeply($spec->{headers}{customResponseHeaders}, { 'X-C' => '3' }, 'response headers');
+};
+
+subtest 'MiddlewareTCPBuilder on a modeled MiddlewareTCP' => sub {
+    my $m = TestBR::MiddlewareTCP->new(metadata => meta('mtcp'));
+    $m->in_flight_conn(10)
+      ->ip_allow_list('10.0.0.0/8', '192.168.1.7')
+      ->ip_white_list('172.16.0.0/12');
+    my $spec = $m->TO_JSON->{spec};
+    is_deeply($spec->{inFlightConn}, { amount => 10 }, 'inFlightConn');
+    is($m->spec->inFlightConn->amount, 10, 'inFlightConn is the struct');
+    is_deeply($spec->{ipAllowList}{sourceRange}, [ '10.0.0.0/8', '192.168.1.7' ], 'ipAllowList');
+    is_deeply($spec->{ipWhiteList}{sourceRange}, [ '172.16.0.0/12' ], 'ipWhiteList');
+
+    # k106: the HTTP builders are a separate role and are not composed here.
+    ok(!TestBR::MiddlewareTCP->can('rate_limit'), 'no HTTP rate_limit on a TCP middleware');
 };
 
 subtest 'Loadbalanced on a modeled TraefikService' => sub {

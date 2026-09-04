@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use IO::K8s::APIObject
     api_version     => 'traefik.io/v1alpha1',
     resource_plural => 'middlewaretcps';
-with 'IO::K8s::Role::Namespaced', 'IO::K8s::Role::MiddlewareBuilder';
+with 'IO::K8s::Role::Namespaced', 'IO::K8s::Role::MiddlewareTCPBuilder';
 
 k8s spec => '+IO::K8s::Traefik::V1alpha1::MiddlewareTCPSpec', { required => 'schema' };
 

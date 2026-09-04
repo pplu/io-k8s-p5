@@ -105,7 +105,7 @@ kinds:
       Spec::IpWhiteList: TCPIPWhiteList
     with:
     - IO::K8s::Role::Namespaced
-    - IO::K8s::Role::MiddlewareBuilder
+    - IO::K8s::Role::MiddlewareTCPBuilder
   ServersTransport:
     extra: []
     names:
