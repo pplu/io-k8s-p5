@@ -1,0 +1,80 @@
+---
+claimed_at: 2026-09-04T23:28:11Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T23:28:11Z
+created: 2026-09-04T20:13:35Z
+id: 117
+priority: high
+started: 2026-09-04T23:28:11Z
+status: done
+tags:
+- roles
+- bug
+title: Routable/NetworkPolicy core branches die on unloaded classes
+updated: 2026-09-04T23:28:11Z
+---
+
+Found while writing the k103 test coverage; pre-existing at HEAD (verified against a pristine git archive of HEAD, so not caused by k103).
+
+IO::K8s::Role::Routable and IO::K8s::Role::NetworkPolicy name concrete
+IO::K8s classes in their method bodies without loading them. Only two of
+them are require-d in place (IngressSpec, NetworkPolicySpec); the rest are
+called as ->new on a package that may never have been loaded:
+
+  Routable  (_route_format eq "ingress"):
+    IngressRule, IngressBackend, IngressServiceBackend, ServiceBackendPort,
+    HTTPIngressPath, HTTPIngressRuleValue
+  NetworkPolicy (_netpol_format eq "core"):
+    Meta::V1::LabelSelector, NetworkPolicyPeer, NetworkPolicyPort,
+    NetworkPolicyIngressRule, NetworkPolicyEgressRule
+
+Reproduce (both fail at HEAD and after k103):
+
+  perl -Ilib -e 'use IO::K8s::Api::Networking::V1::NetworkPolicy;
+    IO::K8s::Api::Networking::V1::NetworkPolicy->new(metadata=>{name=>"w"})
+      ->select_pods(app=>"web")'
+  # Can't locate object method "new" via package
+  #   IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector
+
+  perl -Ilib -e 'use IO::K8s::Api::Networking::V1::Ingress;
+    IO::K8s::Api::Networking::V1::Ingress->new(metadata=>{name=>"w"})
+      ->add_hostname("example.com")'
+  # Can't locate object method "new" via package
+  #   IO::K8s::Api::Networking::V1::IngressRule
+
+It went unnoticed because nothing exercised the two core branches: t/16 and
+t/17 cover the cilium/gateway/traefik branches only, and in the full suite
+some earlier test has always loaded the networking classes already.
+
+Fix per getty-perl-core ("use Module; at the top. Always."): hoist all of
+them to top-level `use` in the two roles and drop the two in-body
+`require`s. Cost is ~13 extra classes pulled in whenever either role is
+composed -- worth measuring against the numbers in k103 before landing.
+
+t/88_k103_specbuilder_requires.t currently loads the classes itself, with a
+comment pointing here, so its core-branch round-trip coverage holds either
+way; that helper `use` block is what to delete when this lands.
+
+
+Second defect in the same unexercised branch, also pre-existing at HEAD:
+Routable::add_path_match with _route_format "ingress" croaks
+
+  Missing required arguments: backend at .../Role/Routable.pm line 192
+
+because IngressBackend is a required field of HTTPIngressPath upstream and
+the branch constructs HTTPIngressPath->new(path => ..., pathType => ...)
+with no backend. It also leaves the object half-mutated: the rule keeps an
+http => { paths => [] } block that the failed call vivified.
+
+Two possible reads -- add_path_match should take the backend (the Gateway/
+Traefik branches carry it separately via add_backend), or the ingress
+branch should defer construction until add_backend supplies one. Upstream
+is the authority: networking.k8s.io/v1 HTTPIngressPath requires both
+pathType and backend, so a path with no backend is not expressible.
+
+t/88_k103_specbuilder_requires.t covers the ingress branch through
+add_hostname/add_backend only, and says so; add_path_match coverage comes
+with the fix.
+
+Erledigt zusammen mit k103 (Commit 3a66c0b0). Beide Core-Zweige laden ihre Klassen jetzt zur Aufrufzeit nach dem im Rollen-Mesh etablierten Muster; standalone in einem Subprozess getestet, der nur die Kind-Klasse laedt - gegen HEAD als rot verifiziert. add_path_match croakt im ingress-Zweig vor jeder Mutation statt halb durchzulaufen, toter Code entfernt, POD an zwei Stellen korrigiert; die Feature-Frage (Backend-Parameter) ist k119.
