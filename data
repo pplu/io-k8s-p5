@@ -1,0 +1,31 @@
+---
+class: standard
+created: 2026-09-04T22:18:07Z
+id: 122
+priority: medium
+status: backlog
+tags:
+- performance
+- d1
+- inflation
+title: 'Inflation: unknown-key-Klassifikation nach _inflate_struct verlagern (k102
+  Option 3, -8.7%)'
+updated: 2026-09-04T22:18:07Z
+---
+
+Aus der k102-Messrunde (2026-09-04), mit Zahlen belegt. Prototyp existierte, wurde bewusst NICHT gebaut.
+
+Messung (t/25 Dashboard-Deployment, ~22 Objekte, interleaved, Median aus 15 gepaarten Rundenverhaeltnissen, CLOCK_PROCESS_CPUTIME_ID mit Kalibrierungsschleife):
+
+  around BUILDARGS ganz entfernt          -14.2%  [-15.3..-10.6]
+  nur der Key-Walk, Wrapper bleibt         -8.2%
+  alle per-Attribut-coerce entfernt        -5.3%
+  beides (Untergrenze)                    -19.7%
+
+Option 3 konkret: _inflate_struct laeuft ohnehin ueber jeden Key und kennt die Registry, kann die undeklarierten also selbst in den Bag legen; ein Package-Flag laesst BUILD frueh zurueckkehren. Gemessen: inflate-deploy -8.7% [-10.5..-6.4], direct ->new -8.5%.
+
+WARUM AUFGESCHOBEN: eine Verhaltensaenderung an einer Fehlermeldung. Unter strict nennt der Fehler dann das AEUSSERSTE unbekannte Feld (top-down) statt des INNERSTEN (bottom-up). Beides deterministisch, aber t/87 Test 5 nagelt die alte Reihenfolge fest, und Aufrufer koennen sich auf den Text stuetzen. Das gehoert eigenstaendig entschieden, nicht als Beifang in einen Performance-Commit.
+
+Zu entscheiden: ist die geaenderte strict-Reihenfolge akzeptabel? Wenn ja, ist der Rest mechanisch und die Zahlen stehen.
+
+Kontext: k102 Option 4 (Coercion nach around BUILDARGS) ist mit +0.2% gemessen und erledigt - NICHT wegen des Setter-Tradeoffs, der ist nachweislich vermeidbar, sondern weil der Gewinn null ist. sub BUILD statt around BUILDARGS (-9.8% auf direct ->new) wurde separat umgesetzt.
