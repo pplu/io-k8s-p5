@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-04T13:09:35Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T13:09:35Z
+created: 2026-09-04T00:37:13Z
+id: 112
+priority: low
+started: 2026-09-04T12:54:10Z
+status: done
+tags:
+- crd
+- emitter
+- follow-up
+title: 'Emitter _type_source: handle arrays of Num/Quantity/Time/IntOrStr (symmetry
+  with to_crd _type_schema)'
+updated: 2026-09-04T13:09:35Z
+---
+
+Step-5 Task-2 scoped re-review (Minor): lib/IO/K8s/CRD/Emitter.pm _type_source (~L259) still croaks on an is_array_of_num/quantity/time/int_or_string field, while lib/IO/K8s/CRD.pm _type_schema (to_crd) now handles all four. Unreachable for shipped classes today (no bundled provider has such an array; only core Api::Resource::*::CapacityRequestPolicy.validValues is [Quantity], and the emitter is not run on core classes). Becomes live only if a future provider CRD grows a [Quantity]/[Num]/[Time]/[IntOrStr] array field and gets rendered. Fix when that happens: add the four reverse branches to _type_source mirroring _type_schema, or a permissive fallback. Filed for symmetry/completeness; not a blocker for step 5.
+
+Fix committet: 5590233d. _type_source vier Reverse-Branches; Test t/74. Suite PASS.
