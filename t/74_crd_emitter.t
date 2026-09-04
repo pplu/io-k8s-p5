@@ -364,4 +364,82 @@ subtest 'array-of-scalar Num/Quantity/Time/IntOrStr fields emit instead of croak
         'emitted class round-trips the same wire shape as the hand-written original');
 };
 
+subtest 'k110: a flagged pattern renders as a string with the flags inlined, not qr/../i' => sub {
+    # Upstream's own spelling. AutoGen compiles it with qr/$p/, and Perl
+    # hoists the leading (?i) into the compiled regex's FLAGS while leaving
+    # it in the text -- which is how the emitter used to write back a
+    # qr/..../i that IO::K8s::CRD then refused to turn into a CRD again.
+    my $schema = {
+        type => 'object',
+        'x-kubernetes-group-version-kind' => [ { group => 'flag.example.com', version => 'v1', kind => 'Flagged' } ],
+        properties => {
+            spec => {
+                type       => 'object',
+                properties => {
+                    strategy => { type => 'string', pattern => '^(?i)(abort|warn)?$' },
+                    plain    => { type => 'string', pattern => '^[a-z]+$' },
+                },
+            },
+        },
+    };
+    my $gen = IO::K8s::AutoGen::get_or_generate('com.example.flag.v1.Flagged', $schema, {}, 'IO::K8s::_AUTOGEN_flag',
+        api_version => 'flag.example.com/v1', kind => 'Flagged', resource_plural => 'flaggeds', is_namespaced => 1);
+    my $flag_files = IO::K8s::CRD::Emitter->new(base => 'TestFlag::V1')->render($gen);
+
+    my $spec_src = $flag_files->{'TestFlag/V1/FlaggedSpec.pm'};
+    like($spec_src, qr/^k8s strategy\s+=> Str, \{ pattern => '\^\(\?i\)\(abort\|warn\)\?\$' \};$/m,
+        'the flagged pattern renders as the plain string upstream wrote, flags inlined');
+    unlike($spec_src, qr{qr/\^\(\?i\)},
+        'and specifically NOT as qr/..../i, which IO::K8s::CRD cannot emit back');
+    like($spec_src, qr{^k8s plain\s+=> Str, \{ pattern => qr/\^\[a-z\]\+\$/ \};$}m,
+        'an unflagged pattern still renders as qr/.../ -- the default is unchanged');
+
+    ok(eval "$spec_src\n1;", 'emitted source compiles') or diag $@;
+
+    # Success condition: the rendered class survives the trip back into a
+    # CRD, with the upstream text intact. Before k110 this croaked.
+    my $props = IO::K8s::CRD::_schema_for_class('TestFlag::V1::FlaggedSpec')->{properties};
+    is($props->{strategy}{pattern}, '^(?i)(abort|warn)?$',
+        'to_crd re-emits the upstream pattern text verbatim');
+    is($props->{plain}{pattern}, '^[a-z]+$', 'and the unflagged one alongside it');
+
+    # Perl-side validation must not have shifted: a string pattern is
+    # compiled by Resource.pm with qr/$p/, which carries no flags, so the
+    # case-insensitivity has to live in the text.
+    lives_ok { TestFlag::V1::FlaggedSpec->new(strategy => 'ABORT') }
+        'the inlined (?i) still accepts an upper-case value';
+    lives_ok { TestFlag::V1::FlaggedSpec->new(strategy => 'warn') } '...and a lower-case one';
+    throws_ok { TestFlag::V1::FlaggedSpec->new(strategy => 'nope') }
+        qr/does not match the pattern/, '...and still rejects a non-member';
+};
+
+subtest 'k110: the flag fold is verified, never assumed' => sub {
+    # No inline modifier in the text: the flags have to be prefixed.
+    is(IO::K8s::CRD::Emitter::_pattern_literal(qr/^abort$/i), q{'(?i)^abort$'},
+        'a bare /i becomes a leading (?i) in the text');
+    is(IO::K8s::CRD::Emitter::_pattern_literal(qr/^a$|^b$/i), q{'(?i)^a$|^b$'},
+        '...and covers every alternative, as the modifier did');
+
+    # Already inline: Perl hoisted it into the flags but left it in the
+    # text, so prefixing again would emit a redundant (?i)(?i).
+    is(IO::K8s::CRD::Emitter::_pattern_literal(qr/^(?i)(abort|warn)?$/i), q{'^(?i)(abort|warn)?$'},
+        'a pattern that already carries the modifier is not given a second one');
+
+    # 'u' is an artifact of the UTF8-flagged string a CRD pattern arrives
+    # as, not something the schema asked for, so it must not push a pattern
+    # onto the string path.
+    my $utf8_born = do { my $p = "^[0-9]+\x{b5}s\$"; qr/$p/ };
+    like(IO::K8s::CRD::Emitter::_pattern_literal($utf8_born), qr{\Aqr/},
+        'an implicit u flag alone still renders as qr/.../');
+
+    # Every modifier re::regexp_pattern actually reports (i m s x n a d l)
+    # does have an inline spelling, so this drives the guard with a flag
+    # letter that has none. The claim is the guard's, not the letter's: an
+    # unfoldable flag must croak rather than silently disappear from a
+    # pattern the caller believes still carries it.
+    throws_ok { IO::K8s::CRD::Emitter::_fold_pattern_flags('^a$', 'Q') }
+        qr/cannot be folded into the pattern text/,
+        'a flag with no inline spelling croaks instead of being dropped';
+};
+
 done_testing;

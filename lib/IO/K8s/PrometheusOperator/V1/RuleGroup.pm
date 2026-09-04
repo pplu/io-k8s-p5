@@ -7,7 +7,11 @@ k8s interval                  => Str, { pattern => qr/^(0|(([0-9]+)y)?(([0-9]+)w
 k8s labels                    => { Str => 1 };
 k8s limit                     => Int;
 k8s name                      => Str, { required => 'schema' };
-k8s partial_response_strategy => Str, { pattern => qr/^(?i)(abort|warn)?$/i };
+# Upstream's own text, kept as the plain string it is: the inline modifier
+# has no ECMA262 spelling, so as a qr// (which also picks up an 'i' flag a
+# CRD pattern cannot carry) to_crd could not emit it back. This is what
+# IO::K8s::CRD::Emitter now renders for a flagged pattern too (k110).
+k8s partial_response_strategy => Str, { pattern => '^(?i)(abort|warn)?$' };
 k8s query_offset              => Str, { pattern => qr/^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$/ };
 k8s rules                     => ['+IO::K8s::PrometheusOperator::V1::Rule'];
 

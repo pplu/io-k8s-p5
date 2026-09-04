@@ -446,7 +446,7 @@ sub _schema_for_class {
         next if $is_top && $attr eq 'metadata';
         my $entry    = $info->{$attr};
         my $json_key = $entry->{json_key} // $attr;
-        $properties{$json_key} = _property_schema($entry, \%next_seen);
+        $properties{$json_key} = _property_schema($entry, \%next_seen, $class . '.' . $json_key);
         push @required, $json_key if $entry->{required};
     }
 
@@ -479,9 +479,9 @@ sub _ensure_class_loaded {
 }
 
 sub _property_schema {
-    my ($entry, $seen) = @_;
+    my ($entry, $seen, $where) = @_;
     my $schema = _type_schema($entry, $seen);
-    _apply_options($schema, $entry->{options}) if $entry->{options};
+    _apply_options($schema, $entry->{options}, $where) if $entry->{options};
     return $schema;
 }
 
@@ -571,25 +571,13 @@ sub _opaque_object {
 # per-property key, it joins the ENCLOSING object's own 'required' array,
 # handled by _schema_for_class's caller loop above.
 sub _apply_options {
-    my ($schema, $opts) = @_;
+    my ($schema, $opts, $where) = @_;
     $schema->{enum} = [ @{ $opts->{enum} } ] if exists $opts->{enum};
     $schema->{minimum} = $opts->{minimum} if exists $opts->{minimum};
     $schema->{maximum} = $opts->{maximum} if exists $opts->{maximum};
     if (exists $opts->{pattern}) {
         my $p = $opts->{pattern};
-        # re::regexp_pattern in LIST context returns the raw pattern text a
-        # qr// was built from -- unlike plain stringification ("$p", which
-        # would wrap it as '(?^u:...)'), it carries no wrapper at all, so
-        # what lands in the schema is what the author (or AutoGen's own
-        # $src->{pattern}) originally wrote. This is only the common-case
-        # unwrap, not a Perl-regex-to-ECMA262 translator: a pattern that
-        # leans on Perl-only syntax (\A/\z anchors, \p{}/\P{} property
-        # classes, named captures, ...) is passed through as-is and is not
-        # valid ECMA262, which is what a CRD's openAPIV3Schema pattern is
-        # specified against. Regex flags (a qr/.../i, say) have no standard
-        # JSON Schema carrier either and are dropped. Both gaps are real and
-        # tracked as k110 rather than guessed at here.
-        $schema->{pattern} = (ref $p eq 'Regexp') ? (re::regexp_pattern($p))[0] : $p;
+        $schema->{pattern} = (ref $p eq 'Regexp') ? _pattern_to_ecma262($p, $where) : $p;
     }
     $schema->{description} = $opts->{description} if exists $opts->{description};
     $schema->{default} = _copy_one_level($opts->{default}) if exists $opts->{default};
@@ -598,6 +586,222 @@ sub _apply_options {
     $schema->{'x-kubernetes-preserve-unknown-fields'} = $opts->{preserve_unknown} ? JSON::MaybeXS::true : JSON::MaybeXS::false
         if exists $opts->{preserve_unknown};
     return;
+}
+
+#### qr// -> ECMA262, for openAPIV3Schema.pattern (k110)
+#
+# A CRD's openAPIV3Schema.pattern is an ECMA262 regex -- that is what JSON
+# Schema specifies and what the apiserver validates against. A Perl qr// is
+# not one, and the two flavors overlap enough that emitting the qr// text
+# verbatim fails SILENTLY: the apiserver either rejects the whole CRD, or
+# accepts a pattern that matches something other than what the Perl class
+# itself validates with (relevant to Kubernetes::REST's ensure_crd).
+#
+# The rule is translate-on-emit, bounded:
+#
+#   * Only a qr// is translated. A pattern given as a plain string is
+#     passed through untouched by _apply_options above -- that string is
+#     already meant to be the wire pattern (it is also exactly what
+#     IO::K8s::AutoGen hands back out of a real CRD's own schema), and
+#     re-parsing someone else's ECMA262 text as if it were Perl would be
+#     the opposite of bounded.
+#   * A qr// is translated where the translation is lossless, and croaks
+#     everywhere else. Nothing is emitted on a guess.
+#
+# What is translated:
+#
+#   \A -> ^ and \z -> $. Both hold only because /m is rejected below:
+#   with no /m, ECMA262 '^' and '$' anchor the whole input, which is
+#   precisely what Perl's \A and \z mean. \Z is NOT '$' -- Perl's \Z also
+#   matches before a final newline -- so it croaks instead of being quietly
+#   equated with it.
+#
+# Everything ECMA262 spells identically -- literals, character classes,
+# (?:...), lookaround, backreferences, lazy quantifiers, \d \w \s \b,
+# {n,m} -- is copied verbatim.
+#
+# The scan is textual and conservative rather than a real regex parser, but
+# it tracks the escape level and character-class nesting, so an escaped
+# construct (a literal \\K, or a ']' inside a class) is not mistaken for
+# the real thing, and it errs towards croaking.
+#
+# What it deliberately does NOT reject are the constructs Perl and the
+# apiserver's own engine agree on even though strict ECMA262 does not:
+# \p{...}/\P{...}/\pC and \x{...}. Upstream ships both -- Cilium's
+# LogConfig.value is qr/^\PC*$/ straight out of the upstream CRD, and
+# IO::K8s::CRD::Emitter renders a non-ASCII pattern as \x{HEX} (see
+# t/74_crd_emitter.t) -- so rejecting them would break checked-in classes
+# to satisfy a rule the validator on the other end does not implement.
+
+# Regex flags that change what the pattern MEANS and have no carrier in a
+# bare pattern string. The charset flags (a/d/l/u) and /p are absent on
+# purpose: they do not change the meaning of the ASCII-oriented text a CRD
+# pattern carries, and a plain qr// picks 'u' up on its own from a feature
+# bundle (qr/^\PC*$/ in Cilium's LogConfig already reports flags 'u'), so
+# croaking on those would reject patterns that were never given a flag.
+# /n is here -- it silently turns every (...) into a non-capturing group.
+my %_PATTERN_BAD_FLAG = (
+    i => 'case-insensitive matching (/i)',
+    m => 'multiline anchors (/m)',
+    s => 'dot-matches-newline (/s)',
+    x => 'extended, whitespace-insensitive syntax (/x)',
+    n => 'non-capturing groups (/n)',
+);
+
+# Backslash escapes that are Perl-only or -- worse -- mean something
+# DIFFERENT in ECMA262. \v is the trap: vertical whitespace in Perl, a
+# plain vertical tab (\x0B) there. Keyed by the character after the
+# backslash; the scan only consults this after establishing that the
+# backslash is not itself escaped.
+my %_PATTERN_BAD_ESCAPE = (
+    'Z' => '\Z (Perl end-of-string-or-before-final-newline; ECMA262 $ is not the same)',
+    'K' => '\K (keep, Perl-only)',
+    'G' => '\G (pos() anchor, Perl-only)',
+    'h' => '\h (horizontal whitespace, Perl-only)',
+    'H' => '\H (non-horizontal-whitespace, Perl-only)',
+    'v' => '\v (vertical whitespace in Perl, a vertical TAB in ECMA262)',
+    'V' => '\V (non-vertical-whitespace, Perl-only)',
+    'R' => '\R (linebreak, Perl-only)',
+    'N' => '\N (non-newline, or \N{NAME}, Perl-only)',
+    'X' => '\X (extended grapheme cluster, Perl-only)',
+    'C' => '\C (single byte, Perl-only)',
+    'o' => '\o{...} (octal escape, Perl-only)',
+    'g' => '\g backreference (Perl-only; ECMA262 has \1 and \k<name>)',
+);
+
+sub _pattern_croak {
+    my ($where, $text, $what) = @_;
+    croak 'IO::K8s::CRD: pattern for '
+        . (defined $where && length $where ? $where : 'an unnamed field')
+        . " cannot be emitted as ECMA262: it uses $what."
+        . ' openAPIV3Schema.pattern is an ECMA262 regex -- rewrite the field'
+        . ' pattern, or give it as a plain string to emit it verbatim.'
+        . ' Pattern: qr/' . $text . '/';
+}
+
+sub _pattern_to_ecma262 {
+    my ($re, $where) = @_;
+
+    # LIST context gives ($raw_text, $flags): the text a qr// was built
+    # from, with no '(?^u:...)' wrapper around it (which is what plain
+    # stringification would produce), plus the flags as their own string.
+    my ($text, $flags) = re::regexp_pattern($re);
+    $flags = '' unless defined $flags;
+
+    my @bad_flags = grep { exists $_PATTERN_BAD_FLAG{$_} } split //, $flags;
+    _pattern_croak($where, $text, join(' and ', map { $_PATTERN_BAD_FLAG{$_} } @bad_flags))
+        if @bad_flags;
+
+    my $out      = '';
+    my $len      = length $text;
+    my $i        = 0;
+    my $in_class = 0;
+
+    while ($i < $len) {
+        my $rest = substr($text, $i);
+
+        # Escapes first, so that a backslashed construct is never read as
+        # the construct itself.
+        if ($rest =~ /\A\\(.)/s) {
+            my $esc = $1;
+            _pattern_croak($where, $text, $_PATTERN_BAD_ESCAPE{$esc})
+                if exists $_PATTERN_BAD_ESCAPE{$esc};
+            _pattern_croak($where, $text,
+                q{\k{...} or \k'...' (Perl-only; ECMA262 spells it \k<name>)})
+                if $esc eq 'k' && $rest !~ /\A\\k</;
+
+            if ($esc eq 'A' || $esc eq 'z') {
+                # Inside a character class these are not anchors at all
+                # (Perl itself warns), so there is nothing to translate
+                # them into -- croak rather than emit either reading.
+                _pattern_croak($where, $text, "\\$esc inside a character class")
+                    if $in_class;
+                $out .= ($esc eq 'A' ? '^' : '$');
+                $i += 2;
+                next;
+            }
+
+            # Copied whole, so the braces they carry are never read as a
+            # {n,m} quantifier by the possessive check further down
+            # (\x{31}+ is one escape plus a '+', not '{31}' made
+            # possessive).
+            if ($rest =~ /\A(\\[pPx]\{[^}]*\})/) {
+                $out .= $1;
+                $i   += length $1;
+                next;
+            }
+
+            $out .= substr($text, $i, 2);
+            $i   += 2;
+            next;
+        }
+
+        my $c = substr($text, $i, 1);
+
+        if ($in_class) {
+            _pattern_croak($where, $text,
+                'a POSIX character class ([[:alpha:]] and friends, Perl-only)')
+                if $c eq '[' && $rest =~ /\A\[:\^?[a-z]+:\]/;
+            $in_class = 0 if $c eq ']';
+            $out .= $c;
+            $i++;
+            next;
+        }
+
+        if ($c eq '[') {
+            # A ']' straight after '[' or '[^' is a literal, not the close,
+            # so it is consumed with the opener and $in_class can then
+            # close on the very next ']' it sees.
+            my ($open) = $rest =~ /\A(\[\^?\]?)/;
+            $out .= $open;
+            $i   += length $open;
+            $in_class = 1;
+            next;
+        }
+
+        if ($c eq '(') {
+            if (substr($text, $i, 2) eq '(?') {
+                # Whitelist, not a blacklist: everything ECMA262 has is
+                # listed here, so atomic groups (?>...), code blocks
+                # (?{...})/(??{...}), comments (?#...), conditionals
+                # (?(...)...), branch reset (?|...), recursion
+                # (?R)/(?1)/(?&name), the (?'name'...)/(?P<name>...)
+                # spellings, inline modifiers (?i)/(?-i:...) and a nested
+                # qr//'s own (?^u:...) wrapper all land in the croak
+                # without needing a rule each.
+                if ($rest =~ /\A(\(\?(?::|=|!|<[=!]|<[A-Za-z_]\w*>))/) {
+                    $out .= $1;
+                    $i   += length $1;
+                    next;
+                }
+                my ($shown) = $rest =~ /\A(\(\?.{0,3})/s;
+                _pattern_croak($where, $text, "the group construct '$shown'"
+                    . ' (ECMA262 has only (?:...), lookaround and (?<name>...))');
+            }
+            $out .= '(';
+            $i++;
+            next;
+        }
+
+        if ($rest =~ /\A(\*|\+|\?|\{\d+(?:,\d*)?\})/) {
+            my $quant = $1;
+            $out .= $quant;
+            $i   += length $quant;
+            my $mod = $i < $len ? substr($text, $i, 1) : '';
+            _pattern_croak($where, $text, "the possessive quantifier '$quant+' (Perl-only)")
+                if $mod eq '+';
+            if ($mod eq '?') {   # lazy: valid ECMA262, but consume it so it
+                $out .= '?';     # is not re-read as a quantifier of its own
+                $i++;
+            }
+            next;
+        }
+
+        $out .= $c;
+        $i++;
+    }
+
+    return $out;
 }
 
 # One level of copying for a 'default' option that might be an array/hash

@@ -2,6 +2,21 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Class->to_crd now emits openAPIV3Schema.pattern as ECMA262 rather than
+    Perl regex text (k110). A qr// pattern loses its (?^u:...) wrapper and has
+    \A/\z translated to ^/$; a Perl-only construct (a semantic /i/m/s/x flag,
+    \Z, \K, possessive quantifiers, atomic groups, POSIX classes, ...) now
+    croaks naming the class, field and construct instead of emitting a regex
+    the apiserver would reject or read differently. A pattern given as a plain
+    string is still passed through verbatim -- that is the escape hatch for an
+    upstream pattern that is not ECMA262-clean. \p{...} and \x{...} are
+    deliberately not rejected: upstream CRDs ship them and the apiserver
+    validates with Go/RE2, where they are valid. IO::K8s::CRD::Emitter renders
+    a flag-carrying pattern as a plain string with an inline (?flags) prefix,
+    so a re-render cannot reintroduce a pattern that to_crd then refuses; the
+    one shipped class affected, PrometheusOperator::V1::RuleGroup, is updated
+    to that form with identical matching behaviour.
+
   - reuse_core no longer pays a ~6.4s cold start on the first CRD generate /
     add_crd / inflate in a process (k104). The core-shape index was built by
     loading all ~840 shipped classes; it now comes from the precomputed

@@ -8,6 +8,7 @@ use warnings;
 use Test::More;
 use Test::Exception;
 use Scalar::Util qw( blessed reftype );
+use re ();
 
 use IO::K8s;
 use IO::K8s::CRD;
@@ -139,7 +140,11 @@ subtest '_schema_for_class mirrors every AutoGen branch in reverse' => sub {
             scores     => { type => 'object', additionalProperties => { type => 'integer' } },
             extras     => { type => 'object', additionalProperties => $ITEM_SCHEMA },
             labels     => { type => 'object', 'x-kubernetes-preserve-unknown-fields' => 1 },
-            mode       => { type => 'string', enum => [qw(fast safe)], pattern => '\A[a-z]+\z' },
+            # k110: a qr// is TRANSLATED to ECMA262 on emit, not passed
+            # through as its Perl source -- \A/\z become ^/$, which is what
+            # openAPIV3Schema.pattern is specified in. Before k110 this
+            # asserted the raw '\A[a-z]+\z', a pattern no apiserver accepts.
+            mode       => { type => 'string', enum => [qw(fast safe)], pattern => '^[a-z]+$' },
             note       => { type => 'string', nullable => 1 },
             blob       => { type => 'string', 'x-kubernetes-preserve-unknown-fields' => 1 },
             greeting   => { type => 'string', default => 'hi' },
@@ -226,6 +231,97 @@ subtest 'regression: arrays of Num/Quantity/Time/IntOrStr are flagged and schema
     isa_ok($crd, 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceDefinition');
 };
 
+# --- k110: openAPIV3Schema.pattern is ECMA262, not Perl -------------------
+
+{
+    package Test79::AnchoredItem;
+    use IO::K8s::Resource;
+
+    k8s label => Str, { pattern => qr/\Aitem-[0-9]+\z/ };
+
+    1;
+}
+
+{
+    package Test79::Anchored;
+    use IO::K8s::APIObject
+        api_version     => 'crdstep5.example.com/v1',
+        resource_plural => 'anchoreds';
+    with 'IO::K8s::Role::Namespaced';
+
+    k8s name     => Str, { pattern => qr/\A[a-z0-9-]+\z/ };
+    k8s lazy     => Str, { pattern => qr/^(?:a|b)+?[]x-]{1,3}$/ };
+    k8s verbatim => Str, { pattern => '\Astill-perl\z' };
+    k8s item     => '+Test79::AnchoredItem';
+
+    1;
+}
+
+{ package Test79::PatFlag;       use IO::K8s::Resource; k8s mode => Str, { pattern => qr/\Aabort\z/i };     1; }
+{ package Test79::PatPossessive; use IO::K8s::Resource; k8s mode => Str, { pattern => qr/\Aa++\z/ };        1; }
+{ package Test79::PatAtomic;     use IO::K8s::Resource; k8s mode => Str, { pattern => qr/\A(?>ab)\z/ };     1; }
+{ package Test79::PatKeep;       use IO::K8s::Resource; k8s mode => Str, { pattern => qr/\Aa\Kb\z/ };       1; }
+{ package Test79::PatBigZ;       use IO::K8s::Resource; k8s mode => Str, { pattern => qr/\Aa\Z/ };          1; }
+{ package Test79::PatPosix;      use IO::K8s::Resource; k8s mode => Str, { pattern => qr/\A[[:alpha:]]+\z/ }; 1; }
+
+subtest 'k110: a qr// pattern is emitted as ECMA262' => sub {
+    my $props = IO::K8s::CRD::_schema_for_class('Test79::Anchored')->{properties};
+
+    is($props->{name}{pattern}, '^[a-z0-9-]+$',
+        '\A and \z become the ECMA262 whole-input anchors ^ and $');
+    is($props->{lazy}{pattern}, '^(?:a|b)+?[]x-]{1,3}$',
+        'everything both flavors spell the same way is copied verbatim '
+        . '(non-capturing group, lazy quantifier, leading ] in a class, {n,m})');
+    is($props->{item}{properties}{label}{pattern}, '^item-[0-9]+$',
+        'a nested class below the top level is translated too');
+
+    # The bounded half of the rule: a pattern the author wrote as a plain
+    # string is the wire pattern already, however Perl-looking it is. We do
+    # not parse other people's regexes.
+    is($props->{verbatim}{pattern}, '\Astill-perl\z',
+        'a plain-string pattern is passed through untouched, not translated');
+};
+
+subtest 'k110: a qr// that cannot be translated croaks, naming field and construct' => sub {
+    throws_ok { IO::K8s::CRD::_schema_for_class('Test79::PatFlag') }
+        qr/pattern for Test79::PatFlag\.mode cannot be emitted as ECMA262: it uses case-insensitive matching \(\/i\)/,
+        'a /i flag croaks, naming the field path and the flag';
+    throws_ok { IO::K8s::CRD::_schema_for_class('Test79::PatFlag') }
+        qr{Pattern: qr/\\Aabort\\z/},
+        'and quotes the offending pattern back';
+
+    throws_ok { IO::K8s::CRD::_schema_for_class('Test79::PatPossessive') }
+        qr/Test79::PatPossessive\.mode .*possessive quantifier '\+\+'/s,
+        'possessive quantifier';
+    throws_ok { IO::K8s::CRD::_schema_for_class('Test79::PatAtomic') }
+        qr/Test79::PatAtomic\.mode .*group construct '\(\?>/s,
+        'atomic group';
+    throws_ok { IO::K8s::CRD::_schema_for_class('Test79::PatKeep') }
+        qr/Test79::PatKeep\.mode .*\\K \(keep, Perl-only\)/s,
+        '\K';
+    # \Z is not $: Perl's \Z also matches before a final newline, so it is
+    # rejected rather than quietly equated with the anchor \z maps to.
+    throws_ok { IO::K8s::CRD::_schema_for_class('Test79::PatBigZ') }
+        qr/Test79::PatBigZ\.mode .*\\Z \(Perl end-of-string/s,
+        '\Z is not silently turned into $';
+    throws_ok { IO::K8s::CRD::_schema_for_class('Test79::PatPosix') }
+        qr/Test79::PatPosix\.mode .*POSIX character class/s,
+        'POSIX character class';
+};
+
+subtest 'k110: the shipped provider patterns still emit exactly as before' => sub {
+    require IO::K8s::Cilium::V2::LogConfig;
+    my $log = IO::K8s::CRD::_schema_for_class('IO::K8s::Cilium::V2::LogConfig');
+    is($log->{properties}{value}{pattern}, '^\PC*$',
+        'Cilium LogConfig.value keeps its \P{...} property class -- upstream ships it '
+        . 'and the apiserver takes it, so it is not rejected in ECMA262\'s name');
+
+    require IO::K8s::PrometheusOperator::V1::RuleGroup;
+    my $rg = IO::K8s::CRD::_schema_for_class('IO::K8s::PrometheusOperator::V1::RuleGroup');
+    is($rg->{properties}{partial_response_strategy}{pattern}, '^(?i)(abort|warn)?$',
+        'the inline modifier upstream ships survives as the plain string it is stored as');
+};
+
 subtest 'smoke: every shipped, resource_plural-bearing Kind survives to_crd' => sub {
     require File::Find;
     require Module::Runtime;
@@ -240,7 +336,8 @@ subtest 'smoke: every shipped, resource_plural-bearing Kind survives to_crd' => 
     }, "$lib/IO/K8s/Api", "$lib/IO/K8s/Apimachinery", "$lib/IO/K8s/ApiextensionsApiserver",
        "$lib/IO/K8s/KubeAggregator", "$lib/IO/K8s/Cilium", "$lib/IO/K8s/Traefik",
        "$lib/IO/K8s/CertManager", "$lib/IO/K8s/GatewayAPI", "$lib/IO/K8s/K3s",
-       "$lib/IO/K8s/AgentSandbox");
+       "$lib/IO/K8s/AgentSandbox", "$lib/IO/K8s/PrometheusOperator",
+       "$lib/IO/K8s/VolumeSnapshot", "$lib/IO/K8s/ExternalSecrets");
 
     my @failed;
     my $checked = 0;
@@ -253,6 +350,32 @@ subtest 'smoke: every shipped, resource_plural-bearing Kind survives to_crd' => 
     }
     ok($checked > 100, "checked a real number of Kinds ($checked)");
     is_deeply(\@failed, [], 'no shipped Kind fails Class->to_crd');
+};
+
+# Runs after the smoke subtest above on purpose -- that one is what has
+# already loaded every shipped class, and the registry is only populated by
+# the `k8s` calls a class makes at load time.
+subtest 'k110: no shipped qr// pattern croaks or changes on emit' => sub {
+    my ($checked, @drifted) = (0);
+    for my $class (sort grep { /\AIO::K8s::/ } keys %IO::K8s::Resource::_attr_registry) {
+        my $info = $IO::K8s::Resource::_attr_registry{$class};
+        for my $attr (sort keys %$info) {
+            my $opts = $info->{$attr}{options} or next;
+            my $p    = $opts->{pattern};
+            next unless defined $p && ref $p eq 'Regexp';
+            $checked++;
+            # The pre-k110 emission: re::regexp_pattern's raw text. Every
+            # shipped pattern must translate to exactly that, so a rule
+            # that starts rejecting or rewriting real provider patterns
+            # fails here rather than in a consumer's cluster.
+            my $before = (re::regexp_pattern($p))[0];
+            my $after  = eval { IO::K8s::CRD::_pattern_to_ecma262($p, "$class.$attr") };
+            if ($@) { push @drifted, "$class.$attr croaks: $@"; next }
+            push @drifted, "$class.$attr: '$before' -> '$after'" if $after ne $before;
+        }
+    }
+    ok($checked > 100, "checked a real number of shipped qr// patterns ($checked)");
+    is_deeply(\@drifted, [], 'the shipped patterns are all already ECMA262');
 };
 
 subtest 'scope: Cluster-scoped shipped Kind' => sub {

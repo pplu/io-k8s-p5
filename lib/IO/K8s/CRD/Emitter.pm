@@ -406,6 +406,71 @@ sub _literal {
     return _scalar_literal($value);
 }
 
+# A `pattern` option specifically (k110). Everything else still goes
+# through _literal above.
+#
+# The qr/.../ form stays the default: it is what every hand-written class in
+# this distribution writes, and IO::K8s::CRD translates one back into the
+# ECMA262 text a CRD's openAPIV3Schema.pattern is specified in.
+#
+# What it cannot translate is a regex FLAG. A CRD pattern is a bare string
+# with nowhere to carry one, so IO::K8s::CRD croaks on a flagged qr// rather
+# than dropping the flag and emitting a pattern that means something else.
+# Rendering `qr/.../i` would therefore hand the caller a class that compiles,
+# validates correctly in Perl, and then cannot be turned back into a CRD --
+# which is how IO::K8s::PrometheusOperator::V1::RuleGroup came to carry one
+# (upstream's own `^(?i)(abort|warn)?$` picked up an 'i' flag on the way
+# through AutoGen's qr/$p/, and this method wrote it back out).
+#
+# So a flagged pattern is folded back into the pattern TEXT as an inline
+# (?flags) group -- the spelling upstream uses anyway, and one Go's regexp
+# engine takes -- and rendered as a plain string. That is the escape hatch
+# IO::K8s::CRD passes through untouched: whatever upstream put in its CRD
+# goes back out unchanged, because upstream knows what its apiserver
+# accepts. Perl-side validation is unaffected either way -- Resource.pm
+# compiles a string pattern with qr/$p/, and an inline (?i) sets exactly
+# what the /i modifier set.
+sub _pattern_literal {
+    my ($value) = @_;
+    return _literal($value) unless ref $value eq 'Regexp';
+
+    my ($pattern, $flags) = re::regexp_pattern($value);
+    $flags = '' unless defined $flags;
+    # 'u' for the same reason _literal drops it (an artifact of the
+    # UTF8-flagged string the pattern was compiled from, not something the
+    # schema asked for); 'p' never changes what a pattern matches.
+    $flags =~ s/[up]//g;
+    return _literal($value) unless length $flags;
+
+    return _scalar_literal(_fold_pattern_flags($pattern, $flags));
+}
+
+# The fold is verified rather than assumed: the candidate text is compiled
+# and its own (text, flags) read back, so the result only ships when Perl
+# agrees it carries the same modifiers. Two candidates, in order:
+#
+#   * the text unchanged -- Perl hoists a leading (?i) INTO the flags while
+#     leaving it in the text, so a pattern upstream already wrote that way
+#     needs no prefix and must not get a duplicate one;
+#   * the text with '(?flags)' prefixed.
+#
+# Neither verifying is a croak, not a silent flag drop.
+sub _fold_pattern_flags {
+    my ($pattern, $flags) = @_;
+    my $want = join '', sort split //, $flags;
+    for my $candidate ($pattern, '(?' . $flags . ')' . $pattern) {
+        my $re = eval { qr/$candidate/ } or next;
+        my ($text, $got) = re::regexp_pattern($re);
+        $got = '' unless defined $got;
+        $got =~ s/[up]//g;
+        return $candidate
+            if $text eq $candidate && join('', sort split //, $got) eq $want;
+    }
+    croak "IO::K8s::CRD::Emitter: the /$flags flags on qr/$pattern/ cannot be"
+        . ' folded into the pattern text, and a CRD pattern has nowhere to'
+        . ' carry a flag';
+}
+
 my @OPTION_ORDER = qw( required enum minimum maximum pattern default nullable preserve_unknown );
 
 # `required` is rendered as `required => 'schema'`: recorded for the CRD
@@ -419,7 +484,8 @@ sub _options_source {
     delete $opts{description};             # goes to POD
     $opts{required} = 'schema' if $info->{required};
     return '' unless %opts;
-    my @parts = map { "$_ => " . _literal($opts{$_}) } grep { exists $opts{$_} } @OPTION_ORDER;
+    my @parts = map { "$_ => " . ($_ eq 'pattern' ? _pattern_literal($opts{$_}) : _literal($opts{$_})) }
+                grep { exists $opts{$_} } @OPTION_ORDER;
     return ', { ' . join(', ', @parts) . ' }';
 }
 
