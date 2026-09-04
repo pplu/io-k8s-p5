@@ -1,0 +1,24 @@
+---
+claimed_at: 2026-09-04T16:26:20Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T16:26:20Z
+created: 2026-09-04T15:59:21Z
+id: 115
+priority: medium
+started: 2026-09-04T16:26:20Z
+status: done
+tags:
+- dsl
+- coercion
+title: 'k100 follow-up: metadata on every APIObject still does not coerce a hashref'
+updated: 2026-09-04T16:26:20Z
+---
+
+k100 gave is_object / is_array_of_objects / is_hash_of_objects a coercer in IO::K8s::Resource::_k8s, so Middleware->new(spec => { rateLimit => { average => 100 } }) works. metadata does NOT, and the root cause is a different one: IO::K8s::Role::APIObject declares it with a plain `has metadata => (is => rw, isa => Maybe[InstanceOf[ObjectMeta]])`, the role is composed at `use IO::K8s::APIObject` time, and _k8s therefore hits its `return if $caller->can($attr_name)` guard -- it registers metadata in the attribute registry (is_object=1, class=ObjectMeta) but never creates the Moo attribute, so no coercer is installed.
+
+Result is a half-usable constructor: Pod->new(spec => { ... }) now works while Pod->new(metadata => { name => "x" }, spec => { ... }) still dies with "Not a blessed reference" for metadata. Deliberately left out of k100 (scope was the three _k8s object forms).
+
+Fix is small -- give the role has metadata a coerce that does the same thing the _k8s is_object branch does -- but it duplicates the coercer body outside _k8s, so it is worth deciding whether the shared body moves to a named sub in IO::K8s::Resource that both call. Blast radius: the metadata attribute of every top-level object; measure with the same before/after as k100 (Moo wraps every coercion in an eval plus a localized hashref, ~1.2 us per coerced attribute per construction).
+
+Umgesetzt direkt im Anschluss an k100: Role::APIObject deklariert metadata jetzt mit demselben Coercer. Gemeinsame Quelle statt Kopie - Resource::_object_coercer($class) ist eine benannte sub (Praezedenz: _normalize_bool im selben File), die _k8s und die Rolle beide benutzen; der Test assertet, dass es fuer Pod und Deployment buchstaeblich derselbe Coderef ist. Der 'return if $caller->can($attr_name)'-Guard in _k8s bleibt unangetastet - die Rolle deklariert die Coercion von vornherein. Kein neuer Ladezyklus (use IO::K8s::Resource () mit leerer Importliste, sonst wuerde _setup_class die Rolle zur Moo-Klasse machen). Geprueft: keine APIObject-Klasse redeklariert metadata, 226 Klassen betroffen, AutoGen-Top-Level-Klassen per Konstruktion mit abgedeckt. Performance: Rauschen (inflate/FROM_HASH-Bereiche ueberlappen vollstaendig), nur Pod->new(metadata => OBJ) +0.6-1.0us = die eine coercte Attribut-Konstante aus k100.
