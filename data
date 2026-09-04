@@ -1,0 +1,26 @@
+---
+claimed_at: 2026-09-04T16:26:36Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T16:26:36Z
+created: 2026-09-03T17:05:19Z
+id: 106
+priority: low
+started: 2026-09-04T15:03:02Z
+status: done
+tags:
+- crd
+- traefik
+- roles
+title: IO::K8s::Role::MiddlewareBuilder offers HTTP-only methods (rate_limit, ...)
+  on MiddlewareTCP, which upstream Traefik's TCP middleware CRD does not support
+updated: 2026-09-04T16:26:36Z
+---
+
+MiddlewareTCP (lib/IO/K8s/Traefik/V1alpha1/MiddlewareTCP.pm) composes the full IO::K8s::Role::MiddlewareBuilder role, same as the HTTP Middleware. Confirmed against the traefik/traefik v3.7.12 Go source (pkg/provider/kubernetes/crd/traefikio/v1alpha1/middlewaretcp.go) while doing task B-Traefik (k95): MiddlewareTCPSpec genuinely has only inFlightConn/ipAllowList/ipWhiteList -- no rateLimit, no basicAuth, etc. Those HTTP-only builder methods (rate_limit, basic_auth, ...) still "work" on a MiddlewareTCP instance because IO::K8s::Role::SpecBuilder writes an undeclared key into the typed MiddlewareTCPSpec _unknown_fields bag (1.108) rather than a real attribute -- it round-trips correctly on the wire (TO_JSON re-emits it), so nothing is silently lost, but a caller gets no signal that they configured an option Traefik will not actually honor for a TCP middleware.
+
+Not fixed as part of k95/task B-Traefik -- that task copies the existing `with` roles verbatim per its recipe rather than redesigning role composition, and t/19_role_helm.t was adjusted only to assert the (correct, already-existing) unknown-fields round-trip instead of a stale opaque-hash read.
+
+Worth a real decision separately: split MiddlewareBuilder into an HTTP subset + a TCP subset (mirrors what CRD::Emitter/D5 already know per-Kind field sets), or leave it as "permissive, wire-preserving, no client-side guard" by design and just document it on the role.
+
+Umgesetzt: Split in IO::K8s::Role::MiddlewareBuilder (HTTP, unveraendert) + neue IO::K8s::Role::MiddlewareTCPBuilder (in_flight_conn/ip_allow_list/ip_white_list gegen die echten MiddlewareTCPSpec-Felder). MiddlewareTCP komponiert jetzt die TCP-Rolle; HTTP-Setter darauf sterben - das ist die beabsichtigte Verhaltensaenderung. t/19 Test-Claim bewusst invertiert, der weiterhin gueltige _unknown_fields-Roundtrip auf einen Fall umgehaengt der ihn wirklich meint. Zusatzfund: maint/crd-render/Traefik.yaml:108 listete noch die alte Rolle und haette k106 beim naechsten Emitter-Render rueckgaengig gemacht - gefixt, plus neuer Guard t/86_crd_render_overlay_roles.t (jeder with:-Eintrag aller 5 Overlays gegen ->does(), 52 Kinds/68 Rollenrefs; gegen den echten Bug verifiziert). Audit: MiddlewareTCP war der einzige falsche Eintrag.
