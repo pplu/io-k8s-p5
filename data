@@ -1,0 +1,23 @@
+---
+class: standard
+created: 2026-09-04T21:41:55Z
+id: 121
+priority: low
+status: backlog
+tags:
+- crd
+- providers
+- volumesnapshot
+title: 'VolumeSnapshot: groupsnapshot.storage.k8s.io/v1 modellieren (VolumeGroupSnapshot*)'
+updated: 2026-09-04T21:41:55Z
+---
+
+Abgespalten von k113, dessen ExternalSecrets-Teil abgeschlossen ist.
+
+Offen: groupsnapshot.storage.k8s.io/v1 aus external-snapshotter v8.6.0 - VolumeGroupSnapshot, VolumeGroupSnapshotClass, VolumeGroupSnapshotContent (in v8.6.0 GA).
+
+BLOCKIERT auf einer Quelle: die CRDs liegen nicht unter spec/crd/VolumeSnapshot/ - dort stehen nur die drei snapshot.storage.k8s.io-Dateien (volumesnapshotclasses, volumesnapshotcontents, volumesnapshots). Die groupsnapshot-Gruppe steht auch nicht in crd_sources, wird vom drift-check also gar nicht erfasst.
+
+Zu tun: CRDs von external-snapshotter v8.6.0 holen und unter spec/crd/VolumeSnapshot/ ablegen, crd_sources in IO::K8s::VolumeSnapshot erweitern, dann modellieren.
+
+Hinweis aus der k113-Runde: fuer VolumeSnapshot existiert kein maint/crd-render/<Provider>.yaml (k120), der Emitter ist also nur Rohmaterial und seine Klassenaufteilung nicht massgeblich - die neuen Klassen muessen zu den eingecheckten passen. Bei ExternalSecrets haette ein blindes Uebernehmen der Render-Ausgabe fuer EINEN Kind 44 Klassen erzeugt statt 2.
