@@ -1,0 +1,21 @@
+---
+class: standard
+created: 2026-09-04T20:43:52Z
+id: 119
+priority: medium
+status: backlog
+tags:
+- roles
+- routable
+- api
+title: Routable::add_path_match hat im ingress-Modus keinen Weg, ein backend zu setzen
+updated: 2026-09-04T20:43:52Z
+---
+
+k117-Folge. Der ingress-Zweig von add_path_match croakt seit k117 sauber und vor jeder Mutation, weil er prinzipiell nicht erfolgreich sein kann: networking.k8s.io/v1 HTTPIngressPath verlangt backend UND pathType als required, die Signatur ist aber ($path, %opts) mit nur `type`, und add_backend schreibt spec.defaultBackend (der Fallback fuer nicht gematchte Requests), nicht das backend eines Pfades.
+
+Offene Feature-Entscheidung (Getty): bekommt die Methode im ingress-Modus einen Backend-Parameter, oder bleibt sie fuer dieses Format ein dokumentiertes No-Go?
+
+Vorschlag aus der k117-Runde: add_path_match(\x27/api\x27, type => \x27Prefix\x27, service => \x27api\x27, port => 8080) wuerde das Vokabular von add_backend aufgreifen. Wichtig dabei: das ergibt nur im ingress-Modus Sinn - gateway und traefik holen ihr Backend ueber add_backend - waere also eine ingress-only Option und keine Signaturaenderung fuer alle drei Formate.
+
+Heutiger Zustand ist konsistent und ehrlich: Croak mit Begruendung und Verweis auf den Ausweg, POD an zwei Stellen korrigiert, toter Code entfernt. Nichts ist kaputt; es fehlt eine Faehigkeit.
