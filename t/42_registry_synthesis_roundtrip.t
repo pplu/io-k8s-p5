@@ -201,13 +201,29 @@ sub union_bare_value {
 # (100/404/500/8080), DNS-label-shaped (a/b), Go-duration-shaped (1h),
 # IPv4/IPv6-address-shaped (10.0.0.1, Cilium's peerAddress/ip fields, k95),
 # CIDR-shaped (10.0.0.0/24, Cilium's destinationCIDRs/excludedCIDRs),
-# BGP-community-triple-shaped (65000:1:1, Cilium's BGPCommunities.large), and
+# BGP-community-triple-shaped (65000:1:1, Cilium's BGPCommunities.large),
 # absolute-URL-shaped (https://example.com, Gateway API's
-# SubjectAltName.uri and HTTPCORSFilter.allowOrigins, k95). Every call site
-# below greps this same pool for the first entry that satisfies the field's
-# own pattern rather than assuming one fixed shape -- a value the field's
-# own constraint rejects isn't a valid instance of it.
-my @PATTERN_CANDIDATES = ('100', '404', '500', '8080', 'a', 'b', '1h', '10.0.0.1', '10.0.0.0/24', '65000:1:1', 'https://example.com');
+# SubjectAltName.uri and HTTPCORSFilter.allowOrigins, k95),
+# cron/@keyword-shaped (@daily, ExternalSecrets'
+# ExternalSecretSyncWindowEntry.schedule, which also accepts a 5-field cron
+# string or "@every <duration>"), GCP-service-account-email-shaped
+# (test@project.iam.gserviceaccount.com, ExternalSecrets'
+# GCPWorkloadIdentityFederation.gcpServiceAccountEmail), Nebius
+# service-account-id-shaped (serviceaccount-abc, ExternalSecrets'
+# NebiusWorkloadIdentity.iamServiceAccountID), byte-size-shaped (512MB,
+# PrometheusOperator's AlertmanagerLimitsSpec.maxPerSilenceBytes and the
+# several *.bodySizeLimit fields, all sharing one "trailing B, optional
+# K/M/G/T/E/P(i) prefix" pattern), abort|warn-enum-shaped (abort,
+# PrometheusOperator's RuleGroup.partial_response_strategy), and
+# filename-shaped (config.yaml, PrometheusOperator's
+# V1alpha1::FileSDConfig.files, which requires a .json/.yml/.yaml suffix).
+# Every call site below greps this same pool for the first entry that
+# satisfies the field's own pattern rather than assuming one fixed shape --
+# a value the field's own constraint rejects isn't a valid instance of it.
+my @PATTERN_CANDIDATES = (
+    '100', '404', '500', '8080', 'a', 'b', '1h', '10.0.0.1', '10.0.0.0/24', '65000:1:1', 'https://example.com',
+    '@daily', 'test@project.iam.gserviceaccount.com', 'serviceaccount-abc', '512MB', 'abort', 'config.yaml',
+);
 
 sub synth_scalar {
     my ($info, $attr) = @_;

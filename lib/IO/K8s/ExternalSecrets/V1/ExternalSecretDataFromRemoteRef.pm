@@ -1,0 +1,43 @@
+package IO::K8s::ExternalSecrets::V1::ExternalSecretDataFromRemoteRef;
+# ABSTRACT: ExternalSecretDataFromRemoteRef defines the connection between the Kubernetes Secret keys and the Provider data when using DataFrom to fetch multiple values from a Provider.
+our $VERSION = '1.108';
+use IO::K8s::Resource;
+
+k8s extract   => '+IO::K8s::ExternalSecrets::V1::ExternalSecretDataRemoteRef';
+k8s find      => '+IO::K8s::ExternalSecrets::V1::ExternalSecretFind';
+k8s rewrite   => ['+IO::K8s::ExternalSecrets::V1::ExternalSecretRewrite'];
+k8s sourceRef => '+IO::K8s::ExternalSecrets::V1::StoreGeneratorSourceRef';
+
+=attr extract
+
+Used to extract multiple key/value pairs from one secret
+Note: Extract does not support sourceRef.Generator or sourceRef.GeneratorRef.
+
+=cut
+
+=attr find
+
+Used to find secrets based on tags or regular expressions
+Note: Find does not support sourceRef.Generator or sourceRef.GeneratorRef.
+
+=cut
+
+=attr rewrite
+
+Used to rewrite secret Keys after getting them from the secret Provider
+Multiple Rewrite operations can be provided. They are applied in a layered order (first to last)
+
+=cut
+
+=attr sourceRef
+
+SourceRef points to a store or generator
+which contains secret values ready to use.
+Use this in combination with Extract or Find pull values out of
+a specific SecretStore.
+When sourceRef points to a generator Extract or Find is not supported.
+The generator returns a static map of values
+
+=cut
+
+1;

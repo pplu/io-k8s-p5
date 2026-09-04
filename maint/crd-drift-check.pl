@@ -114,7 +114,8 @@ my $UA_STRING = 'io-k8s-p5-crd-drift-check (+https://github.com/pplu/io-k8s-p5)'
 # The provider modules this tool knows how to check, in report order. Each
 # is a Moo class composing IO::K8s::Role::ResourceMap with an upstream_version
 # and (as of k82) a crd_sources method.
-my @ALL_PROVIDERS = qw(Cilium GatewayAPI AgentSandbox Traefik CertManager K3s);
+my @ALL_PROVIDERS = qw(Cilium GatewayAPI AgentSandbox Traefik CertManager K3s
+                       PrometheusOperator VolumeSnapshot ExternalSecrets);
 
 # ---------------------------------------------------------------------------
 # CLI

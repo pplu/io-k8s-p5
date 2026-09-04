@@ -2,6 +2,21 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Three new bundled CRD providers (D8, k97), opt-in via
+    IO::K8s->new(with => [...]) like the existing ones: IO::K8s::PrometheusOperator
+    (monitoring.coreos.com, upstream v0.93.1 -- Prometheus, Alertmanager,
+    ServiceMonitor, PodMonitor, PrometheusRule, Probe, ScrapeConfig),
+    IO::K8s::VolumeSnapshot (snapshot.storage.k8s.io/v1, upstream
+    external-snapshotter v8.6.0 -- VolumeSnapshot, VolumeSnapshotClass,
+    VolumeSnapshotContent) and IO::K8s::ExternalSecrets (external-secrets.io,
+    upstream v2.10.0 -- ExternalSecret, SecretStore, ClusterSecretStore,
+    ClusterExternalSecret, PushSecret, ClusterPushSecret). Modeled to full depth
+    with upstream Go type names, per-field POD and crd_sources for
+    maint/crd-drift-check.pl. Deliberately deferred surface (external-secrets
+    generators.external-secrets.io group, external-snapshotter
+    VolumeGroupSnapshot*) is recorded in maint/crd-drift-exceptions.yaml and
+    tracked in k113.
+
   - New Class->to_crd (D9, k96): any IO::K8s::APIObject class now emits its
     own CustomResourceDefinition, built from the same attribute registry
     add_crd/IO::K8s::AutoGen reads -- the exact inverse of AutoGen's

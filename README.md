@@ -105,6 +105,9 @@ my $k8s = IO::K8s->new(with => [
     'IO::K8s::K3s',
     'IO::K8s::GatewayAPI',
     'IO::K8s::AgentSandbox',
+    'IO::K8s::PrometheusOperator',
+    'IO::K8s::VolumeSnapshot',
+    'IO::K8s::ExternalSecrets',
 ]);
 ```
 
@@ -179,6 +182,45 @@ my $sandbox = $k8s->new_object('Sandbox',
     spec => {
         shutdownPolicy => 'Retain',
         podTemplate    => { spec => { containers => [ { name => 'agent', image => 'agent:latest' } ] } },
+    },
+);
+```
+
+### Prometheus Operator (7 CRDs)
+
+`IO::K8s::PrometheusOperator` covers `monitoring.coreos.com/v1` (Prometheus, Alertmanager, ServiceMonitor, PodMonitor, PrometheusRule, Probe) and `monitoring.coreos.com/v1alpha1` (ScrapeConfig) (upstream v0.93.1):
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::PrometheusOperator']);
+my $sm = $k8s->new_object('ServiceMonitor',
+    metadata => { name => 'my-app', namespace => 'monitoring' },
+    spec => { selector => { matchLabels => { app => 'my-app' } }, endpoints => [{ port => 'web' }] },
+);
+```
+
+### VolumeSnapshot (3 CRDs)
+
+`IO::K8s::VolumeSnapshot` covers `snapshot.storage.k8s.io/v1` (upstream external-snapshotter v8.6.0). `VolumeSnapshot` is namespaced; `VolumeSnapshotClass` and `VolumeSnapshotContent` are cluster-scoped:
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::VolumeSnapshot']);
+my $snap = $k8s->new_object('VolumeSnapshot',
+    metadata => { name => 'my-snap', namespace => 'default' },
+    spec => { volumeSnapshotClassName => 'csi-snapclass', source => { persistentVolumeClaimName => 'my-pvc' } },
+);
+```
+
+### External Secrets (6 CRDs)
+
+`IO::K8s::ExternalSecrets` covers `external-secrets.io/v1` (ExternalSecret, SecretStore, ClusterSecretStore, ClusterExternalSecret) and `external-secrets.io/v1alpha1` (PushSecret, ClusterPushSecret) (upstream v2.10.0). `ClusterSecretStore`, `ClusterExternalSecret` and `ClusterPushSecret` are cluster-scoped:
+
+```perl
+my $k8s = IO::K8s->new(with => ['IO::K8s::ExternalSecrets']);
+my $es = $k8s->new_object('ExternalSecret',
+    metadata => { name => 'my-secret', namespace => 'default' },
+    spec => {
+        secretStoreRef => { name => 'vault-backend', kind => 'SecretStore' },
+        data => [{ secretKey => 'password', remoteRef => { key => 'prod/db', property => 'password' } }],
     },
 );
 ```

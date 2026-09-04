@@ -46,6 +46,99 @@ ignore_missing_kinds:
     gvk: gateway.networking.k8s.io/v1alpha3/BackendTLSPolicy
     reason: "k95: served: false at v1.6.1 (graduated to v1); nothing upstream serves to model"
 
+  # VolumeSnapshot (k97, external-snapshotter v8.6.0): the v1beta1 track of all
+  # three Kinds is served: false / storage: false in the pinned manifests -- v1
+  # is the sole served+storage version. GatewayAPI case above: nothing upstream
+  # serves at v1beta1 to model. (VolumeGroupSnapshot* GA'd at v8.6.0 lives in the
+  # separate groupsnapshot.storage.k8s.io group, not in crd_sources yet -- k113.)
+  - provider: VolumeSnapshot
+    gvk: snapshot.storage.k8s.io/v1beta1/VolumeSnapshot
+    reason: "k97: served: false at external-snapshotter v8.6.0 (v1 is sole served/storage version); nothing to model"
+  - provider: VolumeSnapshot
+    gvk: snapshot.storage.k8s.io/v1beta1/VolumeSnapshotClass
+    reason: "k97: served: false at external-snapshotter v8.6.0 (v1 is sole served/storage version); nothing to model"
+  - provider: VolumeSnapshot
+    gvk: snapshot.storage.k8s.io/v1beta1/VolumeSnapshotContent
+    reason: "k97: served: false at external-snapshotter v8.6.0 (v1 is sole served/storage version); nothing to model"
+
+  # ExternalSecrets (k97, external-secrets v2.10.0) -- two kinds of deliberate gap.
+  # (1) The v1beta1 track of the four graduated external-secrets.io Kinds is
+  # served: false in the bundle; external-secrets.io/v1 is served+storage.
+  - provider: ExternalSecrets
+    gvk: external-secrets.io/v1beta1/ExternalSecret
+    reason: "k97: served: false at external-secrets v2.10.0 (graduated to v1); nothing to model"
+  - provider: ExternalSecrets
+    gvk: external-secrets.io/v1beta1/SecretStore
+    reason: "k97: served: false at external-secrets v2.10.0 (graduated to v1); nothing to model"
+  - provider: ExternalSecrets
+    gvk: external-secrets.io/v1beta1/ClusterSecretStore
+    reason: "k97: served: false at external-secrets v2.10.0 (graduated to v1); nothing to model"
+  - provider: ExternalSecrets
+    gvk: external-secrets.io/v1beta1/ClusterExternalSecret
+    reason: "k97: served: false at external-secrets v2.10.0 (graduated to v1); nothing to model"
+  # (2) The generators.external-secrets.io group (generator plugins) is served
+  # but a separate API group / mini-provider of its own, out of scope for the
+  # external-secrets.io Kinds k97 shipped -- deferred to k113. (ClusterPushSecret
+  # was in this list too; it was folded into k97 as a served sibling of
+  # PushSecret and now has a real class, so its entry is gone.)
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/ACRAccessToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/BeyondtrustWorkloadCredentialsDynamicSecret
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/CloudsmithAccessToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/ClusterGenerator
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/ECRAuthorizationToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/Fake
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/GCRAccessToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/GeneratorState
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/GithubAccessToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/GitlabDeployToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/Grafana
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/MFA
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/Password
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/QuayAccessToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/SSHKey
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/STSSessionToken
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/UUID
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/VaultDynamicSecret
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+  - provider: ExternalSecrets
+    gvk: generators.external-secrets.io/v1alpha1/Webhook
+    reason: "k97: separate generators.external-secrets.io group, out of scope; deferred to k113"
+
 # Shipped GVKs (resource_map classes) intentionally kept with no matching
 # upstream CRD at the pinned upstream_version: back-compat tracks for
 # clusters still running an older provider release. Without these, every run
