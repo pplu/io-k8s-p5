@@ -1,0 +1,26 @@
+---
+class: standard
+completed: 2026-09-04T01:07:02Z
+created: 2026-09-03T01:26:10Z
+id: 96
+priority: medium
+started: 2026-09-04T01:07:02Z
+status: done
+tags:
+- crd
+- core
+title: 'CRD step 5: to_crd on CRD classes, multi-version IO::K8s::CRD->new(classes,
+  storage), IO::K8s::Unstructured opt-in (D9, D4)'
+updated: 2026-09-04T01:07:02Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D9, D4). Plan: to be written once step 2 has landed (independent of step 4).
+
+- Class->to_crd: CustomResourceDefinition object from the attribute registry (scalars, arrays, maps, inline structs, referenced classes by recursion, required + the D3 options); opaque { Str => 1 } -> type: object + x-kubernetes-preserve-unknown-fields: true; scope from Role::Namespaced; names from resource_plural/kind.
+- IO::K8s::CRD->new(classes => [...], storage => 'v1') assembles a multi-version CRD.
+- IO::K8s::Unstructured: apiVersion/kind/metadata attributes, rest preserved (D1); IO::K8s->new(unknown_kinds => 'unstructured') opts in; default stays fail-closed.
+Depends on: k93. Unblocks: k97.
+
+Correction of the dependency line: unblocks kubernetes-rest 24 (Kubernetes::REST step 6), not an io-k8s ticket.
+
+Step 5 COMPLETE and merged to master (ff, HEAD b05be306). Three deliverables done+approved: (1) IO::K8s::Unstructured + unknown_kinds=>'unstructured' opt-in (fail-closed default intact); (2) Class->to_crd (registry->openAPIV3Schema, inverse of AutoGen, round-trips via add_crd, works on all 194 shipped resource_plural Kinds); (3) IO::K8s::CRD->new(classes,storage) multi-version, with crd_for_class/to_crd as the single-version special case. Whole-branch review: ready to merge (one prose-only Changes fix applied). Merge-gate: prove -lr 6675 + dzil test 8124 green. Unblocks kubernetes-rest #24 (ensure_crd via to_crd; Unstructured fallback D16). Follow-ups: k110 (pattern ECMA262), k111 (SpecBuilder new array flags), k112 (Emitter array-scalar symmetry).
