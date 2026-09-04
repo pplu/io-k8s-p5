@@ -1,0 +1,28 @@
+---
+claimed_at: 2026-09-04T11:40:45Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T11:40:40Z
+created: 2026-09-03T01:26:15Z
+id: 97
+priority: medium
+started: 2026-09-04T03:22:15Z
+status: done
+tags:
+- crd
+- providers
+title: 'CRD step 7: bundle Prometheus Operator, VolumeSnapshot and external-secrets
+  providers (D8)'
+updated: 2026-09-04T11:40:45Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D8). Plan: to be written once step 4 has landed; built with the step-3 emitter, one Sonnet-class io-k8s-worker per provider.
+
+- IO::K8s::PrometheusOperator (monitoring.coreos.com: Prometheus, Alertmanager, ServiceMonitor, PodMonitor, PrometheusRule, Probe, ScrapeConfig), IO::K8s::VolumeSnapshot (snapshot.storage.k8s.io: VolumeSnapshot, VolumeSnapshotClass, VolumeSnapshotContent), IO::K8s::ExternalSecrets (external-secrets.io: ExternalSecret, SecretStore, ClusterSecretStore, ClusterExternalSecret, PushSecret).
+- Each with upstream_version + crd_sources for crd-drift-check, full depth, Go type names, README + POD sections, provider tests like t/07-t/11.
+Pins to choose at plan time (latest stable release of each).
+Depends on: k95.
+
+Implementiert + verifiziert (uncommitted): PrometheusOperator v0.93.1 (137 Kl.), VolumeSnapshot v8.6.0 (10 Kl.), ExternalSecrets v2.10.0 (226 Kl.). Tests t/81-83; volle Suite Files=86 Tests=8207 PASS. Alle drei drift-clean via Exceptions (served:false-v1beta1, generators-Gruppe, ClusterPushSecret). @ALL_PROVIDERS/README/Changes ergaenzt. Aufgeschobene Flaeche -> k113. Offen: Commit (master -> branchen), Getty-Entscheid ClusterPushSecret.
+
+Committed auf master: ff44dc9c. Volle Suite 8228 Tests PASS. ClusterPushSecret in k97 gefoldet (Getty-Entscheid). Follow-up: k113.
