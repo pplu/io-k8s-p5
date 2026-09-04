@@ -12,7 +12,7 @@
 #      document was dropped instead of dying.
 #
 # Fix: List now composes IO::K8s::Role::Resource (reusing its exact
-# _unknown_fields bag + around BUILDARGS strict mechanism) while keeping its
+# _unknown_fields bag + BUILD strict mechanism) while keeping its
 # own hand-rolled TO_JSON/FROM_STRUCT/to_json/from_json, since kind/api_version
 # derive from the items rather than from a class name the role could use.
 use strict;

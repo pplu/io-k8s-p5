@@ -2,6 +2,26 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::Role::Resource does its D1 unknown-field walk in a sub BUILD
+    instead of an around BUILDARGS (k102). Same walk, same order, same
+    decisions -- Moo charges 1.66us for a BUILDARGS wrapper against 0.46us for
+    a BUILD, and that plumbing was the dominant cost, not the walk itself.
+    Measured on the current tree: direct ->new -7.9%, inflation -5.3%. The
+    option this ticket actually proposed -- moving object coercion into the
+    wrapper -- was prototyped and measured at +0.2% and is not being built;
+    the per-attribute coercion it would remove costs the same as the
+    replacement. Note for the record: that is the reason, not the rw setter,
+    which was shown to be preservable at no cost.
+
+  - A plain hashref passed to ->new for an inline-struct field is now copied
+    one level, not aliased (k116). Every other route -- inflate,
+    struct_to_object, FROM_HASH -- already copied since k54, so the same field
+    of the same class behaved differently depending on how it was built. The
+    inline-struct coercer is gone; is_inline_struct falls through to the named
+    is_object coercer, and the two paths cannot drift apart again. Behaviour
+    change for a caller who mutates the source hashref after ->new and expects
+    the object to see it.
+
   - A direct Class->new now coerces a plain hashref into a named nested class
     for object, array-of-object and hash-of-object fields (k100), where it
     previously died with "Not a blessed reference" / an InstanceOf failure and

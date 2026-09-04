@@ -607,17 +607,31 @@ sub _k8s {
             return \@out;
         });
     }
-    # Inline struct: coerce plain hashref to inner class instance
-    elsif ($info{is_inline_struct}) {
-        my $ic = $info{class};
-        @coerce = (coerce => sub {
-            return $_[0] if blessed($_[0]);
-            return $ic->new(%{$_[0]}) if ref $_[0] eq 'HASH';
-            return $_[0];
-        });
-    }
     # Named nested class, single (k100) -- body in _object_coercer above,
     # because IO::K8s::Role::APIObject's `metadata` needs the same one.
+    #
+    # An inline struct takes this branch too, since is_inline_struct always
+    # sets is_object as well (k116). It used to have a branch of its own
+    # doing `$ic->new(%{$_[0]})`, which differs in exactly one visible way:
+    # `->new` stored the caller's inner containers by reference, while every
+    # other route into the same field -- inflate, struct_to_object,
+    # FROM_HASH -- copies them one level (k54). The same field of the same
+    # class therefore had both semantics depending on how it was built,
+    # which is not something a design chooses: the inline coercer landed
+    # with the inline-struct DSL in 2c0c6d02, k54 arrived five months later
+    # in 5ab95ca3 and touched _inflate_struct and TO_JSON without ever
+    # reaching it. Unified on the copying side, the newer and the tested
+    # one; t/29_inline_struct.t pins it, since nothing did before.
+    #
+    # The other differences the k100 review listed turned out not to be
+    # differences worth keeping either. load_class is not a blocker: Moo
+    # registers a generated inline-struct package in %INC (as '(eval NNN)'),
+    # so require_module finds it and returns. The opaque names
+    # fieldsV1/rawExtension/raw that _inflate_struct special-cases are
+    # theoretical here -- ManagedFieldsEntry is the only class shipping one
+    # and it already declares the opaque form. FROM_STRUCT never exists on a
+    # generated class. What is left is the Bool error wrapper, whose text
+    # now matches the one every other object-bearing field produces.
     #
     # Two things the three object branches here share:
     #   * `ref $_[0] eq 'HASH'` is false for a blessed hashref, so one test
@@ -762,7 +776,12 @@ construction rather than at the API server.
 
 Inline structs auto-generate an inner class (e.g. C<MyClass::_Spec>) with
 the declared fields. Hashrefs are auto-coerced to the inner class on
-construction.
+construction, through the very same coercion a named nested class gets --
+so a plain container inside the hashref is copied one level rather than
+stored by reference (k116). Before that, C<< ->new >> was the one route
+into an inline-struct field that aliased the caller's structure while
+C<inflate>, C<struct_to_object> and C<FROM_HASH> already copied it; the
+four now agree.
 
 A named nested class coerces the same way (since 1.108): a plain hashref
 passed to C<< ->new >> or to the setter of an C<is_object>,

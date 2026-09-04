@@ -22,7 +22,7 @@ sub _build__json_encoder {
 # Constructor arguments no attribute claims (D1). Kept so a document from a
 # newer upstream than the class round-trips instead of losing fields; TO_JSON
 # emits them again, declared attributes winning on a name clash. Filled by
-# the BUILDARGS wrapper below; SpecBuilder writes undeclared keys here too.
+# the BUILD below; SpecBuilder writes undeclared keys here too.
 # Not a k8s-registered attribute, so TO_JSON's attribute walk never sees the
 # bag as a field of its own.
 has _unknown_fields => (
@@ -89,9 +89,34 @@ sub _copy_one_level {
     return $value;
 }
 
-around BUILDARGS => sub {
-    my ($orig, $class, @args) = @_;
-    my $args  = $class->$orig(@args);
+# BUILD, not `around BUILDARGS` (k102). The walk, its order and everything
+# it decides are unchanged; only the plumbing Moo has to generate around it
+# differs, and the two are not priced alike. Measured on a quiet box, a
+# three-attribute Moo class: 4.85 us/construction plain, 6.51 us with an
+# `around BUILDARGS` whose body is empty, 5.31 us with an empty `sub BUILD`
+# -- 1.66 us of pure plumbing against 0.46 us, on every one of the ~850
+# classes and every nested object of every inflated document. Against the
+# t/25 Dashboard Deployment (22 objects) that is -2.6% [IQR -4.5..+4.1],
+# i.e. inside the run-to-run spread; on a small direct ->new it is
+# -9.8%/-8.5% with a tight interval, and that is the honest claim.
+#
+# Two things the move does NOT change, both checked before it was made:
+#   * an unknown key is no longer deleted from the argument hash, because
+#     BUILD runs after the constructor -- Moo ignores a constructor key no
+#     attribute claims, so it lands nowhere either way;
+#   * the field STRICT names first is still the innermost one, since
+#     _inflate_struct builds children before their parent and each child's
+#     BUILD therefore runs first. (Classifying the keys up in
+#     _inflate_struct instead would invert that, which is why it is a
+#     separate decision and not part of this change.)
+#
+# The bag is written through its own writer rather than the object slot: the
+# common case writes nothing at all, so the accessor's cost is paid only by
+# a document that actually carries an undeclared field, and the role stays
+# clear of assumptions about Moo's storage layout.
+sub BUILD {
+    my ($self, $args) = @_;
+    my $class = ref $self;
     my $known = _known_init_args($class);
     my %unknown;
     # sort: with several unknown keys, STRICT's die names a deterministic
@@ -99,22 +124,24 @@ around BUILDARGS => sub {
     for my $key (sort keys %$args) {
         next if $known->{$key};
         die "Unknown field '$key' for $class\n" if $IO::K8s::Resource::STRICT;
-        my $value = delete $args->{$key};
+        my $value = $args->{$key};
         next unless defined $value;
         $unknown{$key} = _copy_one_level($value);
     }
-    # A caller-supplied _unknown_fields hashref must not be aliased -- copy
-    # it one level, same depth as every other value crossing this boundary,
-    # before merging in whatever this pass collected.
-    if (exists $args->{_unknown_fields}) {
-        $args->{_unknown_fields} = _copy_one_level($args->{_unknown_fields});
-    }
     if (%unknown) {
-        my $bag = $args->{_unknown_fields} // {};
-        $args->{_unknown_fields} = { %$bag, %unknown };
+        # A caller-supplied _unknown_fields hashref must not be aliased --
+        # the merge below builds a new hash, which is the same one-level
+        # copy every other value crossing this boundary gets.
+        my $bag = $self->_unknown_fields;
+        $self->_unknown_fields({ %$bag, %unknown });
     }
-    return $args;
-};
+    elsif (exists $args->{_unknown_fields}) {
+        # Nothing collected here, but the caller handed one in: copy it one
+        # level so later edits to their hashref do not reach the object.
+        $self->_unknown_fields(_copy_one_level($args->{_unknown_fields}));
+    }
+    return;
+}
 
 # Get merged attribute info from the global registry in IO::K8s::Resource,
 # walking @ISA so a consumer subclass registered via class_namespaces sees
@@ -213,7 +240,7 @@ own top-level keys besides C<items>/C<metadata>/C<item_class> are preserved
 and checked exactly like any other resource's, under C<strict> or
 otherwise. It keeps its own hand-rolled C<TO_JSON>/C<FROM_STRUCT> rather
 than the role's (C<kind>/C<api_version> derive from the items, not from a
-class name) but reuses this exact bag and C<around BUILDARGS> mechanism for
+class name) but reuses this exact bag and C<BUILD> mechanism for
 the envelope. Objects inside C<items> round-trip independently, each
 through its own class's composition of this role.
 

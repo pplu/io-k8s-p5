@@ -249,8 +249,8 @@ sub FROM_STRUCT {
     # Any top-level key besides the ones this envelope itself understands
     # (kind/apiVersion, consumed above to derive item_class; metadata/items,
     # handled below) is forwarded straight into ->new(). List composes
-    # IO::K8s::Role::Resource for exactly this: its `around BUILDARGS` bags
-    # an undeclared key into _unknown_fields, or dies under strict -- the
+    # IO::K8s::Role::Resource for exactly this: its `BUILD` bags an
+    # undeclared key into _unknown_fields, or dies under strict -- the
     # same envelope-level handling every non-list resource already gets
     # (k99). Items themselves already round-trip through their own class's
     # composition of the role; this only covers the list wrapper.
