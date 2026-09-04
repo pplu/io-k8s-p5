@@ -1,0 +1,21 @@
+---
+class: standard
+completed: 2026-09-04T15:02:46Z
+created: 2026-09-03T03:28:28Z
+id: 101
+priority: medium
+started: 2026-09-04T15:02:46Z
+status: done
+tags:
+- crd
+- specbuilder
+title: SpecBuilder cannot vivify an intermediate whose class has required attributes
+  (473 classes) -- croaks with the path since step 1, but cannot build the object
+updated: 2026-09-04T15:02:46Z
+---
+
+Found by the Task 3 review of the CRD step-1 plan. _sb_fresh / _sb_root construct a missing intermediate with Class->new (no arguments). Any class with a required k8s attribute (grep matches 473 files, e.g. Core::V1::PodSpec containers) cannot be created that way, so spec_set('template.spec.containers.0.name', ...) through an unbuilt PodTemplateSpec cannot succeed. Step 1 makes the failure name the spec path and the class (fix round of Task 3); the user builds that object first and assigns it.
+
+Open design question for later: should vivification supply placeholder values for required container fields (empty arrayref for a required array, empty struct for a required object) so the walk can continue? That risks emitting schema-invalid objects (an empty containers list) and hides a real omission -- decide with D5 in mind, where deep provider classes will have required fields of their own.
+
+Entscheidung (Getty, 2026-09-04): by design geschlossen. Vivification liefert KEINE Platzhalterwerte fuer required-Felder. Ein leeres containers=[] oder ein leeres required-Objekt waere schema-invalide und wuerde eine echte Auslassung verstecken; der Croak mit Spec-Pfad + Klassenname (step 1) ist das gewuenschte Verhalten. Der Aufrufer baut das Zwischenobjekt selbst und weist es zu. Gilt auch mit D5 im Blick: die tiefen Provider-Klassen haben eigene required-Felder -- dieselbe Begruendung, staerker.
