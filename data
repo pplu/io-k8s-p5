@@ -1,0 +1,24 @@
+---
+claimed_at: 2026-09-04T13:09:45Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T13:09:45Z
+created: 2026-09-03T02:55:55Z
+id: 99
+priority: low
+started: 2026-09-04T12:54:00Z
+status: done
+tags:
+- crd
+- list
+- d1
+title: 'IO::K8s::List does not compose Role::Resource: unknown top-level keys on a
+  list response are still dropped'
+updated: 2026-09-04T13:09:45Z
+---
+
+Found by the Task 1 review of the CRD step-1 plan (D1 unknown-field preservation). lib/IO/K8s/List.pm uses plain Moo with its own items/metadata/TO_JSON/FROM_STRUCT and never composes IO::K8s::Role::Resource, so the _unknown_fields bag introduced in step 1 does not apply to the list envelope: an unknown top-level key on a *List document (anything beside apiVersion, kind, metadata, items) is lost on the round-trip. Items themselves are inflated through the item class and do preserve. Decide whether List should carry its own bag (same shape as Role::Resource) or compose the role; either way add a t/61-style round-trip test.
+
+Final review of step 1 (2026-09-03): the strict => 1 promise has the same hole -- $strict->inflate({ kind => 'PodList', bogusList => 1, items => [] }) drops bogusList silently instead of dying, because List does not compose Role::Resource. The step-1 fix wave carves List out in the POD; this ticket owns the real fix for both bag and strict.
+
+Fix committet: 0c5eded0. List komponiert Role::Resource; unknown keys preserved + strict; Test t/84; POD in Role/Resource.pm + IO::K8s.pm nachgezogen. Suite PASS.
