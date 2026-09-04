@@ -27,7 +27,7 @@ k8s serverSide            => Str, { enum => [qw(true false auto)] };
 k8s set                   => { IntOrStr => 1 };
 k8s takeOwnership         => Bool;
 k8s targetNamespace       => Str;
-k8s timeout               => Str, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s timeout               => Str, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s values                => 'Apiextensions::V1::JSON';
 k8s valuesContent         => Str;
 k8s valuesSecrets         => ['+IO::K8s::K3s::V1::SecretSpec'];

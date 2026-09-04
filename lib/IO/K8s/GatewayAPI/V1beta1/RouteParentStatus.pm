@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s conditions     => ['Meta::V1::Condition'], { required => 'schema' };
-k8s controllerName => Str, { required => 'schema', pattern => qr/^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!\$&'()*+,;=:]+$/ };
+k8s controllerName => Str, { required => 'schema', pattern => '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&\'()*+,;=:]+$' };
 k8s parentRef      => '+IO::K8s::GatewayAPI::V1beta1::ParentReference', { required => 'schema' };
 
 =attr conditions

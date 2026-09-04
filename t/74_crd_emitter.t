@@ -7,6 +7,7 @@ use warnings;
 use Test::More;
 use Test::Exception;
 use FindBin;
+use re ();
 
 use IO::K8s;
 use IO::K8s::AutoGen;
@@ -106,6 +107,7 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
                         description => "Contact address.\n=head1 not a real POD command\n\n\n\nTrailing paragraph.",
                     },
                     path    => { type => 'string', pattern => '^\/api\/v1$' },
+                    slash   => { type => 'string', pattern => '^https?://x$' },
                     single  => { type => 'string', pattern => '^a$' },
                     alt     => { type => 'string', pattern => '^(a|b)$' },
                     atparen => { type => 'string', pattern => '(a@$)' },
@@ -126,19 +128,27 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
         qr/^# ABSTRACT: A resource for exercising the emitter's escaping logic across several lines$/m,
         'a multi-line, period-less description collapses to one ABSTRACT line instead of interpolating raw');
 
+    # k114: a pattern whose qr// rendering would not reproduce the pattern
+    # text byte for byte goes to the plain-string path instead, so what
+    # reaches a CRD is upstream's own text and not this emitter's Perl
+    # escaping. The escaping itself is still what decides that (an
+    # unescaped '@' would interpolate away and the round-trip check would
+    # then see a different pattern) -- it just no longer ships.
     my $spec_src = $esc_files->{'TestEscape/V1/EscaperSpec.pm'};
-    like($spec_src, qr/^k8s email\s+=> Str, \{ pattern => qr\/\^\[a-z\]\+\\\@example\\\.com\$\/ \};$/m,
-        'an @ that would interpolate is escaped');
-    like($spec_src, qr/^k8s path\s+=> Str, \{ pattern => qr\/\^\\\/api\\\/v1\$\/ \};$/m,
-        'an already-escaped slash is not double-escaped');
+    like($spec_src, qr/^k8s email\s+=> Str, \{ pattern => '\^\[a-z\]\+\@example\\\\\.com\$' \};$/m,
+        'an @ that a qr// would have to escape renders as a plain string, @ intact');
+    like($spec_src, qr/^k8s path\s+=> Str, \{ pattern => '\^\\\\\/api\\\\\/v1\$' \};$/m,
+        "an escaped slash upstream wrote itself is kept -- a qr// would lose it to the delimiter");
+    like($spec_src, qr/^k8s slash\s+=> Str, \{ pattern => qr\/\^https\?:\\\/\\\/x\$\/ \};$/m,
+        'a BARE slash still renders as qr/.../: escaping it for the delimiter is undone on compile, so nothing is lost');
     like($spec_src, qr/^k8s single\s+=> Str, \{ pattern => qr\/\^a\$\/ \};$/m,
         'a $ anchoring end-of-string is left alone');
     like($spec_src, qr/^k8s alt\s+=> Str, \{ pattern => qr\/\^\(a\|b\)\$\/ \};$/m,
         'a $ before the closing delimiter is left alone');
-    like($spec_src, qr/^k8s atparen\s+=> Str, \{ pattern => qr\/\(a\\\@\$\)\/ \};$/m,
-        'an @ immediately before a ) -anchored $ is still escaped, not just ones before \w or {');
-    like($spec_src, qr/^k8s atalt\s+=> Str, \{ pattern => qr\/\(a\\\@\$\|b\)\/ \};$/m,
-        'an @ immediately before a |-anchored $ is still escaped');
+    like($spec_src, qr/^k8s atparen\s+=> Str, \{ pattern => '\(a\@\$\)' \};$/m,
+        'an @ immediately before a ) -anchored $ takes the string path too, not just ones before \w or {');
+    like($spec_src, qr/^k8s atalt\s+=> Str, \{ pattern => '\(a\@\$\|b\)' \};$/m,
+        'an @ immediately before a |-anchored $ likewise');
     like($spec_src, qr/^k8s mode\s+=> Str, \{ enum => \['',\s*'Always',\s*'IfNotPresent'\] \};$/m,
         'an enum containing the empty string renders as a Dumper list');
     unlike($spec_src, qr/qw\(/, 'no qw() form once one entry needs quoting');
@@ -151,6 +161,7 @@ subtest 'patterns needing escaping, an empty-string enum, and unfriendly descrip
     my %cases = (
         email  => { ok => 'a@example.com', bad => 'not-an-email' },
         path   => { ok => '/api/v1',       bad => '/api/v2' },
+        slash  => { ok => 'https://x',     bad => 'https://y' },
         single => { ok => 'a',             bad => 'b' },
         alt    => { ok => 'a',             bad => 'c' },
         mode   => { ok => '',              bad => 'Sometimes' },
@@ -221,8 +232,13 @@ subtest 'non-ASCII patterns, enum values and descriptions render UTF-8-safely' =
     }
 
     my $spec_src = $u_files->{'TestUtf8/V1/Utf8ThingSpec.pm'};
-    like($spec_src, qr/^k8s interval\s+=> Str, \{ pattern => qr\/\^\[0-9\]\+\\x\{b5\}s\$\/ \};$/m,
-        'the µ in the pattern renders as \x{HEX}, not a raw byte');
+    # k114: a non-ASCII pattern takes the plain-string path, so the value
+    # that reaches a CRD is the µ upstream wrote rather than the seven
+    # characters '\x{b5}'. The SOURCE still carries only ASCII -- a
+    # double-quoted \x{HEX} escape, the same spelling the enum member below
+    # gets -- so the file needs no `use utf8` either way.
+    like($spec_src, qr/^k8s interval\s+=> Str, \{ pattern => "\^\[0-9\]\+\\x\{b5\}s\\\$" \};$/m,
+        'the µ in the pattern renders as an ASCII-safe \x{HEX} escape in a string literal, not a raw byte');
     like($spec_src, qr/^k8s mode\s+=> Str, \{ enum => \['safe',"\\x\{b5\}s"\] \};$/m,
         'the µ-only enum member switches to a double-quoted \x{HEX} literal; its ASCII sibling keeps single quotes');
     unlike($spec_src, qr/^use utf8;$/m, 'no description anywhere in this class -- the pattern/enum are already ASCII-safe -- so no use utf8');
@@ -428,7 +444,10 @@ subtest 'k110: the flag fold is verified, never assumed' => sub {
     # 'u' is an artifact of the UTF8-flagged string a CRD pattern arrives
     # as, not something the schema asked for, so it must not push a pattern
     # onto the string path.
-    my $utf8_born = do { my $p = "^[0-9]+\x{b5}s\$"; qr/$p/ };
+    # The pattern text is ASCII on purpose: a non-ASCII one takes the
+    # string path on its own (k114), which would prove nothing about 'u'.
+    my $utf8_born = do { my $p = '^[0-9]+s$'; utf8::upgrade($p); qr/$p/ };
+    is((re::regexp_pattern($utf8_born))[1], 'u', 'fixture really does carry the implicit u flag');
     like(IO::K8s::CRD::Emitter::_pattern_literal($utf8_born), qr{\Aqr/},
         'an implicit u flag alone still renders as qr/.../');
 
@@ -440,6 +459,54 @@ subtest 'k110: the flag fold is verified, never assumed' => sub {
     throws_ok { IO::K8s::CRD::Emitter::_fold_pattern_flags('^a$', 'Q') }
         qr/cannot be folded into the pattern text/,
         'a flag with no inline spelling croaks instead of being dropped';
+};
+
+# --- k114: the qr// form only where it carries the pattern's own bytes ----
+#
+# Rendering a pattern as `qr/.../ ` source means escaping whatever Perl
+# would otherwise interpolate, and Perl KEEPS those backslashes in the
+# compiled pattern -- so a '\@' or a '\x{b5}' this emitter wrote travels
+# through the registry and out of IO::K8s::CRD into a real CRD, in a field
+# whose whole point is to carry the text upstream wrote. (The one escape
+# that does not survive is the delimiter's own '\/': the tokenizer strips
+# it again, which is why a bare '/' can stay in a qr// and an escaped one
+# upstream wrote cannot.) So the qr// form ships only where it is
+# byte-exact, and everything else takes the plain-string path
+# IO::K8s::CRD passes through untouched.
+subtest 'k114: an emitted pattern carries upstream bytes, not the emitter\'s escaping' => sub {
+    # what upstream wrote                                        => the form it must render as
+    my @cases = (
+        [ 'a bare @ (ExternalSecrets gcpServiceAccountEmail)', '^.*@.*\.iam\.gserviceaccount\.com$',       'str' ],
+        [ 'a bare @ before a )-anchored $',                    '(a@$)',                                    'str' ],
+        [ 'a $ inside a character class (GatewayAPI headers)', '^[A-Za-z0-9!#$%&\'*+\-.^_\x60|~]+$',       'str' ],
+        [ 'a non-ASCII codepoint (Traefik durations)',         "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$",    'str' ],
+        [ 'a \\/ upstream escaped itself (GatewayAPI paths)',  '^a\/b$',                                   'str' ],
+        [ 'a BARE / (PrometheusOperator url)',                 '^https?://.+$',                            'qr'  ],
+        [ 'a $ that really is the end anchor',                 '^(a|b)$',                                  'qr'  ],
+        [ 'nothing that needs escaping at all',                '^[0-9]+[smh]$',                            'qr'  ],
+    );
+    for my $case (@cases) {
+        my ($what, $text, $form) = @$case;
+        my $literal = IO::K8s::CRD::Emitter::_pattern_literal(qr/$text/);
+        like($literal, ($form eq 'qr' ? qr{\Aqr/} : qr{\A["']}), "$what: renders as a $form");
+
+        my $back = eval $literal;
+        ok(defined $back, "$what: the emitted literal compiles") or next;
+        my $emitted = ref $back eq 'Regexp'
+            ? IO::K8s::CRD::_pattern_to_ecma262($back, 'k114.case')
+            : $back;
+        is($emitted, $text, "$what: openAPIV3Schema.pattern gets exactly the text that came in");
+
+        # And the Perl side must not have moved either: whatever the form,
+        # Resource.pm compiles it (a string via qr/$p/) into a matcher that
+        # accepts and rejects exactly what the original did.
+        my $re = ref $back eq 'Regexp' ? $back : qr/$back/;
+        my @probes = ('', 'a', 'a@', 'a/b', 'a@b', 'x@y.iam.gserviceaccount.com',
+                      "100\x{b5}s", '100us', '5m', 'https://x/y', '`', 'A#B', 'b');
+        is_deeply([ map { ($_ =~ $re) ? 1 : 0 } @probes ],
+                  [ map { ($_ =~ qr/$text/) ? 1 : 0 } @probes ],
+                  "$what: validation semantics unchanged");
+    }
 };
 
 done_testing;

@@ -12,6 +12,7 @@ use re ();
 
 use IO::K8s;
 use IO::K8s::CRD;
+use IO::K8s::CRD::Emitter;
 use IO::K8s::CertManager::V1::Order;
 
 # --- fixture: every branch of the reverse mapping -------------------------
@@ -376,6 +377,69 @@ subtest 'k110: no shipped qr// pattern croaks or changes on emit' => sub {
     }
     ok($checked > 100, "checked a real number of shipped qr// patterns ($checked)");
     is_deeply(\@drifted, [], 'the shipped patterns are all already ECMA262');
+};
+
+# k114: the same sweep one step further out, and over the string patterns
+# too. What IO::K8s::CRD::Emitter would RENDER for a shipped pattern, read
+# back in the way the rendered file's own `k8s` line would, must reach a
+# CRD as the same text. That is the drift k106 and k110 each had to clean
+# up: a shipped class and the emitter's output for it disagree, and nothing
+# notices until somebody re-renders the provider.
+sub _crd_pattern {
+    my ($p, $where) = @_;
+    return ref $p eq 'Regexp' ? IO::K8s::CRD::_pattern_to_ecma262($p, $where) : $p;
+}
+
+subtest 'k114: the emitter is a fixed point on every shipped pattern' => sub {
+    my ($checked, @drifted) = (0);
+    for my $class (sort grep { /\AIO::K8s::/ } keys %IO::K8s::Resource::_attr_registry) {
+        my $info = $IO::K8s::Resource::_attr_registry{$class};
+        for my $attr (sort keys %$info) {
+            my $opts = $info->{$attr}{options} or next;
+            next unless exists $opts->{pattern};
+            $checked++;
+            my $p     = $opts->{pattern};
+            my $where = "$class.$attr";
+
+            my $want = eval { _crd_pattern($p, $where) };
+            if ($@) { push @drifted, "$where croaks on emit: $@"; next }
+
+            my $literal = eval { IO::K8s::CRD::Emitter::_pattern_literal($p) };
+            if ($@) { push @drifted, "$where croaks in the emitter: $@"; next }
+
+            my $back = eval $literal;
+            my $got  = eval { _crd_pattern($back, $where) };
+            push @drifted,
+                "$where: emits '$want', renders as $literal, which emits "
+                . (defined $got ? "'$got'" : "nothing ($@)")
+                if !defined $got || $got ne $want;
+        }
+    }
+    ok($checked > 300, "checked every shipped pattern field ($checked)");
+    is_deeply(\@drifted, [], 'rendering a shipped pattern and reading it back changes nothing');
+
+    # The fixed-point check above cannot see an artifact that is ALREADY
+    # baked into a shipped class -- '\@' is an escaped unit, so re-rendering
+    # it reproduces it and the fixed point holds. These two spellings are
+    # what an artifact looks like once it is in: '\@' is an invalid identity
+    # escape in ECMA262's unicode mode and '\x{...}' is not ECMA262 at all,
+    # so no CRD author writes either -- in an openAPIV3Schema.pattern they
+    # mean IO::K8s' own qr// rendering put them there (k114). '\$' is left
+    # out on purpose: it is a legal ECMA262 escape an author may really have
+    # written, so its presence proves nothing.
+    my @artifacts;
+    for my $class (sort grep { /\AIO::K8s::/ } keys %IO::K8s::Resource::_attr_registry) {
+        my $info = $IO::K8s::Resource::_attr_registry{$class};
+        for my $attr (sort keys %$info) {
+            my $opts = $info->{$attr}{options} or next;
+            next unless exists $opts->{pattern};
+            my $text = eval { _crd_pattern($opts->{pattern}, "$class.$attr") };
+            next unless defined $text;
+            push @artifacts, "$class.$attr: '$text'" if $text =~ /\\\@|\\x\{/;
+        }
+    }
+    is_deeply(\@artifacts, [],
+        q{no shipped pattern reaches a CRD carrying a '\@' or '\x{...}' escape});
 };
 
 subtest 'scope: Cluster-scoped shipped Kind' => sub {

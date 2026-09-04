@@ -4,10 +4,10 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s allowCredentials => Bool;
-k8s allowHeaders     => [Str], { pattern => qr/^[A-Za-z0-9!#\$%&'*+\-.^_\x60|~]+$/ };
+k8s allowHeaders     => [Str], { pattern => '^[A-Za-z0-9!#$%&\'*+\\-.^_\\x60|~]+$' };
 k8s allowMethods     => [Str], { enum => ['GET','HEAD','POST','PUT','DELETE','CONNECT','OPTIONS','TRACE','PATCH','*'] };
-k8s allowOrigins     => [Str], { pattern => qr/(^\*$)|(^(http(s)?):\/\/(((\*\.)?([a-zA-Z0-9\-]+\.)*[a-zA-Z0-9-]+|\*)(:([0-9]{1,5}))?)$)/ };
-k8s exposeHeaders    => [Str], { pattern => qr/^[A-Za-z0-9!#\$%&'*+\-.^_\x60|~]+$/ };
+k8s allowOrigins     => [Str], { pattern => '(^\\*$)|(^(http(s)?):\\/\\/(((\\*\\.)?([a-zA-Z0-9\\-]+\\.)*[a-zA-Z0-9-]+|\\*)(:([0-9]{1,5}))?)$)' };
+k8s exposeHeaders    => [Str], { pattern => '^[A-Za-z0-9!#$%&\'*+\\-.^_\\x60|~]+$' };
 k8s maxAge           => Int, { minimum => 1, default => 5 };
 
 =attr allowCredentials

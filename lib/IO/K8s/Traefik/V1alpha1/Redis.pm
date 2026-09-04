@@ -4,15 +4,15 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s db             => Int;
-k8s dialTimeout    => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s dialTimeout    => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s endpoints      => [Str];
 k8s maxActiveConns => Int;
 k8s minIdleConns   => Int;
 k8s poolSize       => Int;
-k8s readTimeout    => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s readTimeout    => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s secret         => Str;
 k8s tls            => '+IO::K8s::Traefik::V1alpha1::ClientTLS';
-k8s writeTimeout   => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s writeTimeout   => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 
 =attr db
 

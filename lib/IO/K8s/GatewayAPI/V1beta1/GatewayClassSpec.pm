@@ -3,7 +3,7 @@ package IO::K8s::GatewayAPI::V1beta1::GatewayClassSpec;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s controllerName => Str, { required => 'schema', pattern => qr/^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!\$&'()*+,;=:]+$/ };
+k8s controllerName => Str, { required => 'schema', pattern => '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&\'()*+,;=:]+$' };
 k8s description    => Str;
 k8s parametersRef  => '+IO::K8s::GatewayAPI::V1beta1::ParametersReference';
 

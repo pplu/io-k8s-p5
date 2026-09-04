@@ -2,6 +2,19 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - A CRD pattern emitted by to_crd now carries upstream's own bytes rather
+    than the escaping a qr// literal introduces (k114). IO::K8s::CRD::Emitter
+    kept the qr// form for patterns it could not represent byte-exactly: @
+    became \@ (an invalid identity escape in ECMA262 unicode mode), a bare $
+    inside a character class became \$, a non-ASCII character became \x{HEX}
+    (not ECMA262 at all), and upstream's own \/ was silently dropped. 28
+    shipped classes are updated to the string form and 46 of 1571 rendered
+    pattern fields change; before the fix those 46 emitted text matching no
+    upstream pattern, now none do. Matching semantics are unchanged for every
+    field. maint/crd-drift-check.pl also learns to repair double-encoded UTF-8
+    beyond the Latin-1 range in a cached manifest, which had been reporting a
+    permanent false difference for Cilium.
+
   - IO::K8s::ExternalSecrets now models the whole
     generators.external-secrets.io/v1alpha1 group (k113): all 19 Kinds --
     ACRAccessToken, BeyondtrustWorkloadCredentialsDynamicSecret,

@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s duration => Str, { required => 'schema' };
-k8s schedule => Str, { required => 'schema', pattern => qr/^(\@(annually|yearly|monthly|weekly|daily|midnight|hourly)|\@every [^\s]+.*|[^\s]+( [^\s]+){4})$/ };
+k8s schedule => Str, { required => 'schema', pattern => '^(@(annually|yearly|monthly|weekly|daily|midnight|hourly)|@every [^\\s]+.*|[^\\s]+( [^\\s]+){4})$' };
 
 =attr duration
 

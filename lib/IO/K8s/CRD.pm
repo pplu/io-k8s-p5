@@ -627,11 +627,19 @@ sub _apply_options {
 #
 # What it deliberately does NOT reject are the constructs Perl and the
 # apiserver's own engine agree on even though strict ECMA262 does not:
-# \p{...}/\P{...}/\pC and \x{...}. Upstream ships both -- Cilium's
-# LogConfig.value is qr/^\PC*$/ straight out of the upstream CRD, and
-# IO::K8s::CRD::Emitter renders a non-ASCII pattern as \x{HEX} (see
-# t/74_crd_emitter.t) -- so rejecting them would break checked-in classes
-# to satisfy a rule the validator on the other end does not implement.
+# \p{...}/\P{...}/\pC and \x{...}. Rejecting them would break checked-in
+# classes to satisfy a rule the validator on the other end does not
+# implement -- Cilium's LogConfig.value is qr/^\PC*$/ straight out of the
+# upstream CRD, so a shipped class really does carry one.
+#
+# That upstream \PC is the whole of the case now (k114). Until then this
+# also rested on IO::K8s::CRD::Emitter rendering a non-ASCII pattern as
+# \x{HEX}, which made a shipped \x{...} something this distribution
+# produced by itself -- and that is exactly what k114 stopped doing: such a
+# pattern is emitted as a plain string carrying the codepoint, so the
+# escape no longer reaches a registry from that direction. A \x{...} here
+# can now only come from a hand-written class, and it is still let through
+# for the same reason \PC is: Go/RE2 takes it.
 
 # Regex flags that change what the pattern MEANS and have no carrier in a
 # bare pattern string. The charset flags (a/d/l/u) and /p are absent on

@@ -3,7 +3,7 @@ package IO::K8s::GatewayAPI::V1beta1::HTTPQueryParamMatch;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s name  => Str, { required => 'schema', pattern => qr/^[A-Za-z0-9!#\$%&'*+\-.^_\x60|~]+$/ };
+k8s name  => Str, { required => 'schema', pattern => '^[A-Za-z0-9!#$%&\'*+\\-.^_\\x60|~]+$' };
 k8s type  => Str, { enum => [qw(Exact RegularExpression)], default => 'Exact' };
 k8s value => Str, { required => 'schema' };
 

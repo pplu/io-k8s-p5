@@ -3,10 +3,10 @@ package IO::K8s::Traefik::V1alpha1::ServersTransportTCPSpec;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s dialKeepAlive    => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
-k8s dialTimeout      => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s dialKeepAlive    => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
+k8s dialTimeout      => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s proxyProtocol    => '+IO::K8s::Traefik::V1alpha1::ProxyProtocol';
-k8s terminationDelay => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s terminationDelay => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s tls              => '+IO::K8s::Traefik::V1alpha1::TLSClientConfig';
 
 =attr dialKeepAlive

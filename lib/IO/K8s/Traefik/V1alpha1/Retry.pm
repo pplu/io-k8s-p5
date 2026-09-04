@@ -5,11 +5,11 @@ use IO::K8s::Resource;
 
 k8s attempts                   => Int, { minimum => 0 };
 k8s disableRetryOnNetworkError => Bool;
-k8s initialInterval            => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s initialInterval            => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s maxRequestBodyBytes        => Int, { minimum => -1 };
 k8s retryNonIdempotentMethod   => Bool;
 k8s status                     => [Str], { pattern => qr/^([1-5][0-9]{2}[,-]?)+$/ };
-k8s timeout                    => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s timeout                    => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 
 =attr attempts
 

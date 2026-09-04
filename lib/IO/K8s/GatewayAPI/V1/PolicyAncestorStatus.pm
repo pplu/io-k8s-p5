@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s ancestorRef    => '+IO::K8s::GatewayAPI::V1::ParentReference', { required => 'schema' };
 k8s conditions     => ['Meta::V1::Condition'], { required => 'schema' };
-k8s controllerName => Str, { required => 'schema', pattern => qr/^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!\$&'()*+,;=:]+$/ };
+k8s controllerName => Str, { required => 'schema', pattern => '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&\'()*+,;=:]+$' };
 
 =attr ancestorRef
 

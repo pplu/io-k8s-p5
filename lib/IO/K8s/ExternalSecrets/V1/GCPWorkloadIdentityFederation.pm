@@ -7,7 +7,7 @@ k8s audience               => Str;
 k8s awsSecurityCredentials => '+IO::K8s::ExternalSecrets::V1::AwsCredentialsConfig';
 k8s credConfig             => '+IO::K8s::ExternalSecrets::V1::ConfigMapReference';
 k8s externalTokenEndpoint  => Str;
-k8s gcpServiceAccountEmail => Str, { pattern => qr/^.*\@.*\.iam\.gserviceaccount\.com$/ };
+k8s gcpServiceAccountEmail => Str, { pattern => '^.*@.*\\.iam\\.gserviceaccount\\.com$' };
 k8s serviceAccountRef      => '+IO::K8s::ExternalSecrets::V1::ServiceAccountSelector';
 
 =attr audience

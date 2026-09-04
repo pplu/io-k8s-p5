@@ -289,6 +289,40 @@ sub http_get {
     return Encode::decode('UTF-8', $res->{content});
 }
 
+# The byte shape a double-encoded character leaves behind, derived from
+# UTF-8's own structure rather than listed case by case. Misreading a
+# character's UTF-8 bytes as Latin-1 codepoints and re-encoding them maps
+# every CONTINUATION byte (\x80-\xBF) to "\xC2" plus itself, and the LEAD
+# byte to "\xC3" plus a byte that still says how long the original was:
+#
+#   original           lead     doubled lead   trailing "\xC2"+cont pairs
+#   2-byte  U+0080+    C2-DF    C3 82-9F       1
+#   3-byte  U+0800+    E0-EF    C3 A0-AF       2
+#   4-byte  U+10000+   F0-F4    C3 B0-B4       3
+#
+# so a doubled run is one C3-led byte from one of those ranges followed by
+# exactly as many pairs as its row implies. Two boundaries are deliberate:
+#
+#   * The 2-byte row stays narrowed to C2/C3 -- the Latin-1 Supplement, the
+#     'µ'/'ü'/'é' a CRD manifest realistically carries. Widening it to the
+#     full C2-DF would make the signature match plain, correct text: 'Ä«'
+#     is C3 84 C2 AB, and since the repair below succeeds on it, it would
+#     silently become 'ī'. A doubled 'Â'/'Ã' run has no such reading.
+#   * Nothing above the 4-byte row: UTF-8 has no longer sequence, and F5-FF
+#     is not a lead byte at all.
+#
+# Before k114 only the 2-byte row existed, so every character from U+0800 up
+# -- an en dash, a curly quote, anything typographic an upstream description
+# realistically carries -- went unrepaired. Cilium's CiliumPodIPPool
+# description reached the emitter as "\xC3\xA2\xC2\x80\xC2\x93" and --check
+# then reported a permanent false difference against a perfectly good
+# checked-in class, which is the way a drift report stops being read.
+my $DOUBLE_ENCODED_RUN = qr{
+      \xC3[\x82\x83]   (?:\xC2[\x80-\xBF])
+    | \xC3[\xA0-\xAF]  (?:\xC2[\x80-\xBF]){2}
+    | \xC3[\xB0-\xB4]  (?:\xC2[\x80-\xBF]){3}
+}x;
+
 sub _slurp {
     my ($path) = @_;
     open my $fh, '<:raw', $path
@@ -312,15 +346,13 @@ sub _slurp {
     # legitimately cached 'Grüße'/'Délai' into U+FFFD replacement
     # characters on read alone (round-2 review finding).
     #
-    # The double-encoding signature actually IS unique: re-encoding any
-    # ORIGINAL 2-byte UTF-8 lead byte (always C2 or C3 for a character in
-    # the Latin-1 Supplement block -- covers 'µ' via C2 and 'ü'/'é'-style
-    # letters via C3, which is what this distribution's CRD manifests
-    # realistically carry) via the misread-as-Latin-1 path always produces
-    # "C3 82" or "C3 83" for that first byte, followed by "C2" plus a
-    # continuation byte (\x80-\xBF) for the second -- four bytes, not two.
-    # A lone 'ü'/'é' never produces that 4-byte run on its own; it would
-    # need a literal "C2" + continuation byte immediately afterward too.
+    # $DOUBLE_ENCODED_RUN above is that tighter signature: a C3-led byte in
+    # one of the three doubled-lead ranges plus the exact number of "C2" +
+    # continuation pairs its row implies -- four bytes for a doubled 'µ',
+    # six for a doubled en dash, eight for a doubled emoji, never two. A
+    # lone 'ü'/'é' never produces such a run on its own; it would need a
+    # literal "C2" + continuation byte immediately afterward too, and for
+    # the longer rows two or three of them in a row.
     #
     # Even with that tighter signature, only ACCEPT the repair if the
     # WHOLE text survives the reinterpret-as-Latin-1-then-decode-as-UTF-8
@@ -334,7 +366,7 @@ sub _slurp {
     # destroy $content -- the exact value this needs to fall back to --
     # even along the success path. A file that fails this check keeps its
     # own, already correctly single-decoded $content.
-    if ($bytes =~ /\xC3[\x82\x83]\xC2[\x80-\xBF]/) {
+    if ($bytes =~ $DOUBLE_ENCODED_RUN) {
         my $check = Encode::FB_CROAK() | Encode::LEAVE_SRC();
         my $repaired = eval {
             Encode::decode('UTF-8', Encode::encode('iso-8859-1', $content, $check), $check);

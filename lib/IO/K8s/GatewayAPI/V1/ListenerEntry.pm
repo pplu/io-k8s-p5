@@ -7,7 +7,7 @@ k8s allowedRoutes => '+IO::K8s::GatewayAPI::V1::AllowedRoutes', { default => {'n
 k8s hostname      => Str, { pattern => qr/^(\*\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/ };
 k8s name          => Str, { required => 'schema', pattern => qr/^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/ };
 k8s port          => Int, { required => 'schema', minimum => 1, maximum => 65535 };
-k8s protocol      => Str, { required => 'schema', pattern => qr/^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9]+$/ };
+k8s protocol      => Str, { required => 'schema', pattern => '^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$|[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9]+$' };
 k8s tls           => '+IO::K8s::GatewayAPI::V1::ListenerTLSConfig';
 
 =attr allowedRoutes

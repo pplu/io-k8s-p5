@@ -288,6 +288,14 @@ sub _type_source {
 # already-escaped character -- notably a pattern that came in as
 # '\/api\/v1' -- is left exactly as it was instead of gaining a second
 # backslash.
+#
+# Since k114 only the '/' branch normally reaches a rendered file: an escape
+# this adds that Perl would still be carrying in the compiled pattern makes
+# _pattern_literal reject the qr// form altogether and emit a plain string
+# instead, so the '@'/'$'/non-ASCII branches now mostly serve the round-trip
+# probe that decides that. They are not dead either way -- a '@' left bare
+# would interpolate the candidate away and the probe would then compare
+# against a different pattern, which is the same bug one step earlier.
 sub _escape_pattern_body {
     my ($pattern) = @_;
     my $out = '';
@@ -406,7 +414,7 @@ sub _literal {
     return _scalar_literal($value);
 }
 
-# A `pattern` option specifically (k110). Everything else still goes
+# A `pattern` option specifically (k110, k114). Everything else still goes
 # through _literal above.
 #
 # The qr/.../ form stays the default: it is what every hand-written class in
@@ -430,6 +438,35 @@ sub _literal {
 # accepts. Perl-side validation is unaffected either way -- Resource.pm
 # compiles a string pattern with qr/$p/, and an inline (?i) sets exactly
 # what the /i modifier set.
+#
+# The other thing a qr// cannot always carry is the pattern's own BYTES
+# (k114). Rendering one means writing the text back as `qr/.../` SOURCE, and
+# _escape_pattern_body has to escape whatever Perl would otherwise
+# interpolate -- an '@', a '$' that is not in an anchor position -- and to
+# spell a non-ASCII codepoint as \x{HEX} so the file needs no `use utf8`.
+# Perl keeps those backslashes in the compiled pattern: only the delimiter's
+# own '\/' is stripped again by the tokenizer. So they survive into the
+# registry and out through IO::K8s::CRD, and upstream's
+# '^.*@.*\.iam\.gserviceaccount\.com$' goes back to a cluster as
+# '^.*\@.*...', Traefik's '^([0-9]+(ns|us|µs|ms|s|m|h)?)+$' as
+# '...\x{b5}s...'. Neither breaks the Go/RE2 engine the apiserver actually
+# validates with -- '\@' is not even a valid ECMA262 identity escape and
+# '\x{...}' is no ECMA262 at all -- but both are IO::K8s' own Perl artifacts
+# sitting in a text that is supposed to be upstream's, which is the thing
+# k110 set out to stop rather than a different problem.
+#
+# So the qr// form ships only where it is byte-exact: the candidate source is
+# compiled and its text read back, and a pattern that does not come out
+# identical takes the same plain-string path a flagged one does. That also
+# catches the loss in the other direction -- a '\/' upstream wrote itself
+# ('^\/api\/v1$') passes through _escape_pattern_body untouched, but the
+# tokenizer then strips that backslash, so the qr// form would hand back
+# '^/api/v1$', again not the bytes upstream wrote.
+#
+# Perl-side validation is unaffected either way: Resource.pm compiles a
+# string pattern with qr/$p/, where '\@' and '@', '\$' and a '$' inside a
+# character class, and '\x{b5}' and a literal MICRO SIGN are each the same
+# regex as the other.
 sub _pattern_literal {
     my ($value) = @_;
     return _literal($value) unless ref $value eq 'Regexp';
@@ -440,9 +477,32 @@ sub _pattern_literal {
     # UTF8-flagged string the pattern was compiled from, not something the
     # schema asked for); 'p' never changes what a pattern matches.
     $flags =~ s/[up]//g;
-    return _literal($value) unless length $flags;
+    return _scalar_literal(_fold_pattern_flags($pattern, $flags)) if length $flags;
 
-    return _scalar_literal(_fold_pattern_flags($pattern, $flags));
+    return _literal($value) if _qr_round_trips($pattern);
+    return _scalar_literal($pattern);
+}
+
+# Whether `qr/BODY/` -- BODY as _escape_pattern_body renders it, which is
+# literally the source _literal is about to emit -- compiles back to exactly
+# $pattern, carrying no flag it was not given.
+#
+# Verified by compiling that source, the same discipline _fold_pattern_flags
+# uses, and here the only faithful one: `qr/$body/` with $body INTERPOLATED
+# is a different thing from the literal the rendered file carries, because
+# delimiter unescaping ('\/' -> '/') happens in the tokenizer and never
+# touches an interpolated string. A candidate that will not compile at all
+# (a pattern ending in a lone backslash, say) fails the check too, which is
+# the right answer: that source would not have compiled in the rendered file
+# either, and the string form carries it without a delimiter to escape.
+sub _qr_round_trips {
+    my ($pattern) = @_;
+    my $re = eval 'qr/' . _escape_pattern_body($pattern) . '/';
+    return 0 unless ref $re eq 'Regexp';
+    my ($text, $flags) = re::regexp_pattern($re);
+    $flags = '' unless defined $flags;
+    $flags =~ s/[up]//g;
+    return $text eq $pattern && $flags eq '';
 }
 
 # The fold is verified rather than assumed: the candidate text is compiled

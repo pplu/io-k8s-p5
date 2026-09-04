@@ -3,10 +3,10 @@ package IO::K8s::Traefik::V1alpha1::CircuitBreaker;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s checkPeriod      => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s checkPeriod      => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s expression       => Str;
 k8s fallbackDuration => IntOrStr;
-k8s recoveryDuration => IntOrStr, { pattern => qr/^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$/ };
+k8s recoveryDuration => IntOrStr, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };
 k8s responseCode     => Int, { minimum => 100, maximum => 599 };
 
 =attr checkPeriod
