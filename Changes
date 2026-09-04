@@ -2,6 +2,17 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::load_class memoises a successful load, which is worth ~14% on
+    inflating a realistic document (measured -13% to -17% across paired runs;
+    direct attribution puts 14.0% of inflate time inside load_class, so that
+    is the ceiling and the memo reaches it). It called require_module afresh
+    for every coercion and every nested inflate -- 21 calls per inflate of the
+    t/25 Deployment. Only successes are recorded: require_module dies before
+    the store, so a failed load is retried and a class defined later still
+    resolves. One documented consequence: deleting a class's %INC entry after
+    a successful load no longer forces a re-require, so a Module::Refresh
+    style hot reload is not served by this path -- it never really was.
+
   - IO::K8s::Role::NetworkPolicy's allow_egress_to_dns now emits, on core
     NetworkPolicy objects, the rule its own documentation describes: port 53
     to the CoreDNS pods (kube-system, k8s-app: kube-dns). It previously

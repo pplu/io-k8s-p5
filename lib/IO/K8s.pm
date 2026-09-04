@@ -17,6 +17,18 @@ our $VERSION = '1.108';
 # Track which classes we've auto-generated
 my %_autogen_cache;
 
+# Classes load_class() has already pulled in successfully.
+#
+# ONLY successes are recorded, and only after require_module has returned:
+# a failed load dies before the store, so a name that was not loadable when
+# it was first asked for is tried again on the next call. That is the whole
+# point of not writing this as a plain memo of the outcome -- a negative
+# entry would make a package that only becomes available later (defined at
+# runtime and registered in %INC, or a module installed mid-process)
+# permanently unloadable, and the resulting failure would depend on which
+# lookup happened first.
+my %_loaded_class;
+
 # Default resource map. Two kinds of key live here:
 #
 #   'Pod'          short name: what new_object('Pod') and any lookup
@@ -846,7 +858,21 @@ sub _gvk_api_version {
 
 sub load_class {
     my ($self, $class) = @_;
+
+    # Memoised: this is called once per nested object on every inflate and
+    # once per hashref coercion into a named class, and require_module does
+    # real work every time -- validate the module name, rewrite '::' to '/',
+    # append '.pm', then require -- to reach a %INC hit that has been true
+    # since the first call. Measured at ~1.9us per call against ~0.05us for
+    # the lookup below, worth ~15% of a full inflate (k102 round).
+    #
+    # `defined` first: an undef $class must keep dying out of Module::Runtime
+    # with its own 'argument is not a module name' message (the k39 path),
+    # not warn about an uninitialized hash key on the way there.
+    return 1 if defined $class && $_loaded_class{$class};
     require_module $class;
+    $_loaded_class{$class} = 1;
+    return 1;
 }
 
 sub json_to_object {
@@ -1870,6 +1896,13 @@ Load (C<< require >>) a class by name. Used internally after
 L</expand_class> to make sure the class is in C<%INC> before the caller
 hands it to C<< $class->new >>. Dies with the usual C<Can't locate ... in
 @INC> message when the class is not installable.
+
+Successful loads are remembered process-wide, so the second and every
+later call for the same name costs a hash lookup instead of a
+C<require>. Failures are B<not> remembered: a name that did not load is
+attempted again on the next call, which is what keeps a package that
+only becomes available later -- one defined at runtime and registered in
+C<%INC>, or a module installed mid-process -- reachable.
 
 =head1 CILIUM CRD SUPPORT
 

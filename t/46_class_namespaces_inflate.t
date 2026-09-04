@@ -27,7 +27,7 @@ use IO::K8s;
 # ----------------------------------------------------------------------------
 # Test-local classes
 # ----------------------------------------------------------------------------
-# The Pod subclass is seeded into %INC so IO::K8s::load_class (a bare
+# The Pod subclass is seeded into %INC so IO::K8s::load_class (a memoised
 # Module::Runtime::require_module) treats it as loaded when inflate runs.
 
 {
