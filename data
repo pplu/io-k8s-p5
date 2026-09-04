@@ -1,0 +1,32 @@
+---
+claimed_at: 2026-09-04T21:42:05Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T21:42:05Z
+created: 2026-09-04T04:15:40Z
+id: 113
+priority: low
+started: 2026-09-04T20:44:51Z
+status: done
+tags:
+- crd
+- providers
+title: 'k97 follow-up: aufgeschobene CRD-Fläche der neuen Provider (ExternalSecrets
+  generators-Gruppe + ClusterPushSecret; VolumeSnapshot VolumeGroupSnapshot*)'
+updated: 2026-09-04T21:42:05Z
+---
+
+Beim Bau der k97-Provider vom crd-drift-check als served-but-not-modeled bzw. bewusst ausgelassen erfasst. Alle als ignore_missing_kinds in maint/crd-drift-exceptions.yaml dokumentiert; hier gebuendelt fuer eine spaetere Entscheidung.
+
+ExternalSecrets (external-secrets v2.10.0):
+- generators.external-secrets.io/v1alpha1 (19 Kinds, alle served): ACRAccessToken, BeyondtrustWorkloadCredentialsDynamicSecret, CloudsmithAccessToken, ClusterGenerator, ECRAuthorizationToken, Fake, GCRAccessToken, GeneratorState, GithubAccessToken, GitlabDeployToken, Grafana, MFA, Password, QuayAccessToken, SSHKey, STSSessionToken, UUID, VaultDynamicSecret, Webhook. Eigene API-Gruppe (Generator-Plugins), ~ein Mini-Provider fuer sich.
+- external-secrets.io/v1alpha1/ClusterPushSecret (served): cluster-scoped Geschwister des gelieferten PushSecret. Steht nicht in D8s Kind-Liste (Asymmetrie zu ClusterExternalSecret/ClusterSecretStore) -- vermutlich D8-Versehen. Trivial: teilt PushSecretSpec. Entscheidung noetig, ob nachziehen.
+
+VolumeSnapshot (external-snapshotter v8.6.0):
+- groupsnapshot.storage.k8s.io/v1: VolumeGroupSnapshot, VolumeGroupSnapshotClass, VolumeGroupSnapshotContent (in v8.6.0 GA). Aktuell nicht in crd_sources, daher vom drift-check nicht erfasst. Bei Aufnahme: crd_sources erweitern + modellieren.
+
+Nicht betroffen: v1beta1-Tracks (served:false, nichts zu modellieren) und monitoring.coreos.com AlertmanagerConfig/ThanosRuler (ausserhalb D8s 7 PrometheusOperator-Kinds) -- das sind endgueltige Nicht-Luecken, kein Nachziehen geplant.
+
+ClusterPushSecret aus dieser Liste GESTRICHEN: in k97 nachgezogen (Getty-Entscheid), hat jetzt eine echte Klasse + Test, Exception entfernt. Verbleibend in k113: generators.external-secrets.io-Gruppe (19 Kinds) und VolumeSnapshot VolumeGroupSnapshot*.
+
+ExternalSecrets-Teil ABGESCHLOSSEN: alle 19 Kinds der generators.external-secrets.io/v1alpha1-Gruppe modelliert, 55 neue Dateien, --drift-check meldet 25 shipped GVKs / 0 MISSING KIND / 0 MISSING FIELD / 0 EXTRA FIELD, verbleibende 4 Exceptions sind die vorbestehenden v1beta1-Back-compat-Eintraege ohne Waisen. Volle Suite 92 Dateien / 8543 Tests gruen. Namespace flach (IO::K8s::ExternalSecrets::V1alpha1::*) nach dem CertManager-Praezedenzfall - der bundelt cert-manager.io/v1 und acme.cert-manager.io/v1 ebenfalls flach in einem V1-Verzeichnis, unterschieden nur ueber api_version. Emitter-Ausgabe bewusst verworfen: fuer VaultDynamicSecret allein haette sie 44 Klassen erzeugt (dritte Privatkopie des Vault-Auth-Baums), es wurden 2. Wichtigster Fund: GCRAccessToken.auth.workloadIdentity sah aus wie V1::GCPWorkloadIdentity, aber clusterLocation/clusterName sind hier required und dort optional - Reuse nach Namensaehnlichkeit haette still ein falsches Schema erzeugt. ClusterGenerator ist ein duenner Union-Wrapper ueber 17 Member (nicht 18 - GeneratorState ist kein Generator-Plugin), alle 17 byte-identisch zur jeweiligen Standalone-Spec geprueft. VolumeGroupSnapshot* abgespalten nach k121 (blockiert: CRD-Quelle fehlt lokal).
