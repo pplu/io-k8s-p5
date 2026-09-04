@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-04T16:26:42Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T16:26:42Z
+created: 2026-09-04T00:07:06Z
+id: 110
+priority: low
+started: 2026-09-04T15:02:51Z
+status: done
+tags:
+- crd
+- to_crd
+- pattern
+title: 'to_crd: emit CRD pattern as ECMA262, not Perl qr// text'
+updated: 2026-09-04T16:26:42Z
+---
+
+Step-5 Task 2 review (Minor #4): Class->to_crd (_apply_options in lib/IO/K8s/CRD.pm) emits a field pattern verbatim. A qr// stored in the registry stringifies with a Perl wrapper ((?^u:^foo$)) and may use Perl-only anchors (\A \z), which are NOT valid ECMA262 -- the regex flavor Kubernetes CRD openAPIV3Schema patterns use. A CRD carrying such a pattern could be rejected or misbehave when applied to a cluster (relevant to Kubernetes::REST ensure_crd, step 6/8). The Task-2 fix round unwraps the qr// (?^:...) wrapper for the common case; full Perl->ECMA262 translation (or storing/emitting patterns as plain ECMA strings end to end) is deferred here. Decide: translate on emit, or require providers to store ECMA-clean pattern strings.
+
+Umgesetzt: _pattern_to_ecma262 in CRD.pm uebersetzt \A/\z zu ^/$ und croakt auf Perl-only-Konstrukten (Flags i/m/s/x/n, Escapes \Z \K \G \h \v \R ..., possessive Quantifier, Gruppen-Whitelist, POSIX-Klassen) mit Feldpfad. Plain-String-Patterns bleiben der Escape-Hatch und werden unveraendert durchgereicht. Bewusste Aufweichung der ECMA262-Strenge: \p{}/\P{}/\x{} croaken NICHT - upstream liefert sie (Cilium LogConfig.value = qr/^\PC*$/) und der apiserver validiert faktisch mit Go/RE2, wo sie gueltig sind; checked-in Upstream-Klassen zu brechen fuer eine Regel die der Validator nicht implementiert waere der falsche Tausch. Registry-Guard in t/79: 331 geshippte qr//-Patterns, 0 Croaks, 0 Aenderungen; Smoke-Sweep auf 210 Kinds erweitert (die drei D8-Provider fehlten, daher war die RuleGroup-Breakage unsichtbar). Zusatz: CRD::Emitter haette das Problem beim naechsten Render wieder eingefuehrt - _pattern_literal/_fold_pattern_flags emittiert ein qr// mit semantischem Flag jetzt als Plain-String mit inline (?flags), verifiziert per Recompile. Re-Render aller 8 Provider: 2030 Dateien, genau 1 Diff (RuleGroup), Validierungssemantik fuer alle 1571 Pattern-Felder unveraendert, \x{HEX}-Ausgabe (t/74) byte-identisch.
