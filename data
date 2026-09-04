@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-04T16:26:31Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T16:26:31Z
+created: 2026-09-03T15:58:57Z
+id: 104
+priority: low
+started: 2026-09-04T15:02:56Z
+status: done
+tags:
+- crd
+- autogen
+- perf
+title: 'reuse_core: precompute the core-shape index'
+updated: 2026-09-04T16:26:31Z
+---
+
+D5 reuse_core builds its core-shape index lazily on the first reuse check by loading all ~839 shipped classes and reading each _k8s_attr_info (~6.5s one-time in a fresh process, per the step-4 A1 review). Default-on means every first add_crd/generate/inflate-of-a-CRD pays it. Follow-up: precompute the shape index at build time (a data file) or memoize across the dist so interactive consumers and the step-4 provider tasks do not each eat the cold start. Not a correctness issue; A1 (275b4464) is approved as-is.
+
+Umgesetzt: vorberechneter Shape-Index lib/IO/K8s/AutoGen/CoreShapes.pm (453 shapes/822 Klassen), Regenerator maint/core-shape-index-gen.pl, Drift-Test t/85_core_shape_index.t. Messung bestaetigte die Praemisse: 99.7% der 6.4s waren use_module x839, nicht Registry-Arbeit. Nachher 0.059s (~110x); t/04 7.64s->0.29s, t/75 6.98s->0.31s. Fallback auf den Live-Scan wenn das Artefakt fehlt (out-of-line verifiziert). Trap geschlossen: der Index nennt Klassen ohne sie zu laden, und ein ungeladener Kandidat haette _core_class_for still aufhoeren lassen zu reusen (keys %$undef autovivifiziert in _entry_compatible) - daher per-shape use_module in core_class_for_shape.
