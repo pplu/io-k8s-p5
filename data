@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-04T13:09:56Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T13:09:56Z
+created: 2026-09-03T21:54:35Z
+id: 109
+priority: low
+started: 2026-09-04T12:54:16Z
+status: done
+tags:
+- crd
+- docs
+- pod
+title: Restore/enrich provider-module POD narratives lost when D5 roots became emitter-rendered
+updated: 2026-09-04T13:09:56Z
+---
+
+Step-4 D5 full-depth modeling replaced each providers hand-written opaque Kind-root classes (rich ABSTRACT + =head1 DESCRIPTION, e.g. AgentSandbox Sandboxs "Isolated runtime environment for AI agents" and the v1beta1-vs-v1alpha1 narrative) with emitter-rendered roots carrying generic "# ABSTRACT: <Kind>" and "No description in the upstream schema." per-field POD. This is inherent to the --check byte-identity gate (the roots must match emitter output). The provider-level modules (Traefik.pm, CertManager.pm, Cilium.pm, GatewayAPI.pm, AgentSandbox.pm) carry summaries but the per-Kind narrative prose is gone. Follow-up: an io-k8s-doc-writer pass on the PROVIDER MODULES (not the render-gated root classes) to restore/enrich the per-Kind and cross-version narrative for all full-depth providers. Not blocking step 4. Surfaced in the B-AgentSandbox review.
+
+Committet: a0385e80. Narrative-POD auf 5 Provider-Modulen wiederhergestellt (Root-Klassen render-gated, unangetastet).
