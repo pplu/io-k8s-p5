@@ -24,7 +24,11 @@ Revision history for IO-K8s
     value map (Int/Num/Bool/Quantity/Time/IntOrStr) round-trips to an
     opaque string map, since AutoGen's additionalProperties dispatch has
     no scalar-type branch at all. A scalar or array Time-typed field is
-    lossless (format: date-time).
+    lossless (format: date-time). IO::K8s::CRD->new(classes => [...],
+    storage => 'v1') assembles a multi-version CustomResourceDefinition
+    from one class per version -- each served, only the named one
+    storage:true, in the order given -- and crd_for_class/Class->to_crd is
+    now its single-version shorthand.
 
   - New IO::K8s::Unstructured and IO::K8s->new(unknown_kinds => 'unstructured')
     (D4, k96): apiVersion/kind/metadata as ordinary typed attributes, with no

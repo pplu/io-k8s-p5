@@ -12,8 +12,8 @@ use re ();
 use IO::K8s::AutoGen ();
 use IO::K8s::Resource ();
 
-# The typed class crd_for_class() builds and returns (D9). Kept as a
-# constant rather than spelled out at each call site -- the brief's own
+# The typed class crd_for_class() and new() build and return (D9). Kept as
+# a constant rather than spelled out at each call site -- the brief's own
 # shorthand ('IO::K8s::Apiextensions::Pkg::...') drops the
 # 'ApiextensionsApiserver' segment the shipped classes actually use; this
 # is the real, checked-in name (see lib/IO/K8s/ApiextensionsApiserver/).
@@ -33,6 +33,13 @@ my $CRD_CLASS = 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::
     my $crds     = IO::K8s::CRD->load($input);            # plain hashrefs
     my $versions = IO::K8s::CRD->served_versions($crds->[0]);
     my $classes  = IO::K8s::CRD->generate($crds->[0], 'My::Namespace');
+
+    # Class-to-CRD (D9), the other direction:
+    my $crd = My::StaticWebSite->to_crd;                                   # single-version
+    my $crd = IO::K8s::CRD->new(                                           # multi-version
+        classes => [ My::StaticWebSite::V1beta1, My::StaticWebSite::V1 ],
+        storage => 'v1',
+    );
 
 =head1 DESCRIPTION
 
@@ -247,13 +254,11 @@ C<< $class->kind >>, C<< $class->resource_plural >> (C<singular> is
 C<lc(kind)>, C<listKind> is C<"${kind}List">); C<metadata.name> is
 C<"$plural.$group">. The schema itself is L</_schema_for_class>.
 
-The manifest is assembled as a plain hashref and handed to
-L<IO::K8s/_struct_to_object_expanded> -- the same inflation path C<add_crd>
-and C<inflate> use -- so the object this returns is a real, fully typed
-C<CustomResourceDefinition>: nested C<CustomResourceDefinitionSpec>,
-C<CustomResourceDefinitionNames>, C<CustomResourceDefinitionVersion>,
-C<CustomResourceValidation> and C<JSONSchemaProps> objects all the way
-down, not a bare hashref standing in for them.
+The single-version shorthand for L</new>: C<< IO::K8s::CRD::crd_for_class($class) >>
+is exactly C<< IO::K8s::CRD->new(classes => [$class], storage => $version) >>
+where C<$version> is C<$class>'s own version (split out of C<api_version> the
+same way). See L</new> for the object this returns -- a real, fully typed
+C<CustomResourceDefinition>, not a bare hashref.
 
 =cut
 
@@ -261,43 +266,129 @@ sub crd_for_class {
     my ($class) = @_;
     croak 'IO::K8s::CRD::crd_for_class needs a class name' unless defined $class && length $class;
 
-    my $api_version = $class->api_version;
-    my ($group, $version) = $api_version =~ m{\A(?:(.*)/)?([^/]+)\z};
-    croak "IO::K8s::CRD::crd_for_class: cannot read a version out of "
-        . "'$api_version' (from ${class}->api_version)"
-        unless defined $version && length $version;
-    $group = '' unless defined $group;
+    my $id = _identity_for_class($class);
+    return __PACKAGE__->new(classes => [$class], storage => $id->{version});
+}
 
-    my $kind   = $class->kind;
-    my $plural = $class->resource_plural;
-    croak "IO::K8s::CRD::crd_for_class: $class has no resource_plural"
-        unless defined $plural && length $plural;
+=method new
 
-    my $scope = $class->DOES('IO::K8s::Role::Namespaced') ? 'Namespaced' : 'Cluster';
+    my $crd = IO::K8s::CRD->new(
+        classes => [ $class_v1, $class_v1beta1 ],   # one class per version
+        storage => 'v1',                            # names one of their versions
+    );
+
+D9: assembles ONE multi-version C<CustomResourceDefinition> object from one
+typed class per version -- the assembly layer over L</crd_for_class>/
+C<< $class->to_crd >>, which is now exactly
+C<< IO::K8s::CRD->new(classes => [$class], storage => $version) >> under the
+hood (see L</crd_for_class>).
+
+Every class in C<classes> is one API version of the SAME CRD, so they must
+agree on C<spec.group>, C<< names.kind >> (from C<< $class->kind >>),
+C<< names.plural >> (from C<< $class->resource_plural >>) and C<spec.scope>
+(L<IO::K8s::Role::Namespaced> or not) -- a mismatch on any of those croaks,
+naming the field and which class supplied which value. Each class becomes
+one C<spec.versions[]> entry (schema from L</_schema_for_class>, applied
+per class): every entry is C<served => true>, and exactly the one whose
+C<name> matches C<storage> gets C<storage => true> (the rest
+C<storage => false>). C<storage> is required and must name one of the given
+classes' own versions, or the call croaks.
+
+Versions land in C<spec.versions> in the order C<classes> was given, not
+re-sorted by a Kubernetes-style version precedence -- the caller already
+chose an order (oldest-first is conventional, but not enforced), and
+silently reordering it would be a surprise, not a service. Pass C<classes>
+in whatever order the manifest should show.
+
+C<classes> must be a non-empty arrayref, or the call croaks.
+
+=cut
+
+sub new {
+    my ($invocant, %args) = @_;
+
+    my $classes = $args{classes};
+    croak "IO::K8s::CRD->new needs a non-empty 'classes' arrayref"
+        unless ref $classes eq 'ARRAY' && @$classes;
+
+    my @ids = map {
+        _ensure_class_loaded($_);
+        _identity_for_class($_);
+    } @$classes;
+
+    for my $field (qw(group kind plural scope)) {
+        my %by_value;
+        push @{ $by_value{ $ids[$_]{$field} } }, $classes->[$_] for 0 .. $#ids;
+        next if keys %by_value <= 1;
+        croak "IO::K8s::CRD->new: classes disagree on $field ("
+            . join(', ', map { "$_: " . join(',', @{ $by_value{$_} }) } sort keys %by_value)
+            . ") -- classes passed to ->new must all be versions of the same CRD";
+    }
+
+    my $storage = $args{storage};
+    croak "IO::K8s::CRD->new needs a 'storage' version name" unless defined $storage && length $storage;
+    my ($storage_index) = grep { $ids[$_]{version} eq $storage } 0 .. $#ids;
+    croak "IO::K8s::CRD->new: storage '$storage' does not name any of the given classes' versions ("
+        . join(', ', map { $_->{version} } @ids) . ")"
+        unless defined $storage_index;
+
+    my $id0 = $ids[0];
+    my @versions = map {
+        my $i = $_;
+        {
+            name    => $ids[$i]{version},
+            served  => JSON::MaybeXS::true,
+            storage => ($i == $storage_index) ? JSON::MaybeXS::true : JSON::MaybeXS::false,
+            schema  => { openAPIV3Schema => _schema_for_class($classes->[$i]) },
+        };
+    } 0 .. $#ids;
 
     my $manifest = {
-        metadata => { name => "$plural.$group" },
+        metadata => { name => "$id0->{plural}.$id0->{group}" },
         spec     => {
-            group => $group,
-            scope => $scope,
+            group => $id0->{group},
+            scope => $id0->{scope},
             names => {
-                plural   => $plural,
-                kind     => $kind,
-                singular => lc($kind),
-                listKind => "${kind}List",
+                plural   => $id0->{plural},
+                kind     => $id0->{kind},
+                singular => lc($id0->{kind}),
+                listKind => "$id0->{kind}List",
             },
-            versions => [ {
-                name    => $version,
-                served  => JSON::MaybeXS::true,
-                storage => JSON::MaybeXS::true,
-                schema  => { openAPIV3Schema => _schema_for_class($class) },
-            } ],
+            versions => \@versions,
         },
     };
 
     require IO::K8s;
     my $k8s = IO::K8s->new;
     return $k8s->_struct_to_object_expanded($CRD_CLASS, $manifest);
+}
+
+# Shared by crd_for_class and new(): $class's group/version (split out of
+# api_version), kind, resource_plural and Namespaced-or-Cluster scope --
+# everything both need to know about $class besides its schema. Does not
+# call _ensure_class_loaded itself (callers that need it call that first;
+# crd_for_class historically didn't, and to_crd's caller is always already
+# loaded), so this keeps crd_for_class's pre-existing behaviour unchanged
+# for an unloaded class: a plain "Can't locate object method" from Perl,
+# not a custom message.
+sub _identity_for_class {
+    my ($class) = @_;
+
+    my $api_version = $class->api_version;
+    my ($group, $version) = $api_version =~ m{\A(?:(.*)/)?([^/]+)\z};
+    croak "IO::K8s::CRD: cannot read a version out of "
+        . "'$api_version' (from ${class}->api_version)"
+        unless defined $version && length $version;
+    $group = '' unless defined $group;
+
+    my $kind   = $class->kind;
+    my $plural = $class->resource_plural;
+    croak "IO::K8s::CRD: $class has no resource_plural"
+        unless defined $plural && length $plural;
+
+    my $scope = $class->DOES('IO::K8s::Role::Namespaced') ? 'Namespaced' : 'Cluster';
+
+    return { group => $group, version => $version, kind => $kind, plural => $plural, scope => $scope };
 }
 
 =method _schema_for_class
