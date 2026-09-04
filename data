@@ -1,0 +1,33 @@
+---
+claimed_at: 2026-09-04T22:55:02Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T22:54:45Z
+created: 2026-09-03T04:47:36Z
+id: 102
+priority: low
+started: 2026-09-04T20:44:57Z
+status: done
+tags:
+- performance
+- d1
+title: 'Inflation ~40% slower since D1: around BUILDARGS on every class removes Moo''s
+  inlined constructor fast path'
+updated: 2026-09-04T22:55:02Z
+---
+
+Measured by the step-1 final review (2000 x a 6-object Pod graph, two runs each): master 87e48095 137 us per object graph, branch crd-step1 190 us; TO_JSON unchanged. Cause: IO::K8s::Role::Resource's around BUILDARGS (D1 unknown-field preservation) means Moo can no longer inline the constructor for any of the ~850 classes, plus one keys-scan per construction on top of the one _inflate_struct already does. The sort keys in the wrapper is NOT the culprit (0.28 us per 5-key hash, ~3% of the delta). Accepted cost for now; options if it matters on large list inflation: precomputed known-key sets per class (already cached), skipping the wrapper when every key is known via a fast path, or moving the diversion into _inflate_struct for the inflate path and keeping BUILDARGS only for direct ->new.
+
+
+--- k100 measurement (2026-09-04) ---
+k100 added a coercer to is_object / is_array_of_objects / is_hash_of_objects and cost another ~5% on top of this. Root cause is NOT the coercer body: Moo generates, per coerced attribute per construction, an eval block plus a `local $Method::Generate::Accessor::CurrentAttribute = { ... }` hashref (visible in the generated constructor via Sub::Quote::quoted_from_sub). Isolated micro-benchmark, one attribute, Moo only:
+
+  no coerce  1.95 us/op
+  coderef    3.10 us/op
+  quote_sub  3.16 us/op   <- quoting does NOT help, Moo never inlines a coercion
+
+That is ~1.2 us per coerced attribute, and it matches the real payload exactly: the Kubernetes Dashboard Deployment from t/25 (~20 objects, ~25 object-valued attributes) went 615 -> 645 us/op.
+
+So a fourth option belongs on the list here, and it is the same lever as the third: do the object coercion inside the existing `around BUILDARGS` (which already walks every arg key) instead of a per-attribute Moo `coerce`, which would remove the eval wrapper for Bool, inline structs and the k100 object forms at once. Cost: the rw setter would stop coercing ($obj->spec({...})), which the current coercers do handle.
+
+Gemessen und entschieden (2026-09-04/05). Option 4 (Coercion nach around BUILDARGS) = +0.2% [IQR -0.8..+2.4] - NICHT gebaut. Grund ist NICHT der Setter-Tradeoff: der ist nachweislich vermeidbar (eigener Accessor, TO_JSON-Lesepfad -1.9%, also Rauschen). Grund ist, dass der Gewinn null ist - Moos per-Attribut-coerce kostet 5.3% auf diesem Pfad, der BUILDARGS-seitige Ersatz kostet 5.5% zurueck. Gebaut stattdessen: sub BUILD statt around BUILDARGS (Moo 1.66us Wrapper vs 0.46us BUILD), gemessen am aktuellen Baum direct ->new -7.9%, inflate -5.3%, ganzer IQR negativ. Ehrlichkeitsnotiz: auf dem alten Snapshot war inflate -2.6% und damit innerhalb der Streuung; k103s zusaetzliche Rollenkomposition hat den Wrapper teurer gemacht, also zahlt sein Entfernen mehr. Option 3 nach k122 abgespalten (-8.7%, aber aendert die strict-Reihenfolge). Zwei Korrekturen an der k100-Notiz: load_class ist KEIN Blocker (Moo registriert das generierte Inline-Struct-Package in %INC, require_module gelingt), und der fieldsV1/rawExtension/raw-Sonderfall ist theoretisch (nur ManagedFieldsEntry deklariert so einen Namen und der ist bereits opak). Offen als groesster gemessener Hebel: IO::K8s::load_class memoisieren = -14.9% auf inflate-deploy.
