@@ -85,10 +85,48 @@ L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Traefik') >> at runtime.
 
 =head2 Included CRDs (traefik.io/v1alpha1)
 
-IngressRoute, IngressRouteTCP, IngressRouteUDP, Middleware, MiddlewareTCP,
-ServersTransport, ServersTransportTCP, TLSOption, TLSStore, TraefikService
+All ten Kinds are namespace-scoped.
 
-All resources are namespace-scoped.
+=over 4
+
+=item * C<IngressRoute> -- the CRD implementation of a Traefik HTTP router: matches
+incoming HTTP requests against a set of routes, each attaching optional middlewares and
+TLS settings.
+
+=item * C<IngressRouteTCP> -- the CRD implementation of a Traefik TCP router: the TCP
+counterpart of C<IngressRoute>.
+
+=item * C<IngressRouteUDP> -- the CRD implementation of a Traefik UDP router: the UDP
+counterpart of C<IngressRoute>.
+
+=item * C<Middleware> -- the CRD implementation of a Traefik middleware: a reusable HTTP
+request/response transformation (redirect, header rewrite, rate limiting, basic auth,
+...) attached to one or more C<IngressRoute>s.
+
+=item * C<MiddlewareTCP> -- the CRD implementation of a Traefik TCP middleware: the TCP
+counterpart of C<Middleware> (e.g. C<InFlightConn>, IP allow/deny-listing), attached to
+C<IngressRouteTCP> routes.
+
+=item * C<ServersTransport> -- the CRD implementation of a ServersTransport: configures
+the HTTP connection between Traefik and its backend servers (TLS trust, timeouts,
+certificates).
+
+=item * C<ServersTransportTCP> -- the CRD implementation of a TCPServersTransport: the
+TCP counterpart of C<ServersTransport> (proxy protocol, TLS, timeouts for TCP backends).
+
+=item * C<TLSOption> -- the CRD implementation of a Traefik TLS Option: configures
+parameters of the TLS connection (protocol versions, cipher suites, client
+authentication) on a Traefik entry point.
+
+=item * C<TLSStore> -- the CRD implementation of a Traefik TLS Store: a store of TLS
+certificates, in particular the C<default> certificate Traefik falls back to. Traefik
+only ever consults the store named C<default>.
+
+=item * C<TraefikService> -- the CRD implementation of a Traefik Service: an
+abstraction layered on top of Kubernetes Services for weighted round-robin
+load-balancing, mirroring, and failover across one or more backend services.
+
+=back
 
 =seealso
 

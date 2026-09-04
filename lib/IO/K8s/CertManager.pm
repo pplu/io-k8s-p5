@@ -78,12 +78,38 @@ L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::CertManager') >> at runtime.
 
 =head2 Included CRDs (cert-manager.io/v1)
 
-Certificate (namespaced), CertificateRequest (namespaced), Issuer (namespaced),
-ClusterIssuer (cluster-scoped)
+=over 4
+
+=item * C<Certificate> (namespaced) -- a human-readable request that an up to date,
+signed X.509 certificate be kept stored in the Kubernetes Secret named in
+C<spec.secretName>.
+
+=item * C<CertificateRequest> (namespaced) -- the single-shot request cert-manager
+generates from a C<Certificate> to actually obtain one signed certificate from the
+referenced issuer; disposable, and re-created on each renewal.
+
+=item * C<Issuer> (namespaced) -- a certificate-issuing authority (ACME, CA, Vault,
+self-signed, ...), usable only by C<Certificate>s in its own namespace.
+
+=item * C<ClusterIssuer> (cluster-scoped) -- the same issuer abstraction as C<Issuer>,
+but referenceable from C<Certificate>s in any namespace. C<Issuer> and C<ClusterIssuer>
+embed the identical upstream C<IssuerSpec>/C<IssuerStatus> Go types, which is why this
+distribution models them as one shared spec/status class tree (see above).
+
+=back
 
 =head2 Included CRDs (acme.cert-manager.io/v1)
 
-Order (namespaced), Challenge (namespaced)
+=over 4
+
+=item * C<Order> (namespaced) -- represents a single ACME certificate order, created
+automatically once a C<CertificateRequest> referencing an ACME issuer exists.
+
+=item * C<Challenge> (namespaced) -- represents one ACME challenge (HTTP-01, DNS-01,
+...) that must be completed to authorize a single DNS name/identifier within an
+C<Order>.
+
+=back
 
 =seealso
 

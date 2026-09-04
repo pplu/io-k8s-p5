@@ -99,24 +99,61 @@ L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::GatewayAPI') >> at runtime.
 
 =head2 Included CRDs (gateway.networking.k8s.io/v1)
 
-GatewayClass (cluster-scoped), Gateway (namespaced), HTTPRoute (namespaced),
-GRPCRoute (namespaced), BackendTLSPolicy (namespaced), ListenerSet
-(namespaced), TLSRoute (namespaced), TCPRoute (namespaced), UDPRoute
-(namespaced), ReferenceGrant (namespaced; reachable only via the
-domain-qualified name C<gateway.networking.k8s.io/v1/ReferenceGrant> since
-the short name C<ReferenceGrant> resolves to the v1beta1 storage version) --
-these are the storage version of every Kind except ReferenceGrant, so every
-short name except C<ReferenceGrant> resolves here
+These are the storage version of every Kind except C<ReferenceGrant>, so every short
+name except C<ReferenceGrant> resolves here.
+
+=over 4
+
+=item * C<GatewayClass> (cluster-scoped) -- describes a class of Gateways available to
+the user for creating C<Gateway> resources, provided by the infrastructure/controller
+(the Gateway API counterpart of Kubernetes' C<IngressClass>).
+
+=item * C<Gateway> (namespaced) -- represents an instance of service-traffic handling
+infrastructure by binding Listeners to a set of IP addresses; creating one triggers its
+C<GatewayClass>'s controller to provision or reconfigure the underlying load balancer.
+
+=item * C<HTTPRoute> (namespaced) -- provides a way to route HTTP requests from a
+C<Gateway> listener to backend Services.
+
+=item * C<GRPCRoute> (namespaced) -- provides a way to route gRPC requests; the gRPC
+counterpart of C<HTTPRoute>.
+
+=item * C<BackendTLSPolicy> (namespaced) -- provides a way to configure how a
+C<Gateway> connects to a backend via TLS (client-side backend TLS, as opposed to a
+Listener's own server-side TLS).
+
+=item * C<ListenerSet> (namespaced) -- defines a set of additional listeners to attach
+to an existing C<Gateway>, letting a delegated team add listeners without editing the
+C<Gateway> itself.
+
+=item * C<TLSRoute> (namespaced) -- similar to C<TCPRoute>, but matches against
+TLS-specific metadata (SNI) without terminating TLS.
+
+=item * C<TCPRoute> (namespaced) -- provides a way to route TCP requests from a
+C<Gateway> listener to backend Services.
+
+=item * C<UDPRoute> (namespaced) -- provides a way to route UDP traffic from a
+C<Gateway> listener to backend Services.
+
+=item * C<ReferenceGrant> (namespaced; reachable only via the domain-qualified name
+C<gateway.networking.k8s.io/v1/ReferenceGrant> since the short name C<ReferenceGrant>
+resolves to the v1beta1 storage version) -- identifies kinds of resources in other
+namespaces that are trusted to reference the specified kinds of resources in the same
+namespace as the policy: the opt-in that makes cross-namespace backend references safe
+by default.
+
+=back
 
 =head2 Included CRDs (gateway.networking.k8s.io/v1beta1)
 
-ReferenceGrant (namespaced) - the storage version; the short name
-C<ReferenceGrant> resolves here. Gateway, GatewayClass and HTTPRoute
-(namespaced) are also served at v1beta1 upstream but v1 is their storage
-version, so these three are reachable only via their domain-qualified names
-(C<gateway.networking.k8s.io/v1beta1/Gateway>,
+C<ReferenceGrant> (namespaced) is the storage version here, so the short name
+C<ReferenceGrant> resolves to this class -- same purpose as described above.
+C<Gateway>, C<GatewayClass> and C<HTTPRoute> (namespaced) are also served at v1beta1
+upstream but v1 is their storage version, so these three are reachable only via their
+domain-qualified names (C<gateway.networking.k8s.io/v1beta1/Gateway>,
 C<gateway.networking.k8s.io/v1beta1/GatewayClass>,
-C<gateway.networking.k8s.io/v1beta1/HTTPRoute>).
+C<gateway.networking.k8s.io/v1beta1/HTTPRoute>) -- again, same purpose as their v1
+counterparts above.
 
 =seealso
 

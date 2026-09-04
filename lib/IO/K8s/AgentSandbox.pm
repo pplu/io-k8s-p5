@@ -105,11 +105,33 @@ L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::AgentSandbox') >> at runtime.
 
 =head2 Included CRDs (agents.x-k8s.io/v1beta1, agents.x-k8s.io/v1alpha1)
 
-Sandbox
+=over 4
+
+=item * C<Sandbox> -- an individual, stateful pod with a stable hostname and network
+identity, and persistent storage that survives restarts: the unit an agent runtime
+actually executes in.
+
+=back
 
 =head2 Included CRDs (extensions.agents.x-k8s.io/v1beta1, extensions.agents.x-k8s.io/v1alpha1)
 
-SandboxClaim, SandboxTemplate, SandboxWarmPool
+Three Kinds that build a self-service workflow on top of C<Sandbox>: a
+C<SandboxTemplate> defines what to create, a C<SandboxWarmPool> keeps instances of it
+ready in advance, and a C<SandboxClaim> is how a caller actually gets one.
+
+=over 4
+
+=item * C<SandboxTemplate> -- a reusable template for creating C<Sandbox>es, so many
+similar Sandboxes don't each need their own hand-written spec.
+
+=item * C<SandboxWarmPool> -- pre-provisions and maintains a pool of C<Sandbox>es built
+from a C<SandboxTemplate>, cutting the time it takes to get a new C<Sandbox> up and
+running.
+
+=item * C<SandboxClaim> -- requests a C<Sandbox> from a C<SandboxWarmPool>, abstracting
+away the underlying Sandbox configuration from the caller.
+
+=back
 
 =seealso
 

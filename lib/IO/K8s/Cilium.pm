@@ -154,17 +154,120 @@ L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::Cilium') >> at runtime.
 
 =head2 Included CRDs (cilium.io/v2)
 
-CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy,
-CiliumLocalRedirectPolicy, CiliumEgressGatewayPolicy, CiliumIdentity,
-CiliumEndpoint, CiliumNode, CiliumNodeConfig, CiliumLoadBalancerIPPool,
-CiliumEnvoyConfig, CiliumClusterwideEnvoyConfig, CiliumCIDRGroup,
-CiliumBGPClusterConfig, CiliumBGPPeerConfig, CiliumBGPAdvertisement,
-CiliumBGPNodeConfig, CiliumBGPNodeConfigOverride
+=over 4
+
+=item * C<CiliumNetworkPolicy> -- a Kubernetes third-party resource with an extended
+version of C<NetworkPolicy>, adding L3-L7 rules the base Kubernetes API can't express.
+
+=item * C<CiliumClusterwideNetworkPolicy> -- a modified version of
+C<CiliumNetworkPolicy> which is cluster-scoped rather than namespace-scoped, and adds
+node-selector-based rules.
+
+=item * C<CiliumLocalRedirectPolicy> -- redirects pod traffic destined to an IP:port/
+protocol tuple, or to a Kubernetes Service, to backend pod(s) local to the same node,
+using eBPF.
+
+=item * C<CiliumEgressGatewayPolicy> -- routes egress traffic from selected pods
+through a designated gateway node so cluster-external destinations see a predictable,
+SNAT'd egress IP.
+
+=item * C<CiliumIdentity> -- represents a security identity managed by Cilium: the
+numeric ID its policy engine assigns to a set of endpoint labels.
+
+=item * C<CiliumEndpoint> -- the runtime status of a Cilium-managed endpoint (pod):
+identity, networking and policy enforcement state. Has no C<spec> upstream at all --
+see below.
+
+=item * C<CiliumNode> -- represents a node managed by Cilium: per-node IPAM and
+networking state the agent and operator maintain.
+
+=item * C<CiliumNodeConfig> -- a list of per-node configuration key/value overrides
+layered on top of the cluster-wide Cilium ConfigMap for a selected set of nodes.
+
+=item * C<CiliumLoadBalancerIPPool> -- defines pools of IPs the Cilium operator can
+allocate and advertise for Services of type C<LoadBalancer>, filling the gap when no
+cloud provider load-balancer is available.
+
+=item * C<CiliumEnvoyConfig> -- namespaced Envoy xDS configuration Cilium's embedded
+Envoy proxy uses for L7 traffic management on selected Services.
+
+=item * C<CiliumClusterwideEnvoyConfig> -- the cluster-scoped counterpart of
+C<CiliumEnvoyConfig>.
+
+=item * C<CiliumCIDRGroup> -- a named list of external CIDRs (peers outside the
+cluster) that can be referenced as a single entity from C<CiliumNetworkPolicy> and
+C<CiliumClusterwideNetworkPolicy> rules.
+
+=item * C<CiliumBGPClusterConfig> -- cluster-wide BGP Control Plane configuration: one
+or more virtual-router "instances" and the node selector choosing which nodes run them.
+
+=item * C<CiliumBGPPeerConfig> -- reusable BGP peer configuration (timers, graceful
+restart, address families, ...), referenced by name from a peer entry in a
+C<CiliumBGPClusterConfig>.
+
+=item * C<CiliumBGPAdvertisement> -- declares which routes (Service VIPs, Pod CIDRs,
+...) a BGP instance advertises, and under what attributes.
+
+=item * C<CiliumBGPNodeConfig> -- per-node BGP Control Plane state, derived
+automatically by the operator from a C<CiliumBGPClusterConfig>'s node selector: one per
+selected node.
+
+=item * C<CiliumBGPNodeConfigOverride> -- manual, per-node overrides layered on top of
+a node's derived C<CiliumBGPNodeConfig>.
+
+=back
 
 =head2 Included CRDs (cilium.io/v2alpha1)
 
-CiliumEndpointSlice, CiliumL2AnnouncementPolicy,
-CiliumGatewayClassConfig, CiliumPodIPPool, CiliumDatapathPlugin
+=over 4
+
+=item * C<CiliumEndpointSlice> -- batches many C<CiliumEndpoint> objects into one
+resource to reduce per-endpoint API server load in large clusters. Has no C<spec>
+upstream at all -- see above.
+
+=item * C<CiliumL2AnnouncementPolicy> -- fine-grained control over which Services are
+announced over L2 (ARP/NDP), from which nodes and which network interfaces.
+
+=item * C<CiliumGatewayClassConfig> -- referenced from a Gateway API C<GatewayClass>'s
+C<parametersRef> to customize Cilium's own Gateway API controller behaviour.
+
+=item * C<CiliumPodIPPool> -- defines a cluster-wide CIDR pool used in multi-pool IPAM
+mode, from which per-node Pod CIDRs are allocated based on workload/node labels.
+
+=item * C<CiliumDatapathPlugin> -- registers an external datapath plugin with Cilium
+and reports its status; creating, updating or deleting one triggers a full datapath
+reinitialization.
+
+=back
+
+=head2 Back-compat CRDs (older Cilium releases)
+
+Reachable only via their domain-qualified C<resource_map> key (never a bare short
+name), for clusters that have not yet upgraded past the Cilium release where each was
+superseded or removed (k78, k83):
+
+=over 4
+
+=item * C<cilium.io/v2alpha1/CiliumBGPAdvertisement>,
+C<cilium.io/v2alpha1/CiliumBGPClusterConfig>,
+C<cilium.io/v2alpha1/CiliumBGPNodeConfig>,
+C<cilium.io/v2alpha1/CiliumBGPNodeConfigOverride>,
+C<cilium.io/v2alpha1/CiliumBGPPeerConfig>,
+C<cilium.io/v2alpha1/CiliumCIDRGroup>,
+C<cilium.io/v2alpha1/CiliumLoadBalancerIPPool> -- the same BGP/CIDR/LoadBalancerIPPool
+Kinds described above under C<cilium.io/v2>, at the older C<v2alpha1> API group version
+those Kinds shipped at before being promoted.
+
+=item * C<cilium.io/v2alpha1/CiliumBGPPeeringPolicy> -- the pre-BGP-Control-Plane-v2
+Kind for configuring BGP peering, superseded by the
+C<CiliumBGPClusterConfig>/C<CiliumBGPPeerConfig>/C<CiliumBGPAdvertisement>/
+C<CiliumBGPNodeConfig> split above and removed from newer Cilium releases.
+
+=item * C<cilium.io/v2/CiliumExternalWorkload> -- represented a non-Kubernetes workload
+(e.g. a VM) joined to the cluster mesh. The external-workloads feature itself was
+removed from Cilium at v1.18, ahead of this provider's pinned v1.20.1.
+
+=back
 
 =seealso
 
