@@ -2,6 +2,25 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::ExternalSecrets now models the whole
+    generators.external-secrets.io/v1alpha1 group (k113): all 19 Kinds --
+    ACRAccessToken, BeyondtrustWorkloadCredentialsDynamicSecret,
+    CloudsmithAccessToken, ClusterGenerator, ECRAuthorizationToken, Fake,
+    GCRAccessToken, GeneratorState, GithubAccessToken, GitlabDeployToken,
+    Grafana, MFA, Password, QuayAccessToken, SSHKey, STSSessionToken, UUID,
+    VaultDynamicSecret and Webhook. They live flat in
+    IO::K8s::ExternalSecrets::V1alpha1 alongside the external-secrets.io
+    track, distinguished by each class's own api_version -- the arrangement
+    IO::K8s::CertManager already uses for cert-manager.io and
+    acme.cert-manager.io. Nested shapes reuse the existing V1 classes wherever
+    the schemas are byte-identical (VaultProvider, AWSAuth,
+    SecretStoreRetrySettings, the SecretKeySelector family), so
+    VaultDynamicSecret is two files rather than the 44 a literal render would
+    produce. Where they only look identical they do not: GCRAccessToken's
+    workloadIdentity has required fields V1::GCPWorkloadIdentity leaves
+    optional, so it is its own class. maint/crd-drift-check.pl now reports the
+    provider with no missing Kinds and no field gaps.
+
   - IO::K8s::Role::Resource does its D1 unknown-field walk in a sub BUILD
     instead of an around BUILDARGS (k102). Same walk, same order, same
     decisions -- Moo charges 1.66us for a BUILDARGS wrapper against 0.46us for

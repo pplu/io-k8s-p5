@@ -37,6 +37,40 @@ sub resource_map {
         # cluster-scoped sibling of PushSecret; its spec wraps the same
         # PushSecretSpec tree (spec.pushSecretSpec) rather than re-modeling it.
         ClusterPushSecret     => 'ExternalSecrets::V1alpha1::ClusterPushSecret',
+        # generators.external-secrets.io/v1alpha1 -- a separate API group
+        # (upstream Go package apis/generators/v1alpha1, not
+        # apis/externalsecrets/*) from the six Kinds above, despite sharing
+        # both the "v1alpha1" version string and the V1alpha1 namespace with
+        # PushSecret's own group -- the same one-provider/two-groups layout
+        # CertManager already uses for cert-manager.io/v1 + acme.cert-manager.io/v1,
+        # disambiguated by each class's own api_version rather than a path
+        # segment (k113).
+        ACRAccessToken => 'ExternalSecrets::V1alpha1::ACRAccessToken',
+        BeyondtrustWorkloadCredentialsDynamicSecret => 'ExternalSecrets::V1alpha1::BeyondtrustWorkloadCredentialsDynamicSecret',
+        CloudsmithAccessToken => 'ExternalSecrets::V1alpha1::CloudsmithAccessToken',
+        # ClusterGenerator is the cluster-scoped, 17-member union kind: its
+        # spec.generator.<x>Spec fields each reference the SAME *Spec class
+        # the corresponding standalone Kind below uses for its own spec
+        # (verified byte-identical upstream, the same way ClusterExternalSecret/
+        # ClusterPushSecret reuse their sibling Kind's Spec) -- not a parallel
+        # tree. It has no GeneratorState member: that Kind is controller state,
+        # not a generator plugin, and is not part of the union upstream either.
+        ClusterGenerator => 'ExternalSecrets::V1alpha1::ClusterGenerator',
+        ECRAuthorizationToken => 'ExternalSecrets::V1alpha1::ECRAuthorizationToken',
+        Fake => 'ExternalSecrets::V1alpha1::Fake',
+        GCRAccessToken => 'ExternalSecrets::V1alpha1::GCRAccessToken',
+        GeneratorState => 'ExternalSecrets::V1alpha1::GeneratorState',
+        GithubAccessToken => 'ExternalSecrets::V1alpha1::GithubAccessToken',
+        GitlabDeployToken => 'ExternalSecrets::V1alpha1::GitlabDeployToken',
+        Grafana => 'ExternalSecrets::V1alpha1::Grafana',
+        MFA => 'ExternalSecrets::V1alpha1::MFA',
+        Password => 'ExternalSecrets::V1alpha1::Password',
+        QuayAccessToken => 'ExternalSecrets::V1alpha1::QuayAccessToken',
+        SSHKey => 'ExternalSecrets::V1alpha1::SSHKey',
+        STSSessionToken => 'ExternalSecrets::V1alpha1::STSSessionToken',
+        UUID => 'ExternalSecrets::V1alpha1::UUID',
+        VaultDynamicSecret => 'ExternalSecrets::V1alpha1::VaultDynamicSecret',
+        Webhook => 'ExternalSecrets::V1alpha1::Webhook',
     };
 }
 
@@ -75,11 +109,22 @@ __END__
 =head1 DESCRIPTION
 
 Resource map provider for L<external-secrets|https://external-secrets.io/>
-Custom Resource Definitions. Registers 6 resource_map entries covering
+Custom Resource Definitions. Registers 24 resource_map entries covering
 C<external-secrets.io/v1> (C<ExternalSecret>, C<SecretStore>,
-C<ClusterSecretStore>, C<ClusterExternalSecret>) and
-C<external-secrets.io/v1alpha1> (C<PushSecret>, C<ClusterPushSecret>),
+C<ClusterSecretStore>, C<ClusterExternalSecret>),
+C<external-secrets.io/v1alpha1> (C<PushSecret>, C<ClusterPushSecret>) and
+C<generators.external-secrets.io/v1alpha1> (17 generator Kinds -- see
+L</"Included CRDs (generators.external-secrets.io/v1alpha1)"> below),
 matching upstream external-secrets v2.10.0.
+
+C<generators.external-secrets.io> is a separate upstream API group (Go
+package C<apis/generators/v1alpha1>, not C<apis/externalsecrets/*>) from
+the two above, despite sharing both the C<v1alpha1> version string and,
+in this distribution, the C<V1alpha1> Perl namespace with C<PushSecret>'s
+own group -- the same one-provider/two-groups layout
+L<IO::K8s::CertManager> already uses for C<cert-manager.io/v1> +
+C<acme.cert-manager.io/v1>. Each class's own C<api_version> carries the
+distinction, not a path segment.
 
 Every Kind is modeled to full depth: C<spec> (and, where upstream declares
 one, C<status>) is a typed object graph of further
@@ -159,6 +204,35 @@ Volcengine, Ngrok, Barbican, NebiusMysterybox, OpenBao.
 =head2 Included CRDs (external-secrets.io/v1alpha1)
 
 PushSecret, ClusterPushSecret
+
+=head2 Included CRDs (generators.external-secrets.io/v1alpha1)
+
+ACRAccessToken, BeyondtrustWorkloadCredentialsDynamicSecret,
+CloudsmithAccessToken, ECRAuthorizationToken, Fake, GCRAccessToken,
+GeneratorState, GithubAccessToken, GitlabDeployToken, Grafana, MFA,
+Password, QuayAccessToken, SSHKey, STSSessionToken, UUID,
+VaultDynamicSecret, Webhook.
+
+Where an upstream schema was verified byte-identical to an existing
+C<external-secrets.io/v1> provider structure, the generator reuses that
+same class rather than a private copy: C<VaultDynamicSecret>'s C<provider>
+is the literal same L<IO::K8s::ExternalSecrets::V1::VaultProvider>
+C<SecretStore>'s Vault backend uses, and
+C<BeyondtrustWorkloadCredentialsDynamicSecret>'s C<provider> is the
+literal same L<IO::K8s::ExternalSecrets::V1::BeyondtrustWorkloadCredentialsProvider>.
+C<ECRAuthorizationToken> and C<STSSessionToken> both reuse
+L<IO::K8s::ExternalSecrets::V1::AWSAuth> for their C<auth> field.
+C<GeneratorState> reuses L<IO::K8s::Api::Core::V1::NamespaceCondition> for
+C<status.conditions>, the same way C<PushSecretStatus> does. A handful of
+generator-only fields narrow the usual cross-namespace
+C<SecretKeySelector> down to a same-namespace, two-field
+L<IO::K8s::ExternalSecrets::V1alpha1::SecretRef> (C<Grafana>'s
+C<auth.basic.password>/C<auth.token>, C<Webhook>'s C<secrets[].secretRef>).
+
+C<ClusterGenerator> is served upstream but not modeled yet: its
+C<spec.generator> is a 19-member union embedding every other generator's
+own Spec class (C<spec.generator.<x>Spec>), so it needs the 18 Kinds above
+to exist first -- see C<maint/crd-drift-exceptions.yaml>.
 
 =seealso
 
