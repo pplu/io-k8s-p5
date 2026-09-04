@@ -1,0 +1,24 @@
+---
+class: standard
+created: 2026-09-03T01:26:19Z
+id: 98
+priority: medium
+status: backlog
+tags:
+- crd
+- testing
+- live
+title: 'CRD step 8: joint live test of IO::K8s + Kubernetes::REST CRD support (minikube,
+  then the OCP cluster) (D18)'
+updated: 2026-09-04T03:15:01Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D18).
+
+- Run the cross-dist suite against the minikube runner from kubernetes-rest ticket 22 with CRD fixtures applied: add_crd from the live cluster, ensure_crd + Established wait, Unstructured for an unknown Kind, preferred-version resolution, provider classes round-tripping real objects.
+- Then the same against the new cluster provisioned via kubernetes-ocp once its control-plane node is up. Read-only against any cluster we did not provision.
+Depends on: kubernetes-rest step-6 ticket, k98.
+
+Correction of the dependency line: depends on kubernetes-rest 24 and k97 (new providers).
+
+OCP-Seite jetzt als kubernetes-ocp k132 getrackt (CRD-Umstellung D1-D18 gegen OCPs echte CRD-Nutzung absichern).
