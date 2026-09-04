@@ -3,6 +3,7 @@ package IO::K8s::List;
 our $VERSION = '1.108';
 use v5.10;
 use Moo;
+with 'IO::K8s::Role::Resource';
 use Module::Runtime qw(require_module);
 use Types::Standard qw( ArrayRef InstanceOf Maybe Str );
 use JSON::MaybeXS ();
@@ -245,10 +246,22 @@ sub FROM_STRUCT {
         push @items, $k8s->_struct_to_object_expanded($resolved_item_class, $item_struct);
     }
 
+    # Any top-level key besides the ones this envelope itself understands
+    # (kind/apiVersion, consumed above to derive item_class; metadata/items,
+    # handled below) is forwarded straight into ->new(). List composes
+    # IO::K8s::Role::Resource for exactly this: its `around BUILDARGS` bags
+    # an undeclared key into _unknown_fields, or dies under strict -- the
+    # same envelope-level handling every non-list resource already gets
+    # (k99). Items themselves already round-trip through their own class's
+    # composition of the role; this only covers the list wrapper.
+    my %known_top_level = map { $_ => 1 } qw(kind apiVersion metadata items item_class);
+    my %extra = map { $_ => $struct->{$_} } grep { !$known_top_level{$_} } keys %$struct;
+
     return $class->new(
         items => \@items,
         (defined $metadata          ? (metadata   => $metadata)          : ()),
         (defined $resolved_item_class ? (item_class => $resolved_item_class) : ()),
+        %extra,
     );
 }
 
@@ -278,6 +291,20 @@ sub TO_JSON {
 
     if ($self->metadata && blessed($self->metadata) && $self->metadata->can('TO_JSON')) {
         $data{metadata} = $self->metadata->TO_JSON;
+    }
+
+    # Unknown top-level fields ride along (D1/k99), the same bag every
+    # Role::Resource class re-emits from TO_JSON -- List composes the role
+    # for this mechanism even though it keeps its own TO_JSON. A declared
+    # field above wins on a name clash, same rule as everywhere else.
+    # _copy_one_level is the role's, reached unqualified because composing
+    # the role installed it into this package too (k54 depth).
+    my $extra = $self->_unknown_fields;
+    if ($extra && %$extra) {
+        for my $key (keys %$extra) {
+            next if exists $data{$key};
+            $data{$key} = _copy_one_level($extra->{$key});
+        }
     }
 
     return \%data;
@@ -316,9 +343,12 @@ second argument when the item types must resolve through that instance's
 providers or C<class_namespaces>; without one a shared default instance is
 used, as FROM_STRUCT does.
 
-List does not consume L<IO::K8s::Role::Resource> -- it is a container, not
-an API object with its own GVK -- so this is a hand-rolled counterpart to
-the role's C<from_json>, not the role's own. C<< $k8s->inflate >> reaches
+List composes L<IO::K8s::Role::Resource> (since k99) so its top-level
+envelope gets the same C<_unknown_fields> bag and C<strict> handling as
+every other resource, but it is a container, not an API object with its
+own GVK, so C<to_json>/C<from_json>/C<TO_JSON>/C<FROM_STRUCT> stay
+hand-rolled overrides rather than the role's own -- C<kind>/C<api_version>
+derive from the items, not from a class name. C<< $k8s->inflate >> reaches
 the same FROM_STRUCT path from a full wire payload and remains the entry
 point when the Kind is only known at runtime.
 

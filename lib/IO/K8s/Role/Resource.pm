@@ -207,12 +207,15 @@ into a fatal error instead: any key that would otherwise land in the bag
 dies as C<Unknown field 'E<lt>nameE<gt>' for E<lt>classE<gt>>, again at every
 nesting level, for the duration of that call.
 
-One carve-out: L<IO::K8s::List>, the generic envelope a list Kind
-(C<PodList>, a bare C<kind: List>, ...) inflates to, does not compose this
-role. Its own top-level keys besides C<items>/C<metadata>/C<item_class> are
-neither preserved nor checked, under C<strict> or otherwise -- only the
-objects inside C<items> are, each through its own class's composition of
-this role (k99).
+Since k99, L<IO::K8s::List> -- the generic envelope a list Kind (C<PodList>,
+a bare C<kind: List>, ...) inflates to -- composes this role too, so its
+own top-level keys besides C<items>/C<metadata>/C<item_class> are preserved
+and checked exactly like any other resource's, under C<strict> or
+otherwise. It keeps its own hand-rolled C<TO_JSON>/C<FROM_STRUCT> rather
+than the role's (C<kind>/C<api_version> derive from the items, not from a
+class name) but reuses this exact bag and C<around BUILDARGS> mechanism for
+the envelope. Objects inside C<items> round-trip independently, each
+through its own class's composition of this role.
 
 =method TO_JSON
 

@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::List now composes IO::K8s::Role::Resource (k99), closing the D1
+    unknown-field hole on the list envelope: an unknown top-level key on a *List
+    document (anything besides apiVersion/kind/metadata/items) now round-trips
+    through the _unknown_fields bag instead of being silently dropped, and strict
+    inflation dies on it like any other resource. List keeps its own hand-rolled
+    TO_JSON/FROM_STRUCT (kind/apiVersion derive from items, not a class name).
+
   - IO::K8s::CRD::Emitter::_type_source now handles arrays of Num/Quantity/Time/
     IntOrStr (k112), mirroring to_crd's _type_schema (k96) -- the reverse
     (registry -> DSL source) direction previously croaked on those four flags.
