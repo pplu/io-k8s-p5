@@ -2,6 +2,15 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - reuse_core no longer pays a ~6.4s cold start on the first CRD generate /
+    add_crd / inflate in a process (k104). The core-shape index was built by
+    loading all ~840 shipped classes; it now comes from the precomputed
+    IO::K8s::AutoGen::CoreShapes and loads in milliseconds (measured 6.43s ->
+    0.06s), with only a looked-up shape's own candidate classes loaded on
+    demand. Falls back to the live scan if the artifact is missing.
+    Regenerate with maint/core-shape-index-gen.pl; t/85 fails if the checked-in
+    index and a live scan disagree.
+
   - IO::K8s::List now composes IO::K8s::Role::Resource (k99), closing the D1
     unknown-field hole on the list envelope: an unknown top-level key on a *List
     document (anything besides apiVersion/kind/metadata/items) now round-trips

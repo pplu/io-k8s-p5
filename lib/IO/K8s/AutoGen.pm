@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Carp qw(croak);
 use Digest::SHA qw( sha1_hex );
+use Module::Runtime qw( use_module );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype looks_like_number);
 use Types::Standard qw( Bool Int Str );
@@ -510,8 +511,27 @@ sub _has_properties {
 # inline schema for that Kind.
 # ---------------------------------------------------------------------------
 
-my %_core_shapes;      # "k1,k2,..." -> [ classes, preference-ordered ]
+my %_core_shapes;       # "k1,k2,..." -> [ classes, preference-ordered ]
+my %_core_shape_loaded; # shape -> 1 once that shape's candidates are loaded
 my $_core_indexed = 0;
+
+# The checked-in, precomputed form of %_core_shapes (k104). Building the
+# index live costs ~6.5s in a fresh process -- >99% of it Module::Runtime
+# loading all 839 classes under the two trees, the File::Find walk and the
+# registry reads being ~15ms together -- and reuse_core is default on, so
+# every first add_crd / generate / CRD inflate paid it. The precomputed
+# module carries the finished shape -> classes map (no DSL semantics: the
+# type-aware half of the reuse decision in _core_class_for loads the few
+# candidate classes it actually looks at, see core_class_for_shape) and
+# loads in ~2ms.
+#
+# It is a maint-maintained artifact in the sense of
+# maint/spec-drift-exceptions.yaml, NOT a codegen step -- nothing under
+# lib/IO/K8s/Api* is generated. maint/core-shape-index-gen.pl writes it by
+# calling _scan_core_shapes below, and t/85_core_shape_index.t fails when
+# the checked-in copy no longer matches what that same function produces,
+# which is what keeps adding, removing or renaming a class honest.
+our $CORE_SHAPE_INDEX = 'IO::K8s::AutoGen::CoreShapes';
 
 # Preference order for core_class_for_shape's listing and for picking among
 # several wire-identical candidates: LabelSelector / LabelSelectorRequirement
@@ -533,18 +553,35 @@ sub _core_rank {
 
 sub _index_core_shapes {
     return if $_core_indexed++;
+    my $precomputed = eval { use_module($CORE_SHAPE_INDEX)->shapes };
+    # A copy of the top level only: the arrayrefs stay shared with the
+    # index module, so core_class_for_shape replaces a shape's entry
+    # rather than sorting or splicing one in place.
+    %_core_shapes = %{ $precomputed || _scan_core_shapes() };
+}
+
+# Build the shape index by loading every shipped class under the two trees
+# and reading its attribute registry -- the slow path the precomputed
+# index above exists to avoid. Called as the fallback when that module is
+# missing, and, deliberately, as the ONE implementation both
+# maint/core-shape-index-gen.pl and t/85_core_shape_index.t call: the
+# artifact cannot encode a different metadata rule or a different
+# preference order than the live path produces, because it IS this
+# function's output. Returns a fresh hashref and touches no module state,
+# so the drift test can scan without disturbing a lookup already served.
+sub _scan_core_shapes {
     require File::Find;
-    require Module::Runtime;
     require IO::K8s::Role::Resource;
     (my $lib = $INC{'IO/K8s/AutoGen.pm'}) =~ s{/IO/K8s/AutoGen\.pm\z}{};
     my @files;
     File::Find::find(sub { push @files, $File::Find::name if /\.pm\z/ },
         "$lib/IO/K8s/Api", "$lib/IO/K8s/Apimachinery");
+    my %shapes;
     for my $file (sort @files) {
         (my $class = $file) =~ s{^\Q$lib\E/}{};
         $class =~ s{/}{::}g;
         $class =~ s/\.pm\z//;
-        eval { Module::Runtime::use_module($class); 1 } or next;
+        eval { use_module($class); 1 } or next;
         my $info = IO::K8s::Role::Resource::_k8s_attr_info($class);
         # See the block comment above: metadata is part of the shape for an
         # embedded type, not for a top-level Kind (Role::APIObject supplies
@@ -552,11 +589,12 @@ sub _index_core_shapes {
         my @attrs = $class->can('_is_resource') ? grep { $_ ne 'metadata' } keys %$info : keys %$info;
         my @keys = sort map { $info->{$_}{json_key} // $_ } @attrs;
         next unless @keys;
-        push @{ $_core_shapes{ join ',', @keys } }, $class;
+        push @{ $shapes{ join ',', @keys } }, $class;
     }
-    for my $shape (keys %_core_shapes) {
-        @{ $_core_shapes{$shape} } = sort { _core_rank($a) <=> _core_rank($b) || $a cmp $b } @{ $_core_shapes{$shape} };
+    for my $shape (keys %shapes) {
+        @{ $shapes{$shape} } = sort { _core_rank($a) <=> _core_rank($b) || $a cmp $b } @{ $shapes{$shape} };
     }
+    return \%shapes;
 }
 
 # Every shipped class whose key set is exactly \@json_keys, preference
@@ -568,7 +606,22 @@ sub core_class_for_shape {
     my ($keys) = @_;
     _index_core_shapes();
     my $shape = join ',', sort @$keys;
-    return @{ $_core_shapes{$shape} // [] };
+    my $classes = $_core_shapes{$shape} or return ();
+    # The precomputed index names classes without loading them, while
+    # every caller -- _core_class_for's type check first among them --
+    # reads the candidate's attribute registry, which is empty until the
+    # class is loaded. Handing out an unloaded name would not raise: the
+    # type filter would simply find no compatible candidate and silently
+    # stop reusing anything, which is the worst shape this optimisation
+    # could fail in. So a shape's candidates are loaded the first time
+    # that shape is asked for: a handful of classes per lookup instead of
+    # all 839 up front. A class that will not load is dropped and stays
+    # dropped, matching the live scan, which never indexes one.
+    unless ($_core_shape_loaded{$shape}++) {
+        $classes = [ grep { eval { use_module($_); 1 } } @$classes ];
+        $_core_shapes{$shape} = $classes;
+    }
+    return @$classes;
 }
 
 # The JSON-schema "kind" a property's type dispatches on for reuse-safety
@@ -1311,9 +1364,14 @@ a map, matches C<is_object>, C<is_inline_struct> or any C<is_hash_of_*>),
 and -- when several type-compatible candidates remain -- requires them to
 be wire-identical before picking the preferred one.
 
-The index is built once, lazily, on first call, by loading every class
-under those two trees, so the first call in a process is dominated by
-that one-time load cost rather than by anything this function itself
-does.
+The index itself is precomputed and shipped as
+L<IO::K8s::AutoGen::CoreShapes>, regenerated by
+F<maint/core-shape-index-gen.pl> and checked against the shipped classes
+by F<t/85_core_shape_index.t>; where that module is missing it is rebuilt
+on first call by loading every class under the two trees instead, which
+costs seconds rather than milliseconds but produces the same index. Either
+way, only the classes a looked-up shape actually names are loaded -- the
+returned names are always loadable, loaded classes, since the reuse
+decision reads their attribute registries.
 
 =cut
