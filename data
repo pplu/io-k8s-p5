@@ -1,0 +1,26 @@
+---
+claimed_at: 2026-09-04T16:26:25Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T16:26:25Z
+created: 2026-09-03T03:16:57Z
+id: 100
+priority: medium
+started: 2026-09-04T15:37:01Z
+status: done
+tags:
+- dsl
+- coercion
+- crd
+title: Direct ->new does not coerce hashrefs into named nested classes (only inline
+  structs and Bool coerce)
+updated: 2026-09-04T16:26:25Z
+---
+
+Surfaced twice during the CRD step-1 plan (Task 1 subtest 4, Task 3 test helper): IO::K8s::Resource::_k8s installs a Moo coerce only for is_bool, is_array_of_bool and is_inline_struct. A direct Class->new(spec => { ... }) therefore dies with 'Not a blessed reference' / an InstanceOf failure for every is_object, is_array_of_objects and is_hash_of_objects field, while $k8s->new_object, inflate and FROM_HASH inflate the same hashref fine through _inflate_struct.
+
+Today users are steered to new_object/FROM_HASH, so this is consistent with the status quo. It matters more after step 4 (k95): the providers get named nested classes at full depth (Go type names, D5/D6), so Middleware->new(spec => { rateLimit => { average => 100 } }) fails where the inline-struct form used to coerce.
+
+Option: a registry-driven coercer in _k8s for the three object forms that routes through IO::K8s::Role::Resource::_default_k8s()->_struct_to_object_expanded($class, $hashref) -- the same path FROM_HASH uses, so bool normalization and D1 unknown-field handling stay consistent. Decide before or during k95; touches every class's constructor, so it needs the full suite plus t/25 and t/26 both directions.
+
+Umgesetzt: registry-getriebene Coercer in _k8s fuer is_object/is_array_of_objects/is_hash_of_objects, die durch _default_k8s()->_struct_to_object_expanded gehen - denselben Pfad wie FROM_HASH, also identische Bool-Normalisierung und D1-Behandlung. Zirkularitaet umgangen: nur der Klassenname (String) wird zur Compile-Zeit gefangen, _default_k8s() erst im Closure-Body. Keine Doppelarbeit im Inflate-Pfad: instrumentiert ueber t/25 und t/26, 398 bzw. 353 Aufrufe von _struct_to_object_expanded, davon 0 aus IO::K8s::Resource (blessed short-circuit greift). Neuer Test t/87, volle Suite 90 Dateien / 8271 Tests gruen. Kosten: +5% Inflation (605->640us/op) zusaetzlich zu k102s dokumentierten 40% - akzeptiert. Root Cause an k102 angehaengt: Moo inlined eine coercion nie, sondern wrappt sie pro coerctem Attribut pro Konstruktion in eval + local (quote_sub hilft nicht, gemessen 1.95 vs 3.10 vs 3.16 us/op). Follow-ups k115 (metadata coerct nicht - wird direkt mitgemacht) und k116 (is_inline_struct ist NICHT semantikgleich: aliasing vs copy).
