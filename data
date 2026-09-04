@@ -1,0 +1,30 @@
+---
+claimed_at: 2026-09-04T22:54:51Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T22:54:51Z
+created: 2026-09-04T15:59:36Z
+id: 116
+priority: low
+started: 2026-09-04T20:45:03Z
+status: done
+tags:
+- dsl
+- coercion
+title: 'k100 follow-up: the is_inline_struct coercer is NOT semantically equal to
+  the new named-class one'
+updated: 2026-09-04T22:54:51Z
+---
+
+k100 left the existing is_inline_struct branch in IO::K8s::Resource::_k8s untouched, as instructed. Checked whether the new named-class branch could simply replace it: it cannot without a behaviour change.
+
+is_inline_struct does `$ic->new(%{$_[0]})`. The new branch goes through _default_k8s->_struct_to_object_expanded, i.e. through IO::K8s::_inflate_struct, which shallow-copies plain containers (k54). Measured:
+
+  Sandbox->new(spec => { podTemplate => $inner })   # inline struct
+    -> $sb->spec->podTemplate IS $inner            (aliased)
+  PodSpec->new(containers => [ { args => $args } ]) # named class
+    -> $ps->containers->[0]->args is NOT $args     (copied)
+
+So merging the two branches would silently switch inline-struct fields from aliasing the caller structure to k54 copy semantics. That is a real, user-visible change (later edits to the source hash stop reaching the object), not a refactor -- hence a decision of its own.
+
+Other, smaller differences in the same direction: the named path calls load_class (a require_module per coercion), special-cases the opaque field names fieldsV1/rawExtension/raw, and honours FROM_STRUCT; the inline path does none of those, and a bad Bool gets a different message wrapper on each ("... while inflating CLASS field X" vs Moo coercion for "X" failed).
