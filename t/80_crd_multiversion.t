@@ -86,6 +86,21 @@ use IO::K8s::CRD;
     1;
 }
 
+# Same group/kind/plural/scope/version ('v1') as Test80::V1::Widget -- a
+# distinct class that is nonetheless NOT a distinct version -- for the
+# duplicate-version guard.
+{
+    package Test80::V1Dup::Widget;
+    use IO::K8s::APIObject
+        api_version     => 'crdstep5.example.com/v1',
+        resource_plural => 'widgets80';
+    with 'IO::K8s::Role::Namespaced';
+
+    k8s name => Str, 'required';
+
+    1;
+}
+
 # Same group/kind/version/plural as Test80::V1::Widget, but Cluster-scoped
 # (no IO::K8s::Role::Namespaced) -- for the scope-mismatch guard.
 {
@@ -175,6 +190,10 @@ subtest 'mismatch guards' => sub {
     throws_ok {
         IO::K8s::CRD->new(classes => [ 'Test80::V1::Widget', 'Test80::V1beta1::Widget' ], storage => 'v2');
     } qr/storage 'v2' does not name any/, 'a storage naming no given class croaks';
+
+    throws_ok {
+        IO::K8s::CRD->new(classes => [ 'Test80::V1::Widget', 'Test80::V1Dup::Widget' ], storage => 'v1');
+    } qr/duplicate version name\(s\) \(v1\)/, 'two classes naming the same version croaks, even though group/kind/plural/scope all agree';
 
     throws_ok {
         IO::K8s::CRD->new(classes => [], storage => 'v1');

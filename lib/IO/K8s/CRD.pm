@@ -287,10 +287,14 @@ Every class in C<classes> is one API version of the SAME CRD, so they must
 agree on C<spec.group>, C<< names.kind >> (from C<< $class->kind >>),
 C<< names.plural >> (from C<< $class->resource_plural >>) and C<spec.scope>
 (L<IO::K8s::Role::Namespaced> or not) -- a mismatch on any of those croaks,
-naming the field and which class supplied which value. Each class becomes
-one C<spec.versions[]> entry (schema from L</_schema_for_class>, applied
-per class): every entry is C<served => true>, and exactly the one whose
-C<name> matches C<storage> gets C<storage => true> (the rest
+naming the field and which class supplied which value. They must also each
+be a genuinely distinct version: two classes naming the same version (e.g.
+two whose C<api_version> both end C<.../v1>) would otherwise produce two
+identically-named C<spec.versions[]> entries -- a shape the apiserver
+rejects -- so that croaks too, naming the repeated version. Each class
+becomes one C<spec.versions[]> entry (schema from L</_schema_for_class>,
+applied per class): every entry is C<served => true>, and exactly the one
+whose C<name> matches C<storage> gets C<storage => true> (the rest
 C<storage => false>). C<storage> is required and must name one of the given
 classes' own versions, or the call croaks.
 
@@ -324,6 +328,12 @@ sub new {
             . join(', ', map { "$_: " . join(',', @{ $by_value{$_} }) } sort keys %by_value)
             . ") -- classes passed to ->new must all be versions of the same CRD";
     }
+
+    my %seen_version;
+    my @dupes = grep { $seen_version{$_}++ } map { $_->{version} } @ids;
+    croak "IO::K8s::CRD->new: duplicate version name(s) (@dupes) across classes; "
+        . "each class must be a distinct served version"
+        if @dupes;
 
     my $storage = $args{storage};
     croak "IO::K8s::CRD->new needs a 'storage' version name" unless defined $storage && length $storage;
