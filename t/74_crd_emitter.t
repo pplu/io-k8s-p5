@@ -320,4 +320,48 @@ subtest 'a path-derived name past 200 chars still renders, with its own fallback
     is($emitter2->package_for($deepest), 'TestDeepNamed::V1::DeepLeaf', 'package_for reflects the name map, not the fallback');
 };
 
+# k112: the registry already carries is_array_of_num/quantity/time/
+# int_or_string (added for k96 task-2, read by IO::K8s::CRD's to_crd
+# _type_schema), but this emitter's own _type_source -- the reverse,
+# registry -> DSL-source direction -- still had no branch for any of the
+# four and croaked. Unreachable today via any bundled provider or AutoGen
+# schema path (AutoGen's array-item dispatch never produces one of these
+# four flags from a schema; see the comment above IO::K8s::CRD::_type_schema),
+# so reproduce with a hand-declared class exercising the DSL forms
+# directly, the same way t/63_k66_array_of_hash.t does for [ {} ] / [ [] ].
+{
+    package Test::Karr112::Thing;
+    use IO::K8s::Resource;
+    k8s numbers    => [Num];
+    k8s quantities => [Quantity];
+    k8s times      => [Time];
+    k8s flexes     => [IntOrStr];
+}
+
+subtest 'array-of-scalar Num/Quantity/Time/IntOrStr fields emit instead of croaking (k112)' => sub {
+    my $emitter = IO::K8s::CRD::Emitter->new(base => 'TestKarr112::V1');
+    my $files;
+    lives_ok { $files = $emitter->render('Test::Karr112::Thing') }
+        '_type_source no longer croaks on [Num]/[Quantity]/[Time]/[IntOrStr]';
+
+    my $src = $files->{'TestKarr112/V1/Thing.pm'};
+    like($src, qr/^k8s numbers\s+=> \[Num\];$/m,      'array of Num');
+    like($src, qr/^k8s quantities\s+=> \[Quantity\];$/m, 'array of Quantity');
+    like($src, qr/^k8s times\s+=> \[Time\];$/m,        'array of Time');
+    like($src, qr/^k8s flexes\s+=> \[IntOrStr\];$/m,   'array of IntOrStr');
+
+    ok(eval "$src\n1;", 'emitted source compiles') or diag $@;
+
+    my $doc = {
+        numbers    => [1, 2.5],
+        quantities => ['100Mi', '2'],
+        times      => ['2024-01-01T00:00:00Z'],
+        flexes     => [1, '20%'],
+    };
+    my $hand    = Test::Karr112::Thing->new(%$doc);
+    my $emitted = TestKarr112::V1::Thing->new(%$doc);
+    is_deeply($emitted->TO_JSON, $hand->TO_JSON,
+        'emitted class round-trips the same wire shape as the hand-written original');
+};
+
 done_testing;

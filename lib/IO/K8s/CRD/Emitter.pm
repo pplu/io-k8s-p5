@@ -240,6 +240,10 @@ sub _type_source {
     return ('[Str]')      if $info->{is_array_of_str};
     return ('[Int]')      if $info->{is_array_of_int};
     return ('[Bool]')     if $info->{is_array_of_bool};
+    return ('[Num]')      if $info->{is_array_of_num};
+    return ('[IntOrStr]') if $info->{is_array_of_int_or_string};
+    return ('[Quantity]') if $info->{is_array_of_quantity};
+    return ('[Time]')     if $info->{is_array_of_time};
     return ('[ {} ]')     if $info->{is_array_of_hash};
     return ('[ [] ]')     if $info->{is_array_of_array};
     return ('{ Str => 1 }')      if $info->{is_hash_of_str};

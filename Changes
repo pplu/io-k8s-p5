@@ -2,6 +2,11 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::CRD::Emitter::_type_source now handles arrays of Num/Quantity/Time/
+    IntOrStr (k112), mirroring to_crd's _type_schema (k96) -- the reverse
+    (registry -> DSL source) direction previously croaked on those four flags.
+    Currently reachable only for an emitter-rendered CRD carrying such an array.
+
   - Fix IO::K8s::Role::SpecBuilder descending into an unset [Num]/[Quantity]/
     [Time]/[IntOrStr] array field (k111): _sb_fresh's array-shape check omitted
     the four is_array_of_num/quantity/time/int_or_string flags added in k96, so
