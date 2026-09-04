@@ -1,0 +1,32 @@
+---
+claimed_at: 2026-09-04T20:53:30Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T20:53:30Z
+created: 2026-09-04T15:36:53Z
+id: 114
+priority: low
+started: 2026-09-04T19:56:07Z
+status: done
+tags:
+- crd
+- emitter
+- pattern
+title: 'CRD::Emitter: eigene Perl-Escapes im gerenderten pattern statt upstream-Bytes
+  (\@, \$, \x{HEX})'
+updated: 2026-09-04T20:53:30Z
+---
+
+k110-Folgefund (Emitter-Nachrunde). Der Emitter rendert ein pattern als qr//-Literal und escapet dabei nach Perl-Regeln, statt den Upstream-Text durchzureichen. Ueber die 1571 gerenderten Patterns der 8 gebundelten Provider:
+
+- @ -> \@ : 6 Dateien, 2 distinkte Patterns. \@ ist im ECMA262 unicode mode ein ungueltiger identity escape; Go/RE2 nimmt es.
+- bares $ -> \$ (nicht als Anker, z.B. in einer Zeichenklasse): 18 Dateien. Ueberall gueltig, reines Rauschen.
+- non-ASCII -> \x{HEX}: 15 Dateien, 1 distinktes Pattern (^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+$, Prometheus-Durations). \x{...} ist ueberhaupt kein ECMA262; Go/RE2 nimmt es.
+
+Keines davon croakt in _pattern_to_ecma262 (k110), deshalb bewusst ausserhalb des dortigen Fixes gelassen -- es sind keine Fehler, sondern IO::K8s-eigene Perl-Artefakte, die statt upstreams Bytes im CRD-Text landen. Dieselbe Begruendung wie bei k110s Entscheidung, \p{}/\x{} nicht zu croaken: der apiserver validiert faktisch mit Go/RE2.
+
+Entscheidung offen: diese Patterns ebenfalls als Plain-String rendern (naeher an upstreams exaktem Text, aendert dafuer to_crd-Ausgabe fuer diese Felder), oder als bewusste Emitter-Konvention dokumentieren und so lassen. Der \x{HEX}-Fall hat das staerkste ECMA262-Argument. Nicht dringend: nichts davon bricht heute etwas.
+
+Umgesetzt. Praemisse per Herkunftsanalyse geprueft statt der Zaehlung geglaubt: alle 47 distinkten upstream-pattern-Strings unter spec/crd/ gegen die Emitter-Ausgabe verglichen - alle drei Faelle (\@, \$, \x{HEX}) sind wirklich unsere Artefakte, upstream schreibt sie nie. Zwei Funde, die die Zaehlung nicht sah: (1) / -> \/ ist KEIN Artefakt (der Tokenizer strippt das Delimiter-Escape, es erreicht die Registry nie); (2) der umgekehrte Verlust ist real - 5 upstream-Patterns schreiben \/ selbst, das qr// hat den Backslash gedroppt, also emittierte to_crd / wo upstream \/ schrieb. Fix ist eine Regel statt einer Fallliste: _qr_round_trips behaelt die qr//-Form nur, wo sie byte-exakt ist (String-eval des Literals, weil Interpolation kein Delimiter-Unescaping macht), alles andere geht den Plain-String-Pfad aus k110. Zahlen: Re-Render 2030 Dateien, 31 Diffs, 46 Pattern-Felder in 9 distinkten Patterns; Semantik aller 1571 Felder identisch (46 geaenderte gegen je ~666 Proben, 0 Mismatches); 0 Croaks; 28 geshippte Dateien / 43 Felder nachgezogen. Kernmetrik: vorher emittierten 46 von 1571 Feldern Text, der zu keinem upstream-Pattern passte - nachher 0. Registry ist Fixpunkt des Emitters (0 Drift). Beide neuen Guards mutationsgetestet.
+
+Abgeschlossen inkl. zwei Nachzieher. (1) Stale k110-Kommentar in CRD.pm korrigiert: die Begruendung fuer das Nicht-Croaken auf \p{}/\x{} traegt jetzt allein Ciliums upstream \PC; ein \x{} kann seit k114 nur noch aus einer handgeschriebenen Klasse kommen. (2) IPPoolSpec-Verdacht war FALSCH - der Agent hat richtig gestoppt statt zu raten: die geshippte Datei ist korrekt (E2 80 93, use utf8, =encoding UTF-8), kaputt war der lokale gitignorierte Cache spec/crd/Cilium/v1.20.1/v2alpha1_ciliumpodippools.yaml. Root Cause im maint-Tool: die Doppelkodierungs-Reparatur in _slurp erkannte nur 2-Byte-Originale (Latin-1 Supplement), waehrend jedes Zeichen ab U+0800 durchrutscht - also alles Typografische in upstream-Beschreibungen. Signatur jetzt hergeleitet statt aufgezaehlt (Zeile fixiert durch das Lead-Byte, Paaranzahl folgt daraus: 2/3/4-Byte-Originale). Die 2-Byte-Zeile bewusst NICHT erweitert, weil sonst 'Ae' + Kombination still zu einem anderen Zeichen umgeschrieben wuerde - verifiziert. Neuer Test t/89, mutationsgetestet in beide Richtungen: alte Signatur -> 5 Assertions rot; FB_CROAK entfernt -> genau die drei False-Positive-Faelle rot. Wirkung ohne Netz und ohne den Cache anzufassen: Cilium 199/1 -> 200/0. Alle Provider MIT Overlay stehen jetzt auf 0 differ; die verbleibenden 29 sind k120.
