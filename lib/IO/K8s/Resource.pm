@@ -427,7 +427,21 @@ sub _k8s {
             $info{is_array_of_array} = 1;
             _reject_value_options(\%opts, $where);
             $inner = ArrayRef[ArrayRef];
-        # Handle [Str] with Type::Tiny object
+        # Handle [Str] with Type::Tiny object -- and, since 1.108's to_crd
+        # (D9), every other scalar kind the DSL knows too. Before, only
+        # Str/Int/Bool recorded an is_array_of_* flag here; [Num]/[Quantity]/
+        # [Time]/[IntOrStr] still built and validated a working ArrayRef
+        # attribute (Moo's own isa/coerce below is unaffected either way),
+        # but left the registry entry with NO classifying flag at all --
+        # invisible to anything that reads the registry instead of the Moo
+        # attribute, which is exactly what to_crd's _schema_for_class does
+        # (found via IO::K8s::Api::Resource::V1::ResourceSlice, whose
+        # DeviceCapacity.validValues is [Quantity]; k96 task-2 review).
+        # Purely additive: TO_JSON/_inflate_struct have no branch keyed on
+        # any of these four new flags either, so they fall through to the
+        # same generic ArrayRef copy an unflagged entry already used --
+        # serialization and inflation are unchanged, only the registry gets
+        # more precise.
         } elsif (_is_type_tiny($elem)) {
             my $kind = $elem->name;
             if ($kind eq 'Str') {
@@ -436,6 +450,14 @@ sub _k8s {
                 $info{is_array_of_int} = 1;
             } elsif ($kind eq 'Bool') {
                 $info{is_array_of_bool} = 1;
+            } elsif ($kind eq 'Num') {
+                $info{is_array_of_num} = 1;
+            } elsif ($kind eq 'IntOrStr') {
+                $info{is_array_of_int_or_string} = 1;
+            } elsif ($kind eq 'Quantity') {
+                $info{is_array_of_quantity} = 1;
+            } elsif ($kind eq 'Time') {
+                $info{is_array_of_time} = 1;
             }
             $inner = ArrayRef[ _constrain($elem, $kind, \%opts, $where) ];
         } elsif ($elem eq 'Str') {

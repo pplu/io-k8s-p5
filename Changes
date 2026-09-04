@@ -6,18 +6,25 @@ Revision history for IO-K8s
     own CustomResourceDefinition, built from the same attribute registry
     add_crd/IO::K8s::AutoGen reads -- the exact inverse of AutoGen's
     schema-to-DSL mapping, so add_crd(Class->to_crd) reconstructs an
-    equivalent class (verified against a shipped cert-manager Kind).
-    IO::K8s::CRD::_schema_for_class walks the registry into an
-    openAPIV3Schema, recursing into referenced/inline-struct classes with a
+    equivalent class (verified against a shipped cert-manager Kind and,
+    for every shipped Kind across core and all bundled CRD providers, that
+    to_crd does not die). IO::K8s::CRD::_schema_for_class walks the
+    registry into an openAPIV3Schema -- scalars, arrays and maps of every
+    kind the k8s DSL supports (Str/Int/Num/Bool/IntOrStr/Quantity/Time,
+    including arrays of Num/Quantity/Time/IntOrStr, previously unhandled
+    and fatal), and referenced/inline-struct classes recursed with a
     path-scoped cycle guard (a class reused as unrelated siblings, e.g. a
     shared LabelSelector, is unaffected -- only a genuine cycle on the
     current path becomes an opaque x-kubernetes-preserve-unknown-fields
-    stub); D3 field options (enum, minimum, maximum, pattern, description,
+    stub). D3 field options (enum, minimum, maximum, pattern, description,
     default, nullable, preserve_unknown) are carried onto the emitted
-    property. One documented lossy edge: a Quantity-typed field has no
-    schema shape AutoGen reads back as Quantity (it is only ever produced
-    from a $ref, never a format string), so it round-trips as a plain Str;
-    a Time-typed field is lossless (format: date-time).
+    property. Documented lossy edges: a Quantity-typed field has no schema
+    shape AutoGen reads back as Quantity (only ever produced from a $ref,
+    never a format string), so it round-trips as a plain Str; a typed
+    value map (Int/Num/Bool/Quantity/Time/IntOrStr) round-trips to an
+    opaque string map, since AutoGen's additionalProperties dispatch has
+    no scalar-type branch at all. A scalar or array Time-typed field is
+    lossless (format: date-time).
 
   - New IO::K8s::Unstructured and IO::K8s->new(unknown_kinds => 'unstructured')
     (D4, k96): apiVersion/kind/metadata as ordinary typed attributes, with no

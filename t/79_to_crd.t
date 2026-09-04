@@ -42,6 +42,10 @@ use IO::K8s::CertManager::V1::Order;
     k8s tags      => [Str];
     k8s ports     => [Int];
     k8s flags     => [Bool];
+    k8s weights   => [Num];
+    k8s limits    => [Quantity];
+    k8s stamps    => [Time];
+    k8s sizes     => [IntOrStr];
     k8s rows      => [ {} ];
     k8s matrix    => [ [] ];
     k8s limit     => '+Test79::Item';
@@ -117,6 +121,17 @@ subtest '_schema_for_class mirrors every AutoGen branch in reverse' => sub {
             tags       => { type => 'array', items => { type => 'string' } },
             ports      => { type => 'array', items => { type => 'integer' } },
             flags      => { type => 'array', items => { type => 'boolean' } },
+            # k96 task-2 review (Critical): before the fix, an array of
+            # Num/Quantity/Time/IntOrStr recorded NO is_array_of_* flag at
+            # all (Resource.pm's array branch only classified Str/Int/Bool),
+            # so _schema_for_class croaked "no recognizable is_* flag" on
+            # every shipped Kind carrying one -- e.g.
+            # IO::K8s::Api::Resource::V1::ResourceSlice via
+            # DeviceCapacity.validValues => [Quantity].
+            weights    => { type => 'array', items => { type => 'number' } },
+            limits     => { type => 'array', items => { type => 'string' } },   # [Quantity]: same documented lossy edge as scalar is_quantity
+            stamps     => { type => 'array', items => { type => 'string', format => 'date-time' } },   # [Time]: lossless
+            sizes      => { type => 'array', items => { 'x-kubernetes-int-or-string' => 1 } },
             rows       => { type => 'array', items => { type => 'object', 'x-kubernetes-preserve-unknown-fields' => 1 } },
             matrix     => { type => 'array', items => { type => 'array' } },
             limit      => $ITEM_SCHEMA,
@@ -196,6 +211,48 @@ subtest 'round trip: a shipped provider Kind survives to_crd -> add_crd' => sub 
         'the enum on status.state survives the round trip');
 
     ok($regen_class->does('IO::K8s::Role::Namespaced'), 'Namespaced scope preserved through the round trip');
+};
+
+subtest 'regression: arrays of Num/Quantity/Time/IntOrStr are flagged and schema-able (k96 review, Critical)' => sub {
+    require IO::K8s::Api::Resource::V1::CapacityRequestPolicy;
+    my $info = IO::K8s::Api::Resource::V1::CapacityRequestPolicy->_k8s_attr_info;
+    is($info->{validValues}{is_array_of_quantity}, 1,
+        'DeviceCapacity/CapacityRequestPolicy.validValues ([Quantity]) is registered as is_array_of_quantity');
+
+    require IO::K8s::Api::Resource::V1::ResourceSlice;
+    my $crd;
+    lives_ok { $crd = IO::K8s::Api::Resource::V1::ResourceSlice->to_crd }
+        'ResourceSlice->to_crd no longer dies (was: "registry entry with no recognizable is_* flag")';
+    isa_ok($crd, 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceDefinition');
+};
+
+subtest 'smoke: every shipped, resource_plural-bearing Kind survives to_crd' => sub {
+    require File::Find;
+    require Module::Runtime;
+    (my $lib = $INC{'IO/K8s.pm'}) =~ s{/IO/K8s\.pm\z}{};
+    my @classes;
+    File::Find::find(sub {
+        return unless /\.pm\z/;
+        (my $c = $File::Find::name) =~ s{^\Q$lib\E/}{};
+        $c =~ s{/}{::}g;
+        $c =~ s/\.pm\z//;
+        push @classes, $c;
+    }, "$lib/IO/K8s/Api", "$lib/IO/K8s/Apimachinery", "$lib/IO/K8s/ApiextensionsApiserver",
+       "$lib/IO/K8s/KubeAggregator", "$lib/IO/K8s/Cilium", "$lib/IO/K8s/Traefik",
+       "$lib/IO/K8s/CertManager", "$lib/IO/K8s/GatewayAPI", "$lib/IO/K8s/K3s",
+       "$lib/IO/K8s/AgentSandbox");
+
+    my @failed;
+    my $checked = 0;
+    for my $class (sort @classes) {
+        eval { Module::Runtime::use_module($class); 1 } or next;
+        next unless $class->can('_is_resource');
+        next unless $class->can('resource_plural') && defined eval { $class->resource_plural };
+        $checked++;
+        eval { $class->to_crd; 1 } or push @failed, "$class: $@";
+    }
+    ok($checked > 100, "checked a real number of Kinds ($checked)");
+    is_deeply(\@failed, [], 'no shipped Kind fails Class->to_crd');
 };
 
 subtest 'scope: Cluster-scoped shipped Kind' => sub {

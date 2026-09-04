@@ -394,9 +394,15 @@ sub _property_schema {
 # resource.Quantity, never through a format string, so there is nothing to
 # emit here that would read back as Quantity. A Quantity field therefore
 # round-trips through add_crd as a plain Str -- documented in the task-2
-# report, not worked around here. is_time does not share that gap: `format:
-# date-time` is exactly what AutoGen's own dispatch reads back into Time,
-# so it is emitted, and the round trip is lossless.
+# report, not worked around here. is_hash_of_quantity shares the same gap
+# for the same reason (AutoGen's additionalProperties dispatch collapses
+# every typed map -- int/num/bool/quantity/time/int-or-string alike -- to
+# the opaque { Str => 1 } shape rather than a typed additionalProperties
+# schema, so none of is_hash_of_{int,num,bool,quantity,time,int_or_string}
+# has a schema shape that reads back as itself; only the standalone scalar
+# is_time is lossless via `format: date-time`, which AutoGen's own dispatch
+# explicitly reads back into Time). is_array_of_quantity has the identical
+# gap to the scalar is_quantity, one level down.
 sub _type_schema {
     my ($entry, $seen) = @_;
 
@@ -415,8 +421,25 @@ sub _type_schema {
     return { type => 'array', items => { type => 'string' } }  if $entry->{is_array_of_str};
     return { type => 'array', items => { type => 'integer' } } if $entry->{is_array_of_int};
     return { type => 'array', items => { type => 'boolean' } } if $entry->{is_array_of_bool};
+    return { type => 'array', items => { type => 'number' } }  if $entry->{is_array_of_num};
+    return { type => 'array', items => { 'x-kubernetes-int-or-string' => JSON::MaybeXS::true } }
+        if $entry->{is_array_of_int_or_string};
+    return { type => 'array', items => { type => 'string' } }  if $entry->{is_array_of_quantity};
+    return { type => 'array', items => { type => 'string', format => 'date-time' } }
+        if $entry->{is_array_of_time};
     return { type => 'array', items => _opaque_object() } if $entry->{is_array_of_hash};
     return { type => 'array', items => { type => 'array' } }   if $entry->{is_array_of_array};
+    # Belt-and-suspenders (k96 task-2 review, Critical): every is_array_of_*
+    # flag Resource.pm can currently set is handled above. A future one that
+    # is not degrades to an untyped array items schema rather than falling
+    # through to the croak below -- a class this function cannot describe
+    # precisely should still produce a *valid*, merely permissive,
+    # openAPIV3Schema, not block to_crd outright the way the unhandled
+    # is_array_of_num/quantity/time/int_or_string case did before this fix
+    # (found via IO::K8s::Api::Resource::V1::ResourceSlice's
+    # DeviceCapacity.validValues, an [Quantity] field).
+    return { type => 'array', items => {} }
+        if grep { /^is_array_of_/ && $entry->{$_} } keys %$entry;
 
     return { type => 'object', additionalProperties => _schema_for_class($entry->{class}, $seen) }
         if $entry->{is_hash_of_objects};
@@ -454,13 +477,17 @@ sub _apply_options {
     if (exists $opts->{pattern}) {
         my $p = $opts->{pattern};
         # re::regexp_pattern in LIST context returns the raw pattern text a
-        # qr// was built from -- unlike plain stringification, it carries no
-        # '(?^:...)' wrapper, so what lands in the schema is what the author
-        # (or AutoGen's own $src->{pattern}) originally wrote. Regex flags
-        # (a qr/.../i, say) have no standard JSON Schema carrier and are
-        # dropped -- every hand-written 'pattern' in this distribution is
-        # case-sensitive, so this has not lost anything real yet; a future
-        # flagged pattern would need an explicit decision, not a guess here.
+        # qr// was built from -- unlike plain stringification ("$p", which
+        # would wrap it as '(?^u:...)'), it carries no wrapper at all, so
+        # what lands in the schema is what the author (or AutoGen's own
+        # $src->{pattern}) originally wrote. This is only the common-case
+        # unwrap, not a Perl-regex-to-ECMA262 translator: a pattern that
+        # leans on Perl-only syntax (\A/\z anchors, \p{}/\P{} property
+        # classes, named captures, ...) is passed through as-is and is not
+        # valid ECMA262, which is what a CRD's openAPIV3Schema pattern is
+        # specified against. Regex flags (a qr/.../i, say) have no standard
+        # JSON Schema carrier either and are dropped. Both gaps are real and
+        # tracked as k110 rather than guessed at here.
         $schema->{pattern} = (ref $p eq 'Regexp') ? (re::regexp_pattern($p))[0] : $p;
     }
     $schema->{description} = $opts->{description} if exists $opts->{description};

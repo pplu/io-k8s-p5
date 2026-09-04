@@ -155,15 +155,18 @@ sub required_flags_for {
     return \%flags;
 }
 
-# A few ArrayRef[X] combinations (X = Quantity, at least) aren't tagged by
-# any is_array_of_* flag: _k8s's Type::Tiny branch only recognises
-# Str/Int/Bool as array element types (see IO::K8s::Resource's `_k8s`,
-# the `if $type_name eq 'Str' ... elsif 'Int' ... elsif 'Bool'` chain), so
-# e.g. `k8s validValues => [Quantity]` in
-# IO::K8s::Api::Resource::V1::CapacityRequestPolicy registers with no flags
-# at all. Rather than hardcode that one field, ask the real Moo `isa`
-# constraint what it is - that's the actual source of truth the task
-# briefing pointed at, and it covers any future addition of the same shape.
+# Before k96 task-2's review fix, a few ArrayRef[X] combinations (X =
+# Quantity, at least - IO::K8s::Api::Resource::V1::CapacityRequestPolicy's
+# validValues => [Quantity]) registered with NO is_array_of_* flag at all:
+# _k8s's Type::Tiny branch only recognised Str/Int/Bool as array element
+# types. That gap is closed (Resource.pm's array branch now also flags
+# Num/IntOrStr/Quantity/Time; synth_value below has explicit cases for all
+# four), so every currently-shipped shape reaches synth_value with a real
+# flag and never falls into this block. Left in place as a defensive
+# fallback for a hypothetical future scalar kind the DSL grows without a
+# matching case being added here: ask the real Moo `isa` constraint what it
+# is - the actual source of truth - rather than silently minting an invalid
+# "synthetic-$attr" string that fails its own type check.
 sub isa_text_for {
     my ($class, $attr) = @_;
     my $isa = moo_specs_for($class)->{$attr}{isa} or return undef;
@@ -325,6 +328,17 @@ sub synth_value {
         return \@vals;
     }
     return [ 1, 0, 1 ]  if $info->{is_array_of_bool};    # the exact DeviceAttribute.bools shape
+    # k96 task-2 review: these four used to register with no flag at all
+    # (see the block comment above isa_text_for) and fell through to the
+    # isa-text fallback in synth_value below, which produced these same
+    # values by sniffing the real Moo ArrayRef[X] constraint. Now that the
+    # registry carries the flag directly, match those values here instead
+    # -- same synthetic data, sourced from the registry like every other
+    # case in this function rather than the isa-text side channel.
+    return [ 1.5, 2.5 ]                               if $info->{is_array_of_num};
+    return [ '8080', 'http' ]                         if $info->{is_array_of_int_or_string};
+    return [ '100m', '1Gi' ]                          if $info->{is_array_of_quantity};
+    return [ '2024-01-01T00:00:00Z' ]                 if $info->{is_array_of_time};
     return { 'sample-key' => 'sample-value' } if $info->{is_hash_of_str};
     # Typed value maps -- the { TypeName => 1 } DSL form (k63). Each value
     # must satisfy the scalar constraint the map carries.
