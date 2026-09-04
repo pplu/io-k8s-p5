@@ -2,6 +2,21 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - A direct Class->new now coerces a plain hashref into a named nested class
+    for object, array-of-object and hash-of-object fields (k100), where it
+    previously died with "Not a blessed reference" / an InstanceOf failure and
+    callers had to go through new_object or FROM_HASH. The coercion routes
+    through the same _struct_to_object_expanded that FROM_HASH uses, so bool
+    normalization and D1 unknown-field handling are identical on both paths --
+    Middleware->new(spec => { rateLimit => { average => 100 } }) now builds
+    what the inline-struct form used to. metadata on every APIObject class
+    coerces too (k115): it is declared by IO::K8s::Role::APIObject rather than
+    by the k8s DSL, so it needed the same coercer wired in there, sharing one
+    source with Resource.pm rather than a copy of it. An already-blessed value
+    still passes straight through, so the inflate path does no double work.
+    Cost is ~5% on inflation, all of it Moo's per-coerced-attribute wrapper
+    (see k102), not the coercion body.
+
   - IO::K8s::Traefik::V1alpha1::MiddlewareTCP no longer composes
     IO::K8s::Role::MiddlewareBuilder (k106). That role is HTTP-only -- verified
     against traefik/traefik v3.7.12, MiddlewareTCPSpec has just

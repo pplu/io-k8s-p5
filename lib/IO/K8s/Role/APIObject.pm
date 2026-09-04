@@ -3,17 +3,50 @@ package IO::K8s::Role::APIObject;
 our $VERSION = '1.108';
 use Moo::Role;
 use Types::Standard qw( InstanceOf Maybe );
+use IO::K8s::Resource ();
 use Scalar::Util qw(blessed);
 use Carp qw( croak );
 
+# Written once, used by both the type constraint and the coercion below so
+# they cannot name different classes.
+my $OBJECT_META = 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta';
+
+# metadata is the one object-bearing field of a top-level Kind that the k8s
+# DSL does not create: this role composes first, so by the time
+# IO::K8s::APIObject::import runs `k8s metadata => 'Meta::V1::ObjectMeta'`
+# the attribute already exists and _k8s's "don't overwrite a role's
+# attribute" guard registers it without installing anything. That guard is
+# right and stays; what it means is that the coercion has to be declared
+# here instead. _object_coercer is _k8s's own, so `metadata` coerces exactly
+# like every other is_object field -- Pod->new(metadata => { name => 'x' })
+# builds an ObjectMeta through the same call FROM_HASH makes (k115).
+#
+# `use IO::K8s::Resource ()`, with the empty import list: its import turns
+# the caller into a Moo class via _setup_class, which is not what a role
+# wants. Nothing IO::K8s::Resource loads leads back here, so this closes no
+# cycle -- and _object_coercer only builds the closure, it does not reach
+# for IO::K8s until something is actually coerced.
 has metadata => (
-    is => 'rw',
-    isa => Maybe[InstanceOf['IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta']],
+    is     => 'rw',
+    isa    => Maybe[InstanceOf[$OBJECT_META]],
+    coerce => IO::K8s::Resource::_object_coercer($OBJECT_META),
 );
 
 =attr metadata
 
 Standard object's metadata. See L<IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta>.
+
+A plain hashref is coerced (since 1.108), exactly as on any other
+object-bearing field, so
+
+    IO::K8s::Api::Core::V1::Pod->new(
+        metadata => { name => 'web', namespace => 'prod' },
+        spec     => { containers => [ { name => 'c', image => 'nginx' } ] });
+
+builds the C<ObjectMeta> itself. It is the same inflation
+L<IO::K8s::Role::Resource/FROM_HASH> performs, so an unknown field inside
+C<metadata> is preserved (or refused under C<< IO::K8s->new(strict => 1) >>)
+identically on both routes. An C<ObjectMeta> passed in is used as it is.
 
 =cut
 

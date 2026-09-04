@@ -320,6 +320,35 @@ sub _normalize_bool {
     return $value ? 1 : 0;
 }
 
+# The coercion a single object-bearing field gets (k100): a plain hashref
+# becomes an instance of $class_name, built by the very call FROM_HASH
+# makes, so bool normalization and the D1 unknown-field policy are the ones
+# the inflate path already uses instead of a second, subtly different way of
+# building the same object. See the is_object branch of _k8s below for why
+# one `ref eq 'HASH'` test is the whole guard.
+#
+# Named rather than written inline in that branch for the same reason
+# _normalize_bool above is: a second caller needs exactly this, and the two
+# must not drift. That caller is IO::K8s::Role::APIObject, whose `metadata`
+# is a plain `has` -- the role composes before any k8s declaration runs, so
+# _k8s's "don't overwrite a role's attribute" guard means it registers
+# metadata but never creates it, and a coercer installed here would never
+# reach it (k115). The role therefore declares metadata with this coercion
+# from the start.
+#
+# $class_name is captured; IO::K8s::Role::Resource::_default_k8s() is
+# touched at COERCION time only, never while the attribute is installed --
+# _k8s runs at compile time of every one of the ~850 classes, and
+# _default_k8s requires IO::K8s, which loads this file.
+sub _object_coercer {
+    my ($class_name) = @_;
+    return sub {
+        return $_[0] unless ref $_[0] eq 'HASH';
+        return IO::K8s::Role::Resource::_default_k8s()
+            ->_struct_to_object_expanded($class_name, $_[0]);
+    };
+}
+
 sub _generate_inline_struct {
     my ($class_name, $fields) = @_;
     __PACKAGE__->_setup_class($class_name);
@@ -587,6 +616,90 @@ sub _k8s {
             return $_[0];
         });
     }
+    # Named nested class, single (k100) -- body in _object_coercer above,
+    # because IO::K8s::Role::APIObject's `metadata` needs the same one.
+    #
+    # Two things the three object branches here share:
+    #   * `ref $_[0] eq 'HASH'` is false for a blessed hashref, so one test
+    #     covers both "already an object, pass it through" and "not a hash,
+    #     pass it through". That short-circuit is also what keeps
+    #     IO::K8s::_inflate_struct from doing the work twice: it hands
+    #     $class->new fully built objects and every one of them lands here.
+    #   * anything that is neither goes on unchanged and lets `isa` write
+    #     the message -- a coercer never invents a type error of its own.
+    elsif ($info{is_object}) {
+        @coerce = (coerce => _object_coercer($info{class}));
+    }
+    # Array of named nested classes: element-wise, and a failing element
+    # gets its index appended the same way the [Bool] coercer above does,
+    # so the culprit can be found. Scanned first and returned untouched
+    # when no element needs building -- the inflate path arrives here with
+    # an array of ready objects and should pay one `ref` per element, not
+    # a fresh arrayref.
+    elsif ($info{is_array_of_objects}) {
+        my $oc = $info{class};
+        @coerce = (coerce => sub {
+            return $_[0] unless ref $_[0] eq 'ARRAY';
+            my $in = $_[0];
+            my $needed = 0;
+            for my $elem (@$in) {
+                next unless ref $elem eq 'HASH';
+                $needed = 1;
+                last;
+            }
+            return $in unless $needed;
+            my @out;
+            for my $i (0 .. $#$in) {
+                if (ref $in->[$i] eq 'HASH') {
+                    push @out, eval {
+                        IO::K8s::Role::Resource::_default_k8s()
+                            ->_struct_to_object_expanded($oc, $in->[$i])
+                    };
+                    if (my $err = $@) {
+                        $err =~ s/\n\z//;
+                        die "$err at element $i\n";
+                    }
+                } else {
+                    push @out, $in->[$i];
+                }
+            }
+            return \@out;
+        });
+    }
+    # Hash of named nested classes: value-wise, with the key named on a
+    # failure. Same scan-first shortcut as the array form; `sort keys` in
+    # the building pass so several bad values still name a deterministic
+    # one, matching the unknown-field walk in IO::K8s::Role::Resource.
+    elsif ($info{is_hash_of_objects}) {
+        my $oc = $info{class};
+        @coerce = (coerce => sub {
+            return $_[0] unless ref $_[0] eq 'HASH';
+            my $in = $_[0];
+            my $needed = 0;
+            for my $key (keys %$in) {
+                next unless ref $in->{$key} eq 'HASH';
+                $needed = 1;
+                last;
+            }
+            return $in unless $needed;
+            my %out;
+            for my $key (sort keys %$in) {
+                if (ref $in->{$key} eq 'HASH') {
+                    $out{$key} = eval {
+                        IO::K8s::Role::Resource::_default_k8s()
+                            ->_struct_to_object_expanded($oc, $in->{$key})
+                    };
+                    if (my $err = $@) {
+                        $err =~ s/\n\z//;
+                        die "$err at key '$key'\n";
+                    }
+                } else {
+                    $out{$key} = $in->{$key};
+                }
+            }
+            return \%out;
+        });
+    }
     $has->($attr_name, is => 'rw', isa => $isa, @coerce,
         ($required ? (required => 1) : ()),
         ($attr_name ne $json_key ? (init_arg => $json_key) : ()),
@@ -650,6 +763,21 @@ construction rather than at the API server.
 Inline structs auto-generate an inner class (e.g. C<MyClass::_Spec>) with
 the declared fields. Hashrefs are auto-coerced to the inner class on
 construction.
+
+A named nested class coerces the same way (since 1.108): a plain hashref
+passed to C<< ->new >> or to the setter of an C<is_object>,
+C<is_array_of_objects> or C<is_hash_of_objects> field is built into that
+class -- element-wise for an array, value-wise for a map -- so
+
+    IO::K8s::Traefik::V1alpha1::Middleware->new(
+        spec => { rateLimit => { average => 100 } });
+
+no longer has to pre-build C<MiddlewareSpec> and C<RateLimit> by hand. It
+goes through the same inflation L<IO::K8s::Role::Resource/FROM_HASH> uses,
+so boolean spellings and the unknown-field policy behave identically on both
+routes. A value that is already an object is passed through untouched, and
+anything that is neither a hashref nor an object is left to the type
+constraint to reject.
 
 Short class names are auto-expanded:
 
