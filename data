@@ -1,0 +1,25 @@
+---
+claimed_at: 2026-09-04T22:54:57Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-04T22:54:57Z
+created: 2026-09-03T04:47:41Z
+id: 103
+priority: low
+started: 2026-09-04T19:56:13Z
+status: done
+tags:
+- roles
+- specbuilder
+title: Builder roles depend on SpecBuilder without declaring it (no requires); NetworkPolicy
+  blocks a plain requires
+updated: 2026-09-04T22:54:57Z
+---
+
+Since step 1 (D2) CertManaged, HelmManaged, MiddlewareBuilder, Loadbalanced, Routable (gateway/traefik branches) and NetworkPolicy (cilium branch) call spec_set/spec_push/spec_hash/spec_array/spec_get, which IO::K8s::APIObject composes only on CRD classes. Composing one of these roles on a class without SpecBuilder fails at runtime with 'Can't locate object method spec_push'. A  in each role would document the coupling, but NetworkPolicy and Routable are also composed on core classes (networking/v1 NetworkPolicy, Ingress) that never get SpecBuilder and never reach the spec_* branches -- so a plain requires would break them. Decide: split the cilium/gateway/traefik branches into CRD-only roles that can , or compose SpecBuilder on every APIObject (it is harmless on typed core specs since D2), or document the coupling only.
+
+Note: two phrases in the body above were eaten by shell quoting. Read "A  in each role" as "A `requires 'spec_set'` (etc.) in each role", and "CRD-only roles that can " as "CRD-only roles that can carry such a requires".
+
+Umgesetzt nach der Option 'SpecBuilder auf jedem APIObject komponieren': Role::APIObject komponiert SpecBuilder direkt, der CRD-only-Zweig in APIObject.pm entfaellt, alle sieben Builder-Rollen haben jetzt ein requires mit ihrem exakten spec_*-Set. Systematisch geprueft statt stichprobenartig: 1832 Module geladen, fuer alle 213 APIObject-Klassen 7 public + 13 private SpecBuilder-Namen gegen can() - 0 verdeckt; fuer alle Registry-Attribute der 213 APIObject- und 1588 eingebetteten Klassen 0 Attribute ohne Accessor und 0 die auf eine SpecBuilder-Sub aufloesen (der Fall der wirklich zaehlt, weil _k8s bei can() die Accessor-Erzeugung ueberspringt). 32 Klassen ohne spec-Feld croaken jetzt an der Aufruferzeile mit Klassennamen statt mit 'Can't locate object method spec'; Guard in _sb_root, bewusst kein requires 'spec' (die Rolle wird oberhalb der k8s spec-Zeile komponiert). Kosten: +308kB RSS fuer 12 Kinds, +0.2% fuer alle 1832 Module, keine messbare Zeit. Neuer Test t/88, volle Suite 91 Dateien / 8284 Tests gruen. Folgefunde: k117 (high, Bug in ausgeliefertem Code - wird direkt mitgemacht) und k118 (low, Rollen-Import-Leak).
+
+Nachtrag: allow_egress_to_dns core-Zweig an sein POD angeglichen. Der Zweig emittierte eine ports-only-Regel ohne to, also DNS nach ueberall - schwaecher als dokumentiert und schwaecher als der cilium-Zweig. Fakten stehen jetzt einmal (%DNS_TARGET + zwei Namespace-Label-Konstanten), jeder Zweig rendert sie in seinem eigenen Vokabular; die vier duplizierten String-Literale sind weg. Kritisches Detail: EIN to-Element mit beiden Selektoren, nicht zwei - Kubernetes schneidet namespaceSelector und podSelector innerhalb eines to-Elements und vereinigt ueber Elemente, zwei Elemente haetten also jeden Pod in kube-system PLUS jeden k8s-app=kube-dns-Pod in jedem Namespace erreicht. Per Assertion festgenagelt. Kein Design-Konflikt: der cilium-Zweig entspricht seinem POD exakt und ist byte-identisch vor/nach dem Refactor; networking.k8s.io/v1 kann in einer NetworkPolicy ohnehin keinen Service adressieren, nur Pods. Isolationsbeweis: mit k117-Ladefix aber zurueckgedrehtem DNS-Zweig faellt t/16 genau an Subtest 14. Verhaltensaenderung fuer Changes: regenerierte core-Manifeste sind enger, Port 53 nur noch zu den CoreDNS-Pods.
