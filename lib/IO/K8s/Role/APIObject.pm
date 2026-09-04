@@ -2,6 +2,23 @@ package IO::K8s::Role::APIObject;
 # ABSTRACT: Role for top-level Kubernetes API objects
 our $VERSION = '1.108';
 use Moo::Role;
+# Composed here rather than only onto CRD classes in IO::K8s::APIObject's
+# import (k103). The builder roles -- CertManaged, HelmManaged,
+# MiddlewareBuilder, MiddlewareTCPBuilder, Loadbalanced, Routable,
+# NetworkPolicy -- build their specs through spec_set/spec_push/..., and
+# two of them (Routable, NetworkPolicy) are composed onto core Kinds that
+# are not CRDs. With SpecBuilder only on CRD classes that coupling could
+# not be declared: a `requires 'spec_set'` in those roles would have
+# rejected networking/v1 Ingress and networking/v1 NetworkPolicy. Composing
+# it for every top-level Kind is what makes the requires correct, and it is
+# harmless on a typed core spec since D2 taught the walk to go through the
+# attribute registry.
+#
+# It widens the public surface deliberately: spec_get/spec_set/spec_array/
+# spec_hash/spec_push/spec_merge/spec_delete are now on all ~213 shipped
+# APIObject classes. The 32 Kinds with no `spec` field at all carry them
+# too and croak naming the class -- see IO::K8s::Role::SpecBuilder.
+with 'IO::K8s::Role::SpecBuilder';
 use Types::Standard qw( InstanceOf Maybe );
 use IO::K8s::Resource ();
 use Scalar::Util qw(blessed);

@@ -4,11 +4,14 @@ use strict;
 use warnings;
 use Test::More;
 use Test::Exception;
+use File::Temp;
+use JSON::MaybeXS;
 
 use IO::K8s::Traefik::V1alpha1::IngressRoute;
 use IO::K8s::GatewayAPI::V1::HTTPRoute;
 use IO::K8s::GatewayAPI::V1::GRPCRoute;
 use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
+use IO::K8s::Api::Networking::V1::Ingress;
 
 # --- Traefik IngressRoute ---
 
@@ -171,6 +174,95 @@ subtest 'grpcroute: add_hostname and backend' => sub {
 
     is_deeply($gr->spec->hostnames, ['grpc.example.com'], 'grpc hostname');
     is($gr->spec->rules->[0]->backendRefs->[0]->name, 'grpc-service', 'grpc backend');
+};
+
+# --- core Ingress (_route_format 'ingress') ---------------------------------
+#
+# The third branch, and the one nothing exercised until k117. Two bugs lived
+# in it undisturbed because of that: it named IngressRule / IngressBackend /
+# ... without loading them (so it only ever worked in a process that had
+# loaded them for another reason -- the standalone probe below is what pins
+# that), and add_path_match built an HTTPIngressPath without the backend
+# upstream requires, croaking only after it had already vivified spec and
+# appended a rule.
+
+subtest 'ingress: add_hostname and add_backend' => sub {
+    my $ing = IO::K8s::Api::Networking::V1::Ingress->new(
+        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
+            name => 'web', namespace => 'prod',
+        ),
+    );
+    is($ing->_route_format, 'ingress', 'the ingress branch is under test');
+
+    $ing->add_hostname('example.com', 'api.example.com')
+        ->add_backend('api', port => 8080)
+        ->add_header_match('X-Env', 'production');    # documented no-op here
+
+    isa_ok($ing->spec, 'IO::K8s::Api::Networking::V1::IngressSpec');
+    isa_ok($ing->spec->rules->[0], 'IO::K8s::Api::Networking::V1::IngressRule');
+    isa_ok($ing->spec->defaultBackend, 'IO::K8s::Api::Networking::V1::IngressBackend');
+
+    is_deeply($ing->TO_JSON->{spec}, {
+        defaultBackend => { service => { name => 'api', port => { number => 8080 } } },
+        rules          => [ { host => 'example.com' }, { host => 'api.example.com' } ],
+    }, 'the ingress branch emits the typed Ingress shape');
+};
+
+subtest 'ingress: add_path_match refuses before it mutates' => sub {
+    my $ing = IO::K8s::Api::Networking::V1::Ingress->new(
+        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
+            name => 'web', namespace => 'prod',
+        ),
+    );
+    $ing->add_hostname('example.com')->add_backend('api', port => 8080);
+    my $before = $ing->TO_JSON;
+
+    throws_ok { $ing->add_path_match('/api', type => 'Prefix') }
+        qr/add_path_match cannot build an ingress path/,
+        'croaks, naming the method and the reason';
+    like($@, qr/requires a backend/, 'and says what upstream demands');
+
+    # The point of the fix: validate, then write. Before k117 this call
+    # left spec vivified with an IngressRule carrying an empty http.paths.
+    is_deeply($ing->TO_JSON, $before, 'the object is byte-for-byte unchanged');
+
+    # ... including on an object that had nothing to lose yet.
+    my $fresh = IO::K8s::Api::Networking::V1::Ingress->new;
+    throws_ok { $fresh->add_path_match('/api') }
+        qr/add_path_match cannot build an ingress path/, 'same on a fresh object';
+    is($fresh->spec, undef, 'and spec was never vivified');
+};
+
+subtest 'ingress: the branch works in a process that loads only the Kind' => sub {
+    # The regression that matters. Every other test in this file has already
+    # pulled half of IO/K8s/Api/Networking into %INC, which is exactly why
+    # this bug survived: the branch names its classes without loading them,
+    # so it fails only in a bare process. That is what this runs.
+    my $probe = <<'PROBE';
+use strict;
+use warnings;
+use IO::K8s::Api::Networking::V1::Ingress;   # and deliberately nothing else
+my $ing = IO::K8s::Api::Networking::V1::Ingress->new;
+$ing->add_hostname('example.com')->add_backend('api', port => 8080);
+my $before = $ing->to_json;
+eval { $ing->add_path_match('/api') };
+print $@ ? 'CROAK' : 'NO-CROAK';
+print '|', ($ing->to_json eq $before ? 'UNCHANGED' : 'MUTATED');
+print '|', $before;
+PROBE
+    my $fh = File::Temp->new(SUFFIX => '.pl');
+    print $fh $probe;
+    close $fh;
+    my $out = qx{"$^X" -Ilib "$fh" 2>&1};
+    is($?, 0, 'the probe exits clean') or diag($out);
+
+    my ($croaked, $mutated, $json) = split /\|/, $out, 3;
+    is($croaked, 'CROAK', 'add_path_match still refuses in a bare process');
+    is($mutated, 'UNCHANGED', 'and still leaves the object alone');
+    is_deeply(JSON::MaybeXS->new->decode($json // '{}')->{spec}, {
+        defaultBackend => { service => { name => 'api', port => { number => 8080 } } },
+        rules          => [ { host => 'example.com' } ],
+    }, 'add_hostname/add_backend built the full typed shape with nothing preloaded');
 };
 
 done_testing;

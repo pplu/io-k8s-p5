@@ -61,11 +61,15 @@ messages.
 For Custom Resource Definitions (CRDs), pass C<api_version> and
 optionally C<resource_plural> as import parameters. These are installed
 as class methods before the role is composed, avoiding redefinition warnings.
-CRD classes also get L<IO::K8s::Role::SpecBuilder> applied automatically
-for deep-path spec manipulation (C<spec_get>, C<spec_set>, C<spec_array>,
+
+Every class built this way gets L<IO::K8s::Role::SpecBuilder> for
+deep-path spec manipulation (C<spec_get>, C<spec_set>, C<spec_array>,
 C<spec_hash>, C<spec_push>, C<spec_merge>, C<spec_delete>), walking a
 typed C<spec> through its own declared fields as readily as a plain hash
-one.
+one -- built-in Kinds as well as CRDs, since 1.108 (k103). A Kind that
+carries no C<spec> field at all (C<ConfigMap>, C<Secret>, the RBAC kinds,
+...) has the methods too, and every one of them croaks naming the class
+rather than failing on a missing accessor.
 
 Use C<IO::K8s::Resource> for embedded objects (PodSpec, Container, etc.)
 and C<IO::K8s::APIObject> for top-level resources (Pod, Deployment, Service, etc.)
@@ -82,7 +86,6 @@ sub import {
 
     # Install CRD overrides *before* applying the role
     # This way the role sees these methods and doesn't install its defaults
-    my $is_crd = 0;
     if (my $api_ver = $params{api_version}) {
         my $stash = Package::Stash->new($caller);
         # A fixed identity method, not a writable field: reject an argument
@@ -91,7 +94,6 @@ sub import {
             croak 'api_version is fixed for this class and cannot be set' if @_ > 1;
             $api_ver;
         });
-        $is_crd = 1;
     }
     if (my $plural = $params{resource_plural}) {
         my $stash = Package::Stash->new($caller);
@@ -103,13 +105,10 @@ sub import {
         });
     }
 
-    # Apply the APIObject role (provides metadata, labels, conditions, owners)
+    # Apply the APIObject role (provides metadata, labels, conditions,
+    # owners -- and, since k103, IO::K8s::Role::SpecBuilder, which that role
+    # composes for every top-level Kind rather than only for CRDs)
     Moo::Role->apply_roles_to_package($caller, 'IO::K8s::Role::APIObject');
-
-    # CRDs get SpecBuilder automatically (deep-path spec manipulation)
-    if ($is_crd) {
-        Moo::Role->apply_roles_to_package($caller, 'IO::K8s::Role::SpecBuilder');
-    }
 
     # Register metadata attribute using the k8s DSL
     # This allows _inflate_struct to properly inflate metadata as ObjectMeta

@@ -198,8 +198,25 @@ sub _sb_fresh {
 
 # The spec node. With $vivify, create it when missing: the declared class
 # when spec is a typed field of this object, a plain hash otherwise.
+#
+# Every spec_* entry point comes through here, so this is also the one
+# place that has to answer for a consumer with no `spec` field at all --
+# 32 of the shipped Kinds carry none (ConfigMap, Secret, Endpoints, the
+# four RBAC kinds, ...). Since the role is composed onto every APIObject
+# rather than only onto CRD classes (k103) they all have the spec_*
+# methods, and without this guard the first thing such a call hits is
+# Moo's "Can't locate object method spec", reported against this file's
+# line number instead of naming the class that has no spec.
+#
+# Checked per call rather than declared as `requires 'spec'`: the role is
+# composed at `use IO::K8s::APIObject` time, before the class's own
+# `k8s spec => ...` line has run, so a requires would reject every
+# consumer including the ones that do declare a spec.
 sub _sb_root {
     my ($self, $vivify, $path) = @_;
+    croak((ref($self) || $self)
+        . ' has no spec field: the spec_* methods need one to read or build')
+        unless $self->can('spec');
     my $spec = $self->spec;
     return $spec if ref $spec;
     return undef unless $vivify;
@@ -471,7 +488,8 @@ __END__
 This role provides dotted-path get/set/push/merge/delete operations against
 a consumer class's C<spec> attribute. It exists so callers building
 arbitrary CRDs (IngressRoute, HTTPRoute, Gateway listeners, ...) can reach
-deeply-nested fields without writing the indexing by hand each time.
+deeply-nested fields without writing the indexing by hand each time; since
+1.108 the built-in Kinds reach theirs the same way.
 
 Path syntax: dot-separated segments. On a plain hashref/arrayref node each
 segment is a hash key or an array index; on an object node -- a typed
@@ -509,14 +527,28 @@ while storing into it), and C<spec_array>/C<spec_hash> finding a
 non-array or scalar value already at the path. C<spec_merge> bypasses
 the path machinery entirely and shallow-merges into the top level only.
 
-The role is composed automatically by L<IO::K8s::APIObject> only on CRD
-classes -- ones declared via
-C<use IO::K8s::APIObject api_version =E<gt> ..., ...>. The built-in
-Kubernetes kinds, whose C<use IO::K8s::APIObject> carries no C<api_version>
-parameter, do not get it. Classes built by L<IO::K8s::AutoGen> at runtime
-do not receive it either -- AutoGen composes L<IO::K8s::Role::APIObject>
-directly rather than going through this import, so the CRD branch that
-adds SpecBuilder never runs for them.
+L<IO::K8s::Role::APIObject> composes this role, so every top-level Kind
+has it: the built-in Kubernetes kinds, CRD classes declared via
+C<use IO::K8s::APIObject api_version =E<gt> ..., ...>, and the classes
+L<IO::K8s::AutoGen> builds at runtime, which compose
+L<IO::K8s::Role::APIObject> directly. Before 1.108 only CRD classes got
+it, and composing one of the builder roles
+(L<IO::K8s::Role::CertManaged>, L<IO::K8s::Role::Routable>, ...) onto a
+class without it failed at the first C<spec_*> call rather than at
+composition time; those roles now C<require> the C<spec_*> methods they
+use, which is only correct because every APIObject has them (k103).
+
+A Kind that declares no C<spec> field at all -- 32 of the shipped ones,
+carrying C<data>/C<rules>/C<subjects> instead: C<ConfigMap>, C<Secret>,
+C<Endpoints>, the four RBAC kinds, ... -- still has the methods, and
+every one of them croaks
+
+    IO::K8s::Api::Core::V1::ConfigMap has no spec field: the spec_* methods need one to read or build
+
+naming the class, at the caller's line. Composition does not fail for
+those Kinds: this role is composed before the class's own
+C<k8s spec =E<gt> ...> line runs, so a C<requires 'spec'> would reject
+every consumer, including the ones that do declare one.
 
 =head1 SEE ALSO
 

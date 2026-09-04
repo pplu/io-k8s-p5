@@ -4,6 +4,14 @@ our $VERSION = '1.108';
 use Moo::Role;
 use Carp qw(croak);
 
+# The fluent setters below build the spec through IO::K8s::Role::SpecBuilder
+# rather than by hand, so that role is a hard dependency of this one (k103).
+# IO::K8s::Role::APIObject composes SpecBuilder for every top-level Kind, so
+# these are satisfied for anything built with IO::K8s::APIObject; a class
+# that composes this role without them now fails at composition time,
+# naming the missing method, instead of at the first setter call.
+requires qw( spec_push spec_set );
+
 # --- Certificate methods ---
 
 =method for_domains

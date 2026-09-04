@@ -2,6 +2,36 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - IO::K8s::Role::NetworkPolicy's allow_egress_to_dns now emits, on core
+    NetworkPolicy objects, the rule its own documentation describes: port 53
+    to the CoreDNS pods (kube-system, k8s-app: kube-dns). It previously
+    emitted the ports with no "to" peer at all, which permits DNS to every
+    destination -- weaker than documented and weaker than the cilium branch,
+    which had the selector right. Behaviour change: a regenerated manifest is
+    narrower than the one it replaces, and anything that was reaching port 53
+    on a non-CoreDNS destination through this rule now needs an explicit
+    allow. Cilium output is unchanged.
+
+  - Every IO::K8s::APIObject class composes IO::K8s::Role::SpecBuilder, not
+    just CRD classes, so the seven builder roles can finally declare what they
+    depend on (k103). CertManaged, HelmManaged, MiddlewareBuilder,
+    MiddlewareTCPBuilder, Loadbalanced, Routable and NetworkPolicy each carry
+    a requires for the exact spec_* methods they call, so composing one on a
+    class that cannot support it fails when the role is applied instead of
+    with "Can't locate object method spec_push" at call time. The spec_*
+    surface is therefore public on all ~213 APIObject classes; on the 32 that
+    have no spec field, a spec_* call croaks naming the class. Measured cost
+    of the extra composition: under a megabyte, no measurable load time.
+
+  - IO::K8s::Role::Routable and IO::K8s::Role::NetworkPolicy load the classes
+    they build (k117). Both core branches died in any process that had not
+    already pulled those classes in some other way -- NetworkPolicy->select_pods
+    on LabelSelector, Ingress->add_hostname on IngressRule. Also,
+    Routable::add_path_match's ingress branch cannot succeed at all, because
+    networking.k8s.io/v1 HTTPIngressPath requires a backend and the method has
+    no parameter carrying one; it now croaks before mutating anything instead
+    of dying partway through and leaving the object half-built.
+
   - A CRD pattern emitted by to_crd now carries upstream's own bytes rather
     than the escaping a qr// literal introduces (k114). IO::K8s::CRD::Emitter
     kept the qr// form for patterns it could not represent byte-exactly: @

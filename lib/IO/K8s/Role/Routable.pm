@@ -2,8 +2,48 @@ package IO::K8s::Role::Routable;
 # ABSTRACT: Role for building HTTP/gRPC routing rules
 our $VERSION = '1.108';
 use Moo::Role;
+use Carp qw( croak );
 
 requires '_route_format';
+
+# The fluent setters below build the spec through IO::K8s::Role::SpecBuilder
+# rather than by hand, so that role is a hard dependency of this one (k103).
+# IO::K8s::Role::APIObject composes SpecBuilder for every top-level Kind, so
+# these are satisfied for anything built with IO::K8s::APIObject; a class
+# that composes this role without them now fails at composition time,
+# naming the missing method, instead of at the first setter call.
+requires qw( spec_get spec_push spec_set );
+
+# The 'ingress' branch builds core networking.k8s.io/v1 objects by name, and
+# a role cannot `use` them at the top: composing this role would then drag
+# the whole Ingress class family into every Gateway API and Traefik consumer
+# that never touches that branch. Loaded on the branch that needs them
+# instead, the way IO::K8s::Role::APIObject loads ObjectMeta/OwnerReference
+# and IO::K8s::Role::NetworkPolicy loads its own spec class. Until k117 they
+# were simply not loaded at all, and every one of these methods died with
+# 'Can't locate object method "new" via package ...IngressRule' in a process
+# that had not happened to load the class for another reason.
+#
+# Also the single place the ingress spec is vivified; before k117 the same
+# five lines sat inlined in three method bodies.
+sub _ensure_ingress_spec {
+    my ($self) = @_;
+    require IO::K8s::Api::Networking::V1::IngressSpec;
+    require IO::K8s::Api::Networking::V1::IngressRule;
+    require IO::K8s::Api::Networking::V1::IngressBackend;
+    require IO::K8s::Api::Networking::V1::IngressServiceBackend;
+    require IO::K8s::Api::Networking::V1::ServiceBackendPort;
+    # HTTPIngressRuleValue and HTTPIngressPath are deliberately absent: the
+    # only branch that constructed them was add_path_match's, which cannot
+    # build a path at all (see there). Add them back with the code that
+    # needs them, not before.
+
+    my $spec = $self->spec;
+    return $spec if $spec;
+    $spec = IO::K8s::Api::Networking::V1::IngressSpec->new;
+    $self->spec($spec);
+    return $spec;
+}
 
 =method add_hostname
 
@@ -45,12 +85,7 @@ sub add_hostname {
         my $hosts = join ', ', map { "Host(`$_`)" } @hostnames;
         $self->spec_push('routes', { match => $hosts, kind => 'Rule', services => [] });
     } elsif ($format eq 'ingress') {
-        my $spec = $self->spec;
-        unless ($spec) {
-            require IO::K8s::Api::Networking::V1::IngressSpec;
-            $spec = IO::K8s::Api::Networking::V1::IngressSpec->new;
-            $self->spec($spec);
-        }
+        my $spec = $self->_ensure_ingress_spec;
         my $rules = $spec->rules // [];
         for my $hostname (@hostnames) {
             push @$rules, IO::K8s::Api::Networking::V1::IngressRule->new(
@@ -102,13 +137,7 @@ sub add_backend {
     } elsif ($format eq 'traefik') {
         $self->spec_push('routes.-1.services', \%backend);
     } elsif ($format eq 'ingress') {
-        # For Ingress, add to the last rule's paths
-        my $spec = $self->spec;
-        unless ($spec) {
-            require IO::K8s::Api::Networking::V1::IngressSpec;
-            $spec = IO::K8s::Api::Networking::V1::IngressSpec->new;
-            $self->spec($spec);
-        }
+        my $spec = $self->_ensure_ingress_spec;
         $spec->defaultBackend(IO::K8s::Api::Networking::V1::IngressBackend->new(
             service => IO::K8s::Api::Networking::V1::IngressServiceBackend->new(
                 name => $name,
@@ -131,7 +160,7 @@ required; C<type> defaults to C<'Prefix'> and selects one of:
 =over
 
 =item * C<'Prefix'> -- Gateway API C<< { path: { type: 'PathPrefix', value } } >>,
-Traefik C<PathPrefix(`...`)>, Ingress C<pathType =E<gt> 'Prefix'>.
+Traefik C<PathPrefix(`...`)>.
 
 =item * C<'Exact'> -- Traefik C<Path(`...`)>.
 
@@ -139,9 +168,16 @@ Traefik C<PathPrefix(`...`)>, Ingress C<pathType =E<gt> 'Prefix'>.
 
 =back
 
-The Ingress path is the only mode that creates a typed
-L<IO::K8s::Api::Networking::V1::HTTPIngressPath> on the way through.
 Returns C<$self> for chaining.
+
+Not available in C<'ingress'> mode: a
+L<IO::K8s::Api::Networking::V1::HTTPIngressPath> requires a C<backend> as
+well as a C<pathType>, and this method has no parameter that could carry
+one -- C<add_backend> writes C<spec.defaultBackend>, which is the
+fallback for unmatched requests rather than a path's own backend. The
+call croaks, leaving the object untouched (k117; before that it croaked
+too, but only after vivifying C<spec> and appending a rule). Build
+C<spec.rules> yourself for a path-routed Ingress.
 
 =cut
 
@@ -165,28 +201,23 @@ sub add_path_match {
                   : undef;
         $self->spec_set('routes.-1.match', $match) if defined $match;
     } elsif ($format eq 'ingress') {
-        my $spec = $self->spec;
-        unless ($spec) {
-            require IO::K8s::Api::Networking::V1::IngressSpec;
-            $spec = IO::K8s::Api::Networking::V1::IngressSpec->new;
-            $self->spec($spec);
-        }
-        my $rules = $spec->rules // [];
-        # Add path to the last rule, or create new one
-        my $rule = @$rules ? $rules->[-1] : IO::K8s::Api::Networking::V1::IngressRule->new;
-        push @$rules, $rule unless @$rules;
-        my $http = $rule->http;
-        unless ($http) {
-            $http = IO::K8s::Api::Networking::V1::HTTPIngressRuleValue->new(paths => []);
-            $rule->http($http);
-        }
-        my $paths = $http->paths // [];
-        push @$paths, IO::K8s::Api::Networking::V1::HTTPIngressPath->new(
-            path     => $path,
-            pathType => $type,
-        );
-        $http->paths($paths);
-        $spec->rules($rules);
+        # networking.k8s.io/v1 HTTPIngressPath requires `backend` as well as
+        # `pathType`, and this method carries no parameter that could supply
+        # one -- add_backend writes spec.defaultBackend, which is the
+        # fallback for unmatched requests, not a path's backend. So an
+        # ingress path is not expressible here and the call cannot succeed.
+        #
+        # It never could: before k117 the branch vivified spec, appended an
+        # IngressRule and hung an empty http.paths off it, and only then
+        # died inside HTTPIngressPath->new for the missing backend -- a
+        # croak the caller could not act on, over an object left half
+        # written. Refusing up front is the same outcome minus the damage
+        # (validate, then write). Whether the method should instead take a
+        # backend is an API decision, not this fix's to make.
+        croak __PACKAGE__.'->add_path_match cannot build an ingress path:'
+            . ' networking.k8s.io/v1 HTTPIngressPath requires a backend and'
+            . ' this method has no parameter for one; build spec.rules'
+            . ' yourself, or use add_backend for spec.defaultBackend';
     }
     return $self;
 }
@@ -259,9 +290,12 @@ IngressRoute wire schema (C<routes[].match> as a Traefik expression,
 C<routes[].services[]>).
 
 =item * C<'ingress'> builds typed L<IO::K8s::Api::Networking::V1::IngressSpec>
-/ C<IngressRule> / C<HTTPIngressRuleValue> / C<HTTPIngressPath> /
-C<IngressBackend> / C<IngressServiceBackend> / C<ServiceBackendPort>
-objects and assembles them into the typed Ingress shape.
+/ C<IngressRule> / C<IngressBackend> / C<IngressServiceBackend> /
+C<ServiceBackendPort> objects and assembles them into the typed Ingress
+shape. C<add_path_match> is the exception and croaks in this mode; see
+there. The classes are loaded when the branch first runs, not at
+composition time, so composing this role onto a Gateway API or Traefik
+Kind pulls none of them in.
 
 =back
 

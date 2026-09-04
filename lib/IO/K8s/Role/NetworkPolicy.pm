@@ -7,6 +7,38 @@ use Carp qw(croak);
 
 requires '_netpol_format';
 
+# The fluent setters below build the spec through IO::K8s::Role::SpecBuilder
+# rather than by hand, so that role is a hard dependency of this one (k103).
+# IO::K8s::Role::APIObject composes SpecBuilder for every top-level Kind, so
+# these are satisfied for anything built with IO::K8s::APIObject; a class
+# that composes this role without them now fails at composition time,
+# naming the missing method, instead of at the first setter call.
+requires qw( spec_push spec_set );
+
+# ---------------------------------------------------------------------------
+# Facts both formats need, written once.
+#
+# The two branches spell a selector in different vocabularies -- core
+# Kubernetes selects a namespace by the kubernetes.io/metadata.name label the
+# API server sets on every namespace, Cilium by its own k8s: label prefixes --
+# but they address the same namespaces and the same pods. Keeping the facts
+# here and the spelling in the branches is what stops the two from drifting:
+# before k117 the CoreDNS target below existed only in the cilium branch, and
+# the core branch quietly emitted a ports-only rule that allowed DNS to any
+# destination, which is looser than what its own documentation promised.
+# ---------------------------------------------------------------------------
+
+my $CORE_NAMESPACE_LABEL   = 'kubernetes.io/metadata.name';
+my $CILIUM_NAMESPACE_LABEL = 'k8s:io.kubernetes.pod.namespace';
+
+# The cluster's DNS: the CoreDNS pods in kube-system, which carry
+# k8s-app=kube-dns (the label CoreDNS inherited from kube-dns and every
+# distribution still sets).
+my %DNS_TARGET = (
+    namespace  => 'kube-system',
+    pod_labels => { 'k8s-app' => 'kube-dns' },
+);
+
 =method select_pods
 
     $netpol->select_pods(app => 'web', tier => 'frontend');
@@ -116,12 +148,12 @@ sub allow_ingress_from_namespace {
 
     if ($format eq 'core') {
         $self->_add_core_ingress_rule(
-            { namespaceSelector => { matchLabels => { 'kubernetes.io/metadata.name' => $namespace } } },
+            { namespaceSelector => { matchLabels => { $CORE_NAMESPACE_LABEL => $namespace } } },
             $opts{ports},
         );
     } elsif ($format eq 'cilium') {
         $self->spec_push('ingress', {
-            fromEndpoints => [ { matchLabels => { 'k8s:io.kubernetes.pod.namespace' => $namespace } } ],
+            fromEndpoints => [ { matchLabels => { $CILIUM_NAMESPACE_LABEL => $namespace } } ],
             $opts{ports} ? (toPorts => [ { ports => $opts{ports} } ]) : (),
         });
     }
@@ -189,10 +221,36 @@ sub allow_egress_to_cidrs {
     $netpol->allow_egress_to_dns;
 
 Adds an egress rule that allows DNS lookups: TCP and UDP port 53 to the
-cluster's CoreDNS pods (C<kube-system/kube-dns>) for core K8s, or the
-equivalent Cilium match for Cilium. This is the common "let pods resolve
-names" companion to a restrictive egress policy. Returns C<$self> for
-chaining.
+cluster's CoreDNS pods -- the ones in C<kube-system> carrying
+C<k8s-app: kube-dns>. This is the common "let pods resolve names"
+companion to a restrictive egress policy. Returns C<$self> for chaining.
+
+Core Kubernetes writes both selectors into a single C<to> peer, so they
+intersect rather than union -- the rule reaches pods that are in
+C<kube-system> B<and> carry the label, not either:
+
+    egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+      ports:
+      - { port: 53, protocol: UDP }
+      - { port: 53, protocol: TCP }
+
+Cilium writes the same two facts as one C<toEndpoints> match in its own
+label vocabulary (C<k8s:io.kubernetes.pod.namespace>, C<k8s:k8s-app>).
+
+B<Changed in 1.108> (k117): the core branch used to emit the ports without
+any C<to> peer, which allows port 53 to B<every> destination -- a policy
+looser than this documentation described, and one that silently opened
+egress on port 53 to anything a pod could reach. Manifests regenerated
+with this version carry the narrower rule. A cluster that relied on the
+old, wider rule for something other than DNS needs that traffic allowed
+explicitly.
 
 =cut
 
@@ -205,10 +263,23 @@ sub allow_egress_to_dns {
     my $format = $self->_netpol_format;
 
     if ($format eq 'core') {
-        $self->_add_core_egress_rule(undef, $dns_ports);
+        # Both selectors in ONE peer: within a single `to` element
+        # namespaceSelector and podSelector intersect, while two elements
+        # would union and reach every pod in kube-system plus every
+        # k8s-app=kube-dns pod anywhere.
+        $self->_add_core_egress_rule({
+            namespaceSelector => { matchLabels => { $CORE_NAMESPACE_LABEL => $DNS_TARGET{namespace} } },
+            podSelector       => { matchLabels => { %{ $DNS_TARGET{pod_labels} } } },
+        }, $dns_ports);
     } elsif ($format eq 'cilium') {
+        # Cilium matches a single endpoint set, so the same two facts are
+        # one matchLabels hash in its k8s: vocabulary.
         $self->spec_push('egress', {
-            toEndpoints => [ { matchLabels => { 'k8s:io.kubernetes.pod.namespace' => 'kube-system', 'k8s:k8s-app' => 'kube-dns' } } ],
+            toEndpoints => [ { matchLabels => {
+                $CILIUM_NAMESPACE_LABEL => $DNS_TARGET{namespace},
+                map { ('k8s:'.$_ => $DNS_TARGET{pod_labels}{$_}) }
+                    keys %{ $DNS_TARGET{pod_labels} },
+            } } ],
             toPorts     => [ { ports => $dns_ports } ],
         });
     }
@@ -281,16 +352,38 @@ sub _validate_cidrs {
 }
 
 # Core K8s helpers (work on typed spec objects)
+#
+# Every core-format path reaches this first -- select_pods, deny_all_ingress,
+# deny_all_egress call it directly, and so does each of the four
+# _add_core_*_rule helpers -- which makes it the one place to load the core
+# networking.k8s.io/v1 classes the branch names below. A role cannot `use`
+# them at the top: composing this role would then drag the whole core
+# NetworkPolicy family into IO::K8s::Cilium::V2::CiliumNetworkPolicy, which
+# never runs this branch. Loaded when the branch first runs instead, the way
+# IO::K8s::Role::APIObject loads ObjectMeta and OwnerReference.
+#
+# Until k117 only NetworkPolicySpec was required, and only inside the
+# vivify block -- so select_pods on a freshly loaded
+# IO::K8s::Api::Networking::V1::NetworkPolicy died with 'Can't locate object
+# method "new" via package ...Meta::V1::LabelSelector', and every rule
+# builder died the same way on NetworkPolicyPeer. It only ever worked in a
+# process that had loaded those classes for some other reason.
 sub _ensure_spec {
     my ($self) = @_;
-    unless ($self->spec) {
-        if ($self->_netpol_format eq 'core') {
-            require IO::K8s::Api::Networking::V1::NetworkPolicySpec;
-            $self->spec(IO::K8s::Api::Networking::V1::NetworkPolicySpec->new(
-                podSelector => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector->new,
-            ));
-        }
-    }
+    return unless $self->_netpol_format eq 'core';
+
+    require IO::K8s::Api::Networking::V1::NetworkPolicySpec;
+    require IO::K8s::Api::Networking::V1::NetworkPolicyEgressRule;
+    require IO::K8s::Api::Networking::V1::NetworkPolicyIngressRule;
+    require IO::K8s::Api::Networking::V1::NetworkPolicyPeer;
+    require IO::K8s::Api::Networking::V1::NetworkPolicyPort;
+    require IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector;
+
+    return if $self->spec;
+    $self->spec(IO::K8s::Api::Networking::V1::NetworkPolicySpec->new(
+        podSelector => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector->new,
+    ));
+    return;
 }
 
 sub _ensure_policy_types {
