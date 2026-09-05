@@ -2,6 +2,14 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Path::Tiny is declared as a test prerequisite, not only a develop one.
+    t/50_shadowed_kind_names.t and t/52_expand_class_shadow_window.t use it
+    unguarded to build the shadowing stub modules they need, and both ship in
+    the tarball, so on a smoker or installer that did not already have
+    Path::Tiny the suite died with "Can't locate Path/Tiny.pm" and took the
+    install down with it. No runtime dependency is added -- lib/ does not use
+    Path::Tiny.
+
   - Five ExternalSecrets generator classes are corrected against their CRD
     (k120 audit). IO::K8s::ExternalSecrets::V1alpha1::SecretRef was missing the
     key and name patterns upstream declares, which matters at runtime: pattern
@@ -68,7 +76,7 @@ Revision history for IO-K8s
     a requires for the exact spec_* methods they call, so composing one on a
     class that cannot support it fails when the role is applied instead of
     with "Can't locate object method spec_push" at call time. The spec_*
-    surface is therefore public on all ~213 APIObject classes; on the 32 that
+    surface is therefore public on all 232 APIObject classes; on the 32 that
     have no spec field, a spec_* call croaks naming the class. Measured cost
     of the extra composition: under a megabyte, no measurable load time.
 
@@ -599,9 +607,11 @@ Revision history for IO-K8s
     apiVersion contracts are now stated in POD (k79); and the builder
     roles and IO::K8s::Types::Net ship with full =method/=func POD (k80).
 
-  - Track upstream Kubernetes v1.37: 22 new Kinds (among them a new
-    IO::K8s::Api::Lifecycle namespace), their supporting types and new
-    fields, all registered for GVK dispatch (k72).
+  - Track upstream Kubernetes v1.37: 11 new Kinds (among them a new
+    IO::K8s::Api::Lifecycle namespace) and 103 new supporting types -- 114
+    new classes in all -- plus 48 new optional fields on 43 existing
+    classes. The new Kinds are registered for GVK dispatch and carry an
+    upstream resource_plural (k72).
 
   - Ten fields upstream made required in v1.37 are now required at
     construction (k72): the apps/v1 workload specs, ControllerRevision
@@ -1105,10 +1115,13 @@ Revision history for IO-K8s
     the first shipped fields of that exact shape; benefits every future
     D3-using provider, not only this one.
 
-  - Cilium cilium.io/v2 modeled to full depth (D5, k95): all 17 Kinds'
-    spec/status fields are now typed object graphs -- 138 classes total
-    (17 Kinds + 121 nested), named after the upstream cilium/cilium
-    v1.20.1 Go types, checked in under IO::K8s::Cilium::V2::*.
+  - Cilium cilium.io/v2 modeled to full depth (D5, k95): 17 Kinds'
+    spec/status fields are now typed object graphs -- 138 rendered
+    classes (17 Kinds + 121 nested), named after the upstream cilium/
+    cilium v1.20.1 Go types, checked in under IO::K8s::Cilium::V2::*.
+    An 18th v2 Kind, CiliumExternalWorkload, has no upstream manifest
+    left to render and stays hand-maintained as-is (back-compat, k78),
+    so the namespace ships 139 classes in total.
     policy/api.Rule -- the shared policy engine struct upstream embeds the
     literal same in both CiliumNetworkPolicy and
     CiliumClusterwideNetworkPolicy, at both spec (one Rule) and specs
