@@ -2,12 +2,15 @@ package IO::K8s::Role::Resource;
 # ABSTRACT: Role providing Kubernetes resource instance behavior
 our $VERSION = '1.108';
 use v5.10;
-use Moo::Role;
 use Moo ();
 use mro ();
 use Types::Standard qw(HashRef);
 use JSON::MaybeXS ();
 use Scalar::Util qw(blessed);
+# Imports above `use Moo::Role` on purpose: Role::Tiny treats subs already in
+# the package as not-methods, so their names stay off every consumer. A `use`
+# below that line composes its exports onto all shipped classes (k118).
+use Moo::Role;
 
 has _json_encoder => (
     is      => 'ro',

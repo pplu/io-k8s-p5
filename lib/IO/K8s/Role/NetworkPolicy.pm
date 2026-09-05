@@ -1,9 +1,12 @@
 package IO::K8s::Role::NetworkPolicy;
 # ABSTRACT: Role for building network policies (core K8s and Cilium)
 our $VERSION = '1.108';
-use Moo::Role;
 use IO::K8s::Types::Net qw( cidr_contains );
 use Carp qw(croak);
+# Imports above `use Moo::Role` on purpose: Role::Tiny treats subs already in
+# the package as not-methods, so their names stay off every consumer. A `use`
+# below that line composes its exports onto all shipped classes (k118).
+use Moo::Role;
 
 requires '_netpol_format';
 

@@ -2,6 +2,18 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - The roles no longer leak their imports as methods onto every class that
+    composes them (k118). Because their use lines sat below use Moo::Role, Moo
+    counted the imported subs as methods of the role: $pod->croak(...),
+    $pod->use_module(...), $container->blessed(...) and $pod_spec->HashRef
+    were all callable. Nothing used them and nothing should. Hoisting each
+    role's imports above use Moo::Role removes them -- HashRef from 1858
+    classes, blessed from 1856, croak / InstanceOf / Maybe / use_module from
+    the 232 top-level Kinds, and cidr_contains from the three NetworkPolicy
+    Kinds. Failure mode for anyone who did call one: "Can't locate object
+    method". No role loses a method it genuinely defines, and DOES is
+    unchanged for every class.
+
   - IO::K8s::load_class memoises a successful load, which is worth ~14% on
     inflating a realistic document (measured -13% to -17% across paired runs;
     direct attribution puts 14.0% of inflate time inside load_class, so that

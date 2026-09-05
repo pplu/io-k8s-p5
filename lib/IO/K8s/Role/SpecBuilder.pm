@@ -1,10 +1,13 @@
 package IO::K8s::Role::SpecBuilder;
 # ABSTRACT: Role for deep-path spec manipulation on CRD objects
 our $VERSION = '1.108';
-use Moo::Role;
 use Scalar::Util qw(blessed);
 use Carp qw(croak);
 use Module::Runtime qw(use_module);
+# Imports above `use Moo::Role` on purpose: Role::Tiny treats subs already in
+# the package as not-methods, so their names stay off every consumer. A `use`
+# below that line composes its exports onto all shipped classes (k118).
+use Moo::Role;
 
 # ---------------------------------------------------------------------------
 # A node on a spec path is one of: a plain hashref, a plain arrayref, or an

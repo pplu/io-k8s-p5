@@ -1,8 +1,11 @@
 package IO::K8s::Role::CertManaged;
 # ABSTRACT: Role for cert-manager certificate and issuer management
 our $VERSION = '1.108';
-use Moo::Role;
 use Carp qw(croak);
+# Imports above `use Moo::Role` on purpose: Role::Tiny treats subs already in
+# the package as not-methods, so their names stay off every consumer. A `use`
+# below that line composes its exports onto all shipped classes (k118).
+use Moo::Role;
 
 # The fluent setters below build the spec through IO::K8s::Role::SpecBuilder
 # rather than by hand, so that role is a hard dependency of this one (k103).

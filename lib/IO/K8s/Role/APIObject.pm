@@ -1,6 +1,13 @@
 package IO::K8s::Role::APIObject;
 # ABSTRACT: Role for top-level Kubernetes API objects
 our $VERSION = '1.108';
+use Types::Standard qw( InstanceOf Maybe );
+use IO::K8s::Resource ();
+use Scalar::Util qw(blessed);
+use Carp qw( croak );
+# Imports above `use Moo::Role` on purpose: Role::Tiny treats subs already in
+# the package as not-methods, so their names stay off every consumer. A `use`
+# below that line composes its exports onto all shipped classes (k118).
 use Moo::Role;
 # Composed here rather than only onto CRD classes in IO::K8s::APIObject's
 # import (k103). The builder roles -- CertManaged, HelmManaged,
@@ -19,10 +26,6 @@ use Moo::Role;
 # APIObject classes. The 32 Kinds with no `spec` field at all carry them
 # too and croak naming the class -- see IO::K8s::Role::SpecBuilder.
 with 'IO::K8s::Role::SpecBuilder';
-use Types::Standard qw( InstanceOf Maybe );
-use IO::K8s::Resource ();
-use Scalar::Util qw(blessed);
-use Carp qw( croak );
 
 # Written once, used by both the type constraint and the coercion below so
 # they cannot name different classes.
