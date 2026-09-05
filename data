@@ -1,0 +1,29 @@
+---
+class: standard
+created: 2026-09-05T01:45:19Z
+id: 126
+priority: high
+status: backlog
+tags:
+- crd
+- certmanager
+- emitter
+- bug
+title: 'CertManager: LocalObjectReference aliast zwei verschiedene Upstream-Typen
+  auf eine Klasse'
+updated: 2026-09-05T01:45:19Z
+---
+
+Gefunden vom neuen maint/crd-schema-audit.pl. ECHTER DEFEKT IN AUSGELIEFERTEM CODE, und --check meldet trotzdem 0 differ.
+
+In cert-manager v1.21.1 ist LocalObjectReference zwei verschiedene Typen:
+- corev1s, an sechs Positionen ...podTemplate.spec.imagePullSecrets[]: name hat default: "", nichts required
+- cert-managers eigener, an vier Positionen spec.venafi.{tpp,ngts}.credentialsRef: kein default, required: [name]
+
+maint/crd-render/CertManager.yaml benennt beide gleich (Zeilen 186/189, 267/270). Daraus entsteht EINE Perl-Klasse, die die corev1-Form traegt. Die vier credentialsRef-Positionen shippen also einen default => \x27\x27, den upstream nicht deklariert, und verlieren ein required, das upstream deklariert.
+
+WARUM --check DAS NICHT SIEHT: render_for macht $files{$_} = $rendered->{$_} - bei nicht byte-identischen Bodies bleibt still der zuletzt geschriebene stehen, und verglichen wird nur der Ueberlebende. CertManager steht deshalb auf 77 match / 0 differ, waehrend crd-schema-audit.pl 8 Findings meldet.
+
+Das ist zugleich der Beleg, dass die Aliasing-Gefahr keine Prognose fuer k120s naechste Schritte ist, sondern bereits realisiert. Und es widerlegt die Annahme, die fuenf emitter-sauberen Provider koennten diese Fehlerklasse per Konstruktion nicht haben.
+
+Zu entscheiden: das Overlay muss die beiden Typen unterschiedlich benennen (dann entstehen zwei Klassen, eine davon neu), oder der Emitter/render_for muss einen Aliasing-Konflikt melden statt still den letzten Body zu behalten. Zweiteres ist die eigentliche Absicherung - ein stiller Konflikt kann in jedem Overlay wieder entstehen.
