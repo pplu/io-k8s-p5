@@ -3,7 +3,7 @@ package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchem
 our $VERSION = '1.108';
 use v5.10;
 use Moo;
-use Types::Standard qw( ArrayRef InstanceOf Maybe );
+use Types::Standard ();
 use JSON::MaybeXS ();
 
 my $PROPS = 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaProps';
@@ -28,7 +28,7 @@ collapses into a single schema.
 
 has schema => (
     is  => 'rw',
-    isa => Maybe[InstanceOf[$PROPS]],
+    isa => Types::Standard::Maybe[ Types::Standard::InstanceOf[$PROPS] ],
 );
 
 =attr schema
@@ -41,7 +41,9 @@ or C<undef> when the array arm is in use.
 
 has schemas => (
     is  => 'rw',
-    isa => Maybe[ArrayRef[InstanceOf[$PROPS]]],
+    isa => Types::Standard::Maybe[
+        Types::Standard::ArrayRef[ Types::Standard::InstanceOf[$PROPS] ]
+    ],
 );
 
 =attr schemas

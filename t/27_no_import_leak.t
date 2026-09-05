@@ -16,6 +16,9 @@
 #    IO::K8s::Role::Resource, so on every shipped class) on the public
 #    surface. The fix hoists every import above `use Moo::Role`.
 #
+#    k119 closed the same leak where it came from a class's own `use Moo`
+#    file rather than from a role -- see 2b, where both are swept together.
+#
 # Part 1 alone could never catch part 2: it asserts what a *foreign*
 # package does not receive, never what a Kind class itself can do.
 
@@ -159,15 +162,31 @@ is_deeply($requires_seen{'IO::K8s::Role::ResourceMap'},
 # ---------------------------------------------------------------------------
 # 2b. The composition direction, on the shipped classes.
 #
-# The names k118 removed, swept over every class that composes
+# The names k118 and k119 removed, swept over every class that composes
 # IO::K8s::Role::Resource -- so both the ~213 top-level Kinds and the
 # nested resource classes.
 #
-# blessed / InstanceOf / Maybe are checked separately: four shipped classes
-# import them in their own `use Moo` file rather than receiving them from a
-# role. That is a different leak with a different fix (those are classes,
-# not roles, so hoisting does nothing for them) and is out of k118's scope.
+# k118 removed the role-composed ones (croak / use_module / HashRef /
+# cidr_contains) by hoisting each role's imports above `use Moo::Role`.
+# k119 removed the rest: blessed / reftype / InstanceOf / Maybe / ArrayRef /
+# require_module reached four classes -- IO::K8s::List and the three
+# Apiextensions JSONSchemaPropsOr* union types -- from their OWN `use Moo`
+# file, where hoisting cannot help because a Moo class has no `not_methods`.
+# Those four now load Scalar::Util / Types::Standard / Module::Runtime with
+# an empty import list and call through fully-qualified names instead, so
+# there is nothing left to compose and no exception list here.
+#
+# Str / Bool / Int are deliberately absent from this list: IO::K8s::Resource
+# imports them into every class it is used from, so they are on ~1850
+# classes by design and are not a leak.
 # ---------------------------------------------------------------------------
+
+# Imported by no shipped resource class on its own account, so any hit here
+# is a leak -- from a role (k118) or from the class's own file (k119).
+my @LEAKED = qw(
+    croak use_module require_module HashRef cidr_contains
+    blessed reftype InstanceOf Maybe ArrayRef
+);
 
 my @modules;
 find(
@@ -194,28 +213,26 @@ my @resource_classes = grep {
 cmp_ok(scalar @resource_classes, '>=', 800,
     'swept every shipped class composing IO::K8s::Role::Resource');
 
-# Imported by no shipped resource class on its own account, so any hit here
-# is a role leak.
-for my $name (qw( croak use_module HashRef cidr_contains )) {
+for my $name (@LEAKED) {
     my @carriers = grep { $_->can($name) } @resource_classes;
     is_deeply(\@carriers, [],
         "no shipped resource class carries '$name' as a method")
         or diag('carried by: '.join(', ', @carriers));
 }
 
-# Imported by these four in their own file; every other class must be clean.
-my %SELF_IMPORTER = map +($_ => 1), qw(
+# The four k119 classes are in that sweep rather than exempted from it --
+# asserted, not assumed, because they only reach @resource_classes by
+# composing IO::K8s::Role::Resource, which each of them does at the BOTTOM
+# of its file (List.pm being the exception, at the top). A `with` line lost
+# in a refactor would drop them out of the sweep silently.
+my %swept = map +($_ => 1), @resource_classes;
+for my $class (qw(
     IO::K8s::List
     IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaPropsOrArray
     IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaPropsOrBool
     IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaPropsOrStringArray
-);
-
-for my $name (qw( blessed InstanceOf Maybe )) {
-    my @carriers = grep { !$SELF_IMPORTER{$_} && $_->can($name) } @resource_classes;
-    is_deeply(\@carriers, [],
-        "no shipped resource class receives '$name' from a role")
-        or diag('carried by: '.join(', ', @carriers));
+)) {
+    ok($swept{$class}, "$class is covered by the leak sweep");
 }
 
 # ---------------------------------------------------------------------------
@@ -266,7 +283,7 @@ for my $class (sort keys %EXPECTED) {
 # The leaked names, spot-checked as method calls on the same classes.
 for my $class (sort keys %EXPECTED) {
     my @leaked = grep { $class->can($_) }
-        qw( croak use_module HashRef cidr_contains blessed InstanceOf Maybe );
+        @LEAKED;
     is_deeply(\@leaked, [], "$class carries no leaked import")
         or diag('leaked: '.join(', ', @leaked));
 }
@@ -300,7 +317,7 @@ for my $class (sort keys %EXPECTED) {
     if ($widget) {
         my $class = ref $widget;
         my @leaked = grep { $class->can($_) }
-            qw( croak use_module HashRef cidr_contains blessed InstanceOf Maybe );
+            @LEAKED;
         is_deeply(\@leaked, [], 'AutoGen-built class carries no leaked import')
             or diag('leaked: '.join(', ', @leaked));
         ok($class->can('TO_JSON'), 'AutoGen-built class kept TO_JSON');

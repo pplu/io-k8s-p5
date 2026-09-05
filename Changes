@@ -14,6 +14,12 @@ Revision history for IO-K8s
     method". No role loses a method it genuinely defines, and DOES is
     unchanged for every class.
 
+    Four classes exposed the same names from their own use Moo rather than
+    from a role, where hoisting does not help; they now load those modules
+    without importing and qualify each call, so blessed, reftype, InstanceOf,
+    Maybe, ArrayRef and require_module stop being methods on IO::K8s::List and
+    the three JSONSchemaPropsOr* classes as well.
+
   - IO::K8s::load_class memoises a successful load, which is worth ~14% on
     inflating a realistic document (measured -13% to -17% across paired runs;
     direct attribution puts 14.0% of inflate time inside load_class, so that

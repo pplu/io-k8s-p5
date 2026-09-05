@@ -4,10 +4,10 @@ our $VERSION = '1.108';
 use v5.10;
 use Moo;
 with 'IO::K8s::Role::Resource';
-use Module::Runtime qw(require_module);
-use Types::Standard qw( ArrayRef InstanceOf Maybe Str );
+use Module::Runtime ();
+use Types::Standard qw( Str );
 use JSON::MaybeXS ();
-use Scalar::Util qw(blessed);
+use Scalar::Util ();
 
 =head1 SYNOPSIS
 
@@ -34,7 +34,7 @@ The C<apiVersion> and C<kind> are automatically derived from the items.
 
 has items => (
     is => 'ro',
-    isa => ArrayRef,
+    isa => Types::Standard::ArrayRef,
     required => 1,
 );
 
@@ -46,7 +46,9 @@ Array of Kubernetes API objects. Required.
 
 has metadata => (
     is => 'ro',
-    isa => Maybe[InstanceOf['IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ListMeta']],
+    isa => Types::Standard::Maybe[
+        Types::Standard::InstanceOf['IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ListMeta']
+    ],
 );
 
 =attr metadata
@@ -58,7 +60,7 @@ Contains pagination info like C<continue> and C<resourceVersion>.
 
 has _item_class => (
     is => 'ro',
-    isa => Maybe[Str],
+    isa => Types::Standard::Maybe[Str],
     init_arg => 'item_class',
 );
 
@@ -91,7 +93,7 @@ sub api_version {
     my ($self) = @_;
 
     # Try to get from first item
-    if (@{$self->items} && blessed($self->items->[0]) && $self->items->[0]->can('api_version')) {
+    if (@{$self->items} && Scalar::Util::blessed($self->items->[0]) && $self->items->[0]->can('api_version')) {
         return $self->items->[0]->api_version;
     }
 
@@ -100,7 +102,7 @@ sub api_version {
     # apiextensions.k8s.io, ...). undef unless the class loads, has an
     # api_version method and answers without error.
     if (my $class = $self->_resolved_item_class) {
-        eval { require_module($class) };
+        eval { Module::Runtime::require_module($class) };
         return undef if $@;
         return undef unless $class->can('api_version');
         my $api_version = eval { $class->api_version };
@@ -121,7 +123,7 @@ sub kind {
     my $self = shift;
 
     # Try to get from first item
-    if (@{$self->items} && blessed($self->items->[0]) && $self->items->[0]->can('kind')) {
+    if (@{$self->items} && Scalar::Util::blessed($self->items->[0]) && $self->items->[0]->can('kind')) {
         return $self->items->[0]->kind . 'List';
     }
 
@@ -286,10 +288,10 @@ sub TO_JSON {
     $data{kind} = $self->kind if $self->kind;
 
     $data{items} = [
-        map { blessed($_) && $_->can('TO_JSON') ? $_->TO_JSON : $_ } @{$self->items}
+        map { Scalar::Util::blessed($_) && $_->can('TO_JSON') ? $_->TO_JSON : $_ } @{$self->items}
     ];
 
-    if ($self->metadata && blessed($self->metadata) && $self->metadata->can('TO_JSON')) {
+    if ($self->metadata && Scalar::Util::blessed($self->metadata) && $self->metadata->can('TO_JSON')) {
         $data{metadata} = $self->metadata->TO_JSON;
     }
 

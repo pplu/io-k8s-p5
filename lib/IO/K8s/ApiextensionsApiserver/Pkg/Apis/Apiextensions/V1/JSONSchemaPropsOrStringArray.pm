@@ -3,7 +3,7 @@ package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchem
 our $VERSION = '1.108';
 use v5.10;
 use Moo;
-use Types::Standard qw( ArrayRef InstanceOf Maybe Str );
+use Types::Standard qw( Str );
 use JSON::MaybeXS ();
 
 my $PROPS = 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaProps';
@@ -27,7 +27,7 @@ Exactly one arm is populated, and which one it was survives a round trip.
 
 has schema => (
     is  => 'rw',
-    isa => Maybe[InstanceOf[$PROPS]],
+    isa => Types::Standard::Maybe[ Types::Standard::InstanceOf[$PROPS] ],
 );
 
 =attr schema
@@ -40,7 +40,7 @@ or C<undef> when the string array arm is in use.
 
 has property => (
     is  => 'rw',
-    isa => Maybe[ArrayRef[Str]],
+    isa => Types::Standard::Maybe[ Types::Standard::ArrayRef[Str] ],
 );
 
 =attr property
