@@ -2,6 +2,26 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Five ExternalSecrets generator classes are corrected against their CRD
+    (k120 audit). IO::K8s::ExternalSecrets::V1alpha1::SecretRef was missing the
+    key and name patterns upstream declares, which matters at runtime: pattern
+    is enforced as a constraint at construction, so an invalid value was
+    accepted client-side and left for the API server to reject. The other four
+    affect to_crd fidelity only -- GrafanaSpec.auth is required, and a
+    "Defaults to ..." sentence in a field description had been read as a real
+    default on GithubAccessTokenSpec.url and GitlabDeployTokenSpec.url, while
+    ACRWorkloadIdentity.serviceAccountRef was marked required where the CRD
+    has no required list at all.
+
+  - New maint/crd-schema-audit.pl compares each provider class's field options
+    against the CRD the provider is modelled from, which is what found the
+    five above. It answers a question --check cannot: --check compares lib to
+    the emitter's render, so where an overlay aliases two upstream types onto
+    one class, only the surviving render is ever compared and the difference
+    is invisible. Constraints the k8s DSL cannot express (minLength, maxLength,
+    minItems and friends) are counted and named separately rather than
+    reported as findings.
+
   - The roles no longer leak their imports as methods onto every class that
     composes them (k118). Because their use lines sat below use Moo::Role, Moo
     counted the imported subs as methods of the role: $pod->croak(...),

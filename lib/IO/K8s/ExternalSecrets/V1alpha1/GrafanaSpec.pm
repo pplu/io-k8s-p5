@@ -3,7 +3,7 @@ package IO::K8s::ExternalSecrets::V1alpha1::GrafanaSpec;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s auth           => '+IO::K8s::ExternalSecrets::V1alpha1::GrafanaAuth';
+k8s auth           => '+IO::K8s::ExternalSecrets::V1alpha1::GrafanaAuth', { required => 'schema' };
 k8s serviceAccount => '+IO::K8s::ExternalSecrets::V1alpha1::GrafanaServiceAccount', { required => 'schema' };
 k8s url            => Str, { required => 'schema' };
 

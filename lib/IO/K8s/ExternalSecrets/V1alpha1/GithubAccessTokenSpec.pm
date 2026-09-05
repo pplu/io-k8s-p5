@@ -8,7 +8,7 @@ k8s auth         => '+IO::K8s::ExternalSecrets::V1alpha1::GithubAuth', { require
 k8s installID    => Str, { required => 'schema' };
 k8s permissions  => { Str => 1 };
 k8s repositories => [Str];
-k8s url          => Str, { default => 'https://github.com/' };
+k8s url          => Str;
 
 =attr appID
 

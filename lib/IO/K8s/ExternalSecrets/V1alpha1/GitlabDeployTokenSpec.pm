@@ -9,7 +9,7 @@ k8s groupID   => Str;
 k8s name      => Str, { required => 'schema' };
 k8s projectID => Str;
 k8s scopes    => [Str], { required => 'schema', enum => [qw(read_repository read_registry write_registry read_package_registry write_package_registry read_virtual_registry write_virtual_registry)] };
-k8s url       => Str, { default => 'https://gitlab.com' };
+k8s url       => Str;
 k8s username  => Str;
 
 =attr auth
