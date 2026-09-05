@@ -1,0 +1,49 @@
+---
+claimed_at: 2026-09-05T01:11:13Z
+claimed_by: opus-orchestrator
+class: standard
+completed: 2026-09-05T01:11:13Z
+created: 2026-09-04T20:20:58Z
+id: 118
+priority: low
+started: 2026-09-05T00:06:48Z
+status: done
+tags:
+- roles
+- cleanup
+title: Roles leak their imports as methods onto every consumer
+updated: 2026-09-05T01:11:13Z
+---
+
+IO::K8s::Role::APIObject and IO::K8s::Role::SpecBuilder both put their
+`use` lines *after* `use Moo::Role;`. Role::Tiny snapshots the package
+stash at `use Moo::Role` time into not_methods, so anything imported after
+that line is a concrete method of the role and gets composed into every
+consumer.
+
+Measured on IO::K8s::Api::Core::V1::Pod:
+
+  before k103   blessed, croak (Scalar::Util/Carp, from Role::APIObject)
+                InstanceOf, Maybe (Types::Standard, same role)
+  after  k103   the four above, plus use_module (Module::Runtime, from
+                SpecBuilder, which now composes onto every APIObject
+                rather than only onto CRD classes)
+
+So $pod->croak(...) and $pod->use_module(...) are callable methods on all
+213 shipped top-level Kinds. Nothing uses them; nothing should.
+
+k103 deliberately did NOT fix this, because either direction is a change
+of public surface and the two halves pull opposite ways:
+
+  - moving SpecBuilders three `use` lines above `use Moo::Role` removes
+    use_module from the 89 CRD classes that already had it (a removal, and
+    this repo has a protocol for those)
+  - leaving it adds use_module to the other 125
+
+The clean fix is one pass over the role mesh -- hoist every import above
+`use Moo::Role`, or add namespace::clean -- decided as one change rather
+than per-role, with a Changes note stating that these names stop being
+callable as methods. Check IO::K8s::Role::Resource and the behaviour
+mixins in the same pass.
+
+Erledigt in zwei Commits (df5c6c6b, plus der Rest). Umfang war groesser als das Ticket: Role::Resource leakte HashRef und blessed auf ALLE 1858 Klassen, nicht nur auf die Top-Level-Kinds - $container->blessed(...) war aufrufbar. Es sind 232 Kinds, nicht 213 (die Ticketzahl ist aelter als die D8-Provider). cidr_contains aus Role::NetworkPolicy stand gar nicht im Ticket und kam nur heraus, weil alle zwoelf Rollen geprueft wurden statt der zwei genannten. Loesung per Hochziehen ueber use Moo::Role, kein namespace::clean, keine neue Abhaengigkeit; Mechanismus vorab am Minimalfall verifiziert. Nachweis: Surface-Diff ueber alle 1889 Pakete meldet nichts hinzugekommen, DOES und @ISA byte-identisch, Methodenzahl je Rolle unveraendert (Herkunft ueber das definierende Paket des Coderefs, nicht per Namensheuristik). Die vier Klassen, die aus dem eigenen use Moo leakten (List, JSONSchemaPropsOr*), sind ebenfalls geschlossen - Module ohne Import laden und voll qualifiziert aufrufen; Str/Bool bleiben bewusst importiert, weil Resource::import sie auf 1855 Klassen installiert und sie damit nicht anomal sind. t/27 deckte bisher nur die Gegenrichtung ab (was ein fremdes Package NICHT bekommt) und konnte diesen Fall strukturell nicht sehen; jetzt Sweep ueber alle 1858 Klassen, Ausnahmeliste komplett leer, gegen die Vorher-Fassung als scharf verifiziert.
