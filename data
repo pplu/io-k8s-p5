@@ -1,0 +1,30 @@
+---
+claimed_at: 2026-09-05T00:06:54Z
+claimed_by: opus-orchestrator
+class: standard
+created: 2026-09-04T20:43:57Z
+id: 120
+priority: medium
+started: 2026-09-05T00:06:54Z
+status: in-progress
+tags:
+- crd
+- emitter
+- maint
+- d8
+title: 'Drei D8-Provider haben kein maint/crd-render Overlay: 29 strukturelle Differs
+  in --check'
+updated: 2026-09-05T00:06:54Z
+---
+
+Gefunden in der k114-Nachrunde. maint/crd-drift-check.pl --check meldet ueber alle Provider 543 match / 30 differ. 29 davon sind vorbestehende strukturelle Drift der drei bei k97/D8 gebundelten Provider:
+
+  PrometheusOperator  3 match / 13 differ
+  VolumeSnapshot      0 match /  7 differ
+  ExternalSecrets     7 match /  9 differ
+
+Ursache: fuer keinen der drei existiert ein maint/crd-render/<Provider>.yaml. Overlays gibt es nur fuer AgentSandbox, CertManager, Cilium, GatewayAPI und Traefik. Ohne Overlay teilt und benennt der Render verschachtelte Klassen anders als die eingecheckten (z.B. PodMonitor.pm: lib \x27+...::ConfigResourceStatus\x27 vs render \x27+...::PodMonitorStatus\x27), teils weichen ganze Klassenkoerper ab (VolumeSnapshot.pm ab Zeile 2).
+
+Nichts davon ist kaputt - die eingecheckten Klassen sind korrekt und getestet. Aber solange die drei Provider kein Overlay haben, ist --check fuer sie ohne Aussagekraft, und der Emitter kann sie nicht als Quelle fuer Erweiterungen benutzen (relevant fuer k113, das genau diese Provider erweitert).
+
+Die restliche 1 von 30 ist Cilium/V2alpha1/IPPoolSpec.pm und eine andere Sache (kaputter lokaler Cache, Mojibake-Signatur in _slurp).
