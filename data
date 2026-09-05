@@ -1,0 +1,29 @@
+---
+class: standard
+created: 2026-09-05T01:16:41Z
+id: 125
+priority: medium
+status: backlog
+tags:
+- crd
+- emitter
+- types
+title: 'Emitter erkennt die Quantity-Form nicht: IntOrStr+pattern statt Quantity'
+updated: 2026-09-05T01:16:41Z
+---
+
+Gefunden bei k120 (VolumeSnapshot-Overlay).
+
+Ein CRD-Feld mit type: string + x-kubernetes-int-or-string: true + der apimachinery-Quantity-Pattern ist eine Quantity. Der Emitter erkennt die Form nicht und rendert sie als:
+
+  k8s restoreSize => IntOrStr, { pattern => qr/^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$/ };
+
+waehrend die handgeschriebene Klasse sagt:
+
+  k8s restoreSize => Quantity;
+
+Beide Schreibweisen koexistieren heute im ausgelieferten Baum: VolumeSnapshotStatus.restoreSize benutzt Quantity, PrometheusOperator hat an sieben Feldern die Emitter-Schreibweise (z.B. V1/EmptyDirVolumeSource.pm, sizeLimit).
+
+WICHTIG - die Richtung: IO::K8s::Types Quantity ist ein Str, der auf die apimachinery-Quantity-Grammatik eingeschraenkt ist, also strikt ENGER als IntOrStr (ein blankes Str) bei identischer Wire-Form. lib auf die Emitter-Schreibweise umzustellen wuerde Validierung loeschen. Der Fix gehoert in den Emitter: Quantity-Form erkennen und Quantity emittieren, dann verschwindet die Divergenz von der richtigen Seite.
+
+Beruehrt danach die sieben PrometheusOperator-Felder, die heute die schwaechere Form tragen.
