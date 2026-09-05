@@ -1,0 +1,21 @@
+---
+class: standard
+created: 2026-09-05T01:45:24Z
+id: 127
+priority: medium
+status: backlog
+tags:
+- crd
+- to_crd
+- bug
+title: to_crd emittiert einen Bool-Default als 0 statt false
+updated: 2026-09-05T01:45:24Z
+---
+
+Gefunden beim Schreiben von t/91 (k120-Runde), nicht gesucht.
+
+Ein Bool-Feld mit default erreicht to_crd als blanke 0 bzw. 1, sodass z.B. PasswordSpec ein default: 0 unter type: boolean emittiert. Ein strukturell validierender apiserver prueft Defaults gegen den Typ des Feldes und wuerde so ein CRD ablehnen.
+
+Sitzt in to_crd / Role::Resource, nicht in einer Provider-Klasse - also ein Fehler an der Stelle, die aus dem Registry-Wert das Schema baut, und betrifft potenziell jedes Bool-Feld mit Default in jedem Provider.
+
+t/91 liest den Wert deshalb typabhaengig und sagt das im Kommentar; der Test umgeht das Problem also, statt es zu verdecken. Fix gehoert an die Emissionsstelle: einen Bool-Default als JSON-Boolean emittieren, so wie es TO_JSON fuer Bool-Felder ohnehin tut.
