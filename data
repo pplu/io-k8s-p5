@@ -1,0 +1,29 @@
+---
+claimed_at: 2026-09-08T05:13:30Z
+claimed_by: io-k8s-p5
+class: standard
+created: 2026-09-03T01:26:19Z
+id: 98
+priority: medium
+status: backlog
+tags:
+- crd
+- testing
+- live
+title: 'CRD step 8: joint live test of IO::K8s + Kubernetes::REST CRD support (minikube,
+  then the OCP cluster) (D18)'
+updated: 2026-09-08T05:13:30Z
+---
+
+Design: docs/superpowers/specs/2026-09-03-crd-design.md (D18).
+
+- Run the cross-dist suite against the minikube runner from kubernetes-rest ticket 22 with CRD fixtures applied: add_crd from the live cluster, ensure_crd + Established wait, Unstructured for an unknown Kind, preferred-version resolution, provider classes round-tripping real objects.
+- Then the same against the new cluster provisioned via kubernetes-ocp once its control-plane node is up. Read-only against any cluster we did not provision.
+Depends on: kubernetes-rest step-6 ticket, k98.
+
+Correction of the dependency line: depends on kubernetes-rest 24 and k97 (new providers).
+
+OCP-Seite jetzt als kubernetes-ocp k132 getrackt (CRD-Umstellung D1-D18 gegen OCPs echte CRD-Nutzung absichern).
+
+READ-ONLY-VORPRÜFUNG 2026-09-08: Der sibling bin/kube_test_minikube existiert, isoliert kubeconfig/profil, kann fehlendes minikube SHA256-geprüft laden und unterstützt rootless Podman. Auf PATH fehlen minikube/kubectl; Docker-API meldet 5.8.4 (Podman), beide Live-Test-Gates sind unset. Direkte lokale Rootless-Preflight-Probe /usr/bin/podman info --format ... lieferte nach 120 Sekunden keinen Output und wurde gezielt gestoppt. Deshalb keinen unbeaufsichtigten Clusterstart, keinen Binary-/Image-Download, keine vorhandenen Cluster/Kubeconfigs angefasst.
+Vorhandene echte CRD-Livetests in kubernetes-rest t/08_crd.t und t/09_crd_autogen.t decken CRUD nach vorheriger StaticWebSite-Provisionierung ab, NICHT add_crd/ensure_crd/Established/Unstructured/preferredVersion. Diese vier Claims sind bisher nur lokal/mock-getestet; eine eigenständige Crossdist-Live-Suite samt Fixture-Provisionierung fehlt weiterhin. OCP-Stufe unberührt. Nächste Voraussetzung: funktionierenden isolierten rootless Runtime-Pfad klären, dann bewusst eigene Live-Suite/Throwaway-Profil aufsetzen. Kein falscher Abschluss von k98 aus Mock-PASS abgeleitet.
