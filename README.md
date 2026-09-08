@@ -306,7 +306,15 @@ $mw->rate_limit(average => 100, burst => 200)
    ->redirect_https;
 ```
 
-Core `Ingress` supports `add_hostname` and `add_backend` for `spec.defaultBackend`, but `add_path_match` croaks because an Ingress path needs its own backend. Build `spec.rules` directly for a path-routed Ingress.
+Core `Ingress` uses `add_backend` for `spec.defaultBackend`; each `add_path_match` instead requires its own `service` and `port` (number or name). Supported Ingress path types are `Prefix` (default), `Exact` and `ImplementationSpecific`:
+
+```perl
+my $ingress = $k8s->new_object('Ingress',
+    metadata => { name => 'my-ingress', namespace => 'default' },
+);
+$ingress->add_hostname('example.com')
+        ->add_path_match('/api', service => 'api-v1', port => 8080);
+```
 
 ### IP Type Validation
 

@@ -11,6 +11,7 @@ use IO::K8s::Traefik::V1alpha1::IngressRoute;
 use IO::K8s::GatewayAPI::V1::HTTPRoute;
 use IO::K8s::GatewayAPI::V1::GRPCRoute;
 use IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
+use IO::K8s;
 use IO::K8s::Api::Networking::V1::Ingress;
 
 # --- Traefik IngressRoute ---
@@ -178,13 +179,9 @@ subtest 'grpcroute: add_hostname and backend' => sub {
 
 # --- core Ingress (_route_format 'ingress') ---------------------------------
 #
-# The third branch, and the one nothing exercised until k117. Two bugs lived
-# in it undisturbed because of that: it named IngressRule / IngressBackend /
-# ... without loading them (so it only ever worked in a process that had
-# loaded them for another reason -- the standalone probe below is what pins
-# that), and add_path_match built an HTTPIngressPath without the backend
-# upstream requires, croaking only after it had already vivified spec and
-# appended a rule.
+# Ingress has two distinct backend slots: spec.defaultBackend for unmatched
+# requests and each HTTPIngressPath.backend for matched paths. The tests below
+# pin both shapes and their all-or-nothing validation separately.
 
 subtest 'ingress: add_hostname and add_backend' => sub {
     my $ing = IO::K8s::Api::Networking::V1::Ingress->new(
@@ -208,7 +205,80 @@ subtest 'ingress: add_hostname and add_backend' => sub {
     }, 'the ingress branch emits the typed Ingress shape');
 };
 
-subtest 'ingress: add_path_match refuses before it mutates' => sub {
+subtest 'ingress: add_path_match builds typed path backends' => sub {
+    my $ing = IO::K8s::Api::Networking::V1::Ingress->new(
+        metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
+            name => 'web', namespace => 'prod',
+        ),
+    );
+
+    $ing->add_backend('fallback', port => 8080)
+        ->add_hostname('api.example.com')
+        ->add_path_match('/api', service => 'api', port => 8080)
+        ->add_path_match('/healthz', type => 'Exact', service => 'health', port => 'http')
+        ->add_hostname('admin.example.com')
+        ->add_path_match('/console', type => 'ImplementationSpecific', service => 'admin', port => 8443);
+
+    isa_ok($ing->spec->rules->[0]->http,
+        'IO::K8s::Api::Networking::V1::HTTPIngressRuleValue');
+    isa_ok($ing->spec->rules->[0]->http->paths->[0],
+        'IO::K8s::Api::Networking::V1::HTTPIngressPath');
+    isa_ok($ing->spec->rules->[0]->http->paths->[0]->backend,
+        'IO::K8s::Api::Networking::V1::IngressBackend');
+    isa_ok($ing->spec->rules->[0]->http->paths->[0]->backend->service,
+        'IO::K8s::Api::Networking::V1::IngressServiceBackend');
+    isa_ok($ing->spec->rules->[0]->http->paths->[0]->backend->service->port,
+        'IO::K8s::Api::Networking::V1::ServiceBackendPort');
+
+    my $expected = {
+        apiVersion => 'networking.k8s.io/v1',
+        kind       => 'Ingress',
+        metadata   => { name => 'web', namespace => 'prod' },
+        spec       => {
+            defaultBackend => { service => { name => 'fallback', port => { number => 8080 } } },
+            rules          => [
+                {
+                    host => 'api.example.com',
+                    http => { paths => [
+                        {
+                            backend  => { service => { name => 'api', port => { number => 8080 } } },
+                            path     => '/api',
+                            pathType => 'Prefix',
+                        },
+                        {
+                            backend  => { service => { name => 'health', port => { name => 'http' } } },
+                            path     => '/healthz',
+                            pathType => 'Exact',
+                        },
+                    ] },
+                },
+                {
+                    host => 'admin.example.com',
+                    http => { paths => [
+                        {
+                            backend  => { service => { name => 'admin', port => { number => 8443 } } },
+                            path     => '/console',
+                            pathType => 'ImplementationSpecific',
+                        },
+                    ] },
+                },
+            ],
+        },
+    };
+    is_deeply($ing->TO_JSON, $expected,
+        'each path retains its typed backend, and paths stay with their host rule');
+
+    my $roundtrip = IO::K8s->new->inflate($ing->to_json);
+    isa_ok($roundtrip, 'IO::K8s::Api::Networking::V1::Ingress');
+    isa_ok($roundtrip->spec->rules->[1]->http->paths->[0],
+        'IO::K8s::Api::Networking::V1::HTTPIngressPath');
+    isa_ok($roundtrip->spec->rules->[0]->http->paths->[1]->backend->service->port,
+        'IO::K8s::Api::Networking::V1::ServiceBackendPort');
+    is_deeply($roundtrip->TO_JSON, $expected,
+        'JSON/inflate round-trip preserves the complete Ingress wire shape');
+};
+
+subtest 'ingress: add_path_match rejects incomplete or unsupported paths before mutation' => sub {
     my $ing = IO::K8s::Api::Networking::V1::Ingress->new(
         metadata => IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
             name => 'web', namespace => 'prod',
@@ -218,37 +288,85 @@ subtest 'ingress: add_path_match refuses before it mutates' => sub {
     my $before = $ing->TO_JSON;
 
     throws_ok { $ing->add_path_match('/api', type => 'Prefix') }
-        qr/add_path_match cannot build an ingress path/,
-        'croaks, naming the method and the reason';
-    like($@, qr/requires a backend/, 'and says what upstream demands');
+        qr/add_path_match.*service.*required/i,
+        'a path without its own service croaks clearly';
+    is_deeply($ing->TO_JSON, $before,
+        'a missing service leaves the object byte-for-byte unchanged');
 
-    # The point of the fix: validate, then write. Before k117 this call
-    # left spec vivified with an IngressRule carrying an empty http.paths.
-    is_deeply($ing->TO_JSON, $before, 'the object is byte-for-byte unchanged');
+    throws_ok { $ing->add_path_match('/api', type => 'Prefix', service => 'api') }
+        qr/add_path_match.*port.*required/i,
+        'a path without its own service port croaks clearly';
+    is_deeply($ing->TO_JSON, $before,
+        'a missing service port leaves the object byte-for-byte unchanged');
 
-    # ... including on an object that had nothing to lose yet.
+    for my $type (qw( Prefix Exact )) {
+        throws_ok {
+            $ing->add_path_match(undef, type => $type, service => 'api', port => 8080);
+        } qr/add_path_match.*path.*required/i,
+            "$type rejects a missing path";
+        is_deeply($ing->TO_JSON, $before,
+            "$type missing path leaves the object byte-for-byte unchanged");
+
+        throws_ok {
+            $ing->add_path_match('api', type => $type, service => 'api', port => 8080);
+        } qr/add_path_match.*path.*start.*\//i,
+            "$type rejects a path that does not begin with a slash";
+        is_deeply($ing->TO_JSON, $before,
+            "$type relative path leaves the object byte-for-byte unchanged");
+    }
+
+    throws_ok {
+        $ing->add_path_match('api', type => 'ImplementationSpecific', service => 'api', port => 8080);
+    } qr/add_path_match.*path.*start.*\//i,
+        'ImplementationSpecific also rejects a non-absolute path';
+    is_deeply($ing->TO_JSON, $before,
+        'an ImplementationSpecific relative path leaves the object byte-for-byte unchanged');
+
+    my $implementation_specific = IO::K8s::Api::Networking::V1::Ingress->new;
+    $implementation_specific->add_hostname('example.com');
+    lives_ok {
+        $implementation_specific->add_path_match(
+            undef, type => 'ImplementationSpecific', service => 'api', port => 8080,
+        );
+    } 'ImplementationSpecific permits an omitted path';
+    lives_ok {
+        $implementation_specific->add_path_match(
+            '', type => 'ImplementationSpecific', service => 'health', port => 8080,
+        );
+    } 'ImplementationSpecific permits an empty path';
+    is(scalar @{$implementation_specific->spec->rules->[0]->http->paths}, 2,
+        'both optional ImplementationSpecific paths were added');
+    ok(!defined $implementation_specific->spec->rules->[0]->http->paths->[0]->path,
+        'the first optional path remains absent');
+    is($implementation_specific->spec->rules->[0]->http->paths->[1]->path, '',
+        'the second optional path remains empty');
+
+    throws_ok { $ing->add_path_match('/api', type => 'Regex', service => 'api', port => 8080) }
+        qr/add_path_match.*Regex/i,
+        'Ingress does not reinterpret the unsupported Regex path type';
+    is_deeply($ing->TO_JSON, $before,
+        'an unsupported path type leaves the object byte-for-byte unchanged');
+
+    # The parameter-free call remains invalid, including before spec exists.
     my $fresh = IO::K8s::Api::Networking::V1::Ingress->new;
     throws_ok { $fresh->add_path_match('/api') }
-        qr/add_path_match cannot build an ingress path/, 'same on a fresh object';
+        qr/add_path_match.*service.*required/i,
+        'the old call without a service still croaks';
     is($fresh->spec, undef, 'and spec was never vivified');
 };
 
-subtest 'ingress: the branch works in a process that loads only the Kind' => sub {
-    # The regression that matters. Every other test in this file has already
-    # pulled half of IO/K8s/Api/Networking into %INC, which is exactly why
-    # this bug survived: the branch names its classes without loading them,
-    # so it fails only in a bare process. That is what this runs.
+subtest 'ingress: the path branch works in a process that loads only the Kind' => sub {
+    # Every other test here has loaded the nested Ingress classes. This probe
+    # makes the actual path call in a new process where only Ingress was used.
     my $probe = <<'PROBE';
 use strict;
 use warnings;
 use IO::K8s::Api::Networking::V1::Ingress;   # and deliberately nothing else
 my $ing = IO::K8s::Api::Networking::V1::Ingress->new;
-$ing->add_hostname('example.com')->add_backend('api', port => 8080);
-my $before = $ing->to_json;
-eval { $ing->add_path_match('/api') };
-print $@ ? 'CROAK' : 'NO-CROAK';
-print '|', ($ing->to_json eq $before ? 'UNCHANGED' : 'MUTATED');
-print '|', $before;
+$ing->add_hostname('example.com')
+    ->add_backend('fallback', port => 8080)
+    ->add_path_match('/api', service => 'api', port => 8080);
+print $ing->to_json;
 PROBE
     my $fh = File::Temp->new(SUFFIX => '.pl');
     print $fh $probe;
@@ -256,13 +374,17 @@ PROBE
     my $out = qx{"$^X" -Ilib "$fh" 2>&1};
     is($?, 0, 'the probe exits clean') or diag($out);
 
-    my ($croaked, $mutated, $json) = split /\|/, $out, 3;
-    is($croaked, 'CROAK', 'add_path_match still refuses in a bare process');
-    is($mutated, 'UNCHANGED', 'and still leaves the object alone');
-    is_deeply(JSON::MaybeXS->new->decode($json // '{}')->{spec}, {
-        defaultBackend => { service => { name => 'api', port => { number => 8080 } } },
-        rules          => [ { host => 'example.com' } ],
-    }, 'add_hostname/add_backend built the full typed shape with nothing preloaded');
+    is_deeply(JSON::MaybeXS->new->decode($out)->{spec}, {
+        defaultBackend => { service => { name => 'fallback', port => { number => 8080 } } },
+        rules          => [ {
+            host => 'example.com',
+            http => { paths => [ {
+                backend  => { service => { name => 'api', port => { number => 8080 } } },
+                path     => '/api',
+                pathType => 'Prefix',
+            } ] },
+        } ],
+    }, 'the valid path builds the full typed shape with nothing preloaded');
 };
 
 done_testing;

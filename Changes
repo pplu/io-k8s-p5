@@ -2,6 +2,10 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Support Ingress path backends via add_path_match(service => ..., port =>
+    ...), including named ports; add_backend remains the default backend.
+    Gateway/Traefik routing is unchanged, with Gateway path-type translation.
+
   - Extend VolumeSnapshot with the three VolumeGroupSnapshot Kinds in v1,
     v1beta1 and v1beta2. Bare names select storage v1beta2; explicit GVKs
     select any served track, with fully typed version-specific fields.
