@@ -1198,8 +1198,8 @@ namespace prefix an AutoGen instance generates under adds still more) is
 shortened instead of failing class generation: C<< <root>::_<10 hex chars>
 >>, the root being the top-level generated class (the Kind) the nesting
 started from and the hex digits a C<Digest::SHA::sha1_hex> of the full,
-unshortened logical name. The logical path is not lost -- L</class_path>
-and L</class_root> recover it -- and a name collision between two
+unshortened logical name. The logical path is not lost -- L</"class_path($class)">
+and L</"class_root($class)"> recover it -- and a name collision between two
 different schema keys is still detected against that full logical name,
 never against the (much smaller) space of possibly-shortened names.
 
@@ -1213,13 +1213,13 @@ class rather than a per-provider copy. C<get_or_generate>'s C<< reuse_core
 inline object becomes its own nested class, per D10 above).
 
 A name match alone is not enough to reuse a class -- it only decides which
-classes L</core_class_for_shape> lists as candidates. The reuse decision
+classes L</"core_class_for_shape(\@json_keys)"> lists as candidates. The reuse decision
 applies three further checks: a shape under two keys is never reused (a
 single shared key name -- C<{value}>, C<{name}>, ... -- is common enough by
 accident that this alone rules out most of it); every remaining candidate
 must be type-compatible with the schema, key by key (a schema C<string>
 field can't reuse a class that declares the same-named field as an array,
-for instance -- see L</core_class_for_shape> below for the full
+for instance -- see L</"core_class_for_shape(\@json_keys)"> below for the full
 compatibility table); and where several candidates survive that filter,
 they are reused as the preferred one (apimachinery's C<LabelSelector>
 family first, then the rest of C<Meta::V1>, then C<Core::V1>, then
@@ -1310,8 +1310,8 @@ Returns true if the class was auto-generated.
 Clear the generated class cache. Classes generated before the call keep
 working -- their packages already exist and nothing here touches them --
 but regenerating the same names into the same namespace afterward is
-unsupported: Moo cannot rebuild an existing package, and L</class_path> /
-L</class_root> forget what they knew about the classes this cleared.
+unsupported: Moo cannot rebuild an existing package, and L</"class_path($class)"> /
+L</"class_root($class)"> forget what they knew about the classes this cleared.
 
 =head2 generated_classes()
 
@@ -1331,7 +1331,7 @@ C<$class> is not something AutoGen generated at all. Never C<undef>.
 
 =head2 class_path($class)
 
-The C<::>-joined field path C<$class> sits at below its L</class_root>
+The C<::>-joined field path C<$class> sits at below its L</"class_root($class)">
 (C<Spec::Acme::SolversItem::...>), recorded even when C<$class>'s own Perl
 name had to be shortened past Perl's identifier limit. C<undef> for a root
 class or for a class AutoGen did not generate through nested-object

@@ -17,7 +17,7 @@ use IO::K8s::Resource;
     $obj->apiVersion;      # 'example.com/v1'
     $obj->kind;            # 'Widget'
     $obj->metadata->name;  # 'my-widget'
-    $obj->TO_JSON;         # round-trips 'spec' byte-identically
+    $obj->TO_JSON;         # retains the 'spec' value for re-emission
 
     # Opt-in fallback for a Kind no shipped or AutoGen'd class resolves:
     my $k8s = IO::K8s->new(unknown_kinds => 'unstructured');
@@ -32,9 +32,11 @@ to disagree with the document, because this class has no opinion of its own
 about what Kind it holds. Every other field on the wire -- C<spec>,
 C<status>, or anything else a document happens to carry -- rides in the
 L<IO::K8s::Role::Resource/UNKNOWN FIELDS> bag exactly the way an
-undeclared field does on any typed class: C<FROM_HASH> keeps it,
-C<TO_JSON> re-emits it, so an arbitrary custom resource round-trips
-byte-for-byte with no schema of its own.
+undeclared field does on any typed class: C<FROM_HASH> keeps it and
+C<TO_JSON> re-emits the same Perl value, so an arbitrary custom resource
+round-trips semantically with no schema of its own. It does not preserve the
+original JSON or YAML bytes, whitespace or key order; C<to_json> emits the
+normal canonical JSON encoding.
 
 This is the class L<IO::K8s/inflate> and L<IO::K8s/new_object> build when
 the instance was constructed with C<< unknown_kinds => 'unstructured' >>

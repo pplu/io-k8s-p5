@@ -39,8 +39,12 @@ my $pod = $k8s->new_object('Pod',
     spec => { containers => [{ name => 'app', image => 'nginx' }] }
 );
 
-# Load and validate YAML manifests
+# Load YAML manifests and validate declared field types
 my $resources = $k8s->load_yaml('deployment.yaml');
+
+# Also reject fields the current model does not declare
+my $strict_k8s = IO::K8s->new(strict => 1);
+my $strict_resources = $strict_k8s->load_yaml('deployment.yaml');
 
 # Save to YAML file
 $pod->save('pod.yaml');
@@ -55,6 +59,8 @@ my $struct = $k8s->object_to_struct($pod);
 ```
 
 Constructor keys no attribute declares are kept, not dropped: `TO_JSON` re-emits them so a manifest written against a newer upstream schema round-trips instead of losing fields (at every nesting level, across `new_object`, `inflate`, `json_to_object`, `struct_to_object`, `load` and `load_yaml`). Pass `strict => 1` to the constructor -- `IO::K8s->new(strict => 1)` -- to turn an unknown field into a fatal `Unknown field '<name>' for <class>` at construction instead.
+
+An unknown `apiVersion`/`kind` still fails closed by default. To preserve such a document without a typed class, opt in with `IO::K8s->new(unknown_kinds => 'unstructured')`; `inflate` then returns [IO::K8s::Unstructured](https://metacpan.org/pod/IO::K8s::Unstructured), which retains its undeclared wire fields.
 
 ### Multi-version dispatch
 
@@ -111,9 +117,9 @@ my $k8s = IO::K8s->new(with => [
 ]);
 ```
 
-### Cilium (31 CRDs)
+### Cilium (31 resource-map entries: 22 current Kind keys + 9 back-compat GVK keys)
 
-`IO::K8s::Cilium` covers `cilium.io/v2` and `cilium.io/v2alpha1` (upstream v1.20.1):
+`IO::K8s::Cilium` covers `cilium.io/v2` and `cilium.io/v2alpha1` (upstream v1.20.1). Its 22 current short-name keys come from the provider's current CRD Kinds; the other nine entries are domain-qualified back-compat tracks:
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
@@ -159,9 +165,9 @@ my $hc = $k8s->new_object('HelmChart',
 );
 ```
 
-### Gateway API (11 CRDs)
+### Gateway API (10 CRD Kinds / 14 served GVKs)
 
-`IO::K8s::GatewayAPI` covers `gateway.networking.k8s.io/v1` and `gateway.networking.k8s.io/v1beta1` (upstream v1.6.1, GA/Standard channel only):
+`IO::K8s::GatewayAPI` covers ten Gateway API Kinds across `gateway.networking.k8s.io/v1` and `gateway.networking.k8s.io/v1beta1` (14 served GVKs; upstream v1.6.1, GA/Standard channel only):
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::GatewayAPI']);
@@ -210,9 +216,9 @@ my $snap = $k8s->new_object('VolumeSnapshot',
 );
 ```
 
-### External Secrets (6 CRDs)
+### External Secrets (25 resource-map entries)
 
-`IO::K8s::ExternalSecrets` covers `external-secrets.io/v1` (ExternalSecret, SecretStore, ClusterSecretStore, ClusterExternalSecret) and `external-secrets.io/v1alpha1` (PushSecret, ClusterPushSecret) (upstream v2.10.0). `ClusterSecretStore`, `ClusterExternalSecret` and `ClusterPushSecret` are cluster-scoped:
+`IO::K8s::ExternalSecrets` covers `external-secrets.io/v1` (ExternalSecret, SecretStore, ClusterSecretStore, ClusterExternalSecret), `external-secrets.io/v1alpha1` (PushSecret, ClusterPushSecret), and 19 Kinds in `generators.external-secrets.io/v1alpha1` (including ClusterGenerator) (upstream v2.10.0). `ClusterSecretStore`, `ClusterExternalSecret`, `ClusterPushSecret` and `ClusterGenerator` are cluster-scoped:
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::ExternalSecrets']);
@@ -247,7 +253,7 @@ $pod->set_owner($deployment);
 $pod->is_owned_by($deployment);
 ```
 
-CRD classes automatically get deep-path spec manipulation via `SpecBuilder`:
+All API objects expose deep-path spec manipulation via `SpecBuilder` when they declare a `spec` field:
 
 ```perl
 $ir->spec_set('tls.secretName', 'my-cert');
@@ -257,7 +263,7 @@ $ir->spec_merge(entryPoints => ['web', 'websecure']);
 $ir->spec_delete('tls');
 ```
 
-Paths walk typed specs too: `-1` addresses the last (or a new) array element, and a hashref written into a typed slot is inflated.
+Paths walk typed specs too: `-1` addresses the last (or a new) array element, and a hashref written into a typed slot is inflated. An API object without a `spec` field has the same methods, but they croak naming that class.
 
 Domain-specific builder roles provide fluent APIs for common tasks:
 
@@ -268,7 +274,7 @@ $netpol->select_pods(app => 'web')
        ->allow_egress_to_dns
        ->deny_all_egress;
 
-# HTTP routing (Ingress, HTTPRoute, IngressRoute)
+# HTTP routing (HTTPRoute and IngressRoute)
 $route->add_hostname('example.com')
       ->add_backend('api-v1', port => 8080, weight => 90)
       ->add_path_match('/api', type => 'Prefix');
@@ -288,6 +294,8 @@ $mw->rate_limit(average => 100, burst => 200)
    ->strip_prefix('/api')
    ->redirect_https;
 ```
+
+Core `Ingress` supports `add_hostname` and `add_backend` for `spec.defaultBackend`, but `add_path_match` croaks because an Ingress path needs its own backend. Build `spec.rules` directly for a path-routed Ingress.
 
 ### IP Type Validation
 
@@ -452,7 +460,7 @@ clear redirect message.
 - Domain-qualified resource names for disambiguation (`api_version/Kind`)
 - Dynamic class generation from OpenAPI schemas via `IO::K8s::AutoGen`
 - Convenience methods: labels, annotations, conditions, owner references on all API objects
-- Deep-path spec manipulation for CRD classes via `SpecBuilder`
+- Deep-path spec manipulation for API objects with a `spec` field via `SpecBuilder`
 - Domain-specific builder roles for network policies, routing, certificates, Helm, and more
 - Net::IP-backed IP/CIDR type constraints (`IO::K8s::Types::Net`)
 - Proper handling of namespaced resources
@@ -483,8 +491,8 @@ This code is distributed under the Apache 2 License. The full text of the licens
 ## See Also
 
 - [Kubernetes::REST](https://metacpan.org/pod/Kubernetes::REST) - Kubernetes REST API client
-- [IO::K8s::Resource](https://metacpan.org/pod/IO::K8s::Resource) - Base class for all Kubernetes resources
-- [IO::K8s::APIObject](https://metacpan.org/pod/IO::K8s::APIObject) - The `k8s` DSL for declaring API classes
+- [IO::K8s::Resource](https://metacpan.org/pod/IO::K8s::Resource) - Moo/`k8s` setup for embedded Kubernetes objects
+- [IO::K8s::APIObject](https://metacpan.org/pod/IO::K8s::APIObject) - Top-level API-object setup and identity role
 - [IO::K8s::List](https://metacpan.org/pod/IO::K8s::List) - List-typed inflation (`PodList`, `ServiceList`, ...)
 - [IO::K8s::AutoGen](https://metacpan.org/pod/IO::K8s::AutoGen) - Generate classes at runtime from an OpenAPI schema
 - [IO::K8s::Deprecated](https://metacpan.org/pod/IO::K8s::Deprecated) - Redirects for class names removed in 1.000+

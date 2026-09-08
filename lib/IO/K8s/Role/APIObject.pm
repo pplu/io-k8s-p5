@@ -654,9 +654,10 @@ sub _is_resource { 1 }
     my $crd = IO::K8s::Api::Core::V1::Pod->to_crd;
 
 The C<CustomResourceDefinition> this class's own attribute registry
-describes (D9) -- the exact inverse of L<IO::K8s::AutoGen>'s
-schema-to-DSL mapping. See L<IO::K8s::CRD/crd_for_class>, which this
-delegates to.
+describes (D9), emitted through L<IO::K8s::CRD/crd_for_class>. It is a
+schema export, not a lossless reverse round-trip through C<add_crd>: see
+L<IO::K8s::CRD/crd_for_class> for the C<Quantity> export and typed-map /
+scalar-array inference limits.
 
 =cut
 

@@ -1265,8 +1265,12 @@ IO::K8s - Objects representing things found in the Kubernetes API
   # Load .pk8s manifest files (Perl DSL)
   my $resources = $k8s->load('myapp.pk8s');
 
-  # Load and validate YAML manifests
+  # Load YAML manifests and validate declared field types
   my $resources = $k8s->load_yaml('deployment.yaml');
+
+  # Also reject fields the current model does not declare
+  my $strict_k8s = IO::K8s->new(strict => 1);
+  my $strict_resources = $strict_k8s->load_yaml('deployment.yaml');
 
   # Validate with error collection
   my ($objs, $errors) = $k8s->load_yaml($yaml, collect_errors => 1);
@@ -1325,9 +1329,11 @@ It also inflates JSON returned by Kubernetes into typed Perl objects.
 IO::K8s uses a layered architecture. Understanding these layers helps when
 working with built-in resources or writing your own CRD classes.
 
-=head2 IO::K8s::Resource (base layer)
+=head2 IO::K8s::Resource (setup layer)
 
-All Kubernetes objects inherit from L<IO::K8s::Resource>. It provides:
+Declaring a class with C<use IO::K8s::Resource> imports L<Moo>, installs the
+C<k8s> DSL, and composes L<IO::K8s::Role::Resource>. It does not make that
+class C<isa('IO::K8s::Resource')>. It provides:
 
 =over 4
 
@@ -1353,9 +1359,9 @@ The C<k8s> DSL supports these type specifications:
 
 =head2 IO::K8s::APIObject (top-level resources)
 
-L<IO::K8s::APIObject> extends C<IO::K8s::Resource> for top-level API objects
-(Pod, Deployment, Service, etc.) by applying L<IO::K8s::Role::APIObject>.
-This adds:
+L<IO::K8s::APIObject> uses the same setup for top-level API objects
+(Pod, Deployment, Service, etc.) and additionally composes
+L<IO::K8s::Role::APIObject>. It adds:
 
 =over 4
 
@@ -1384,8 +1390,9 @@ C</namespaces/{ns}/>).
 =head1 WRITING CRD CLASSES
 
 To use Custom Resource Definitions with L<Kubernetes::REST>, write a Perl
-class using C<IO::K8s::APIObject>. This is the same base used by all built-in
-Kubernetes types like Pod, Deployment, and Service.
+class using C<IO::K8s::APIObject>. It gives a custom class the same Moo/DSL
+setup and top-level APIObject role composition as built-in Kubernetes types
+like Pod, Deployment, and Service.
 
 =head2 Minimal CRD class
 
@@ -1494,7 +1501,7 @@ on demand:
   # Create IO::K8s with auto-generation enabled
   my $k8s = IO::K8s->new(openapi_spec => $spec);
 
-  # Now inflate works for ANY type in the cluster
+  # An unknown Kind with an unambiguous GVK definition in this spec auto-generates a class
   my $addon = $k8s->inflate($k3s_addon_json);   # k3s.cattle.io/v1 Addon
   my $chart = $k8s->inflate($helmchart_json);   # helm.cattle.io/v1 HelmChart
 
@@ -1722,13 +1729,16 @@ With CRDs (requires openapi_spec):
 Load a YAML manifest file (or YAML string) and return an ArrayRef of IO::K8s
 objects. Supports multi-document YAML (separated by C<--->).
 
-This method validates the YAML against the Kubernetes types. If a field has
-the wrong type or an unknown field is used, an error is thrown. This is useful
-for validating manifests before applying them to a cluster.
+This method validates declared fields against the Kubernetes types. A declared
+field with the wrong type throws an error. By default, an undeclared field is
+kept for forward-compatible round-tripping; construct C<IO::K8s> with
+C<< strict => 1 >> to reject it instead. This is useful for validating
+manifests before applying them to a cluster.
 
-    # Validate a manifest file
+    # Validate a manifest file and reject undeclared fields
+    my $strict_k8s = IO::K8s->new(strict => 1);
     eval {
-        my $objs = $k8s->load_yaml('deployment.yaml');
+        my $objs = $strict_k8s->load_yaml('deployment.yaml');
         say "Valid! Contains " . scalar(@$objs) . " resources";
     };
     if ($@) {
@@ -1906,14 +1916,12 @@ C<%INC>, or a module installed mid-process -- reachable.
 
 =head1 CILIUM CRD SUPPORT
 
-IO::K8s includes L<IO::K8s::Cilium> with 30 Cilium CRD classes covering
-C<cilium.io/v2> (18 CRDs) and C<cilium.io/v2alpha1> (12 CRDs). The
-provider's C<resource_map> exposes 30 keys: 22 short-name keys (17
-C<cilium.io/v2> + 5 C<cilium.io/v2alpha1>) plus 8 domain-qualified
-back-compat keys for v2alpha1 BGP/CIDR tracks superseded by their v2
-counterparts and C<CiliumExternalWorkload>, which remain reachable for
-older clusters without losing the v2 short name (k78). These are not
-loaded by default -- opt in at construction:
+IO::K8s includes L<IO::K8s::Cilium> with 31 resource-map entries: 22
+short-name Kinds (17 C<cilium.io/v2> + 5 C<cilium.io/v2alpha1>) and 9
+domain-qualified back-compat tracks for v2alpha1 BGP/CIDR/LoadBalancerIPPool,
+CiliumBGPPeeringPolicy, and CiliumExternalWorkload. The compatibility tracks
+remain reachable for older clusters without displacing the current short-name
+Kind. These are not loaded by default -- opt in at construction:
 
   my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
 
@@ -1947,7 +1955,8 @@ Create a class that consumes L<IO::K8s::Role::ResourceMap>:
       };
   }
 
-See L<IO::K8s::Cilium> for a real-world example with 30 CRD classes.
+See L<IO::K8s::Cilium> for a real-world provider with 22 current short-name
+Kinds and nine domain-qualified compatibility tracks.
 
 =head2 Collision handling
 
@@ -2020,6 +2029,11 @@ namespace-scoped.
 L<Kubernetes::REST> - REST client for the Kubernetes API, uses IO::K8s for typed request/response objects
 
 L<IO::K8s::Deprecated> - CPAN redirect stubs for IO::K8s module names that were renamed or removed
+
+Bundled CRD providers: L<IO::K8s::Cilium>, L<IO::K8s::Traefik>,
+L<IO::K8s::CertManager>, L<IO::K8s::K3s>, L<IO::K8s::GatewayAPI>,
+L<IO::K8s::AgentSandbox>, L<IO::K8s::PrometheusOperator>,
+L<IO::K8s::VolumeSnapshot>, and L<IO::K8s::ExternalSecrets>
 
 L<Kubernetes::REST::Example> - Comprehensive examples for using Kubernetes::REST with IO::K8s against a real cluster (Minikube, K3s, etc.)
 

@@ -197,8 +197,9 @@ sub ca {
 
 Appends an HTTP-01 challenge solver to C<spec.acme.solvers>. The solver
 configures cert-manager to satisfy ACME challenges via an Ingress; pass
-C<class =E<gt> $name> to select a specific Ingress class (the empty class
-default is C<nginx>). Returns C<$self> for chaining.
+C<class =E<gt> $name> to write that exact C<ingress.class> value. Without
+C<class>, this method emits an empty C<ingress> block and does not choose an
+Ingress class. Returns C<$self> for chaining.
 
     $issuer->add_http01_solver(class => 'nginx');
 

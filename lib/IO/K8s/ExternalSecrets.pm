@@ -109,12 +109,10 @@ __END__
 =head1 DESCRIPTION
 
 Resource map provider for L<external-secrets|https://external-secrets.io/>
-Custom Resource Definitions. Registers 24 resource_map entries covering
-C<external-secrets.io/v1> (C<ExternalSecret>, C<SecretStore>,
-C<ClusterSecretStore>, C<ClusterExternalSecret>),
-C<external-secrets.io/v1alpha1> (C<PushSecret>, C<ClusterPushSecret>) and
-C<generators.external-secrets.io/v1alpha1> (17 generator Kinds -- see
-L</"Included CRDs (generators.external-secrets.io/v1alpha1)"> below),
+Custom Resource Definitions. Registers 25 C<resource_map> entries: six
+Kinds in C<external-secrets.io> and 19 Kinds in
+C<generators.external-secrets.io/v1alpha1> (see
+L</"Included Kinds (generators.external-secrets.io/v1alpha1)"> below),
 matching upstream external-secrets v2.10.0.
 
 C<generators.external-secrets.io> is a separate upstream API group (Go
@@ -149,7 +147,7 @@ C<provider> field, L<IO::K8s::ExternalSecrets::V1::SecretStoreProvider>,
 a 43-member union of every backend the CRD's C<MinProperties=1>/
 C<MaxProperties=1> validation restricts to exactly one of (AWS, Azure Key
 Vault, HashiCorp Vault, GCP Secret Manager, Kubernetes, Akeyless, and so on
--- see L</"Included CRDs (external-secrets.io/v1)"> below for the full
+-- see L</"Included Kinds (external-secrets.io/v1)"> below for the full
 list), each backend's own auth/reference structs modeled to full depth in
 turn. C<ClusterExternalSecret> similarly embeds the literal same
 C<ExternalSecretSpec> Go type C<ExternalSecret> uses for its own C<spec>
@@ -169,10 +167,11 @@ C<status.conditions> reuses the same L<IO::K8s::Api::Core::V1::NamespaceConditio
 class C<PushSecretStatus> already reuses for the identical
 C<PushSecretStatusCondition> Go type.
 
-B<Scope (D9):> C<ClusterSecretStore>, C<ClusterExternalSecret> and
-C<ClusterPushSecret> are cluster-scoped upstream (C<spec.scope: Cluster>)
-and do not compose L<IO::K8s::Role::Namespaced>; C<ExternalSecret>,
-C<SecretStore> and C<PushSecret> are namespaced upstream and do.
+B<Scope (D9):> C<ClusterSecretStore>, C<ClusterExternalSecret>,
+C<ClusterPushSecret> and C<ClusterGenerator> are cluster-scoped upstream
+(C<spec.scope: Cluster>) and do not compose L<IO::K8s::Role::Namespaced>;
+C<ExternalSecret>, C<SecretStore> and C<PushSecret> are namespaced upstream
+and do.
 
 B<Served versions:> the CRD manifest at this pin still ships a deprecated
 C<external-secrets.io/v1beta1> track for C<ExternalSecret>, C<SecretStore>
@@ -188,7 +187,7 @@ Not loaded by default -- opt in via the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::ExternalSecrets') >> at
 runtime.
 
-=head2 Included CRDs (external-secrets.io/v1)
+=head2 Included Kinds (external-secrets.io/v1)
 
 ExternalSecret, SecretStore, ClusterSecretStore, ClusterExternalSecret
 
@@ -201,13 +200,14 @@ SecretServer, Chef, Pulumi, Fortanix, PasswordDepot, Passbolt, DVLS,
 Infisical, Beyondtrust, BeyondtrustWorkloadCredentials, CloudruSM,
 Volcengine, Ngrok, Barbican, NebiusMysterybox, OpenBao.
 
-=head2 Included CRDs (external-secrets.io/v1alpha1)
+=head2 Included Kinds (external-secrets.io/v1alpha1)
 
 PushSecret, ClusterPushSecret
 
-=head2 Included CRDs (generators.external-secrets.io/v1alpha1)
+=head2 Included Kinds (generators.external-secrets.io/v1alpha1)
 
-ACRAccessToken, BeyondtrustWorkloadCredentialsDynamicSecret,
+ClusterGenerator (cluster-scoped), ACRAccessToken,
+BeyondtrustWorkloadCredentialsDynamicSecret,
 CloudsmithAccessToken, ECRAuthorizationToken, Fake, GCRAccessToken,
 GeneratorState, GithubAccessToken, GitlabDeployToken, Grafana, MFA,
 Password, QuayAccessToken, SSHKey, STSSessionToken, UUID,
@@ -229,10 +229,10 @@ C<SecretKeySelector> down to a same-namespace, two-field
 L<IO::K8s::ExternalSecrets::V1alpha1::SecretRef> (C<Grafana>'s
 C<auth.basic.password>/C<auth.token>, C<Webhook>'s C<secrets[].secretRef>).
 
-C<ClusterGenerator> is served upstream but not modeled yet: its
-C<spec.generator> is a 19-member union embedding every other generator's
-own Spec class (C<spec.generator.<x>Spec>), so it needs the 18 Kinds above
-to exist first -- see C<maint/crd-drift-exceptions.yaml>.
+C<ClusterGenerator> is modeled as the cluster-scoped generator union. Its
+C<spec.generator> has 17 members, each reusing the corresponding standalone
+Kind's C<Spec> class; C<GeneratorState> is controller state rather than a
+generator plugin and is not a union member.
 
 =seealso
 

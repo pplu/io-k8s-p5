@@ -17,10 +17,10 @@ requires qw( spec_hash spec_set );
 
 Configures the Traefik rateLimit middleware. C<average> is the allowed
 average request rate and C<burst> the maximum instantaneous queue depth;
-C<period> is the averaging window and is optional. Only the keys you pass
-appear in the resulting C<spec.rateLimit> hash, so an empty call
-(C<rate_limit()>) writes a C<< {} >> rather than a populated block. Returns
-C<$self> for chaining.
+C<period> is the averaging window and is optional. Only values Perl treats as
+true appear in the resulting C<spec.rateLimit> hash, so an empty call or
+falsey values such as C<0> and C<''> write C<< {} >> rather than a populated
+block. Returns C<$self> for chaining.
 
     $mw->rate_limit(average => 100, burst => 200, period => '1s');
 

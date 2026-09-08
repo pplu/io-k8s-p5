@@ -264,6 +264,9 @@ __END__
 
     sub _route_format { 'gateway' }   # or 'traefik', 'ingress'
 
+    # The full chain below is available for gateway and traefik. In ingress
+    # mode add_path_match croaks because a path needs its own backend.
+
     package main;
     my $r = My::Route->new;
     $r->add_hostname('example.com')
@@ -274,10 +277,12 @@ __END__
 =head1 DESCRIPTION
 
 This role provides the fluent HTTP routing builders documented in the
-README's "HTTP routing" section. The same chain works against Gateway API
-HTTPRoute, Traefik IngressRoute, and core Kubernetes Ingress -- the role
-dispatches on C<_route_format>, which the consumer must implement and
-return as one of C<'gateway'>, C<'traefik'>, or C<'ingress'>.
+README's "HTTP routing" section. Gateway API HTTPRoute and Traefik
+IngressRoute support the full chain below; core Kubernetes Ingress supports
+the hostname and default-backend helpers but C<add_path_match> croaks because
+an Ingress path needs its own backend. The role dispatches on
+C<_route_format>, which the consumer must implement and return as one of
+C<'gateway'>, C<'traefik'>, or C<'ingress'>.
 
 The three backends produce three different wire shapes:
 

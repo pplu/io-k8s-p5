@@ -25,13 +25,16 @@ use IO::K8s::Role::Resource ();
 =head1 DESCRIPTION
 
 The source half of D10: what L<IO::K8s::CRD> generates at runtime, rendered
-as the checked-in, hand-maintained class files this distribution ships --
-one file per class, the C<k8s> DSL line per field with its options, the
-schema description as the field's C<=attr> POD. It reads nothing but the
-attribute registry of the generated classes, so it renders any AutoGen
-class set, and it never writes a file: callers get C<< { path => source } >>
-and decide (C<maint/crd-drift-check.pl --suggest> prints,
-C<--suggest-dir> writes outside C<lib/>).
+as checked-in, hand-maintained class files this distribution ships -- one
+output file per target path, the C<k8s> DSL line per field with its options,
+the schema description as the field's C<=attr> POD. Several generated classes
+may name the same target only when their functional declarations are identical;
+contextual C<# ABSTRACT> and POD may differ, and one source is retained. A
+functional difference croaks before either class can overwrite the other. It
+reads nothing but the attribute registry of the generated classes, so it
+renders any AutoGen class set, and it never writes a file: callers get
+C<< { path => source } >> and decide (C<maint/crd-drift-check.pl --suggest>
+prints, C<--suggest-dir> writes outside C<lib/>).
 
 Descriptions go into POD, not into the C<description> field option: the
 house format documents every field once, in the C<=attr> block.
@@ -164,10 +167,13 @@ sub package_for {
     my $files = $emitter->render($root_class);
 
 Renders C<$root_class> and every generated class reachable from its fields
-(objects, arrays of objects, maps of objects) as
-C<< { 'Relative/Path.pm' => $source } >>. Stock classes referenced by a
-field (C<ObjectMeta>, core types) are written by their short name and not
-rendered.
+(objects, arrays of objects, maps of objects) into
+C<< { 'Relative/Path.pm' => $source } >>. The result has one entry per target
+path, not necessarily per logical class: two classes mapped to the same path
+share it only when their executable declarations are identical after ignoring
+contextual C<# ABSTRACT> and POD; otherwise C<render> croaks naming the path
+and both logical classes. Stock classes referenced by a field (C<ObjectMeta>,
+core types) are written by their short name and not rendered.
 
 =cut
 

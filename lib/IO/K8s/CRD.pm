@@ -244,15 +244,25 @@ sub generate {
     my $crd = IO::K8s::CRD::crd_for_class($class);
     my $crd = $class->to_crd;   # installed on every APIObject class, see IO::K8s::Role::APIObject
 
-D9: the inverse of L<IO::K8s::AutoGen>'s schema-to-DSL mapping. Builds a
-single-version C<CustomResourceDefinition> object from a top-level
-C<$class>'s own attribute registry: C<spec.group> and the one
-C<spec.versions[]> entry's C<name> come from splitting C<< $class->api_version >>
+D9's DSL-to-schema direction. Builds a single-version
+C<CustomResourceDefinition> object from a top-level C<$class>'s own attribute
+registry: C<spec.group> and the one C<spec.versions[]> entry's C<name> come
+from splitting C<< $class->api_version >>
 on the last C</>; C<spec.scope> is C<Namespaced> when C<$class> composes
 L<IO::K8s::Role::Namespaced>, else C<Cluster>; C<spec.names> comes from
 C<< $class->kind >>, C<< $class->resource_plural >> (C<singular> is
 C<lc(kind)>, C<listKind> is C<"${kind}List">); C<metadata.name> is
 C<"$plural.$group">. The schema itself is L</_schema_for_class>.
+
+The schema is generated from the registry, but it is not a lossless
+DSL-to-schema-to-DSL round-trip through C<add_crd>. C<Quantity> and
+C<[Quantity]> export only C<type: string> (or string array items), so the
+Quantity constraint cannot be reconstructed. During the reverse
+L<IO::K8s::AutoGen> inference, typed maps whose values are C<Int>, C<Num>,
+C<Bool>, C<Quantity>, C<Time> or C<IntOrStr> re-import as the opaque
+C<< { Str => 1 } >> form. Scalar arrays C<[Num]>, C<[Quantity]>, C<[Time]>
+and C<[IntOrStr]> re-import as C<[Str]>; C<[Str]>, C<[Int]> and C<[Bool]>
+retain their scalar element type.
 
 The single-version shorthand for L</new>: C<< IO::K8s::CRD::crd_for_class($class) >>
 is exactly C<< IO::K8s::CRD->new(classes => [$class], storage => $version) >>
