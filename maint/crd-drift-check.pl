@@ -437,7 +437,8 @@ sub load_manifests {
 # openAPIV3Schema.properties.spec.properties. GVK = "group/version/Kind".
 # The whole document rides along too (doc), so --suggest can hand a
 # reported GVK's manifest straight to IO::K8s::CRD->generate without
-# re-fetching or re-parsing it.
+# re-fetching or re-parsing it. Keep the root schema as well: a clearly
+# closed root without `spec` is distinct from an opaque spec schema.
 # ---------------------------------------------------------------------------
 
 sub parse_crds {
@@ -471,6 +472,7 @@ sub parse_crds {
                     version         => $vname,
                     label           => $label,
                     doc             => $doc,
+                    root_schema     => $schema,
                     has_spec_schema => ($spec_props ? 1 : 0),
                     spec_props      => { map { $_ => 1 } keys %{ $spec_props // {} } },
                 };
@@ -478,6 +480,37 @@ sub parse_crds {
         }
     }
     return \%by_gvk;
+}
+
+# A class without a registered `spec` can only be exempt from opaque-spec
+# reporting when the upstream root is unambiguously a closed flat object.
+# Keep every open, preserve-unknown, composite, or malformed shape visible:
+# Tier 3 deliberately compares spec fields only, not arbitrary root fields.
+sub has_closed_flat_root_without_spec {
+    my ($upstream) = @_;
+    my $schema = $upstream->{root_schema};
+    return unless ref $schema eq 'HASH';
+    return unless ($schema->{type} // '') eq 'object';
+    if (exists $schema->{'x-kubernetes-preserve-unknown-fields'}) {
+        my $preserve_unknown = $schema->{'x-kubernetes-preserve-unknown-fields'};
+        return unless JSON::PP::is_bool($preserve_unknown);
+        return if $preserve_unknown;
+    }
+    if (exists $schema->{additionalProperties}) {
+        my $additional_properties = $schema->{additionalProperties};
+        return unless JSON::PP::is_bool($additional_properties) && !$additional_properties;
+    }
+    for my $keyword (qw( allOf anyOf oneOf not $ref )) {
+        return if exists $schema->{$keyword};
+    }
+
+    my $properties = $schema->{properties};
+    return unless ref $properties eq 'HASH';
+    return if exists $properties->{spec};
+    for my $property (values %$properties) {
+        return unless ref $property eq 'HASH';
+    }
+    return 1;
 }
 
 # ---------------------------------------------------------------------------
@@ -706,9 +739,11 @@ sub check_provider {
         my $class = $shipped->{$gvk} or next;
         my $u = $upstream->{$gvk};
         my $shipped_fields = shipped_spec_fields($class, $provider);
+        my $has_shipped_spec = exists $IO::K8s::Resource::_attr_registry{$class}{spec};
 
         if (!defined $shipped_fields) {
-            # spec modeled opaquely: field coverage not individually verified.
+            next if !$has_shipped_spec && has_closed_flat_root_without_spec($u);
+            # No comparable spec fields: retain the uncertainty as info.
             push @{ $result->{opaque_spec} },
                 [$gvk, $class, scalar keys %{ $u->{spec_props} }, $u->{has_spec_schema}];
             next;
@@ -797,7 +832,7 @@ sub render_provider {
         my ($gvk, $class, $n, $has_schema) = @$e;
         my $detail = $has_schema
             ? "upstream schema has $n spec field(s), class models spec opaquely"
-            : 'upstream has no spec schema (preserve-unknown-fields)';
+            : 'upstream has no spec schema to compare';
         push @out, "  $gvk  ($class): $detail";
     }
     push @out, '  (none)' unless @{ $r->{opaque_spec} };
