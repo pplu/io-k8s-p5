@@ -1,0 +1,34 @@
+---
+claimed_at: 2026-09-08T06:01:06Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T06:01:06Z
+created: 2026-09-04T21:41:55Z
+id: 121
+priority: low
+started: 2026-09-08T04:32:10Z
+status: done
+tags:
+- crd
+- providers
+- volumesnapshot
+title: 'VolumeSnapshot: groupsnapshot.storage.k8s.io/v1 modellieren (VolumeGroupSnapshot*)'
+updated: 2026-09-08T06:01:06Z
+---
+
+Abgespalten von k113, dessen ExternalSecrets-Teil abgeschlossen ist.
+
+Offen: groupsnapshot.storage.k8s.io/v1 aus external-snapshotter v8.6.0 - VolumeGroupSnapshot, VolumeGroupSnapshotClass, VolumeGroupSnapshotContent (in v8.6.0 GA).
+
+BLOCKIERT auf einer Quelle: die CRDs liegen nicht unter spec/crd/VolumeSnapshot/ - dort stehen nur die drei snapshot.storage.k8s.io-Dateien (volumesnapshotclasses, volumesnapshotcontents, volumesnapshots). Die groupsnapshot-Gruppe steht auch nicht in crd_sources, wird vom drift-check also gar nicht erfasst.
+
+Zu tun: CRDs von external-snapshotter v8.6.0 holen und unter spec/crd/VolumeSnapshot/ ablegen, crd_sources in IO::K8s::VolumeSnapshot erweitern, dann modellieren.
+
+Hinweis aus der k113-Runde: fuer VolumeSnapshot existiert kein maint/crd-render/<Provider>.yaml (k120), der Emitter ist also nur Rohmaterial und seine Klassenaufteilung nicht massgeblich - die neuen Klassen muessen zu den eingecheckten passen. Bei ExternalSecrets haette ein blindes Uebernehmen der Render-Ausgabe fuer EINEN Kind 44 Klassen erzeugt statt 2.
+
+QUELLENBLOCKER GELÖST 2026-09-08: Alle drei CRDs und Go-Typdateien offiziell am Tag kubernetes-csi/external-snapshotter v8.6.0 über GitHub-Baum und raw URLs verifiziert; lokal zunächst /tmp/io-k8s-k121-upstream-bYIA0h. Tatsächlich served: v1, v1beta1, v1beta2; STORAGE: v1beta2 für alle drei Kinds. D7/D17 verlangt damit drei API-Tracks, mit bare Kind -> V1beta2, nicht voreilig V1. Umfang wird anhand dieser Quellen festgelegt. Go-Typen verwenden in allen Tracks snapshotv1.VolumeSnapshotError; keine duplizierten Beta-Fehlertypen. Dieselbe bekannte Overlay-Cross-Version-Grenze wie k120 soll nicht durch falsche Namensduplikate verdeckt werden.
+
+ERLEDIGT 2026-09-08: Commit c0c318b5, gepusht auf origin/k126-k127-changes. 33 tatsächlich erreichbare neue Klassen (11 pro v1/v1beta1/v1beta2), keine List-/unreferenzierten Alt-Typen. Drei neue Kinds in allen neun GVK-Routen; bare Namen auf der tatsächlich gepinnten storage-Version v1beta2. V1beta1 behält volumeSnapshotHandlePairList, v1/v1beta2 verwenden VolumeSnapshotInfoList. Alle Error-Referenzen teilen V1::VolumeSnapshotError; LabelSelector/ObjectReference bleiben Stock-Typen. Providerquellen um die drei offiziellen CRDs erweitert, Cache lokal ignoriert; Tests enthalten eigene literale Erwartungen und brauchen weder Netz noch Cache.
+RED/GREEN: neue Registrierungs-/33-Modell-Tests zuerst fehlgeschlagen, danach tiefe typed/strict Roundtrips, genaue Feldlisten/required-Metadaten, Bool/Int-JSON und Multi-Version-CRD-Ausgabe grün. Vollsuite 98 Dateien / 8796 Tests PASS; optionaler Live-Cluster-Test weiter übersprungen. Vollständiger Offline-Provider-Schema-Audit: 0 Findings, 11 nicht ausdrückbare format-Keywords, 3 Stock-Klassen separat ausgewiesen.
+Paketprüfung: Ein erster Build vor git add hatte die untracked neuen Module/Testdatei nicht eingesammelt; das wurde vor Commit/Installation erkannt. Nach Staging frisch gebaut und explizit alle 33 Module, t/96 und META.json/provides-Einträge geprüft. Author-POD/Changes-Tests 1925 PASS; Pod::Checker für genau34betroffeneModule 0Fehler/0Warnungen. README-Beispiel ausgeführt. AUTHOR_TESTING=1 RELEASE_TESTING=1 dzil install erfolgreich; ohne -Ilib laden die neuen Module aus /home/getty/perl5/lib/perl5, alle9GVK und storageBareDefault unabhängig bestätigt.
+Bewusst getrennt: alte zehn Snapshot-Dateien unverändert; k124-POD-Abgleich blockiert. Cross-Version-Erroralias ist im heutigen Emitter-Overlay nicht darstellbar (k120), deshalb kein falscher globaler --check-0-Claim. Falsche OPAQUE-Spec-Info bei direkten Class-Kinds separat als k131 erfasst. Kein master-Merge/Release.
