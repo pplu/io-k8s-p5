@@ -181,16 +181,46 @@ sub render {
     my ($self, $root) = @_;
     $self->{_root} = $root;   # kept after render() so package_for() stays usable
     my %files;
+    my %functional;
+    my %origins;
     my @todo = ($root);
     my %seen;
     while (my $class = shift @todo) {
         next if $seen{$class}++;
         my ($source, @nested) = $self->_render_class($class);
+        my $functional = $self->_functional_source($source);
         (my $path = $self->package_for($class)) =~ s{::}{/}g;
-        $files{"$path.pm"} = $source;
+        $path .= '.pm';
+        if (exists $files{$path}) {
+            croak 'IO::K8s::CRD::Emitter: target ' . $path
+                . ' has non-identical generated classes ' . $origins{$path}
+                . ' and ' . $class
+                if $functional{$path} ne $functional;
+        }
+        # Deliberately retain the last equivalent source, matching the
+        # overwrite selection render() made before collision detection.
+        $files{$path} = $source;
+        $functional{$path} = $functional;
+        $origins{$path} = $class;
         push @todo, @nested;
     }
     return \%files;
+}
+
+# The collision identity is the generated class's executable declaration
+# surface. Contextual # ABSTRACT and POD text describe the same wire class
+# differently across upstream GVKs; they must not turn that alias into a
+# rejected collision. `use utf8` is equally documentation-only when no
+# remaining executable source needs it, because _render_class adds it for
+# non-ASCII POD too.
+sub _functional_source {
+    my ($self, $source) = @_;
+    (my $functional = $source) =~ s/\n\n(?:=encoding UTF-8\n\n=cut\n\n)?=attr\b.*\z//s;
+    $functional =~ s/^# ABSTRACT:.*\n//m;
+    my $without_utf8 = $functional;
+    $without_utf8 =~ s/^use utf8;\n//m;
+    $functional = $without_utf8 unless $without_utf8 =~ /[^\x00-\x7F]/;
+    return $functional;
 }
 
 # A generated class is one this emitter renders; anything else is stock.

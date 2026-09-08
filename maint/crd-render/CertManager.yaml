@@ -183,10 +183,10 @@ kinds:
       Spec::Venafi::Cloud: VenafiCloud
       Spec::Venafi::Cloud::ApiTokenSecretRef: SecretKeySelector
       Spec::Venafi::Ngts: VenafiNGTS
-      Spec::Venafi::Ngts::CredentialsRef: LocalObjectReference
+      Spec::Venafi::Ngts::CredentialsRef: CertManagerLocalObjectReference
       Spec::Venafi::Tpp: VenafiTPP
       Spec::Venafi::Tpp::CaBundleSecretRef: SecretKeySelector
-      Spec::Venafi::Tpp::CredentialsRef: LocalObjectReference
+      Spec::Venafi::Tpp::CredentialsRef: CertManagerLocalObjectReference
       Status: IssuerStatus
       Status::Acme: ACMEIssuerStatus
     with:
@@ -264,10 +264,10 @@ kinds:
       Spec::Venafi::Cloud: VenafiCloud
       Spec::Venafi::Cloud::ApiTokenSecretRef: SecretKeySelector
       Spec::Venafi::Ngts: VenafiNGTS
-      Spec::Venafi::Ngts::CredentialsRef: LocalObjectReference
+      Spec::Venafi::Ngts::CredentialsRef: CertManagerLocalObjectReference
       Spec::Venafi::Tpp: VenafiTPP
       Spec::Venafi::Tpp::CaBundleSecretRef: SecretKeySelector
-      Spec::Venafi::Tpp::CredentialsRef: LocalObjectReference
+      Spec::Venafi::Tpp::CredentialsRef: CertManagerLocalObjectReference
       Status: IssuerStatus
       Status::Acme: ACMEIssuerStatus
     with:

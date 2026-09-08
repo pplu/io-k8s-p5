@@ -2,6 +2,16 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Venafi NGTS and TPP credentialsRef fields now use the new
+    IO::K8s::CertManager::V1::CertManagerLocalObjectReference, whose name is
+    schema-required and has no default. The existing LocalObjectReference
+    semantics are unchanged.
+
+  - IO::K8s::CRD::Emitter and maint/crd-drift-check.pl now permit generated
+    classes to share a target path only when their functional source is
+    identical; contextual POD and ABSTRACT text may differ. Conflicting
+    declarations fail before overwriting and identify both classes or GVKs.
+
   - Path::Tiny is declared as a test prerequisite, not only a develop one.
     t/50_shadowed_kind_names.t and t/52_expand_class_shadow_window.t use it
     unguarded to build the shadowing stub modules they need, and both ship in

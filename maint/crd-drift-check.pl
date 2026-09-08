@@ -902,17 +902,40 @@ sub render_gvk {
     return $emitter->render($root);
 }
 
+sub _merge_rendered_files {
+    my ($files, $functional, $origins, $rendered, $gvk) = @_;
+    for my $path (sort keys %$rendered) {
+        my $source = $rendered->{$path};
+        my $signature = IO::K8s::CRD::Emitter->_functional_source($source);
+        if (exists $files->{$path}) {
+            die 'crd-drift-check: target ' . $path
+                . ' has non-identical GVK sources ' . $origins->{$path}
+                . ' and ' . $gvk . "\n"
+                if $functional->{$path} ne $signature;
+        }
+        # Deliberately retain the last equivalent source, matching the
+        # overwrite selection render_for/suggest_for made before collision
+        # detection.
+        $files->{$path} = $source;
+        $functional->{$path} = $signature;
+        $origins->{$path} = $gvk;
+    }
+    return;
+}
+
 sub suggest_for {
     my ($opt, $result, $upstream) = @_;
     my @gvks = map { $_->[0] } @{ $result->{opaque_spec} }, @{ $result->{missing_field} };
     my %seen;
     my %files;
+    my %functional;
+    my %origins;
     my $overlay = load_overlay($opt, $result->{provider});
     for my $gvk (grep { !$seen{$_}++ } @gvks) {
         my $u = $upstream->{$gvk} or next;
         my $kind_overlay = $overlay->{kinds}{$u->{kind}} // {};
         my $rendered = render_gvk($opt, $result->{provider}, $u, $kind_overlay);
-        $files{$_} = $rendered->{$_} for keys %$rendered;
+        _merge_rendered_files(\%files, \%functional, \%origins, $rendered, $gvk);
     }
     return \%files;
 }
@@ -923,11 +946,13 @@ sub render_for {
     my ($opt, $provider, $upstream) = @_;
     my $overlay = load_overlay($opt, $provider);
     my %files;
+    my %functional;
+    my %origins;
     for my $gvk (sort keys %$upstream) {
         my $u = $upstream->{$gvk};
         my $kind_overlay = $overlay->{kinds}{$u->{kind}} // {};
         my $rendered = render_gvk($opt, $provider, $u, $kind_overlay);
-        $files{$_} = $rendered->{$_} for keys %$rendered;
+        _merge_rendered_files(\%files, \%functional, \%origins, $rendered, $gvk);
     }
     return \%files;
 }

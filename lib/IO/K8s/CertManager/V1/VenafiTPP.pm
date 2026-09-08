@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s caBundle          => Str;
 k8s caBundleSecretRef => '+IO::K8s::CertManager::V1::SecretKeySelector';
-k8s credentialsRef    => '+IO::K8s::CertManager::V1::LocalObjectReference', { required => 'schema' };
+k8s credentialsRef    => '+IO::K8s::CertManager::V1::CertManagerLocalObjectReference', { required => 'schema' };
 k8s url               => Str, { required => 'schema' };
 
 =attr caBundle
