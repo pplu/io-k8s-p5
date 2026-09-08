@@ -419,7 +419,7 @@ If you are upgrading from a pre-1.100 release:
   serialised for these two groups were rejected by the API server.
   The release between 1.105 and now also carried a substantial body of
   behaviour changes worth knowing about before upgrading:
-  - **Upstream sync to v1.37** (k72) — 22 new Kinds, a new
+  - **Upstream sync to v1.37** (k72) — 11 new Kinds, a new
     `IO::K8s::Api::Lifecycle` namespace, and ten fields upstream made
     required are now required at construction.
   - **Seven embedded template classes** (`PodTemplateSpec`,
@@ -430,13 +430,13 @@ If you are upgrading from a pre-1.100 release:
     instances. Use the role on a wrapping object instead.
   - **`set_owner()` became strict** (k47): owners without a `uid` are
     refused; `controller` is now an explicit parameter (default 1);
-    a second controller reference or a duplicate owner is rejected
-    rather than silently written.
+    a second distinct controller reference is rejected; adding the same
+    owner UID again is an idempotent no-op.
   - **Booleans stop inventing `false` from `undef`** (k48); an explicit
     `undef` now omits the field, matching the inflation path.
-  - **`FROM_HASH` is now strict and recursive** (k59) — every class is
-    `to_json` / `from_json` symmetric; raw nested hashrefs that used to
-    be refused are now inflated.
+  - **`FROM_HASH` now inflates nested objects recursively** (k59), making
+    class-level `to_json` / `from_json` symmetric. Unknown fields remain
+    preserved by default; recursive inflation does not imply strict mode.
   - **`kind()` and `api_version()` croak on an argument** (k67, k70) —
     they are derived read-only identity accessors and silently
     swallowing an argument was the source of hidden bugs.
