@@ -1,0 +1,43 @@
+---
+claimed_at: 2026-09-08T14:48:35Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T14:47:19Z
+created: 2026-09-05T01:16:36Z
+id: 124
+priority: low
+started: 2026-09-08T04:43:24Z
+status: done
+tags:
+- crd
+- volumesnapshot
+- d8
+title: 'VolumeSnapshot: die 10 handgeschriebenen Klassen aus Emitter-Output neu schreiben
+  (fehlender k95-Pass)'
+updated: 2026-09-08T14:48:35Z
+---
+
+Gefunden bei k120 (VolumeSnapshot-Overlay). Nach dem Overlay steht der Provider auf 0 missing in lib / 0 not rendered, aber 10 differ - und diese 10 sind per Overlay NICHT schliessbar: die Overlay-Sprache hat drei Schluessel (names, with, extra) und keiner davon fasst einen Klassen-Body an.
+
+Ursache: ff44dc9c (D8, k97) hat diese 10 Klassen von Hand geschrieben. Die fuenf Provider, die heute auf 0 differ stehen, bekamen jeweils spaeter einen "modeled to full depth (D5, k95)"-Commit, der lib aus der Emitter-Ausgabe neu schrieb. VolumeSnapshot hat diesen Pass nie bekommen.
+
+Die 10 Restdifferenzen sind ausschliesslich Body-Formatierung, vollstaendig inventarisiert (jede Konvention wegnormalisiert und neu gediffed - danach sind alle 10 Dateien identisch ausser restoreSize, das ein eigener Fall ist und nach kNN geht):
+
+1. POD-Umbruch, alle 10 Dateien: lib flacht upstreams |-Bloecke zu einer langen Zeile ab, _pod_safe behaelt sie.
+2. # ABSTRACT mit Punkt am Ende: 2 Dateien, lib strippt ihn.
+3. # ABSTRACT-Quelle bei verschachtelten Klassen: 7 Dateien. lib nahm den Go-Doc-Kommentar, der Emitter nimmt die Schema-Feldbeschreibung des Elternteils. Libs Prosa ist besser, aber aus dem CRD nicht erreichbar - kein Emitter und kein Overlay kann sie erzeugen.
+4. Reihenfolge der Optionsschluessel: 2 Dateien, lib { enum, required }, _options_source emittiert fest required-dann-enum.
+5. Typografische Anfuehrungszeichen: 1 Datei. Upstream schreibt in sourceVolumeMode U+201C/U+201D, lib hat sie zu ASCII gemacht; der Emitter behaelt upstreams Bytes und emittiert entsprechend use utf8 + =encoding UTF-8.
+
+Zu entscheiden: lib aus dem Render neu schreiben (dann verliert man Punkt 3, die bessere ABSTRACT-Prosa) oder die fuenf Konventionen als bewusste Abweichung dokumentieren und die 10 Differs stehenlassen. Nichts davon ist kaputt - es ist eine Frage, ob --check fuer diesen Provider aussagekraeftig sein soll.
+
+NACHTARBEIT 2026-09-08: Nach k125 ist die Quantity-Divergenz auf der Emitter-Seite behoben. Für die verbleibende reine Format-/POD-Konvergenz wird die bestehende Konvention der bereits emitter-konformen Provider gewählt: die zehn alten Snapshot-Klassen an kuratierten Emitter-Output angleichen, ohne Typen/Optionen/Serialisierung zu verändern. Die besseren, aber aus der CRD nicht rekonstruierbaren Go-ABSTRACT-Texte werden dabei durch die gepinnten Schema-Beschreibungen ersetzt; keine öffentliche API-Entscheidung. k121s neue GroupSnapshot-Klassen und dessen Cross-Version-Overlaygrenze sind ausdrücklich nicht Teil dieses Zehn-Klassen-Passes. Vorher/nachher Schema-/Wire-Parität der alten Klassen prüfen; kein globales --check-0 für den später erweiterten Provider behaupten.
+
+ZURÜCKGESTELLT 2026-09-08: Doc-Writer durfte die zehn alten Snapshot-POD-Dateien wegen der ursprünglichen Emitter-only-Dateigrenze nicht schreiben. Ablehnung respektiert. Die einzigen vorbereitenden Änderungen (Optionsreihenfolge in VolumeSnapshotClass/VolumeSnapshotContentSpec) gezielt zurückgenommen; beide Dateien wieder ohne Diff. Keine k124-Änderung committet. Vollständige geprüfte Rendererreferenzen und isolierte drei Snapshot-Quellen bleiben /tmp/io-k8s-k124-review.UETroU/{rendered,crd-input}; Registry-/Wire-Parität war nachgewiesen. k121-GroupSnapshot-Arbeit ist unabhängig und bleibt erhalten.
+
+DIREKTE SCHREIBFREIGABE 2026-09-08: Nutzer sagt ausdrücklich „Mach k124, die Schreibfreigabe für die Snapshot-Dateien hast du.“ Die zehn bisherigen Snapshot-Dateien dürfen jetzt wie vorgesehen normalisiert werden; GroupSnapshot-Dateien und fachliche Verträge bleiben unverändert.
+
+UMGESETZT UND VERIFIZIERT 2026-09-08 nach direkter Nutzerschreibfreigabe: Commit 03b0b787, gepusht auf origin/k126-k127-changes. Exakt zehn alte Snapshot-Dateien an den erneut gerenderten v8.6.0-Referenzstand angeglichen: ABSTRACT/POD/Umbrüche, passende UTF-8-Deklaration und zwei Optionsreihenfolgen. 10/10 Dateien bytegenau gleich zur frischen Renderreferenz. Registry- und vollständige repräsentative Wire-/Roundtrip-Baselines vor/nach bytegleich (baseline-probe.pl unter /tmp/io-k8s-k124-review.UETroU; final /tmp/io-k8s-k124-after-0Hjjue.json). Keine Typ-/Optionswertänderung, restoreSize-Quantity/Int-Aufteilung erhalten. Alle GroupSnapshot-Dateien, Provider und Overlay unverändert.
+Source-Suite: 99 Dateien / 8800 Tests PASS, optionaler Live-Cluster-Test übersprungen. Frischer Build /tmp/io-k8s-k124-build-7Im07d/dist erfolgreich; Author-POD/Changes 1925 Tests PASS; zusätzlicher Pod::Checker aller zehn betroffenen Module: 0 Fehler/0 Warnungen. git diff --check sauber. Kein neuer Changes-Bullet für den reinen Format-/Doku-Pass. Der vollständige erweiterte VolumeSnapshot-Provider hat weiterhin die getrennte Cross-Version-Overlaygrenze aus k120/k121; 10/10 betrifft bewusst nur diesen klassischen Snapshot-Pass. Kein master-Merge oder Release.
+
+INSTALLATION BESTÄTIGT: AUTHOR_TESTING=1 RELEASE_TESTING=1 dzil install erfolgreich (Build/Test/Installation jeweils OK). SnapshotContentSpec lädt ohne -Ilib aus /home/getty/perl5/lib/perl5. Weiterhin nur vorbestehende Changes-Straffung und Skilländerung uncommittet.
