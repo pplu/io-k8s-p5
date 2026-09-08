@@ -17,6 +17,10 @@ our $VERSION = '1.108';
 # Track which classes we've auto-generated
 my %_autogen_cache;
 
+# Generated classes outlive their IO::K8s instance, so a freed instance's
+# reusable object address cannot identify its namespace.
+my $_autogen_namespace_sequence = 0;
+
 # Classes load_class() has already pulled in successfully.
 #
 # ONLY successes are recorded, and only after require_module has returned:
@@ -376,9 +380,8 @@ has _autogen_namespace => (
     is => 'ro',
     lazy => 1,
     default => sub {
-        my $self = shift;
-        # Create unique identifier based on object address
-        my $id = sprintf('%x', 0 + $self);
+        # A process-wide sequence remains unique after an instance is freed.
+        my $id = sprintf('%x', ++$_autogen_namespace_sequence);
         return "IO::K8s::_AUTOGEN_$id";
     },
 );

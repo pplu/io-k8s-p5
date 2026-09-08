@@ -2,6 +2,10 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Allocate process-unique AutoGen namespaces even after an IO::K8s instance
+    is destroyed, preventing later instances from reusing generated classes
+    from another openapi_spec.
+
   - Class->to_crd emits Bool defaults as JSON true or false. Numeric defaults,
     including 0 and 1, remain JSON numbers.
 

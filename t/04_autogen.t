@@ -461,4 +461,109 @@ subtest 'autogen Quantity and Time support' => sub {
     like($json_str, qr/"replicas":3\b/, 'JSON: replicas as integer');
 };
 
+{
+    package Test::K123::SameNumericIdentity;
+    use parent -norequire, 'IO::K8s';
+    use overload '0+' => sub { 0x1234 }, fallback => 1;
+}
+
+subtest 'autogen namespaces do not reuse numeric object identities' => sub {
+    my $definition = 'test.example.v1.Widget';
+    my $first_spec = {
+        definitions => {
+            $definition => {
+                type => 'object',
+                'x-kubernetes-group-version-kind' => [{
+                    group   => 'test.example',
+                    version => 'v1',
+                    kind    => 'Widget',
+                }],
+                properties => {
+                    apiVersion => { type => 'string' },
+                    kind       => { type => 'string' },
+                    legacyText => { type => 'string' },
+                    replicas   => { type => 'integer' },
+                },
+            },
+        },
+    };
+    my $second_spec = {
+        definitions => {
+            $definition => {
+                type => 'object',
+                'x-kubernetes-group-version-kind' => [{
+                    group   => 'test.example',
+                    version => 'v1',
+                    kind    => 'Widget',
+                }],
+                properties => {
+                    apiVersion => { type => 'string' },
+                    kind       => { type => 'string' },
+                    enabled    => { type => 'boolean' },
+                    replicas   => { type => 'integer' },
+                },
+            },
+        },
+    };
+
+    my ($first_class, $first_namespace);
+    {
+        my $first_k8s = Test::K123::SameNumericIdentity->new(
+            openapi_spec => $first_spec,
+        );
+        $first_namespace = $first_k8s->_autogen_namespace;
+        my $first = $first_k8s->inflate({
+            apiVersion => 'test.example/v1',
+            kind       => 'Widget',
+            legacyText => 'first schema',
+            replicas   => 3,
+        });
+        $first_class = ref $first;
+        is_deeply(
+            $first_k8s->inflate($first->TO_JSON)->TO_JSON,
+            {
+                apiVersion => 'test.example/v1',
+                kind       => 'Widget',
+                legacyText => 'first schema',
+                replicas   => 3,
+            },
+            'first generated class round-trips its schema',
+        );
+    }
+
+    my $second_k8s = Test::K123::SameNumericIdentity->new(
+        openapi_spec => $second_spec,
+    );
+    my $second_namespace = $second_k8s->_autogen_namespace;
+    my $second = $second_k8s->inflate({
+        apiVersion => 'test.example/v1',
+        kind       => 'Widget',
+        enabled    => 1,
+        replicas   => 7,
+    });
+    my $second_class = ref $second;
+
+    isnt($second_namespace, $first_namespace, 'a fresh instance has a fresh namespace');
+    isnt($second_class, $first_class, 'the same definition name yields an independent class');
+
+    my $info = $second_class->_k8s_attr_info;
+    ok($info->{enabled}{is_bool}, 'second schema boolean remains declared as Bool');
+    ok($info->{replicas}{is_int}, 'second schema integer remains declared as Int');
+    ok(!exists $info->{legacyText}, 'second schema does not retain the first schema field');
+
+    my $wire = $second->TO_JSON;
+    like($second->to_json, qr/"replicas":7\b/, 'second schema integer is unquoted on the wire');
+    like($second->to_json, qr/"enabled":true/, 'second schema boolean is a JSON boolean');
+    is_deeply(
+        $second_k8s->inflate($wire)->TO_JSON,
+        {
+            apiVersion => 'test.example/v1',
+            kind       => 'Widget',
+            enabled    => JSON::MaybeXS::true,
+            replicas   => 7,
+        },
+        'second generated class round-trips its independent schema',
+    );
+};
+
 done_testing;
