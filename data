@@ -1,0 +1,40 @@
+---
+claimed_at: 2026-09-08T01:52:05Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T01:25:28Z
+created: 2026-09-08T01:04:25Z
+id: 129
+priority: medium
+started: 2026-09-08T01:07:08Z
+status: done
+tags:
+- docs
+- readme
+- pod
+title: README und POD an den aktuellen öffentlichen API-Vertrag angleichen
+updated: 2026-09-08T01:52:05Z
+---
+
+Bestandsaufnahme 2026-09-08 auf k126-k127-changes, HEAD ab3f106d plus lokale k126/k127-Änderungen. Reine Doku-Korrektur, keine Verhaltensänderung und keine Releasefreigabe.
+
+Bestätigte Widersprüche:
+- README.md:114/162/213: Provider-Zahlen vermischen resource_map-Einträge und CRDs bzw. sind veraltet. Cilium: 31 Map-Schlüssel statt 31 CRDs; GatewayAPI: zehn Kinds in 14 GVKs statt elf CRDs; ExternalSecrets: 25 Kinds einschließlich 19 Generator-Kinds statt sechs.
+- lib/IO/K8s/ExternalSecrets.pm:111-118,232-235: alte Zähler und Aussage ClusterGenerator sei nicht modelliert; resource_map:58 und V1alpha1/ClusterGenerator.pm belegen das Gegenteil.
+- README.md:271-274 und Role/Routable.pm:274-280 bewerben eine gemeinsame add_path_match-Kette einschließlich Ingress. Tatsächlich croakt Ingress absichtlich (Routable.pm:220, t/17_role_routable.t:211-234). Nur die Doku präzisieren; API-Entscheidung bleibt k119.
+- lib/IO/K8s.pm:1725-1727 behauptet load_yaml lehne unbekannte Felder immer ab. Default bewahrt sie, erst strict => 1 lehnt ab (lokal reproduziert; t/66_unknown_fields.t).
+- Role/APIObject.pm:657 und CRD.pm:242-261 nennen to_crd den exact inverse von AutoGen. Quantity wird aber zu type:string und nach add_crd zu Str; bekannte Verluste dokumentieren, keine automatische Änderung der Typabbildung.
+- lib/IO/K8s.pm:1330/1356 beschreibt Vererbung von Resource/APIObject statt tatsächlicher Rollenkomposition; isa auf diese DSL-Module ist falsch, DOES auf die Rollen richtig.
+- Changes:14-17 sagt identical source; k126 erlaubt ausdrücklich unterschiedliches Kontext-POD/ABSTRACT bei identischer funktionaler Quelle (Emitter.pm:174-217, t/92:221-269). Den bestehenden Bullet präzisieren, keinen zusätzlichen Worklog-Bullet anfügen.
+
+README.md wird separat gepflegt, nicht aus Haupt-POD gespiegelt. Prüfen: Beispiele lokal gegen den Code, aktuelle Provider-Maps zählen, frisches transformiertes POD auf Syntax/Links prüfen; dabei keine alten Buildkopien als aktuellen Buildnachweis verwenden. Kein massenhafter Provider-POD-Sweep als Beifang.
+
+UMGESETZT UND VERIFIZIERT 2026-09-08, uncommittet auf k126-k127-changes. README.md und zehn POD-Module aktualisiert: IO/K8s.pm, AutoGen, CRD, CRD/Emitter, ExternalSecrets, Role/APIObject, Role/CertManaged, Role/MiddlewareBuilder, Role/Routable, Unstructured. Bestehenden Changes-Bullet zur funktionalen Kollisionsidentität präzisiert; kein neuer Worklog-Bullet.
+
+Korrigiert: Provider-Inventar und Cilium-Zahlen auch im Haupt-POD; ExternalSecrets ClusterGenerator/Scope/17-member union; Ingress-Ausnahme konsistent in Übersicht/Beispielen; load_yaml mit explizitem strict-Beispiel; Rollenkomposition statt Vererbung; Quantity-Verlust beim Export und weitere AutoGen-Inferenzgrenzen; Emitter-Zielpfad-/Kollisionssemantik; sieben AutoGen-Linkziele; HTTP01 ohne nginx-Default; RateLimit falsey-Verhalten; Unstructured semantisch statt byteidentisch. README zeigt unknown_kinds-Fallback und SpecBuilder auf allen APIObjects; Haupt-POD verlinkt alle neun Provider.
+
+Verifikation auf aktuellem Arbeitsbaum: prove -lr t/ PASS, 96 Dateien / 8652 Tests, Exit 0; optionaler Live-Cluster-Test in t/04 mangels TEST_IO_K8S_KUBECONFIG übersprungen. Frischer dzil build --no-tgz in /tmp/io-k8s-k129-build-1pAstN/dist erfolgreich. Dort AUTHOR_TESTING=1 RELEASE_TESTING=1 prove -l t/author-pod-syntax.t t/release-changes_has_content.t: 1891 Tests PASS ohne übersprungene Dateien. Zusätzlicher Pod::Checker auf allen zehn geänderten transformierten POD-Modulen: 0 Fehler / 0 Warnungen. Geänderte Beispiele lokal reproduziert (Strict-YAML, Unstructured, HTTPRoute, ClusterGenerator, Ingress-Croak, HTTP01, RateLimit, CRD-Typgrenzen). git diff --check sauber. Vergleich aller 1890 Module gegen den Stand vor k129, ohne POD/Kommentare/Leerzeilen: keinerlei ausführbare Änderungen.
+
+Vorhandene k126/k127-Implementierungen und Tests unangetastet. Kein Provider-Wurzel-Massensweep, keine API-Entscheidung aus k119 umgesetzt. Kein Commit, Push oder Release.
+
+COMMIT 2026-09-08: e090ca72 (Align README and POD with the current API contracts). Nur README und zehn POD-Dateien, bei CRD.pm/Emitter.pm hunkweise von k126/k127 getrennt. Die Changes-Präzisierung liegt weiterhin uncommittet im zu k126 gehörenden Bullet innerhalb der vorbestehenden Changes-Straffung; nicht in den reinen Doku-Commit aufgenommen. Kein Push.
