@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-08T06:01:11Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T05:22:45Z
+created: 2026-09-08T05:20:08Z
+id: 130
+priority: low
+started: 2026-09-08T05:20:23Z
+status: done
+tags:
+- docs
+- readme
+title: README-Migrationsnotizen an verifizierte 1.108-Verträge angleichen
+updated: 2026-09-08T06:01:11Z
+---
+
+Bei k121-Dokuintegration wurden drei übrig gebliebene Aussagen im Migrationsabschnitt gefunden, unabhängig vom GroupSnapshot-Feature: README nennt 22 neue v1.37-Kinds, tatsächlich sind seit 1.107 genau 11 neue APIObject-Klassen unter lib/IO/K8s/Api hinzugekommen; set_owner-Duplikate werden laut README abgelehnt, die Implementierung behandelt dieselbe UID jedoch als idempotenten No-op vor der Controller-Konfliktprüfung; FROM_HASH wird pauschal als strict bezeichnet, unbekannte Felder bleiben aber standardmäßig erhalten. Nur diese drei README-Aussagen korrigieren, kein Runtime-/POD-Sweep. Primärbelege: git diff --diff-filter=A 1.107..HEAD plus APIObject-Imports; Role/APIObject.pm::set_owner; direkte FROM_HASH-Probe mit neuerem Feld; t/55_set_owner.t+t/66_unknown_fields.t (16 Tests PASS). Ein zusätzlicher Verdacht auf ein fehlerhaftes Pod-Minimalbeispiel wurde nicht bestätigt und wird NICHT geändert.
+
+ERLEDIGT 2026-09-08, Commit ec203fff: ausschließlich drei Migrationsaussagen in README korrigiert (11 Core-Kinds, UID-Duplikat als No-op, FROM_HASH rekursiv ohne behauptetes Default-strict). K121s GroupSnapshot-README-Hunk wurde bewusst nicht in diesen Commit aufgenommen. Direkte FROM_HASH-Probe und t/55+t/66 mit 16 Tests PASS; keine Runtime-Änderung. Push folgt zusammen mit dem nächsten verifizierten k121-Commit.
+
+PUSH 2026-09-08: ec203fff liegt nun zusammen mit k121 auf origin/k126-k127-changes. Keine Runtime-Änderung; der nachfolgende k121-Stand ist ebenfalls erfolgreich installiert.
