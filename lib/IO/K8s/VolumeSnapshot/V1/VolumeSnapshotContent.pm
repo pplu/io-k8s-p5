@@ -10,7 +10,8 @@ k8s status => '+IO::K8s::VolumeSnapshot::V1::VolumeSnapshotContentStatus';
 
 =attr spec
 
-spec defines properties of a VolumeSnapshotContent created by the underlying storage system. Required.
+spec defines properties of a VolumeSnapshotContent created by the underlying storage system.
+Required.
 
 =cut
 
