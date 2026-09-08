@@ -1,0 +1,28 @@
+---
+claimed_at: 2026-09-08T17:45:08Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T17:45:08Z
+created: 2026-09-04T20:43:52Z
+id: 119
+priority: medium
+started: 2026-09-08T15:54:35Z
+status: done
+tags:
+- roles
+- routable
+- api
+title: Routable::add_path_match hat im ingress-Modus keinen Weg, ein backend zu setzen
+updated: 2026-09-08T17:45:08Z
+---
+
+k117-Folge. Der ingress-Zweig von add_path_match croakt seit k117 sauber und vor jeder Mutation, weil er prinzipiell nicht erfolgreich sein kann: networking.k8s.io/v1 HTTPIngressPath verlangt backend UND pathType als required, die Signatur ist aber ($path, %opts) mit nur `type`, und add_backend schreibt spec.defaultBackend (der Fallback fuer nicht gematchte Requests), nicht das backend eines Pfades.
+
+Offene Feature-Entscheidung (Getty): bekommt die Methode im ingress-Modus einen Backend-Parameter, oder bleibt sie fuer dieses Format ein dokumentiertes No-Go?
+
+Vorschlag aus der k117-Runde: add_path_match(\x27/api\x27, type => \x27Prefix\x27, service => \x27api\x27, port => 8080) wuerde das Vokabular von add_backend aufgreifen. Wichtig dabei: das ergibt nur im ingress-Modus Sinn - gateway und traefik holen ihr Backend ueber add_backend - waere also eine ingress-only Option und keine Signaturaenderung fuer alle drei Formate.
+
+Heutiger Zustand ist konsistent und ehrlich: Croak mit Begruendung und Verweis auf den Ausweg, POD an zwei Stellen korrigiert, toter Code entfernt. Nichts ist kaputt; es fehlt eine Faehigkeit.
+
+ERLEDIGT 2026-09-08: Implementierung/Regressionen/POD/README in Commit5fad0f1e, vollständig nach master integriert und gepusht (aktueller HEAD771d999c). Ingress add_path_match benötigt service UND port, baut typisierte pfadspezifische Backends mit numerischen/benannten Ports und unterstützt Prefix/Exact/ImplementationSpecific. Prefix/Exact verlangen absolute vorhandene Pfade; ImplementationSpecific darf undef/leer sein, sonst ebenfalls absolut. Fehlende/ungültige Parameter scheitern vor Mutation. Mehrere Pfade/Hosts, lazy Klassenladung und JSON-Roundtrip geprüft. add_backend bleibt beim bisherigen defaultBackend-Verhalten; andere Routingformate unverändert. README und vollständiges Rollen-Synopsis lokal ausgeführt.
+Technischer Abschlusscheck: Source-Suite vor/nach Integration99Dateien/8801Tests PASS, optionaler Live-Cluster-Zweig in t04 mangels TEST_IO_K8S_KUBECONFIG übersprungen. Frischer Audit-Build /tmp/io-k8s-release-audit.S1Bnba ohne Blocker; 1923Module=1923MANIFEST-Einträge=1923META-provides, alleVersion1.108; Abhängigkeiten/Metadaten/Autorität/POD korrekt, alle33GroupSnapshot-Typen imPaket. Changes106Zeilenstatt314, bestehendeHistoriebyteidentisch, kein k122-Optimierungsclaim. AUTHOR_TESTING=1 RELEASE_TESTING=1 dzil install erfolgreich; installierter benannter Ingress-Pfadport ohne-Ilib unabhängig geprüft. Master/Origin synchron, WorkingTreeclean, temporärerArbeitsbranchentfernt. Keine Veröffentlichung ausgeführt.
