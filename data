@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-08T06:39:35Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T06:39:35Z
+created: 2026-09-08T05:46:15Z
+id: 131
+priority: low
+started: 2026-09-08T05:52:42Z
+status: done
+tags:
+- maint
+- reporting
+- crd
+title: 'crd-drift-check: flache Kinds fälschlich als OPAQUE SPEC einordnen'
+updated: 2026-09-08T06:39:35Z
+---
+
+Bei k121 verifiziert: VolumeSnapshotClass und VolumeGroupSnapshotClass haben driver/deletionPolicy/parameters direkt auf dem Kind und absichtlich kein spec-Feld. Der Field-Level-Loop in maint/crd-drift-check.pl:704-719 ordnet fehlende shipped_spec_fields bzw. fehlendes has_spec_schema pauschal opaque_spec zu. render_provider:795-801 behauptet dann upstream has no spec schema (preserve-unknown-fields), obwohl die gepinnten CRDs normale Properties ohne eine solche Preserve-Unknown-Entscheidung haben. Das ist eine falsche Info-Klassifikation, kein fehlendes Modell: kompletter VolumeSnapshot-Schema-Audit ist bei 0 Findings und die neuen Modelltests prüfen die direkten Class-Felder.
+Gezielter Folgefix: nicht anwendbaren spec-Vergleich für beiderseits spec-lose flache Kinds von tatsächlich opaken/schemalosen specs unterscheiden; K3s/echte preserve-unknown-Fälle dürfen nicht verschwinden. Die dokumentierte Tier-3-Spec-only-Abdeckung nicht still in vollständige Root-Feldabdeckung umdeuten. JSON-/Text-Reporting und --suggest-Auswahl mit lokalen Fixtures absichern. Keine Overlay-/Provider-Klassenänderung als Beifang.
+
+ERLEDIGT 2026-09-08: Commit bbdf3142, gepusht auf origin/k126-k127-changes. Root-Schema wird nur im bereits privaten _upstream-View mitgeführt; öffentliche JSON-Reportstruktur unverändert. Beiderseits spec-lose, explizit geschlossene flache Objektschemata erzeugen keine falsche OPAQUE-Spec-Info und keine unnötigen --suggest-Quellen mehr. Echte schemalose/preserve-unknown/offene/composite/unklare Fälle bleiben sichtbar; zusätzliche Root-Feldabdeckung wird ausdrücklich NICHT behauptet. Unbelegte preserve-unknown-Klammer im No-Schema-Text neutralisiert.
+RED zuerst: flacher VolumeSnapshotClass-Fall meldete noch opaque_spec=1 und Source-Suggestion. GREEN mit lokalen CLI-Fixtures samt offenem additionalProperties-Hash, true/false-Flags, opaque spec und regulärem typed spec. Ein Scope-Argument-Zwischenstand im Test wurde korrigiert; finaler Main-Lauf bestätigt alle vollständigen Aufrufe und alle Gegenfälle grün. Vollsuite 99 Dateien / 8800 Tests PASS, optionaler Live-Cluster-Test weiterhin übersprungen. AUTHOR_TESTING=1 RELEASE_TESTING=1 dzil install erfolgreich. Finaler Offline-Report: VolumeSnapshot 12 shipped GVK, 0 OPAQUE SPEC, 0 MISSING KIND. Keine lib-/Provider-/Overlay-Änderung und kein zusätzlicher Changes-Worklog-Bullet für diese reine maint-Reporting-Korrektur. Kein master-Merge/Release.
