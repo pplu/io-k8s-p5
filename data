@@ -1,0 +1,188 @@
+---
+class: standard
+completed: 2026-09-08T14:56:37Z
+created: 2026-09-05T18:50:51Z
+id: 128
+priority: high
+started: 2026-09-05T18:55:54Z
+status: done
+tags:
+- release
+- cpan
+- escalated-from:kubernetes-ocp#133
+title: Release IO::K8s 1.108 nach CPAN (Wurzel der Kette, blockiert OCPs Image-Build)
+updated: 2026-09-08T14:56:37Z
+---
+
+CPAN hat 1.107 (2026-08-15), OCP und beide Downstream-Siblings verlangen 1.108.
+
+Diese Distribution ist die WURZEL der Release-Kette. Nichts anderes kann vorher
+raus:
+
+  IO::K8s 1.108            <- hier, keine Sibling-Deps
+    -> Kubernetes::REST 1.108      (cpanfile: requires IO::K8s 1.108) -> dort k26
+      -> Net::Async::Kubernetes 0.008 (requires beide 1.108)
+        -> kubernetes-ocp: make snapshot -> dort k133
+
+WARUM ES DRAENGT
+kubernetes-ocps cpanfile verlangt seit dessen k125 (commit 7fb412b, 2026-09-01)
+IO::K8s 1.108. Der erste echte CI-Lauf dort (GitHub Actions run 33928559437,
+2026-09-04) hat gezeigt, was das heisst: cpm install --cpanfile --snapshot
+bricht mit "FAIL resolve" ab, das OCP-Docker-Image laesst sich aus einem
+frischen Checkout ueberhaupt nicht mehr bauen -- weder in CI noch lokal, dort
+verdeckte es nur der Layer-Cache. Vier Distributionen sind betroffen, diese ist
+die erste in der Reihe.
+
+STAND HIER
+20 unveroeffentlichte Commits seit tag 1.107, $VERSION steht ueberall auf 1.108,
+Changes {{$NEXT}} ist gefuellt. Testsuite auf dem Host gruen: 94 Dateien,
+8643 Tests, Result PASS (geprueft 2026-09-05).
+
+Inhaltlich drin, soweit fuer die Downstreams relevant:
+- bare-Kind-Aufloesung (ein einwortiger Name wie Role wird als Kind gelesen und
+  nicht als irgendein ladbares Top-Level-Package) -- das ist der Fix, den
+  Net::Async::Kubernetes fuer GH #2 braucht
+- Upstream-Sync auf Kubernetes v1.37: 22 neue Kinds inkl. IO::K8s::Api::Lifecycle,
+  samt Typen und GVK-Registrierung
+- gebundelte Provider PrometheusOperator, VolumeSnapshot, ExternalSecrets (D8/k97)
+- Rollen komponieren SpecBuilder, Import-Leaks geschlossen (k117, k118)
+- CRD::Emitter: pattern als ECMA262 statt Perl-Regex-Text (k110, k114)
+- Resource: hashref-Coercion in ->new, BUILD statt BUILDARGS (k100/k102/k115/k116)
+
+OFFEN VOR DEM RELEASE -- Entscheidung des Maintainers
+k120 steht auf in-progress (crd-render-Overlays, 1 von 3 fertig, claimed). Das
+ist maint-Tooling und kein Laufzeitverhalten, blockiert 1.108 also nicht -- aber
+dist.ini hat kein Prune, maint/ geht mit ins Tarball, und damit ginge die
+Tooling-Ecke in einem Zwischenstand raus. Entweder k120 vorher fertig machen
+oder bewusst so releasen.
+
+DANACH
+kubernetes-rest k26 anstossen (Kubernetes::REST 1.108), dann
+p5-net-async-kubernetes, dann kubernetes-ocp k133 (make snapshot + make test).
+
+2026-09-05 19:16 RELEASE-PREP ABGESCHLOSSEN (nur vorbereitet -- kein Upload, kein Tag, kein dzil release).
+
+GRUEN, mit Zahlen
+- Testsuite: 94 Dateien, 8643 Tests, Result PASS, exit 0. Zweimal gefahren: auf
+  HEAD unveraendert und nach meinen Aenderungen, identisches Ergebnis. Bestaetigt
+  damit die Ticketangabe vom 2026-09-05.
+- dzil build: exit 0, 8 Zeilen Output, NULL Warnungen. Tarball
+  IO-K8s-1.108.tar.gz, 1.5M, 96 .t-Dateien (94 aus t/ + 2 generierte
+  Author-/Release-Tests).
+- Author-/Release-Tests aus dem gebauten Dist: 1891 Tests PASS
+  (author-pod-syntax + release-changes_has_content).
+- $VERSION: 1889 Module unter lib/, ALLE exakt 1.108. Kein Modul ohne $VERSION,
+  kein Ausreisser. 1889 Pakete = 1889 $VERSION-Zeilen.
+- META.json aus dem Build: version 1.108, x_authority "cpan:JLMARTIN" (der
+  k75-Fix greift, kein doppeltes "cpan:cpan:"), license apache_2_0.
+- Deps: keine Sibling-Dependency. Kubernetes::REST::Kubeconfig taucht nur in
+  POD-Beispielcode in lib/IO/K8s.pm auf, nicht als echtes use. Keine Pins auf
+  unveroeffentlichte Versionen (Moo 2.000000, Type::Tiny 2.000000, Rest
+  unpinned).
+
+GEAENDERT -- Commit f84f5b2a auf Branch k128-release-prep (NICHT gepusht, NICHT auf master)
+1. cpanfile: Path::Tiny von "develop" zusaetzlich nach "test". ECHTER BLOCKER,
+   kein Kosmetikfix: t/50_shadowed_kind_names.t und
+   t/52_expand_class_shadow_window.t machen ein ungeschuetztes "use Path::Tiny",
+   beide liegen im Tarball, und META.json deklarierte Path::Tiny bisher nur
+   unter develop. Auf einem Smoker oder einer Maschine ohne vorinstalliertes
+   Path::Tiny stirbt die Suite mit "Can't locate Path/Tiny.pm" und reisst die
+   Installation mit. Das ist exakt der cpm-Pfad, den kubernetes-ocps
+   Image-Build benutzt -- der Fix gehoert also in 1.108 selbst, nicht in eine
+   Folgeversion. Kein Runtime-Dep dazu; lib/ benutzt Path::Tiny nicht.
+2. Changes: drei Aussagen korrigiert, die nicht mehr zum Code passten, plus ein
+   neuer Bullet fuer den Path::Tiny-Fix.
+   a) v1.37-Sync sagte "22 new Kinds" -> real 11. Dreifach belegt: 11 neu
+      hinzugekommene APIObject-Klassen unter lib/IO/K8s/Api/ seit tag 1.107, die
+      Commit-Message von ab736b95 ("the 11 new v1.37 Kinds and 103 new non-Kind
+      types"), und t/51s eigener Pin (113 -> 124 API-Objekte, Delta 11). Der
+      Bullet nennt jetzt zusaetzlich 103 Supporting Types, 114 neue Klassen und
+      48 neue Felder auf 43 bestehenden Klassen.
+   b) k103/SpecBuilder sagte "~213 APIObject classes" -> real 232 (Live-Sweep
+      ueber ->does(IO::K8s::Role::APIObject)). Die Datei widersprach sich
+      selbst: der k118-Bullet nennt fuer dieselbe Menge bereits "232 top-level
+      Kinds". Die "32 that have no spec field" im selben Satz stimmen und
+      blieben.
+   c) Cilium-v2-Bullet sagte "138 classes total (17 Kinds + 121 nested)". Der
+      Namespace liefert 139 Klassen / 18 Kinds aus; der 18. ist
+      CiliumExternalWorkload, der k78-Back-compat-Kind ohne Upstream-Manifest.
+      Der v2alpha1-Bullet erklaerte sein Gegenstueck (CiliumBGPPeeringPolicy)
+      bereits sauber, v2 tut es jetzt auch.
+   Alle uebrigen 78 Bullets gegen "git log 1.107..HEAD" geprueft: jeder
+   verhaltensrelevante Commit ist erfasst. Nicht erfasst und korrekt so: reine
+   Infra-/Skill-/Plan-Commits, POD-Politur (k65, k69), und k109 (Provider-POD),
+   das nur wiederherstellt, was k95 innerhalb desselben unveroeffentlichten
+   Fensters verloren hatte -- gegenueber 1.107 also netto keine Aenderung.
+   Ebenso netto null: 6aab1be0 entfernte NodeAllocatableResourceMapping,
+   cfd18b20 nahm es zurueck.
+
+ZWEI ANGABEN IM TICKETKOPF SIND FALSCH
+- "20 unveroeffentlichte Commits seit tag 1.107" -> real 132 (git describe:
+  1.107-132-gbf328485).
+- "22 neue Kinds" -> real 11 (siehe oben). Die Zahl stammt aus dem alten
+  Changes-Text und hat sich ins Ticket fortgepflanzt.
+
+MAINTAINER MUSS VOR DEM UPLOAD ENTSCHEIDEN
+1. Branch mergen. Die beiden Fixes liegen auf k128-release-prep, NICHT auf
+   master. Ohne Merge geht 1.108 mit der Path::Tiny-Luecke und den drei
+   falschen Changes-Aussagen raus:
+     git merge --ff-only k128-release-prep
+   Bewusst nicht gepusht und nicht auf master committet: oeffentliches,
+   co-maintained Repo (pplu/io-k8s-p5), das ist keine unilaterale Entscheidung.
+2. origin/master haengt 13 Commits hinter local master (origin: a0385e80 k109,
+   local: bf328485 k120). Push gehoert vor oder mit das Release.
+3. k120-Frage, konkret gemacht (Entscheidung bleibt beim Maintainer):
+   dist.ini hat kein [PruneFiles], maint/ geht also mit ins Tarball.
+   Ausgeliefert wuerden 15 Eintraege, 256K von 1.5M:
+     6 Skripte  crd-drift-check.pl, crd-schema-audit.pl, spec-drift-check.pl,
+                core-shape-index-gen.pl, spec-kind-fixture-gen.pl,
+                spec-resource-plural-gen.pl
+     2 YAMLs    crd-drift-exceptions.yaml, spec-drift-exceptions.yaml
+     6 Overlays crd-render/{AgentSandbox,CertManager,Cilium,GatewayAPI,Traefik,
+                VolumeSnapshot}.yaml
+   Der Zwischenstand ist genau: VolumeSnapshot-Overlay fertig (0f83668e, "first
+   of three"), PrometheusOperator und ExternalSecrets fehlen noch. K3s hat
+   bewusst nie eins (schemaloses Upstream, dokumentiert als SOURCE UNRESOLVED).
+   WEM SCHADET ES: niemandem zur Laufzeit und niemandem bei der Installation.
+   maint/ liegt zwar im Tarball, wird aber nicht installiert -- das generierte
+   Makefile.PL hat kein EXE_FILES und kennt nur lib/. Kein Test haengt an den
+   fehlenden Overlays; t/86 iteriert nur ueber vorhandene crd-render/*.yaml und
+   ist gruen. Der einzige Effekt: wer das Tarball auspackt und
+   crd-drift-check.pl --check auf PrometheusOperator oder ExternalSecrets
+   laufen laesst, bekommt laut k120 22 strukturelle Scheindifferenzen
+   (PrometheusOperator 3 match/13 differ, ExternalSecrets 7 match/9 differ) --
+   irrefuehrend fuer einen Maintainer, aber report-only, das Tool aendert
+   nichts.
+   EMPFEHLUNG: so releasen, k120 danach zu Ende bringen -- die ausgelieferten
+   Klassen sind korrekt und getestet, und ein unvollstaendiges Overlay-Set in
+   nicht-installiertem Maintainer-Tooling ist kein Grund, die Kette aus vier
+   Distributionen weiter blockiert zu lassen.
+
+NICHT GETAN, bewusst: kein CPAN-Upload, kein dzil release, kein git tag, kein
+Push. maint/crd-drift-check.pl --check habe ich nicht laufen lassen -- es
+braucht Netz (kein spec/crd-Cache im Worktree); die 22 Differenzen sind aus k120
+zitiert, nicht von mir nachgemessen.
+
+NAECHSTER SCHRITT NACH DEM RELEASE: kubernetes-rest k26, dann
+p5-net-async-kubernetes, dann kubernetes-ocp k133.
+
+MERGE ERLEDIGT 2026-09-05 (kubernetes-ocp, Main-Agent). Der Hinweis oben, die Fixes laegen auf k128-release-prep und NICHT auf master, ist ueberholt: f84f5b2a ist per --ff-only auf master. Branch und Worktree sind entfernt, ebenso die Karteileichen crd-step4 und crd-step5 (beide waren bereits Ancestor von master, Worktrees sauber).
+
+Master ist jetzt f84f5b2a, 14 Commits vor origin/master. Testsuite auf dem gemergten Stand nachgefahren: 94 Dateien, 8643 Tests, Result PASS.
+
+Zwei Zahlen aus dem Bericht habe ich unabhaengig nachgezaehlt statt sie zu glauben, beide stimmen exakt: 232 APIObject-Klassen (Dateien mit dem APIObject-Import, abzueglich der 9 Rollen, der Basisklasse und IO/K8s.pm) und davon 32 ohne 'k8s spec'. Der Path::Tiny-Befund ebenfalls verifiziert: ungeschuetztes 'use Path::Tiny' in t/50:32 und t/52:45, und lib/ benutzt es nirgends -- der Fix ist echt und gehoert in 1.108.
+
+MAINTAINER-ENTSCHEIDUNG zu k120 ist gefallen: maint/ ist fuer das Release nicht relevant, es wird so released. k120 laeuft danach normal weiter.
+
+OFFEN, weil deine Entscheidung: master ist nicht gepusht. origin ist pplu/io-k8s-p5, co-maintained -- 14 Commits Push gehoert vor oder mit das Release.
+
+GEPUSHT 2026-09-05. Der Punkt 'master ist nicht gepusht' oben ist erledigt: origin/master steht auf f84f5b2a (a0385e80..f84f5b2a, 14 Commits, sauberer Fast-Forward, vorher gefetcht -- nichts Fremdes upstream). Auch der Rueckstand von 13 Commits, der vor dieser Runde bestand, ist damit weg.
+
+STAND: alles ausser dem Upload selbst ist fertig. Was jetzt noch fehlt, kann nur der Maintainer: das Release nach CPAN. Danach kubernetes-rest k26, dann p5-net-async-kubernetes k29, dann kubernetes-ocp k133.
+
+INTEGRATIONSNACHWEIS 2026-09-06: dzil install gefahren (kein Upload). Build und Testsuite liefen dabei gegen die installierten Vorgaenger der Kette, nicht nur gegen das eigene lib/ -- 'Building and testing ... OK'. Danach OCPs Suite gegen alle drei installierten Staende: 81 Dateien, 1292 Tests, PASS. Bis dahin hatte OCP gegen VERALTETE installierte Kopien getestet (IO::K8s und K::REST je 3 Commits hinterher, N::A::K vom 2026-08-23). Details in kubernetes-ocp k133. Die bindende make test in Docker bleibt bis zum Upload unfahrbar -- sie loest aus CPAN auf.
+
+STATUSAKTUALISIERUNG 2026-09-08 auf Nutzerfrage: Die ältere Aussage „nur noch Upload fehlt“ bezog sich auf den damaligen master-Stand f84f5b2a und ist für den heutigen Gesamtstand unvollständig. Die inzwischen verifizierten k129/k126/k127/k123/k125/k130/k121/k131/k124-Änderungen liegen gepusht auf origin/k126-k127-changes (aktuell 03b0b787), nicht auf master. Aktuelle Source-Suite 99 Dateien / 8800 Tests PASS, optionaler Live-Test übersprungen; frischer Author-POD/Changes-Lauf 1925 Tests PASS. Lokale Installation ist kein CPAN-Upload.
+Vor einer Veröffentlichung des Gesamtstands bleiben Release-Branch-Integration, Finalisierung/Commit der noch offenen Changes-Straffung und Prüfung des finalen Release-Stands nötig. Ausdrückliche CPAN-Release-Freigabe liegt weiterhin nicht vor. Die frühere Maintainer-Entscheidung, k120/maint nicht als Releaseblocker zu behandeln, bleibt unverändert. Keine Release-Aktion ausgeführt; Status review bleibt.
+
+2026-09-08 14:56 GESCHLOSSEN auf Maintainer-Anweisung: Tickets für CPAN-Uploads gibt es nicht mehr. Ein Release ist keine Arbeit, die ein Agent erledigen kann, sondern eine Entscheidung des Maintainers: entweder der Stand ist releasefähig oder nicht. Ein Ticket, dessen Abschlusskriterium der Upload ist, kann von einem Agenten nie abgeschlossen werden und endet zwangsläufig als Dauer-Blockade. Die Prüfarbeit in diesem Verlauf (Audit, Integrationsnachweis gegen den Sibling-Working-Tree) bleibt lesbar; sie ist normale Arbeit gegen den Tree und braucht kein Release-Ticket. Die offenen Punkte aus der Statusaktualisierung vom 2026-09-08 (Integration von k126-k127-changes nach master, Commit der Changes-Straffung) sind Arbeit an den jeweiligen Tickets, nicht an einem Release-Ticket. Die Upload-Reihenfolge (IO::K8s vor Kubernetes::REST vor Net::Async::Kubernetes wegen der cpanfile-Pins) ist Sache des Maintainers.
