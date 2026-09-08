@@ -491,7 +491,7 @@ sub _ensure_class_loaded {
 sub _property_schema {
     my ($entry, $seen, $where) = @_;
     my $schema = _type_schema($entry, $seen);
-    _apply_options($schema, $entry->{options}, $where) if $entry->{options};
+    _apply_options($schema, $entry->{options}, $where, $entry->{is_bool}) if $entry->{options};
     return $schema;
 }
 
@@ -581,7 +581,7 @@ sub _opaque_object {
 # per-property key, it joins the ENCLOSING object's own 'required' array,
 # handled by _schema_for_class's caller loop above.
 sub _apply_options {
-    my ($schema, $opts, $where) = @_;
+    my ($schema, $opts, $where, $is_bool) = @_;
     $schema->{enum} = [ @{ $opts->{enum} } ] if exists $opts->{enum};
     $schema->{minimum} = $opts->{minimum} if exists $opts->{minimum};
     $schema->{maximum} = $opts->{maximum} if exists $opts->{maximum};
@@ -590,7 +590,14 @@ sub _apply_options {
         $schema->{pattern} = (ref $p eq 'Regexp') ? _pattern_to_ecma262($p, $where) : $p;
     }
     $schema->{description} = $opts->{description} if exists $opts->{description};
-    $schema->{default} = _copy_one_level($opts->{default}) if exists $opts->{default};
+    if (exists $opts->{default}) {
+        my $default = _copy_one_level($opts->{default});
+        $schema->{default} = $is_bool
+            ? (IO::K8s::Resource::_normalize_bool($default)
+                ? JSON::MaybeXS::true
+                : JSON::MaybeXS::false)
+            : $default;
+    }
     $schema->{nullable} = $opts->{nullable} ? JSON::MaybeXS::true : JSON::MaybeXS::false
         if exists $opts->{nullable};
     $schema->{'x-kubernetes-preserve-unknown-fields'} = $opts->{preserve_unknown} ? JSON::MaybeXS::true : JSON::MaybeXS::false

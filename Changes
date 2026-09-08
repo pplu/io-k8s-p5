@@ -2,6 +2,9 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Class->to_crd emits Bool defaults as JSON true or false. Numeric defaults,
+    including 0 and 1, remain JSON numbers.
+
   - Venafi NGTS and TPP credentialsRef fields now use the new
     IO::K8s::CertManager::V1::CertManagerLocalObjectReference, whose name is
     schema-required and has no default. The existing LocalObjectReference
