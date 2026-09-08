@@ -1,0 +1,40 @@
+---
+claimed_at: 2026-09-08T03:58:49Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T02:21:12Z
+created: 2026-09-05T01:45:19Z
+id: 126
+priority: high
+started: 2026-09-07T17:59:24Z
+status: done
+tags:
+- crd
+- certmanager
+- emitter
+- bug
+title: 'CertManager: LocalObjectReference aliast zwei verschiedene Upstream-Typen
+  auf eine Klasse'
+updated: 2026-09-08T03:58:49Z
+---
+
+Gefunden vom neuen maint/crd-schema-audit.pl. ECHTER DEFEKT IN AUSGELIEFERTEM CODE, und --check meldet trotzdem 0 differ.
+
+In cert-manager v1.21.1 ist LocalObjectReference zwei verschiedene Typen:
+- corev1s, an sechs Positionen ...podTemplate.spec.imagePullSecrets[]: name hat default: "", nichts required
+- cert-managers eigener, an vier Positionen spec.venafi.{tpp,ngts}.credentialsRef: kein default, required: [name]
+
+maint/crd-render/CertManager.yaml benennt beide gleich (Zeilen 186/189, 267/270). Daraus entsteht EINE Perl-Klasse, die die corev1-Form traegt. Die vier credentialsRef-Positionen shippen also einen default => \x27\x27, den upstream nicht deklariert, und verlieren ein required, das upstream deklariert.
+
+WARUM --check DAS NICHT SIEHT: render_for macht $files{$_} = $rendered->{$_} - bei nicht byte-identischen Bodies bleibt still der zuletzt geschriebene stehen, und verglichen wird nur der Ueberlebende. CertManager steht deshalb auf 77 match / 0 differ, waehrend crd-schema-audit.pl 8 Findings meldet.
+
+Das ist zugleich der Beleg, dass die Aliasing-Gefahr keine Prognose fuer k120s naechste Schritte ist, sondern bereits realisiert. Und es widerlegt die Annahme, die fuenf emitter-sauberen Provider koennten diese Fehlerklasse per Konstruktion nicht haben.
+
+Zu entscheiden: das Overlay muss die beiden Typen unterschiedlich benennen (dann entstehen zwei Klassen, eine davon neu), oder der Emitter/render_for muss einen Aliasing-Konflikt melden statt still den letzten Body zu behalten. Zweiteres ist die eigentliche Absicherung - ein stiller Konflikt kann in jedem Overlay wieder entstehen.
+
+ABSCHLUSS 2026-09-08, vom Nutzer ausdrücklich freigegeben: Vorliegende Aliasaufspaltung und funktionale Emitter-/cross-GVK-Kollisionserkennung unabhängig geprüft, keine weiteren lib-/maint-Änderungen nötig. t/92 gezielt ergänzt: kein falscher Venafi-Default, bisherige LocalObjectReference bleibt schema-optional mit default "", option-only-Kollision, Unicode-POD/use-utf8-Alias, präziser cross-GVK-Diagnosemarker.
+RED in temporärer git-archive-HEAD-Kopie ohne Fixes scheitert an den tatsächlichen Schema-/Kollisionsansprüchen, nicht Dependencies. GREEN im Arbeitsbaum: t/92+t/93, 2 Dateien / 7 Top-Level-Tests PASS. Vollsuite mit ergänzten Tests: 96 Dateien / 8654 Tests PASS; optionaler Live-Cluster-Test in t/04 übersprungen. Letzte zusätzliche schema-optional-Assertion danach im fokussierten Lauf bestätigt.
+Offline-CertManager v1.21.1: 78 match / 0 differ / 0 missing / 0 not rendered, sechs GVK; Schema-Audit 0 Findings, 84 nicht darstellbare Keywords und 40 Stock-Klassen separat ausgewiesen. Zehn zusätzliche Review-Proben bestanden. Typwechsel vorgebauter Venafi-Referenzen betrifft nur unreleased full-depth-Oberfläche, die in Release 1.107 noch nicht existierte.
+Fixes, Tests und Changes bleiben uncommittet; k129 separat als e090ca72 committet. Kein Push/Release.
+
+COMMIT/PUSH/INSTALL 2026-09-08: b73a7e0d ist auf origin/k126-k127-changes. dzil install des nachfolgenden cda4303e-Standes erfolgreich; neue CertManagerLocalObjectReference wird ohne lokales -Ilib aus /home/getty/perl5/lib/perl5 geladen. Kein master-Merge/Release.
