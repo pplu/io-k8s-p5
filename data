@@ -1,0 +1,29 @@
+---
+claimed_at: 2026-09-08T04:46:01Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T04:46:01Z
+created: 2026-09-04T23:24:14Z
+id: 123
+priority: medium
+started: 2026-09-08T03:58:39Z
+status: done
+tags:
+- autogen
+- bug
+title: 'AutoGen: _autogen_namespace kollidiert bei wiederverwendeter refaddr'
+updated: 2026-09-08T04:46:01Z
+---
+
+Gefunden in der load_class-Memoisierungsrunde (als Drittfall geprueft, nicht als Ziel gesucht). Vorbestehend, unabhaengig von der Memoisierung - base und cached verhalten sich identisch falsch, eine echte Kollision wurde dafuer erzwungen.
+
+IO::K8s::_autogen_namespace bildet den Namespace ueber sprintf("%x", 0 + $self), also die refaddr der Instanz. Perl vergibt die Adresse einer zerstoerten Instanz wieder. Zwei verschiedene IO::K8s-Objekte mit verschiedenen openapi_spec koennen darum auf denselben generierten Klassennamen fallen.
+
+Symptom bei erzwungener Kollision: die zweite Instanz bekommt die Attribute der ERSTEN Spec, und ein Feld, das nur in der zweiten Spec existiert, schlaegt fehl. Ursache ist AutoGens eigener %_generated-Cache zusammen mit dem %INC-Eintrag, den Moo fuer das generierte Package setzt - der zweite Generierungsversuch findet die Klasse als vorhanden vor und generiert nicht neu.
+
+Zu entscheiden: Namespace aus einem monoton wachsenden Zaehler statt der refaddr (einfach, macht generierte Klassennamen ueber Prozesslaeufe hinweg unvorhersehbar - fuer AutoGen-Klassen aber ohnehin kein Vertrag), oder Spec-Identitaet in den Namespace aufnehmen (Hash ueber die Spec), oder die Instanz am Leben halten. Erste Variante duerfte reichen.
+
+Praktische Relevanz gering: braucht zwei IO::K8s-Instanzen mit verschiedenen Specs, von denen die erste zerstoert wird, bevor die zweite entsteht. Aber es ist ein stiller Falschverhalten-Bug, kein Croak.
+
+ERLEDIGT 2026-09-08: Commit 376e531c, gepusht auf origin/k126-k127-changes. _autogen_namespace nutzt einen privaten monotonen Prozesszähler statt wiederverwendeter Objektadresse; Hex-Namespaceform, lazy allocation, Caches und ::_CRD-Isolation bleiben erhalten. Deterministischer RED-Test mit gleicher numerischer Objektidentität und inkompatiblen Specs zeigte alte Klasse/fehlenden Bool-Typ und JSON 1 statt true; jetzt GREEN ohne Cache-Clear. Beide Specs roundtrippen mit korrekten Wire-Typen.
+Verifikation: t/04+t/73 23 Top-Level-Tests PASS (optionaler Live-Cluster-Test übersprungen); gesamte Suite gemeinsam mit k125 97 Dateien / 8659 Tests PASS. AUTHOR_TESTING=1 RELEASE_TESTING=1 dzil install erfolgreich. Installierter Code ohne -Ilib aus /home/getty/perl5/lib/perl5 bestätigt unterschiedliche _AUTOGEN_1/_AUTOGEN_2 bei gleicher simulierten numerischen Identität. Kein master-Merge/Release.
