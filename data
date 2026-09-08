@@ -1,0 +1,36 @@
+---
+claimed_at: 2026-09-08T04:46:11Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-08T04:46:11Z
+created: 2026-09-05T01:16:41Z
+id: 125
+priority: medium
+started: 2026-09-08T03:58:44Z
+status: done
+tags:
+- crd
+- emitter
+- types
+title: 'Emitter erkennt die Quantity-Form nicht: IntOrStr+pattern statt Quantity'
+updated: 2026-09-08T04:46:11Z
+---
+
+Gefunden bei k120 (VolumeSnapshot-Overlay).
+
+Ein CRD-Feld mit type: string + x-kubernetes-int-or-string: true + der apimachinery-Quantity-Pattern ist eine Quantity. Der Emitter erkennt die Form nicht und rendert sie als:
+
+  k8s restoreSize => IntOrStr, { pattern => qr/^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$/ };
+
+waehrend die handgeschriebene Klasse sagt:
+
+  k8s restoreSize => Quantity;
+
+Beide Schreibweisen koexistieren heute im ausgelieferten Baum: VolumeSnapshotStatus.restoreSize benutzt Quantity, PrometheusOperator hat an sieben Feldern die Emitter-Schreibweise (z.B. V1/EmptyDirVolumeSource.pm, sizeLimit).
+
+WICHTIG - die Richtung: IO::K8s::Types Quantity ist ein Str, der auf die apimachinery-Quantity-Grammatik eingeschraenkt ist, also strikt ENGER als IntOrStr (ein blankes Str) bei identischer Wire-Form. lib auf die Emitter-Schreibweise umzustellen wuerde Validierung loeschen. Der Fix gehoert in den Emitter: Quantity-Form erkennen und Quantity emittieren, dann verschwindet die Divergenz von der richtigen Seite.
+
+Beruehrt danach die sieben PrometheusOperator-Felder, die heute die schwaechere Form tragen.
+
+ERLEDIGT 2026-09-08: Commit ced5198f, gepusht auf origin/k126-k127-changes. Emitter-only-Erkennung von is_int_or_string plus exakt kanonischem Quantity-Pattern; String/Regexp unterstützt, externe semantische Flags nicht umgedeutet, nur u/p wie bestehende Literalmechanik ignoriert. Rendert Quantity und entfernt nur das redundante Pattern aus der Optionskopie. Dynamische AutoGen-Registry, übrige Optionen und CRD-Export unverändert. Sieben PrometheusOperator-Felder kuratiert zu Quantity geändert; VolumeSnapshot restoreSize unverändert.
+RED/GREEN in t/95 belegt: beide echten strukturellen Schemaformen, negative Patterns/Flags/Str, externe /i-Semantik, Registry-Unverändertheit, kompilierte Quellen und Wire-Roundtrips. Numeric-looking Quantity ist jetzt JSON-String "42" statt Zahl 42; im Changes-Bullet und Emitter-POD ausdrücklich dokumentiert. Vorherige Pattern-Validierung war bereits vorhanden. Gezielte fünf Dateien / 46 Top-Level-Tests PASS; gesamte Suite 97 Dateien / 8659 Tests PASS, optionaler Live-Cluster-Test übersprungen. Prometheus-Schema-Audit 0 Findings; bekannte Quantity-Exportgrenze aggregiert als 8 grammar-carrying Quantity-Felder ausgewiesen. AUTHOR_TESTING=1 RELEASE_TESTING=1 dzil install erfolgreich; installierte EmptyDirVolumeSource emittiert {"sizeLimit":"42"}. Kein master-Merge/Release.
