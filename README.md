@@ -204,9 +204,11 @@ my $sm = $k8s->new_object('ServiceMonitor',
 );
 ```
 
-### VolumeSnapshot (3 CRDs)
+### VolumeSnapshot (6 CRD Kinds / 12 served GVKs)
 
-`IO::K8s::VolumeSnapshot` covers `snapshot.storage.k8s.io/v1` (upstream external-snapshotter v8.6.0). `VolumeSnapshot` is namespaced; `VolumeSnapshotClass` and `VolumeSnapshotContent` are cluster-scoped:
+`IO::K8s::VolumeSnapshot` covers `snapshot.storage.k8s.io/v1` and all three served `groupsnapshot.storage.k8s.io` tracks (`v1`, `v1beta1`, `v1beta2`) from external-snapshotter v8.6.0. `VolumeSnapshot` and `VolumeGroupSnapshot` are namespaced; their Class and Content Kinds are cluster-scoped.
+
+Bare group-snapshot names select the pinned upstream's **storage version `v1beta2`**, not `v1`. An explicit `apiVersion` selects any served track. The beta1 content status uses `volumeSnapshotHandlePairList`; v1 and v1beta2 use the typed `volumeSnapshotInfoList` instead.
 
 ```perl
 my $k8s = IO::K8s->new(with => ['IO::K8s::VolumeSnapshot']);
@@ -214,6 +216,15 @@ my $snap = $k8s->new_object('VolumeSnapshot',
     metadata => { name => 'my-snap', namespace => 'default' },
     spec => { volumeSnapshotClassName => 'csi-snapclass', source => { persistentVolumeClaimName => 'my-pvc' } },
 );
+
+my $group = $k8s->new_object('VolumeGroupSnapshot',
+    metadata => { name => 'database-snapshots', namespace => 'default' },
+    spec => {
+        volumeGroupSnapshotClassName => 'csi-group-snapclass',
+        source => { selector => { matchLabels => { app => 'database' } } },
+    },
+);
+# $group->api_version is 'groupsnapshot.storage.k8s.io/v1beta2'.
 ```
 
 ### External Secrets (25 resource-map entries)

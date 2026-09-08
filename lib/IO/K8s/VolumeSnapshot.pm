@@ -6,6 +6,12 @@ with 'IO::K8s::Role::ResourceMap';
 
 sub upstream_version { 'v8.6.0' }  # kubernetes-csi/external-snapshotter
 
+=method upstream_version
+
+Returns the external-snapshotter release whose CRDs this provider models.
+
+=cut
+
 # Upstream CRD manifests for the pinned upstream_version, consumed by
 # maint/crd-drift-check.pl. Data only -- no fetching happens here. `base`
 # + each `files` entry is the raw manifest URL; the checker caches each
@@ -19,23 +25,56 @@ sub crd_sources {
             'snapshot.storage.k8s.io_volumesnapshotclasses.yaml',
             'snapshot.storage.k8s.io_volumesnapshotcontents.yaml',
             'snapshot.storage.k8s.io_volumesnapshots.yaml',
+            'groupsnapshot.storage.k8s.io_volumegroupsnapshotclasses.yaml',
+            'groupsnapshot.storage.k8s.io_volumegroupsnapshotcontents.yaml',
+            'groupsnapshot.storage.k8s.io_volumegroupsnapshots.yaml',
         ],
     };
 }
+
+=method crd_sources
+
+Returns the six raw CRD manifest locations pinned to C<upstream_version>.
+
+=cut
 
 sub resource_map {
     return {
         VolumeSnapshot        => 'VolumeSnapshot::V1::VolumeSnapshot',
         VolumeSnapshotClass   => 'VolumeSnapshot::V1::VolumeSnapshotClass',
         VolumeSnapshotContent => 'VolumeSnapshot::V1::VolumeSnapshotContent',
+
+        VolumeGroupSnapshot        => 'VolumeSnapshot::V1beta2::VolumeGroupSnapshot',
+        VolumeGroupSnapshotClass   => 'VolumeSnapshot::V1beta2::VolumeGroupSnapshotClass',
+        VolumeGroupSnapshotContent => 'VolumeSnapshot::V1beta2::VolumeGroupSnapshotContent',
+
+        'groupsnapshot.storage.k8s.io/v1/VolumeGroupSnapshot'
+            => 'VolumeSnapshot::V1::VolumeGroupSnapshot',
+        'groupsnapshot.storage.k8s.io/v1/VolumeGroupSnapshotClass'
+            => 'VolumeSnapshot::V1::VolumeGroupSnapshotClass',
+        'groupsnapshot.storage.k8s.io/v1/VolumeGroupSnapshotContent'
+            => 'VolumeSnapshot::V1::VolumeGroupSnapshotContent',
+        'groupsnapshot.storage.k8s.io/v1beta1/VolumeGroupSnapshot'
+            => 'VolumeSnapshot::V1beta1::VolumeGroupSnapshot',
+        'groupsnapshot.storage.k8s.io/v1beta1/VolumeGroupSnapshotClass'
+            => 'VolumeSnapshot::V1beta1::VolumeGroupSnapshotClass',
+        'groupsnapshot.storage.k8s.io/v1beta1/VolumeGroupSnapshotContent'
+            => 'VolumeSnapshot::V1beta1::VolumeGroupSnapshotContent',
     };
 }
+
+=method resource_map
+
+Returns the twelve short-name and fully qualified group-version-kind routes
+provided by this provider.
+
+=cut
 
 1;
 
 __END__
 
-=head1 SYNOPSIS
+=synopsis
 
     my $k8s = IO::K8s->new(with => ['IO::K8s::VolumeSnapshot']);
 
@@ -44,48 +83,59 @@ __END__
         spec => { source => { persistentVolumeClaimName => 'my-pvc' } },
     );
 
-    print $vs->to_yaml;
+    my $group = $k8s->new_object('VolumeGroupSnapshot',
+        metadata => { name => 'database-group', namespace => 'default' },
+        spec => {
+            volumeGroupSnapshotClassName => 'csi-group-snapshot-class',
+            source => { selector => { matchLabels => { app => 'database' } } },
+        },
+    );
 
-=head1 DESCRIPTION
+    print $group->to_yaml;
 
-Resource map provider for the L<external-snapshotter|https://github.com/kubernetes-csi/external-snapshotter>
-VolumeSnapshot Custom Resource Definitions. Registers 3 resource_map
-entries covering C<snapshot.storage.k8s.io/v1>, matching upstream
-external-snapshotter v8.6.0.
+=description
 
-Modeled to full depth: every Kind's C<spec> and, where upstream declares
-one, C<status> is a typed object graph of further
-C<IO::K8s::VolumeSnapshot::V1::*> classes, one per upstream Go structure,
-named after the upstream Go types -- 3 Kinds, 7 further classes.
-L<IO::K8s::VolumeSnapshot::V1::VolumeSnapshotError> is shared between
-L<IO::K8s::VolumeSnapshot::V1::VolumeSnapshotStatus> and
-L<IO::K8s::VolumeSnapshot::V1::VolumeSnapshotContentStatus>, matching how
-upstream declares one Go type for both. C<VolumeSnapshotContentSpec>'s
-C<volumeSnapshotRef> reuses the stock
-L<IO::K8s::Api::Core::V1::ObjectReference>, not a re-modeled copy.
-C<VolumeSnapshotClass> has no C<spec>/C<status> wrapper upstream -- its
-fields (C<driver>, C<deletionPolicy>, C<parameters>) sit directly on the
-Kind, the same shape as L<IO::K8s::Cilium::V2::CiliumIdentity>.
+Resource-map provider for the VolumeSnapshot and VolumeGroupSnapshot Custom
+Resource Definitions from the
+L<external-snapshotter|https://github.com/kubernetes-csi/external-snapshotter>
+project, pinned to external-snapshotter v8.6.0. Its C<crd_sources> lists the
+six raw CRD manifests for that release.
 
-Only the storage C<v1> API version is modeled; the deprecated, non-served
-C<v1beta1> track that upstream still ships alongside it is not.
+The provider has 12 raw resource-map entries. The three snapshot Kinds,
+C<VolumeSnapshot>, C<VolumeSnapshotClass>, and C<VolumeSnapshotContent>, are
+modeled at C<snapshot.storage.k8s.io/v1>. C<VolumeSnapshot> is
+namespace-scoped; C<VolumeSnapshotClass> and C<VolumeSnapshotContent> are
+cluster-scoped. The deprecated, non-served C<snapshot.storage.k8s.io/v1beta1>
+track that upstream ships alongside C<v1> is not modeled. Both snapshot-class
+Kinds keep their upstream shape: C<driver>, C<deletionPolicy>, and
+C<parameters> are direct fields rather than a C<spec>/C<status> wrapper.
 
-C<VolumeSnapshot> is namespace-scoped; C<VolumeSnapshotClass> and
-C<VolumeSnapshotContent> are cluster-scoped, matching each Kind's
-C<spec.scope> in the upstream CRD manifests.
+The provider additionally models the three group-snapshot Kinds,
+C<VolumeGroupSnapshot>, C<VolumeGroupSnapshotClass>, and
+C<VolumeGroupSnapshotContent>, in all three served
+C<groupsnapshot.storage.k8s.io> tracks: C<v1>, C<v1beta1>, and C<v1beta2>.
+The bare group-snapshot names select their C<v1beta2> classes because
+C<v1beta2> is the sole storage version. Use an explicit GVK such as
+C<groupsnapshot.storage.k8s.io/v1/VolumeGroupSnapshot> or
+C<groupsnapshot.storage.k8s.io/v1beta1/VolumeGroupSnapshot> to select either
+of the other served tracks.
 
-v8.6.0 also promoted C<VolumeGroupSnapshot>/C<VolumeGroupSnapshotClass>/
-C<VolumeGroupSnapshotContent> (group C<groupsnapshot.storage.k8s.io/v1>)
-to GA. Those are not modeled by this provider -- see karr for a possible
-follow-up.
+The provider models 33 group-snapshot types and 10 snapshot types.
+C<VolumeGroupSnapshot> is namespace-scoped; C<VolumeGroupSnapshotClass> and
+C<VolumeGroupSnapshotContent> are cluster-scoped. The group-snapshot source
+reuses the stock L<IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector>,
+and the content reference reuses L<IO::K8s::Api::Core::V1::ObjectReference>.
 
-Not loaded by default -- opt in via the C<with> constructor parameter of
+C<v1> and C<v1beta2> use their C<VolumeSnapshotInfo> type for
+C<volumeSnapshotInfoList>; C<v1beta1> uses
+C<VolumeSnapshotHandlePair> for C<volumeSnapshotHandlePairList>. All tracks
+reuse L<IO::K8s::VolumeSnapshot::V1::VolumeSnapshotError>. The
+L<IO::K8s::CRD::Emitter>-rendered C<maint/crd-render> overlay does not yet
+support this shared error leaf as a cross-version alias.
+
+Not loaded by default. Opt in through the C<with> constructor parameter of
 L<IO::K8s> or by calling C<< $k8s->add('IO::K8s::VolumeSnapshot') >> at
 runtime.
-
-=head2 Included CRDs (snapshot.storage.k8s.io/v1)
-
-VolumeSnapshot, VolumeSnapshotClass, VolumeSnapshotContent
 
 =seealso
 

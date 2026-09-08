@@ -49,7 +49,7 @@ subtest 'IO::K8s::VolumeSnapshot resource_map' => sub {
     is($provider->upstream_version, 'v8.6.0', 'upstream_version pin');
 
     my $map = $provider->resource_map;
-    is(scalar keys %$map, 3, 'resource_map has 3 entries');
+    is(scalar keys %$map, 12, 'resource_map has 12 entries (3 VolumeSnapshot plus 9 VolumeGroupSnapshot registrations)');
 
     for my $kind (sort keys %v1_classes) {
         ok(exists $map->{$kind}, "$kind in resource_map");
@@ -59,7 +59,18 @@ subtest 'IO::K8s::VolumeSnapshot resource_map' => sub {
     my $sources = $provider->crd_sources;
     is($sources->{status}, 'ok', 'crd_sources status ok');
     like($sources->{base}, qr{external-snapshotter/v8\.6\.0/client/config/crd$}, 'crd_sources base URL');
-    is(scalar @{ $sources->{files} }, 3, 'crd_sources lists 3 manifests');
+    is_deeply(
+        $sources->{files},
+        [
+            'snapshot.storage.k8s.io_volumesnapshotclasses.yaml',
+            'snapshot.storage.k8s.io_volumesnapshotcontents.yaml',
+            'snapshot.storage.k8s.io_volumesnapshots.yaml',
+            'groupsnapshot.storage.k8s.io_volumegroupsnapshotclasses.yaml',
+            'groupsnapshot.storage.k8s.io_volumegroupsnapshotcontents.yaml',
+            'groupsnapshot.storage.k8s.io_volumegroupsnapshots.yaml',
+        ],
+        'crd_sources lists all 6 pinned Snapshot and GroupSnapshot manifests',
+    );
 };
 
 # --- new(with => ['IO::K8s::VolumeSnapshot']) integration ---
