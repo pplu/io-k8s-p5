@@ -6,16 +6,17 @@ Revision history for IO-K8s
     v1beta1 and v1beta2. Bare names select storage v1beta2; explicit GVKs
     select any served track, with fully typed version-specific fields.
 
-  - Recognize canonical Quantity patterns in CRD::Emitter; seven
-    PrometheusOperator fields now use Quantity. Numeric quantities serialize
-    as JSON strings rather than numbers; dynamic AutoGen typing is unchanged.
-
   - Allocate process-unique AutoGen namespaces even after an IO::K8s instance
     is destroyed, preventing later instances from reusing generated classes
     from another openapi_spec.
 
-  - Class->to_crd emits Bool defaults as JSON true or false. Numeric defaults,
-    including 0 and 1, remain JSON numbers.
+  - Recognize canonical Quantity patterns in CRD::Emitter; seven
+    PrometheusOperator fields now use Quantity. Numeric quantities serialize
+    as JSON strings rather than numbers; dynamic AutoGen typing is unchanged.
+
+  - Path::Tiny is now declared as a test prerequisite. Installations no longer
+    fail when the shipped test suite runs without a preinstalled Path::Tiny;
+    no runtime dependency is added.
 
   - Venafi NGTS and TPP credentialsRef fields now use the new
     IO::K8s::CertManager::V1::CertManagerLocalObjectReference, whose name is
@@ -27,1180 +28,289 @@ Revision history for IO-K8s
     identical; contextual POD and ABSTRACT text may differ. Conflicting
     declarations fail before overwriting and identify both classes or GVKs.
 
-  - Path::Tiny is declared as a test prerequisite, not only a develop one.
-    t/50_shadowed_kind_names.t and t/52_expand_class_shadow_window.t use it
-    unguarded to build the shadowing stub modules they need, and both ship in
-    the tarball, so on a smoker or installer that did not already have
-    Path::Tiny the suite died with "Can't locate Path/Tiny.pm" and took the
-    install down with it. No runtime dependency is added -- lib/ does not use
-    Path::Tiny.
-
-  - Five ExternalSecrets generator classes are corrected against their CRD
-    (k120 audit). IO::K8s::ExternalSecrets::V1alpha1::SecretRef was missing the
-    key and name patterns upstream declares, which matters at runtime: pattern
-    is enforced as a constraint at construction, so an invalid value was
-    accepted client-side and left for the API server to reject. The other four
-    affect to_crd fidelity only -- GrafanaSpec.auth is required, and a
-    "Defaults to ..." sentence in a field description had been read as a real
-    default on GithubAccessTokenSpec.url and GitlabDeployTokenSpec.url, while
-    ACRWorkloadIdentity.serviceAccountRef was marked required where the CRD
-    has no required list at all.
-
-  - New maint/crd-schema-audit.pl compares each provider class's field options
-    against the CRD the provider is modelled from, which is what found the
-    five above. It answers a question --check cannot: --check compares lib to
-    the emitter's render, so where an overlay aliases two upstream types onto
-    one class, only the surviving render is ever compared and the difference
-    is invisible. Constraints the k8s DSL cannot express (minLength, maxLength,
-    minItems and friends) are counted and named separately rather than
-    reported as findings.
-
-  - The roles no longer leak their imports as methods onto every class that
-    composes them (k118). Because their use lines sat below use Moo::Role, Moo
-    counted the imported subs as methods of the role: $pod->croak(...),
-    $pod->use_module(...), $container->blessed(...) and $pod_spec->HashRef
-    were all callable. Nothing used them and nothing should. Hoisting each
-    role's imports above use Moo::Role removes them -- HashRef from 1858
-    classes, blessed from 1856, croak / InstanceOf / Maybe / use_module from
-    the 232 top-level Kinds, and cidr_contains from the three NetworkPolicy
-    Kinds. Failure mode for anyone who did call one: "Can't locate object
-    method". No role loses a method it genuinely defines, and DOES is
-    unchanged for every class.
-
-    Four classes exposed the same names from their own use Moo rather than
-    from a role, where hoisting does not help; they now load those modules
-    without importing and qualify each call, so blessed, reftype, InstanceOf,
-    Maybe, ArrayRef and require_module stop being methods on IO::K8s::List and
-    the three JSONSchemaPropsOr* classes as well.
-
-  - IO::K8s::load_class memoises a successful load, which is worth ~14% on
-    inflating a realistic document (measured -13% to -17% across paired runs;
-    direct attribution puts 14.0% of inflate time inside load_class, so that
-    is the ceiling and the memo reaches it). It called require_module afresh
-    for every coercion and every nested inflate -- 21 calls per inflate of the
-    t/25 Deployment. Only successes are recorded: require_module dies before
-    the store, so a failed load is retried and a class defined later still
-    resolves. One documented consequence: deleting a class's %INC entry after
-    a successful load no longer forces a re-require, so a Module::Refresh
-    style hot reload is not served by this path -- it never really was.
-
-  - IO::K8s::Role::NetworkPolicy's allow_egress_to_dns now emits, on core
-    NetworkPolicy objects, the rule its own documentation describes: port 53
-    to the CoreDNS pods (kube-system, k8s-app: kube-dns). It previously
-    emitted the ports with no "to" peer at all, which permits DNS to every
-    destination -- weaker than documented and weaker than the cilium branch,
-    which had the selector right. Behaviour change: a regenerated manifest is
-    narrower than the one it replaces, and anything that was reaching port 53
-    on a non-CoreDNS destination through this rule now needs an explicit
-    allow. Cilium output is unchanged.
-
-  - Every IO::K8s::APIObject class composes IO::K8s::Role::SpecBuilder, not
-    just CRD classes, so the seven builder roles can finally declare what they
-    depend on (k103). CertManaged, HelmManaged, MiddlewareBuilder,
-    MiddlewareTCPBuilder, Loadbalanced, Routable and NetworkPolicy each carry
-    a requires for the exact spec_* methods they call, so composing one on a
-    class that cannot support it fails when the role is applied instead of
-    with "Can't locate object method spec_push" at call time. The spec_*
-    surface is therefore public on all 232 APIObject classes; on the 32 that
-    have no spec field, a spec_* call croaks naming the class. Measured cost
-    of the extra composition: under a megabyte, no measurable load time.
-
-  - IO::K8s::Role::Routable and IO::K8s::Role::NetworkPolicy load the classes
-    they build (k117). Both core branches died in any process that had not
-    already pulled those classes in some other way -- NetworkPolicy->select_pods
-    on LabelSelector, Ingress->add_hostname on IngressRule. Also,
-    Routable::add_path_match's ingress branch cannot succeed at all, because
-    networking.k8s.io/v1 HTTPIngressPath requires a backend and the method has
-    no parameter carrying one; it now croaks before mutating anything instead
-    of dying partway through and leaving the object half-built.
-
-  - A CRD pattern emitted by to_crd now carries upstream's own bytes rather
-    than the escaping a qr// literal introduces (k114). IO::K8s::CRD::Emitter
-    kept the qr// form for patterns it could not represent byte-exactly: @
-    became \@ (an invalid identity escape in ECMA262 unicode mode), a bare $
-    inside a character class became \$, a non-ASCII character became \x{HEX}
-    (not ECMA262 at all), and upstream's own \/ was silently dropped. 28
-    shipped classes are updated to the string form and 46 of 1571 rendered
-    pattern fields change; before the fix those 46 emitted text matching no
-    upstream pattern, now none do. Matching semantics are unchanged for every
-    field. maint/crd-drift-check.pl also learns to repair double-encoded UTF-8
-    beyond the Latin-1 range in a cached manifest, which had been reporting a
-    permanent false difference for Cilium.
-
-  - IO::K8s::ExternalSecrets now models the whole
-    generators.external-secrets.io/v1alpha1 group (k113): all 19 Kinds --
-    ACRAccessToken, BeyondtrustWorkloadCredentialsDynamicSecret,
-    CloudsmithAccessToken, ClusterGenerator, ECRAuthorizationToken, Fake,
-    GCRAccessToken, GeneratorState, GithubAccessToken, GitlabDeployToken,
-    Grafana, MFA, Password, QuayAccessToken, SSHKey, STSSessionToken, UUID,
-    VaultDynamicSecret and Webhook. They live flat in
-    IO::K8s::ExternalSecrets::V1alpha1 alongside the external-secrets.io
-    track, distinguished by each class's own api_version -- the arrangement
-    IO::K8s::CertManager already uses for cert-manager.io and
-    acme.cert-manager.io. Nested shapes reuse the existing V1 classes wherever
-    the schemas are byte-identical (VaultProvider, AWSAuth,
-    SecretStoreRetrySettings, the SecretKeySelector family), so
-    VaultDynamicSecret is two files rather than the 44 a literal render would
-    produce. Where they only look identical they do not: GCRAccessToken's
-    workloadIdentity has required fields V1::GCPWorkloadIdentity leaves
-    optional, so it is its own class. maint/crd-drift-check.pl now reports the
-    provider with no missing Kinds and no field gaps.
-
-  - IO::K8s::Role::Resource does its D1 unknown-field walk in a sub BUILD
-    instead of an around BUILDARGS (k102). Same walk, same order, same
-    decisions -- Moo charges 1.66us for a BUILDARGS wrapper against 0.46us for
-    a BUILD, and that plumbing was the dominant cost, not the walk itself.
-    Measured on the current tree: direct ->new -7.9%, inflation -5.3%. The
-    option this ticket actually proposed -- moving object coercion into the
-    wrapper -- was prototyped and measured at +0.2% and is not being built;
-    the per-attribute coercion it would remove costs the same as the
-    replacement. Note for the record: that is the reason, not the rw setter,
-    which was shown to be preservable at no cost.
-
-  - A plain hashref passed to ->new for an inline-struct field is now copied
-    one level, not aliased (k116). Every other route -- inflate,
-    struct_to_object, FROM_HASH -- already copied since k54, so the same field
-    of the same class behaved differently depending on how it was built. The
-    inline-struct coercer is gone; is_inline_struct falls through to the named
-    is_object coercer, and the two paths cannot drift apart again. Behaviour
-    change for a caller who mutates the source hashref after ->new and expects
-    the object to see it.
-
-  - A direct Class->new now coerces a plain hashref into a named nested class
-    for object, array-of-object and hash-of-object fields (k100), where it
-    previously died with "Not a blessed reference" / an InstanceOf failure and
-    callers had to go through new_object or FROM_HASH. The coercion routes
-    through the same _struct_to_object_expanded that FROM_HASH uses, so bool
-    normalization and D1 unknown-field handling are identical on both paths --
-    Middleware->new(spec => { rateLimit => { average => 100 } }) now builds
-    what the inline-struct form used to. metadata on every APIObject class
-    coerces too (k115): it is declared by IO::K8s::Role::APIObject rather than
-    by the k8s DSL, so it needed the same coercer wired in there, sharing one
-    source with Resource.pm rather than a copy of it. An already-blessed value
-    still passes straight through, so the inflate path does no double work.
-    Cost is ~5% on inflation, all of it Moo's per-coerced-attribute wrapper
-    (see k102), not the coercion body.
-
-  - IO::K8s::Traefik::V1alpha1::MiddlewareTCP no longer composes
-    IO::K8s::Role::MiddlewareBuilder (k106). That role is HTTP-only -- verified
-    against traefik/traefik v3.7.12, MiddlewareTCPSpec has just
-    inFlightConn/ipAllowList/ipWhiteList -- so its setters configured options
-    Traefik never honours for a TCP middleware. Behaviour change: a call
-    like $tcp_mw->rate_limit(...) now dies with "Can't locate object method"
-    where it previously succeeded, writing the key into the typed spec's
-    _unknown_fields bag (correct on the wire, but no signal to the caller).
-    MiddlewareTCP composes the new IO::K8s::Role::MiddlewareTCPBuilder instead
-    (in_flight_conn, ip_allow_list, ip_white_list); the HTTP Middleware and
-    IO::K8s::Role::MiddlewareBuilder itself are unchanged. Nothing is removed,
-    so no IO::K8s::Deprecated stub is involved. New t/86 guards every with:
-    entry in maint/crd-render/*.yaml against the class's actual ->does(),
-    after the Traefik overlay was found still naming the old role.
-
-  - Class->to_crd now emits openAPIV3Schema.pattern as ECMA262 rather than
-    Perl regex text (k110). A qr// pattern loses its (?^u:...) wrapper and has
-    \A/\z translated to ^/$; a Perl-only construct (a semantic /i/m/s/x flag,
-    \Z, \K, possessive quantifiers, atomic groups, POSIX classes, ...) now
-    croaks naming the class, field and construct instead of emitting a regex
-    the apiserver would reject or read differently. A pattern given as a plain
-    string is still passed through verbatim -- that is the escape hatch for an
-    upstream pattern that is not ECMA262-clean. \p{...} and \x{...} are
-    deliberately not rejected: upstream CRDs ship them and the apiserver
-    validates with Go/RE2, where they are valid. IO::K8s::CRD::Emitter renders
-    a flag-carrying pattern as a plain string with an inline (?flags) prefix,
-    so a re-render cannot reintroduce a pattern that to_crd then refuses; the
-    one shipped class affected, PrometheusOperator::V1::RuleGroup, is updated
-    to that form with identical matching behaviour.
-
-  - reuse_core no longer pays a ~6.4s cold start on the first CRD generate /
-    add_crd / inflate in a process (k104). The core-shape index was built by
-    loading all ~840 shipped classes; it now comes from the precomputed
-    IO::K8s::AutoGen::CoreShapes and loads in milliseconds (measured 6.43s ->
-    0.06s), with only a looked-up shape's own candidate classes loaded on
-    demand. Falls back to the live scan if the artifact is missing.
-    Regenerate with maint/core-shape-index-gen.pl; t/85 fails if the checked-in
-    index and a live scan disagree.
-
-  - IO::K8s::List now composes IO::K8s::Role::Resource (k99), closing the D1
-    unknown-field hole on the list envelope: an unknown top-level key on a *List
-    document (anything besides apiVersion/kind/metadata/items) now round-trips
-    through the _unknown_fields bag instead of being silently dropped, and strict
-    inflation dies on it like any other resource. List keeps its own hand-rolled
-    TO_JSON/FROM_STRUCT (kind/apiVersion derive from items, not a class name).
-
-  - IO::K8s::CRD::Emitter::_type_source now handles arrays of Num/Quantity/Time/
-    IntOrStr (k112), mirroring to_crd's _type_schema (k96) -- the reverse
-    (registry -> DSL source) direction previously croaked on those four flags.
-    Currently reachable only for an emitter-rendered CRD carrying such an array.
-
-  - Fix IO::K8s::Role::SpecBuilder descending into an unset [Num]/[Quantity]/
-    [Time]/[IntOrStr] array field (k111): _sb_fresh's array-shape check omitted
-    the four is_array_of_num/quantity/time/int_or_string flags added in k96, so
-    spec_set('field.-1', ...) through such a field croaked "cannot descend
-    through scalar field" instead of vivifying it. Reachable on shipped
-    Api::Resource::*::ResourceSlice [Quantity] fields.
-
-  - Three new bundled CRD providers (D8, k97), opt-in via
-    IO::K8s->new(with => [...]) like the existing ones: IO::K8s::PrometheusOperator
-    (monitoring.coreos.com, upstream v0.93.1 -- Prometheus, Alertmanager,
-    ServiceMonitor, PodMonitor, PrometheusRule, Probe, ScrapeConfig),
-    IO::K8s::VolumeSnapshot (snapshot.storage.k8s.io/v1, upstream
-    external-snapshotter v8.6.0 -- VolumeSnapshot, VolumeSnapshotClass,
-    VolumeSnapshotContent) and IO::K8s::ExternalSecrets (external-secrets.io,
-    upstream v2.10.0 -- ExternalSecret, SecretStore, ClusterSecretStore,
-    ClusterExternalSecret, PushSecret, ClusterPushSecret). Modeled to full depth
-    with upstream Go type names, per-field POD and crd_sources for
-    maint/crd-drift-check.pl. Deliberately deferred surface (external-secrets
-    generators.external-secrets.io group, external-snapshotter
-    VolumeGroupSnapshot*) is recorded in maint/crd-drift-exceptions.yaml and
-    tracked in k113.
-
-  - New Class->to_crd (D9, k96): any IO::K8s::APIObject class now emits its
-    own CustomResourceDefinition, built from the same attribute registry
-    add_crd/IO::K8s::AutoGen reads -- the exact inverse of AutoGen's
-    schema-to-DSL mapping, so add_crd(Class->to_crd) reconstructs an
-    equivalent class (verified against a shipped cert-manager Kind and,
-    for every shipped Kind across core and all bundled CRD providers, that
-    to_crd does not die). IO::K8s::CRD::_schema_for_class walks the
-    registry into an openAPIV3Schema -- scalars, arrays and maps of every
-    kind the k8s DSL supports (Str/Int/Num/Bool/IntOrStr/Quantity/Time,
-    including arrays of Num/Quantity/Time/IntOrStr, previously unhandled
-    and fatal), and referenced/inline-struct classes recursed with a
-    path-scoped cycle guard (a class reused as unrelated siblings, e.g. a
-    shared LabelSelector, is unaffected -- only a genuine cycle on the
-    current path becomes an opaque x-kubernetes-preserve-unknown-fields
-    stub). D3 field options (enum, minimum, maximum, pattern, description,
-    default, nullable, preserve_unknown) are carried onto the emitted
-    property. Documented lossy edges: a Quantity-typed field has no schema
-    shape AutoGen reads back as Quantity (only ever produced from a $ref,
-    never a format string), so it round-trips as a plain Str; a typed
-    value map (Int/Num/Bool/Quantity/Time/IntOrStr) round-trips to an
-    opaque string map, since AutoGen's additionalProperties dispatch has
-    no scalar-type branch at all. A scalar Time field is lossless
-    (format: date-time), but an array of Num, Quantity, Time or IntOrStr
-    round-trips to an array of Str, since AutoGen's array-items dispatch
-    reads only items.type. IO::K8s::CRD->new(classes => [...],
-    storage => 'v1') assembles a multi-version CustomResourceDefinition
-    from one class per version -- each served, only the named one
-    storage:true, in the order given -- and crd_for_class/Class->to_crd is
-    now its single-version shorthand.
-
-  - New IO::K8s::Unstructured and IO::K8s->new(unknown_kinds => 'unstructured')
-    (D4, k96): apiVersion/kind/metadata as ordinary typed attributes, with no
-    fixed api_version()/kind() identity, and every other field on the wire
-    preserved byte-for-byte through the existing _unknown_fields bag. Opt-in
-    only -- bare IO::K8s still dies with the current "Cannot resolve
-    Kubernetes GVK" error on an unresolvable Kind; passing unknown_kinds =>
-    'unstructured' to inflate() or new_object() builds an
-    IO::K8s::Unstructured from the document instead.
-
-  - K3s modeled to full depth by hand (D5/D6, k95): 14 classes across its 4
-    Kinds (HelmChart, HelmChartConfig, Addon, ETCDSnapshotFile), named after
-    the upstream Go types -- helm.cattle.io/v1 from k3s-io/helm-controller
-    v0.17.7 (the version k3s v1.36.4+k3s1's go.mod vendors), k3s.cattle.io/v1
-    from k3s-io/api v0.1.4 (split out of k3s-io/k3s itself at this tag).
-    K3s's CRDs stay schemaless upstream (x-kubernetes-preserve-unknown-fields,
-    no openAPIV3Schema), so this is the one provider modeled by hand from Go
-    source rather than rendered and `--check`ed against a manifest;
-    `crd-drift-check.pl --provider K3s` stays SOURCE UNRESOLVED by design.
-    Reused core types where the Go field is exactly one (LocalObjectReference,
-    PodSecurityContext, SecurityContext, apiextensions/v1.JSON for the
-    `values` field). Two opaque fields the pre-full-depth model guessed
-    disappear because upstream's Go structs never had them: Addon has no
-    `status` (`+genclient:noStatus`) and HelmChartConfig has no `status`
-    either. Calling `->status` on Addon or HelmChartConfig now throws a
-    missing-method error instead of returning undef. HelmManaged is unchanged.
-    t/68_specbuilder_objects.t's "plain hash specs behave as before"
-    subtest, which used HelmChart as its opaque-hash-spec fixture, now uses a
-    small class local to the test file instead, since every bundled
-    provider's Kinds have gone to full-depth typed modeling in turn and
-    none is left to borrow.
-
-  - AgentSandbox v1beta1 modeled to full depth (D5, k95): 28 classes across
-    the 4 served Kinds (Sandbox, SandboxClaim, SandboxTemplate,
-    SandboxWarmPool), named after the upstream kubernetes-sigs/agent-sandbox
-    v1.0.0 Go types (api/v1beta1/sandbox_types.go, extensions/api/v1beta1/
-    *.go), checked in under IO::K8s::AgentSandbox::V1beta1::*. A Go type
-    shared across Kinds via agent-sandbox's inlined SandboxBlueprint
-    (PodTemplate, PodMetadata, PersistentVolumeClaimTemplate,
-    EmbeddedObjectMetadata) is one class, not a copy per Kind; conditions
-    reuse Meta::V1::Condition (reuse_core). podTemplate.spec is a literal
-    corev1.PodSpec field, but the CRD schema is one field short of what
-    Core::V1::PodSpec ships (evictionResponders, added upstream after
-    agent-sandbox's vendored client-go snapshot), so reuse_core correctly
-    declines it and its own single-key sub-structs (os, readinessGates,
-    schedulingGates, schedulingGroup, imagePullSecrets items) stay nested
-    classes -- all named after their real corev1 Go types (PodSpec, PodOS,
-    PodReadinessGate, PodSchedulingGate, PodSchedulingGroup,
-    LocalObjectReference) regardless, matching how GatewayAPI/CertManager
-    already name their own single-key LocalObjectReference occurrences.
-    SandboxClaim.status.sandbox is a genuine Go-name collision (its type is
-    also spelled SandboxStatus, in a different upstream Go package than the
-    Sandbox Kind's own SandboxStatus) resolved by keeping the emitter's own
-    Kind-prefixed default name instead of the bare Go name. This also fixes
-    two fields the earlier opaque model guessed wrong: SandboxClaim's env
-    is upstream's array of {name, value, containerName} EnvVar structs, not
-    a bare string map, and SandboxTemplate/SandboxClaim/Sandbox's
-    volumeClaimTemplates items are agent-sandbox's trimmed
-    PersistentVolumeClaimTemplate (metadata + Core::V1::
-    PersistentVolumeClaimSpec), not a full Core::V1::PersistentVolumeClaim.
-    v1alpha1 has no manifest left at v1.0.0 (upstream ships no api/v1alpha1
-    directory at this tag) so it stays hand-checked-in as-is, unmodeled
-    below the top level, excused from `crd-drift-check.pl --check` via four
-    new ignore_unrendered entries (D7 back-compat, k88). t/67_strict.t's
-    "inline-struct coercer path is covered" and t/68_specbuilder_objects.t's
-    "k90: spec_set on a modeled spec" subtests, which used AgentSandbox's
-    v1beta1 Sandbox as their opaque-inline-struct fixture, were updated:
-    the former now targets the v1alpha1 track (the distribution's one
-    remaining inline-struct example) with a v1beta1-only field as the
-    "unknown" one, the latter merges a valid operatingMode enum value now
-    that the full-depth field actually constrains it.
-
-  - Gateway API modeled to full depth (D5/D7, k95): 143 classes across 14
-    served GVKs (10 Kinds at gateway.networking.k8s.io/v1 -- the storage
-    version of every Kind but ReferenceGrant -- plus, per D7's "every
-    served version gets a class", the v1beta1 tracks upstream still serves
-    for Gateway, GatewayClass, HTTPRoute and ReferenceGrant), named after
-    the upstream kubernetes-sigs/gateway-api v1.6.1 Go types, checked in
-    under IO::K8s::GatewayAPI::V1::* / ::V1beta1::*. v1beta1 Gateway/
-    GatewayClass/HTTPRoute are literal Go type aliases of their v1
-    counterparts (`type Gateway v1.Gateway`, `type GatewaySpec =
-    v1.GatewaySpec`, ...), so one overlay entry per Kind renders both
-    version trees correctly; each tree gets its own class files (D6: a
-    shared type is one class only within a version directory). A Go type
-    reused across Kinds or fields within one version (ParentReference
-    across every route Kind's parentRefs/status.parents, HTTPHeaderFilter
-    shared by HTTPRouteFilter and GRPCRouteFilter, BackendTLSPolicy's
-    PolicyStatus/PolicyAncestorStatus from policy_types.go) is one class,
-    not a copy per occurrence; LabelSelector- and Condition-shaped fields
-    reuse Meta::V1::LabelSelector/Condition (reuse_core). The v1alpha2/
-    v1alpha3 route and BackendTLSPolicy tracks in the same standard-channel
-    manifests are listed but `served: false` at v1.6.1 (graduated to v1) --
-    IO::K8s::CRD->generate already skips them, nothing to model; the
-    corresponding maint/crd-drift-exceptions.yaml ignore_missing_kinds
-    reasons were corrected to say so (they previously said "deprecated
-    served version", which was wrong for these five). The three
-    ignore_missing_kinds entries for v1beta1 Gateway/GatewayClass/HTTPRoute
-    are removed, satisfied by the new classes; short names still resolve
-    to the v1 storage version, v1beta1 reachable only via its
-    domain-qualified resource_map key (matching ReferenceGrant's existing
-    v1/v1beta1 pattern, reversed). Fixed in IO::K8s::Role::Routable::
-    add_path_match's 'gateway' branch: the role's own Prefix/Exact/Regex
-    vocabulary was passed straight through as HTTPPathMatch.type, which
-    only ever coincidentally worked while spec was opaque -- it now
-    translates 'Prefix' to Gateway API's own 'PathPrefix' and 'Regex' to
-    'RegularExpression', matching the enum the modeled class actually
-    declares. Constructing spec/status (or any nested field) via a raw
-    ->new(spec => { ... }) no longer coerces the hashref (k100,
-    pre-existing); build via new_object/inflate, or seed a typed spec
-    through spec_set/spec_push/spec_merge, which do coerce -- t/
-    17_role_routable.t's Gateway API subtests were updated to that pattern.
-    t/68_specbuilder_objects.t's "plain hash specs behave as before" fixture
-    moved from GatewayAPI::V1::GatewayClass (now typed) to K3s::V1::
-    HelmChart, the remaining genuinely-opaque-by-design example (K3s CRDs
-    are schemaless upstream). t/42_registry_synthesis_roundtrip.t's shared
-    pattern-candidate pool gained an absolute-URL-shaped candidate
-    (https://example.com) for SubjectAltName.uri and HTTPCORSFilter.
-    allowOrigins, benefiting any future D3-using provider with the same
-    shape.
-
-  - IO::K8s::AutoGen types inline objects (D10, k94). A type: object
-    with properties -- which is how every CRD schema is written below its
-    top level -- now becomes a nested class named after its place in the
-    parent (<Kind>::Spec, <Kind>::Spec::Limit, ...Item for array items,
-    ...Value for map values) instead of an opaque hash, so field options,
-    strict and the unknown-field bag reach every level. Hash-style access
-    on such a field keeps working (a Moo object is a blessed hash);
-    property-less objects and additionalProperties-only maps stay opaque.
-    A direct Class->new(spec => { ... }) on such a generated class now
-    fails its type constraint (a plain hashref no longer satisfies an
-    object-typed field); inflate/new_object/FROM_HASH still coerce a
-    hashref into the right nested class as before. This applies to any
-    AutoGen class with a typed nested object, including one built from a
-    live cluster's /openapi/v2, not only to a class IO::K8s::CRD generated
-    from a CRD manifest. IO::K8s::AutoGen::class_description / class_path
-    / class_root are new public functions (used by IO::K8s::CRD::Emitter
-    below). IO::K8s::Resource::_sanitize_attr_name now maps every
-    character outside [A-Za-z0-9_] to '_', not only '-', '.' and '/': a
-    property key with any other odd character becomes an attribute
-    instead of dying at class load.
-
-  - New IO::K8s::CRD and IO::K8s->add_crd (D10, k94): load a
-    CustomResourceDefinition (object, hashref, YAML/JSON text, path, or a
-    list of those), generate one class per served version, register every
-    version under its domain-qualified key and the storage version under
-    the bare Kind -- through add(), so a provider merged earlier keeps the
-    short name. Generated classes live under a "::_CRD" sub-namespace of
-    the instance's own AutoGen namespace, never the bare namespace itself:
-    without it, a CRD manifest and an openapi_spec definition for the same
-    GVK would build the identical class name and alias in AutoGen's
-    per-class-name cache, silently discarding whichever generated second
-    while add_crd still reported success. Two CRDs that share a bare Kind
-    across groups now merge under that Kind in add_crd's return value
-    (every version from both present, storage kept from the FIRST
-    registration) instead of the second overwriting the first outright.
-
-  - New IO::K8s::CRD::Emitter renders generated classes as house-style
-    source files from the attribute registry (fields, options, required,
-    descriptions as =attr POD, a name map for upstream Go type names).
-    maint/crd-drift-check.pl --suggest prints those files for every
-    OPAQUE SPEC / MISSING FIELD Kind; --suggest-dir writes them, and
-    refuses a directory inside lib/. A pattern, enum member or default
-    carrying a character above ASCII (Traefik's "^[0-9]+\xB5s$", say)
-    renders as a \x{HEX}-escaped, ASCII-only Perl literal rather than the
-    raw character, which used to interpolate straight into the file and
-    silently reject a value the generated class accepted; a schema
-    description carrying such a character stays verbatim in POD, and the
-    file gains "use utf8;" plus "=encoding UTF-8" only when it needs to.
-
-  - maint/crd-drift-check.pl decodes a fetched manifest as UTF-8 once,
-    before caching it, instead of writing the raw response bytes through
-    an ':encoding(UTF-8)' filehandle -- doing that to undecoded bytes
-    double-encoded every non-ASCII character on disk (Traefik's "µs"
-    became four garbled bytes in the cache). A cache file written before
-    this fix is detected and corrected on read rather than needing to be
-    deleted. --suggest's rendered source (and --suggest-dir's "wrote N
-    file(s)" confirmation) now goes to stderr instead of stdout when
-    --format json is active, so stdout stays one parseable JSON document.
-
-  - IO::K8s::AutoGen caps a path-derived nested class name at 200
-    characters instead of risking "Identifier too long": cert-manager's
-    CRDs inline a full PodTemplateSpec several levels into a
-    ClusterIssuer/Challenge spec, and the resulting name ran past Perl's
-    251-character limit on a fully qualified identifier, which made
-    IO::K8s::CRD->generate -- and maint/crd-drift-check.pl --suggest --
-    fail closed for all three affected Kinds. A name that would exceed
-    the cap is replaced with <root>::_<10 hex chars> (a SHA-1 of the full
-    logical name); the logical path survives the shortening and is
-    recoverable via the new IO::K8s::AutoGen::class_path / class_root.
-    IO::K8s::CRD::Emitter renders such a class from that recovered path
-    rather than from its own (possibly hashed) name, so the emitted
-    source usually keeps the readable package name even where AutoGen's
-    own namespace-qualified one had to be hashed; only when the emitted
-    name would itself exceed 200 characters, or a long "base" would push
-    the full joined package name past 255, does it fall back the same
-    way, and a names entry still overrides either.
-
-  - IO::K8s::AutoGen checks x-kubernetes-int-or-string before the type
-    dispatch (k94). A property that marks Kubernetes' IntOrString union
-    this way and carries no type of its own -- the structural-schema
-    convention -- previously fell through to Str; found while building
-    IO::K8s::CRD::Emitter, whose registry-type assertion is stricter than
-    a Str field's own round-trip. A malformed value there is treated as
-    false (falls through to the ordinary type-based dispatch) rather than
-    aborting class generation.
-
-  - The k8s DSL takes per-field options (D3 of the CRD design, k93):
-    k8s replicas => Int, { minimum => 0, maximum => 10, default => 1 },
-    or name => [ Type, { ... } ] inside an inline struct. required,
-    default, enum, minimum, maximum, pattern, description, nullable and
-    preserve_unknown are recorded in the attribute registry for the CRD
-    schema that to_crd will emit; enum, minimum, maximum and pattern are
-    also enforced at construction on scalar fields, arrays of scalars and
-    typed value maps, failing with "Value "x" is not one of: ...", "is
-    below the minimum N" / "is above the maximum N" and "does not match
-    the pattern ...". default is never applied client-side. required => 1
-    both enforces and records, like the legacy 'required' marker and the
-    Type! suffix; required => 'schema' records required => 1 without
-    enforcing it, for a field a real document may validly omit. An option
-    a field cannot carry (enum on Bool, minimum on Str, pattern on an
-    object) is a class-load error naming class and field -- as is a type
-    spec _k8s cannot interpret at all (a Type::Tiny outside the seven
-    kinds, or a coderef), which now croaks "k8s: cannot interpret the
-    type of field ..." instead of silently building an unconstrained
-    attribute.
-
-  - IO::K8s::AutoGen carries an OpenAPI property's required list, enum,
-    minimum, maximum, pattern, default, description, nullable and
-    x-kubernetes-preserve-unknown-fields into those options, per element
-    for arrays, so a generated class enforces a bad enum/range/pattern
-    value at construction exactly like a hand-written one does. The
-    schema's required list becomes required => 'schema': recorded (for
-    to_crd) but not enforced, since a real cluster document can validly
-    omit a field the schema requires -- a server-side default, or a
-    status object not yet populated -- and inflate must not die over
-    that. A malformed schema option -- a minimum above the maximum or a
-    non-numeric bound, a default the field cannot hold, an enum
-    containing a JSON null -- is dropped the same way an uncompilable
-    pattern already was, rather than failing class generation.
-
-  - Unknown fields are kept instead of dropped (D1 of the CRD design,
-    docs/superpowers/specs/2026-09-03-crd-design.md). A constructor key no
-    attribute claims -- on inflate, new_object, FROM_HASH or a direct
-    ->new, at any nesting level including inline structs -- now lands in
-    the object's _unknown_fields bag and TO_JSON emits it again, declared
-    attributes winning on a clash. Before, every class silently lost such
-    a field on the round-trip (the README AgentSandbox example passed a
-    spec.replicas that vanished, k91). IO::K8s->new(strict => 1) makes
-    the same situation die with "Unknown field '<name>' for <class>" for
-    the duration of that instance's inflate / new_object / json_to_object
-    / struct_to_object calls (load and load_yaml inherit it).
-
-  - SpecBuilder walks typed specs (k90). spec_get/spec_set/spec_push/
-    spec_merge/spec_delete used to assume spec was a plain hashref; on a
-    class whose spec is an inline struct (the eight AgentSandbox classes)
-    spec_set replaced the struct with an empty hash and wrote into an
-    orphan, so to_json emitted spec: {} afterwards. The methods now walk
-    objects through their accessors, vivify missing intermediates as the
-    declared class, inflate hashrefs handed to typed slots, and put a key
-    an object does not declare into its _unknown_fields bag. A -1 path
-    segment addresses the last array element, or a freshly created one on
-    an empty array. New: spec_array($path) and spec_hash($path) return
-    the vivified container. The builder roles (CertManaged, HelmManaged,
-    MiddlewareBuilder, Loadbalanced, Routable's gateway and traefik
-    branches, NetworkPolicy's cilium branch) are expressed in these calls
-    and therefore work on hash and object specs alike. Visible changes:
-    Routable::add_path_match on a traefik route with an unknown type no
-    longer leaves an empty route behind; on a plain-hash spec too,
-    spec_push onto a path holding a defined non-array value now croaks
-    instead of replacing it, spec_set through a defined scalar
-    intermediate croaks instead of clobbering it, and spec_set('a.5', ...)
-    on an empty array croaks instead of autovivifying the holes in
-    between. Every failure raised while walking or vivifying begins with
-    the spec path and carries no internal file/line (k101); a class with
-    required attributes cannot be vivified, since it would have to be
-    constructed with none.
-
-  - README: the AgentSandbox example no longer passes spec.replicas, a
-    field neither the class nor upstream agent-sandbox v1.0.0 has (k91).
-
-  - Bump CRD-provider upstream pins (k85-k88). Verified with
-    maint/crd-drift-check.pl against each new upstream release:
-      * Cilium v1.20.0 -> v1.20.1 (k85) -- no schema drift.
-      * Traefik v3.7.10 -> v3.7.12 (k86) -- no schema drift.
-      * K3s v1.36.3+k3s1 -> v1.36.4+k3s1 (k87) -- schemaless upstream;
-        version pin only (k3s has no v1.37 release yet).
-      * AgentSandbox v0.5.4 -> v1.0.0 (k88) -- v1.0.0 removes the entire
-        v1alpha1 track upstream (all four Kinds now serve v1beta1 only).
-        The four v1alpha1 classes are kept as a back-compat superset for
-        clusters still on agent-sandbox v0.5.x and suppressed via new
-        ignore_stale_kinds entries in maint/crd-drift-exceptions.yaml; the
-        v1beta1 classes still match upstream exactly.
-    GatewayAPI (v1.6.1) and CertManager (v1.21.1) were already current.
-
-  - Register the missing cilium.io/v2alpha1/CiliumLoadBalancerIPPool
-    back-compat GVK (k83). Upstream Cilium v1.20 serves
-    CiliumLoadBalancerIPPool at both cilium.io/v2 and cilium.io/v2alpha1,
-    but the k78 back-compat pass covered only the sibling BGP/CIDR Kinds --
-    the v2alpha1 LB pool had no shipped class and did not inflate. A new
-    opaque IO::K8s::Cilium::V2alpha1::CiliumLoadBalancerIPPool class is
-    registered under its domain-qualified key, mirroring k78; the
-    CiliumLoadBalancerIPPool short name still resolves to the v2 storage
-    version.
-
-  - Drop spec.volumeClaimTemplatesPolicy from
-    IO::K8s::AgentSandbox::V1alpha1::SandboxTemplate (k84). Upstream
-    agent-sandbox v0.5.4 adds that field only at v1beta1; the v1alpha1 CRD
-    schema does not carry it, so the shipped v1alpha1 class over-modelled by
-    one field. The v1beta1 class keeps the field; POD on both tracks is
-    corrected.
-
-  - New maintenance tool maint/crd-drift-check.pl (k82): the CRD-provider
-    analog of spec-drift-check.pl. It fetches each provider's upstream CRD
-    manifests at its declared upstream_version, parses the openAPIV3Schema
-    and reports missing Kinds, missing/extra spec fields and stale classes
-    against the shipped resource_map and class registries. Each provider
-    gains a data-only crd_sources hook beside upstream_version; deliberate
-    non-gaps live in maint/crd-drift-exceptions.yaml. Report-only -- it
-    never edits lib/ and never creates tickets. K3s reports its source as
-    unresolved (k3s ships schemaless wrangler CRDs upstream).
-
-  - Make the eight back-compat Cilium classes restored in 1.105 actually
-    reachable (k78). The v2alpha1 BGP/CIDR tracks
-    (CiliumBGPAdvertisement, CiliumBGPClusterConfig, CiliumBGPNodeConfig,
-    CiliumBGPNodeConfigOverride, CiliumBGPPeerConfig, CiliumCIDRGroup),
-    CiliumBGPPeeringPolicy (v2alpha1) and CiliumExternalWorkload (v2)
-    loaded as classes but were absent from IO::K8s::Cilium's resource_map,
-    so inflate()/new_object() on their GVKs died "Cannot resolve
-    Kubernetes GVK" -- the stated purpose (serving clusters on older
-    Cilium releases) did not work. They are now registered under
-    domain-qualified keys, mirroring the k58 AgentSandbox pattern, so the
-    v2 short names keep resolving to the storage version.
-
-  - Fix the built META.json x_authority, which read "cpan:cpan:JLMARTIN"
-    (k75). dist.ini carried authority = cpan:JLMARTIN, but the
-    Author::GETTY plugin bundle prepends "cpan:" itself; the doubled
-    prefix -- shipped in every release to date -- did not match
-    cpan:JLMARTIN, so authority-aware tooling could not confirm the
-    co-maintainer's claim. dist.ini now carries the bare PAUSE id.
-
-  - Documentation corrections for the 1.108 audit: README and the core
-    POD now say Kubernetes v1.37 (k74, k79); the per-Kind API-class doc
-    reference URLs were moved from v1.36 to v1.37 to match (k74); the
-    dangling L</TO_JSON> / L</to_json> links in Role::Resource are
-    resolved and the serialization entry points documented (k76); the
-    fail-closed kind()/api_version()/resource_plural() and new_object
-    apiVersion contracts are now stated in POD (k79); and the builder
-    roles and IO::K8s::Types::Net ship with full =method/=func POD (k80).
-
-  - Track upstream Kubernetes v1.37: 11 new Kinds (among them a new
-    IO::K8s::Api::Lifecycle namespace) and 103 new supporting types -- 114
-    new classes in all -- plus 48 new optional fields on 43 existing
-    classes. The new Kinds are registered for GVK dispatch and carry an
-    upstream resource_plural (k72).
-
-  - Ten fields upstream made required in v1.37 are now required at
-    construction (k72): the apps/v1 workload specs, ControllerRevision
-    .data, and five flowcontrol/v1 fields. Building one without the field
-    now dies instead of yielding a partial object.
-
-  - resource_plural() now croaks when passed an argument instead of silently
-    swallowing it, in all three spots (role accessor, APIObject import param,
-    AutoGen GVK constant) -- the same fail-closed shape k67 applied to
-    kind()/api_version() (k70)
-  - The k8s DSL gains a hash-of-scalar-type form, { Quantity => 1 } (and
-    Int/Num/Bool/Time/IntOrStr), and the fields upstream declares as
-    map[ResourceName]Quantity are retyped onto it (k63). Those maps
-    -- ResourceRequirements and VolumeResourceRequirements limits/requests,
-    NodeStatus capacity/allocatable, ResourceQuota hard/used, LimitRangeItem
-    max/min/default/defaultRequest/maxLimitRequestRatio, PersistentVolume(Claim)
-    capacity and allocatedResources, and the DRA capacity/requests fields --
-    validated nothing: limits => { cpu => 'banana' } constructed happily and
-    only failed at the API server. Each value is now type-checked at
-    construction. The bare { Str => 1 } form stays deliberately opaque for
-    genuinely free-form maps (labels, annotations, fieldsV1, and
-    PersistentVolumeClaimStatus allocatedResourceStatuses, whose values are
-    a status enum, not a Quantity).
-
-  - The k8s DSL gains array-of-hash and array-of-array forms, [ {} ] and
-    [ [] ], and AutoGen maps items: object / items: array onto them
-    (k66). Both used to fall through to [ Str ], so a generated class
-    rejected the very hashrefs and arrayrefs the schema describes on an
-    ArrayRef[Str] constraint that never named the real problem. The
-    contents are opaque -- validated as the right container shape,
-    otherwise passed through with the same one-level copy a free-form
-    HashRef gets.
-
-  - The k8s DSL gains a Num scalar type, and AutoGen maps OpenAPI
-    type: number onto it instead of Str (k68). A JSON number in a
-    generated class used to round-trip as a quoted string ({"cpu":1.5}
-    came back {"cpu":"1.5"}), which the API server rejects for a numeric
-    field. Num serializes unquoted, the fractional counterpart to Int's
-    int-cast; Quantity remains a string type, unchanged.
-
-  - IO::K8s::List gains from_json, so serializing a List and reading it
-    back no longer dies with "Can not locate object method from_json"
-    (k64) -- it was the last class outside the to_json/from_json
-    symmetry k59 established. List is a container, not a
-    Role::Resource, so from_json is hand-rolled and delegates to
-    FROM_STRUCT (an optional IO::K8s instance as the second argument lets
-    item types resolve through your providers). List->to_json now also
-    emits a UTF-8 byte string like every other class, instead of a
-    wide-character string that round-tripped non-ASCII data to mojibake
-    (the k53 convention). ASCII payloads are unaffected.
-
-  - new_object() now honours an apiVersion passed inside the params hash,
-    the same key inflate() already reads, instead of silently resolving
-    the short name to its default version (k62). It used to take the
-    exact-GVK request only as its third positional argument, so
-    new_object('Sandbox', { apiVersion => '.../v1alpha1' }) built a
-    v1beta1 object with no diagnostic -- a version the caller never asked
-    for. Behaviour change: an apiVersion in the params hash that cannot be
-    resolved now fails closed, and one that contradicts an explicit
-    positional api_version croaks rather than picking one.
-
-  - kind() and api_version() now croak when passed an argument instead of
-    silently ignoring it (k67). They are derived, read-only identity
-    accessors; the swallow meant a caller who wrote $obj->kind('Other')
-    believing they had retargeted the object got no error and no change,
-    and only found out at the API server, if at all. Behaviour change on
-    the two most-called accessors: this covers the hand-written classes
-    (via IO::K8s::Role::APIObject), CRD classes declaring api_version as
-    an import parameter, and AutoGen-generated GVK classes. The
-    no-argument reads are unchanged.
-
-  - add() no longer re-qualifies a provider resource_map key that is
-    already domain-qualified (k61). A key carrying a '/' is an exact
-    GVK request registered verbatim; merging IO::K8s::GatewayAPI or
-    IO::K8s::AgentSandbox used to also produce junk
-    "$group/$version/$group/$version/$Kind" keys that nothing could
-    resolve. Harmless at lookup time, but they polluted resource_map for
-    anyone iterating or counting it.
-
-  - FROM_HASH now inflates nested objects, so every class is to_json /
-    from_json symmetric (k59). Pod->from_json($pod->to_json) used to
-    die at the first object-typed field with a bare Moo type error on
-    metadata that never pointed at the path which worked
-    ($k8s->json_to_object). Behaviour change: FROM_HASH used to be the
-    shallow entry point and raw nested hashrefs were refused. It also
-    inherits the k42 diagnostics now, and an explicit undef on a
-    required Bool dies with "Missing required arguments" instead of
-    building the object -- that is a convergence, $k8s->struct_to_object
-    already behaved that way. IO::K8s::List does not consume the role and
-    still has no from_json.
-
-  - from_json now decodes UTF-8, symmetric to to_json (k53).
-    Class->from_json($obj->to_json) read the encoded bytes as characters
-    and produced mojibake with no error raised -- silent data mutation on
-    the class-level round-trip. Behaviour change: from_json takes a UTF-8
-    encoded byte string, which is exactly what to_json emits. An already
-    decoded character string is no longer accepted silently; it fails
-    loudly. Pure ASCII is unaffected. A tolerance shim was rejected
-    deliberately: it would have made from_json more permissive than
-    $k8s->json_to_object, which has always been byte-oriented.
-
-  - TO_JSON and the inflation path no longer share array and hash
-    references with the object (k54). Post-processing the struct from
-    TO_JSON silently mutated the object and the mutation showed up in
-    every later serialization: $cm->TO_JSON->{data}{key} = "MUTATED"
-    changed $cm->data->{key}. Mutating a source struct after
-    $k8s->inflate reached the object the same way. Both directions now
-    shallow-copy. The depth is deliberately one level: structures nested
-    under an opaque hash attribute (fieldsV1 and friends) still share
-    their inner references.
-
-  - An undef element in an array of Bool now dies instead of being
-    serialized as false (k51). bools => [1, undef, 0] emitted
-    {"bools":[true,false,false]} -- the same invented-false problem
-    k48 fixed one level up, where omitting the field is not an option
-    because the positions would shift. The message names class, field and
-    element index. The element still passes the constructor (Bool
-    includes undef); the refusal happens at the wire boundary. Affects
-    DeviceAttribute bools, which upstream documents as a non-empty list
-    of true/false values.
-
-  - Quantity now accepts the n (nano) and u (micro) decimal SI suffixes
-    (k52). "100n" was rejected, so inflating real cluster data failed
-    on the 30 Quantity-typed fields -- metrics-server reports CPU that way
-    and autoscaling/v2 averageValue carries such values. The suffix set
-    now matches the decimal table in upstream suffix.go exactly. Note the
-    BNF in the doc comment of upstream quantity.go is stale and omits
-    both suffixes. Quantities without a digit in the mantissa ("Ki", "m",
-    ".") stay rejected although upstream parses them as 0; no component
-    emits them and accepting them would swallow a typo.
-
-  - AgentSandbox v1alpha1 kinds are reachable by domain-qualified name
-    (k58). agents.x-k8s.io/v1alpha1/Sandbox and the three
-    extensions.agents.x-k8s.io/v1alpha1 kinds resolved to undef and died
-    with "Cannot resolve Kubernetes GVK" through new_object() and
-    inflate(), contradicting the module's own documentation. The short
-    names Sandbox, SandboxClaim, SandboxTemplate and SandboxWarmPool are
-    unchanged and still resolve to the v1beta1 storage version.
-
-  - AutoGen refuses a $ref it cannot resolve instead of dropping the
-    property (k56). A property referencing a definition missing from
-    the spec was never turned into an attribute; Moo ignores unknown
-    constructor arguments, so inflation accepted the data and TO_JSON
-    never emitted it again -- silent data loss on the round-trip.
-    Behaviour change: a partial spec that references definitions it does
-    not ship used to generate the class successfully, minus those fields,
-    and now dies at class-generation time naming class and field. An
-    opaque fallback was rejected because the DSL has no array-of-hash
-    form, so items: { $ref: <missing> } would have become ArrayRef[Str]
-    and rejected the very hashrefs the field carries -- k57's bug,
-    reintroduced by the fix for this one. Still works: a top-level CRD
-    schema whose metadata references the stock ObjectMeta without
-    shipping its definition, because metadata is skipped first.
-
-  - AutoGen handles additionalProperties given as a JSON boolean
-    (k55). The boolean schema form is common in CRDs and killed class
-    generation with "Not a HASH reference" and no class or field context.
-    Both polarities now yield the same opaque hash a schemaless object
-    gets; additionalProperties: false deliberately narrows nothing. An
-    additionalProperties that is neither a schema object nor a boolean is
-    a malformed schema and croaks naming class and field.
-
-  - AutoGen maps boolean array items to an array of Bool (k57).
-    items: { type: boolean } fell into the string default, so
-    schema-conforming JSON booleans were rejected with a type error that
-    never named the real problem. The generated attribute now reaches the
-    DSL's per-element normalization. Internally the item types are
-    Type::Tiny objects rather than barewords, because inside an arrayref
-    the DSL reads a plain string as a class name for everything except
-    'Str' and 'Int' -- ['Bool'] would have asked for an array of
-    IO::K8s::Api::Bool objects.
-
-  - AutoGen no longer generates apiVersion and kind as data attributes on
-    classes that get GVK class methods (k60). $obj->kind("Other")
-    was a silent no-op, and worse, apiVersion had no accessor collision
-    at all: it stayed writable and its value overwrote the role-supplied
-    one, so $obj->apiVersion("other/v9") produced a manifest claiming a
-    GVK the class does not have. Same line k45 drew for the
-    hand-written template classes. Classes without a GVK keep kind as an
-    ordinary writable attribute.
-
-  - set_owner() no longer writes ownerReferences the API server rejects
-    (k47). Behaviour changes: an owner without a uid (anything built
-    locally rather than read back from the cluster) is refused with a
-    message naming the owner, instead of silently writing uid: "";
-    controller is now a parameter ($obj->set_owner($owner, controller =>
-    0|1), default 1 as before) and a second controller reference is
-    refused, since Kubernetes allows at most one; adding the same owner
-    (same uid) twice is an idempotent no-op instead of a duplicate entry;
-    a non-controller reference omits the controller field entirely.
-    blockOwnerDeletion stays unset (upstream defaults it to false).
-
-  - A Bool attribute set explicitly to undef now stays unset instead of
-    becoming false (k48). SecurityContext->new(privileged => undef)
-    used to serialize as {"privileged":false} -- an explicit claim on the
-    wire that overrides cluster- or admission-controller-set values under
-    strategic-merge patch and server-side apply; now the field is simply
-    omitted, matching what the inflation path always did. \undef likewise
-    yields undef ("no value stays no value"). Behaviour change for callers
-    who passed undef and relied on reading 0 back from the accessor. For
-    the seven required Bool attributes (e.g. ContainerStatus ready) an
-    explicit undef now means the field is missing at the API server instead
-    of being sent as an invented false.
-
-  - Bad data on a Bool field now dies with a diagnostic message instead of
-    "Not a SCALAR reference at ... Resource.pm line NNN" (k42). A
-    hashref/arrayref/coderef where a boolean was expected reports the
-    reference type; the inflation path names the class and JSON field
-    ("... while inflating IO::K8s::Api::Core::V1::PodSpec field
-    hostNetwork"), the constructor path keeps Moo's attribute-naming
-    wrapper, and a bad array element reports its index. Also fixed: a
-    ref-to-a-ref (\\0) was silently true -- the exact bug k37 fixed,
-    one dereference deeper; it now dies too. Blessed scalar refs
-    (JSON::PP::Boolean and friends) keep working unchanged.
-
-  - Internal: the apiextensions union classes (JSONSchemaPropsOrArray,
-    JSONSchemaPropsOrBool, JSONSchemaPropsOrStringArray) now call
-    _struct_to_object_expanded() for their hard-coded, fully-qualified
-    JSONSchemaProps class name instead of the public struct_to_object()
-    (k43), per the rule established in k35: callers that already
-    hold a resolved class name skip re-expansion. No behaviour change.
-
-  - Documentation: resource_plural's POD no longer promises a working REST
-    path for every Kind (k44). For the fifteen Kinds on API tracks
-    upstream no longer serves (e.g. Api::Resource::V1alpha3::DeviceClass),
-    the group-fallback plural is correct for RBAC resources: rules -- and no
-    other value would be better -- but the REST path built from it and the
-    class's own api_version 404s against a current cluster because the track
-    itself is dead. POD only, no behaviour change.
-
-  - IO::K8s::List can now inflate a List-shaped payload (k46), matching
-    what the README already claimed: `$k8s->json_to_object($podlist_json)`
-    and `struct_to_object()` route any `kind` ending in `List` (or the bare
-    `kind: List`) to a new `IO::K8s::List->FROM_STRUCT`, which derives the
-    item type from the list's own Kind-minus-'List' and apiVersion (a real
-    API list response carries neither on its items) and inflates each item
-    fully. `item_class` remains available, now also as a sibling key in the
-    struct, to override the derived type for a generic `kind: List` payload
-    that has nothing to derive from. An item Kind that cannot be resolved
-    dies with the same "Cannot resolve Kubernetes GVK" error every other
-    entry point uses -- never a silently empty or half-inflated list.
-    Previously this died with "Cannot resolve Kubernetes GVK: kind
-    'PodList', ..." (no *List classes have existed since 1.105) or, via a
-    direct `struct_to_object('+IO::K8s::List', ...)` call, with an unrelated
-    "Can't locate object method _k8s_attr_info" error.
-
-  - IO::K8s::List::item_class now only accepts a fully-qualified class name
-    (k49), matching the '+' convention used everywhere else in this
-    distribution: a leading `+` is stripped before the class is loaded, and
-    a short or partially-qualified name (e.g. `'Pod'` instead of
-    `'IO::K8s::Api::Core::V1::Pod'`) is not guessed at. Behaviour change:
-    `kind()` now returns `undef` for such a name instead of a guessed Kind
-    string (`'PodList'`) that `api_version()` could never confirm --
-    IO::K8s::List never serializes a `kind` without an `apiVersion`
-    alongside it, in either direction now.
-
-  - Stop stamping apiVersion/kind into seven embedded template classes that
-    the upstream schema carries no such keys for (k45): PodTemplateSpec,
-    JobTemplateSpec, PersistentVolumeClaimTemplate, and ResourceClaimTemplateSpec
-    (v1, v1alpha3, v1beta1, v1beta2). Each composed IO::K8s::APIObject, so
-    TO_JSON emitted the pair on every embedded occurrence -- most visibly
-    spec.template on every Deployment, StatefulSet, DaemonSet, ReplicaSet,
-    Job and CronJob this distribution serializes. The upstream OpenAPI
-    definitions for these seven declare only metadata and spec, with no
-    x-kubernetes-group-version-kind, and kubectl's default strict field
-    validation rejects unrecognized fields rather than pruning them, so the
-    extra pair was liable to make `kubectl apply` reject otherwise-valid
-    output (not verified against a live cluster; this describes the
-    validation behaviour, not an observed failure). Contrast case, left
-    unchanged: Core::V1::PersistentVolumeClaim (embedded in
-    StatefulSetSpec.volumeClaimTemplates) genuinely carries inline TypeMeta
-    upstream and keeps emitting apiVersion/kind.
-    Breaking change: all seven now compose IO::K8s::Resource instead of
-    IO::K8s::APIObject, with an explicit C<k8s metadata> declaration in
-    place of the role-derived one. C<metadata> is unaffected, but
-    C<api_version()>, C<kind()>, C<add_label()>, C<add_annotation()> and the
-    other IO::K8s::Role::APIObject convenience methods are no longer public
-    methods on instances of these seven classes -- calling one now fails
-    with "Can't locate object method" instead of returning a value.
-
-  - Derive IO::K8s::List::kind() for a single-segment item_class too
-    (k41). The same missing '::' as the previous entry, in the
-    item_class fallback -- which is precisely the empty-list case, where
-    there is no first item to ask. An empty list of a single-segment Kind
-    therefore serialized apiVersion without kind:. The non-empty path was
-    already fixed by k38, since it asks the item.
-
-  - Derive kind() for a single-segment class from the whole class name
-    (k38). A CRD registered as a top-level package -- reached as
-    '+Widget' or through a resource_map value of '+Widget' -- has no '::',
-    so kind() returned undef and TO_JSON emitted a manifest with no kind:
-    at all, which the API server rejects. k35 had just made those
-    names reliably reachable, so the class was usable and its output was
-    not. set_owner() was worse than silent there: OwnerReference declares
-    kind as a required Str, so an undef kind made it die outright.
-    api_version() and resource_plural() are unaffected -- both key off an
-    IO::K8s:: prefix, so the '::' is guaranteed by the time they parse.
-
-  - Document the fail-closed guarantee of the GVK entry points (k40).
-    new_object, inflate, json_to_object and struct_to_object all die on an
-    unresolvable GVK request rather than substituting a different version or
-    a similarly-named class, and a bare unqualified name is deliberately
-    exempt -- behaviour that was tested but stated nowhere. POD only.
-
-  - Fail closed on an unresolvable GVK in every entry point, not just
-    new_object (k39). A name carrying its apiVersion inside the string,
-    'nonexistent.io/v1/UnknownKind', is an exact GVK request and comes back
-    from expand_class as undef. Only new_object turned that into the
-    intended "Cannot resolve Kubernetes GVK: kind ..., apiVersion ...";
-    json_to_object, struct_to_object and inflate passed the undef on to
-    load_class and died out of Module::Runtime with "argument is not a
-    module name", which names neither the kind nor the apiVersion. inflate
-    had the guard on its explicit-apiVersion branch only, so the
-    single-argument forms and load_yaml, which all route through it,
-    inherited the hole. All four now share one check. A name without a
-    domain qualifier is deliberately not affected: expand_class still falls
-    back to IO::K8s::<Name> there, so an unknown bare Kind keeps failing on
-    the missing module rather than on GVK resolution.
-
-  - Stop boolean fields reading an unblessed \0 as true (k37). The
-    is_bool branch of struct_to_object/inflate tested the reference itself,
-    and every reference is true in Perl, so the classic Perl false idiom
-    arrived as true -- and came back out blessed as a JSON::PP::Boolean,
-    indistinguishable downstream from a correct one. On a field like
-    privileged, allowPrivilegeEscalation or hostNetwork that is a silent
-    flip in the unsafe direction. Blessed JSON booleans and plain 0/1 were
-    never affected, nor was load_yaml, whose default yields plain 0/1.
-
-  - Stop boolean fields reading the string "false" as true (k37, found
-    while fixing the above). A non-empty string is truthy in Perl, so
-    "false" and "False" became 1 -- the same silent flip, and on both paths:
-    the inflation path and the constructor, where SecurityContext->new(
-    privileged => "false") returned 1. Behaviour change for callers who
-    passed the string and relied on the old answer. Both paths now share one
-    normalization in IO::K8s::Resource, which is what let the two disagree
-    in the first place. One narrow case changes from wrong-but-quiet to
-    loud: a hashref or arrayref on a boolean field used to be taken as true
-    and now dies, which is the same class of bad data this pair of entries
-    is about.
-
-  - Read a bare one-word class name as a Kubernetes Kind, never as a
-    package name (k35). k34 put the resource_map ahead of
-    expand_class's "is there a loadable class of exactly this name?" probe,
-    which made every registered Kind safe but left a window for Kinds the
-    model does not know: with an openapi_spec defining kind "Widget" and an
-    unrelated top-level Widget.pm installed, expand_class('Widget') returned
-    the foreign distribution instead of the generated class. Single-segment
-    names now skip that probe entirely and continue to IO::K8s::<Kind> and
-    then to auto-generation; multi-segment names ('My::StaticWebSite') keep
-    it, which is the documented CRD case. To name a single-segment class of
-    your own, prefix it -- '+Widget' -- or use class_namespaces or a
-    resource_map entry. The failure mode changes for one narrow case: a
-    consumer who relied on a bare 'Widget' resolving to an installed
-    top-level Widget now gets IO::K8s::Widget, which fails to load.
-
-  - Stop struct_to_object re-expanding a class name its caller had already
-    resolved (k35). new_object(), json_to_object() and the nested-object
-    inflation all called expand_class() and then handed the result to
-    struct_to_object(), which ran the full search order over it a second
-    time -- so an exactly-resolved name could be re-interpreted. Concretely,
-    new_object('+Secret', \%args) resolved to 'Secret' and the second pass
-    found 'Secret' in the resource_map, returning
-    IO::K8s::Api::Core::V1::Secret instead of the caller's class: the '+'
-    prefix's guarantee of an exact class was lost on every new_object and
-    json_to_object. These callers now use a pre-expanded internal path.
-    struct_to_object() itself is unchanged for consumers and still expands
-    the short names it is given.
-
-  - Resolve resource_plural for Kinds on API tracks upstream no longer
-    serves (k36). The generated table from the previous entry is keyed
-    by exact GVK, so the 15 shipped classes on dropped tracks
-    (resource.k8s.io/v1alpha3, flowcontrol/v1beta3,
-    storage.k8s.io/v1alpha1 and others) still had no plural. A second
-    generated tier keyed "group|Kind" now answers those, consulted only
-    after the exact-GVK lookup misses. This is upstream data, not a
-    heuristic: RBAC addresses resources by apiGroups plus resources with no
-    version at all, so the plural is a property of the GroupResource, and
-    the generator emits a group-level entry only where every version in the
-    spec agrees on it -- dying otherwise rather than picking one. Kinds
-    carrying a plural rose from 95 to 110 of the 120 shipped API classes.
-    Still no bare-Kind fallback and still no guessing: core/v1 Event and
-    events.k8s.io/v1 Event remain distinct, and the subresources plus the
-    embedded *TemplateSpec types keep returning undef.
-
-  - Give the shipped Kinds a real resource_plural (k33).
-    IO::K8s::Role::APIObject::resource_plural returned undef for every
-    built-in class, so consumers needing Kind -> plural -- RBAC speaks
-    plurals, the API speaks Kinds -- had to fall back to an lc+s guess,
-    where a wrong plural is indistinguishable from a denied permission.
-    The role now carries a table keyed "$api_version/Kind", so
-    core/v1 Event and events.k8s.io/v1 Event stay distinct, and
-    class_namespaces subclasses inherit through @ISA exactly as they do
-    for api_version. The values are generated from the collection REST
-    paths of the upstream OpenAPI spec, not derived -- Endpoints is
-    endpoints, NetworkPolicy is networkpolicies, Ingress is ingresses --
-    and maint/spec-resource-plural-gen.pl regenerates the block at the
-    next upstream sync. An explicit resource_plural on a CRD or from
-    IO::K8s::AutoGen still wins. There is deliberately no heuristic
-    fallback: Kinds with no collection endpoint of their own, such as the
-    Eviction, Scale and TokenRequest subresources, keep returning undef.
-
-  - Stop bare Kind short names from resolving to an identically-named
-    installed CPAN module (GH #7, GH #8). expand_class() probed for a
-    loaded-or-loadable class of exactly the given name before consulting
-    the resource_map, and that probe loads rather than merely tests -- so on
-    a machine that happened to have the CPAN distributions Event or Role
-    installed, expand_class('Event') returned Event instead of
-    IO::K8s::Api::Core::V1::Event and the caller then died in
-    _k8s_attr_info. The probe now runs after the resource_map and after
-    class_namespaces, so a registered Kind always wins over a same-named
-    package; '+Full::Class' still forces an exact class, and a CRD class
-    named in full is still loaded on demand. All 78 short names in the
-    default resource_map were exposed; reported from CPAN smokers.
-
-  - IO::K8s::AutoGen reuses a shipped core class for a nested schema of
-    exactly its shape (D5) instead of generating a new one: a CRD's inline
-    LabelSelector, HTTPHeader-shaped struct, and the like are now typed as
-    the real IO::K8s class rather than a per-provider copy. On by default;
-    IO::K8s::CRD->generate and IO::K8s->add_crd (as a trailing options
-    hashref, e.g. add_crd($path, { reuse_core => 0 })) turn it off. A
-    shape under two keys is never reused, and every candidate must be
-    type-compatible with the schema key by key; several surviving
-    candidates are resolved to the preferred one (LabelSelector family,
-    then the rest of Meta::V1, then core/v1, then alphabetically) only
-    when they are wire-identical (same type per key, ignoring
-    required-ness, and the same referenced class per key) -- {name,value}
-    reuses HTTPHeader over PodDNSConfigOption/Sysctl, {key,operator,values}
-    reuses LabelSelectorRequirement over FieldSelectorRequirement/
-    NodeSelectorRequirement even though it spans two API areas. A shape
-    shared by candidates that are NOT wire-identical, such as
-    {metadata,spec} (PodTemplateSpec, JobTemplateSpec,
-    ResourceClaimTemplateSpec and others each type spec differently),
-    stays a nested class rather than guess. New
-    IO::K8s::AutoGen::core_class_for_shape(\@json_keys) lists shipped
-    classes matching a given key set (name only, preference-ordered) --
-    metadata counts as part of the shape for an embedded type but not for
-    a top-level Kind.
-
-  - The bundled CRD providers (Cilium, Traefik, CertManager, GatewayAPI,
-    K3s, AgentSandbox, and the reserved PrometheusOperator, VolumeSnapshot,
-    ExternalSecrets) join IO::K8s::Resource's class-prefix map, so a
-    provider class is written the short way a core class is
-    ('Traefik::V1alpha1::MiddlewareSpec' like 'Core::V1::PodSpec') instead
-    of always spelling out '+IO::K8s::Traefik::V1alpha1::MiddlewareSpec';
-    the new IO::K8s::Resource::class_prefixes() exposes the map read-only.
-    IO::K8s::CRD::Emitter renders those short references (longest matching
-    namespace first) and gains an overlay attribute -- the per-Kind slice
-    of a provider's forthcoming maint/crd-render/<Provider>.yaml -- that
-    supplies the root class's with roles (one with line, defaulting to
-    Namespaced when the Kind is one and to no roles otherwise), verbatim
-    extra source lines right after it, and a names map from a nested
-    class's logical path (IO::K8s::AutoGen::class_path) to its bare
-    (upstream Go) package name, checked after the existing class-name-keyed
-    names map.
-
-  - Traefik modeled to full depth (D5, k95): all 10 traefik.io/v1alpha1
-    Kinds' spec fields are now typed object graphs -- 86 classes total (10
-    Kinds + 76 nested), named after the upstream traefik/traefik v3.7.12
-    Go types, checked in under IO::K8s::Traefik::V1alpha1::*. A shared Go
-    type used by several Kinds (Service, ServerHealthCheck, Sticky,
-    Cookie, IPStrategy, ProxyProtocol, RootCA, Spiffe, Domain,
-    Certificate, ...) is one class, not a copy per Kind; a middleware
-    reference, TLS option/store reference and similar {name, namespace}
-    shapes reuse Core::V1::SecretReference (reuse_core) instead of a
-    provider-local class. None of the 10 Kinds declares a status
-    subresource upstream, so IngressRoute/Middleware/.../TraefikService no
-    longer have a status field at all -- constructing with status => {...}
-    now keeps the value in the unknown-fields bag (re-emitted on the wire)
-    rather than a real attribute, same as any other undeclared key.
-    Constructing spec (or any of its nested fields) via a raw
-    ->new(spec => { ... }) no longer coerces the hashref (k100, pre-
-    existing); build via new_object/inflate, or seed a typed spec through
-    spec_set/spec_push/spec_merge, which do coerce.
-
-  - cert-manager modeled to full depth (D5, k95): all 6 Kinds' spec/status
-    fields are now typed object graphs -- 77 classes total (6 Kinds + 71
-    nested), named after the upstream cert-manager/cert-manager v1.21.1
-    Go types, checked in under IO::K8s::CertManager::V1::*. Issuer and
-    ClusterIssuer embed the literal same Go type (cmapi.IssuerSpec /
-    IssuerStatus), so both Kinds share one spec/status class tree rather
-    than a copy each; a Go type used by several Kinds otherwise
-    (SecretKeySelector, IssuerReference, LocalObjectReference,
-    ServiceAccountRef, the whole ACMEChallengeSolver family) is likewise
-    one shared class. The ACME HTTP01 solver's inlined pod template is
-    cert-manager's own trimmed corev1.PodSpec subset, not the full
-    PodTemplateSpec, so it stays a nested class named after cert-manager's
-    own ACMEChallengeSolverHTTP01IngressPodTemplate/PodObjectMeta/PodSpec
-    Go types rather than reusing Core::V1::PodTemplateSpec; a Gateway API
-    HTTPRoute parentRef embedded by the same solver is named
-    ParentReference after its own upstream Go type. IO::K8s::Role::
-    CertManaged's fluent builders (for_domains, with_issuer, letsencrypt,
-    add_http01_solver, add_dns01_solver, ...) needed no changes -- they
-    already only used the coercing spec_set/spec_push paths. Constructing
-    spec (or any of its nested fields) via a raw ->new(spec => { ... })
-    no longer coerces the hashref (k100, pre-existing); build via
-    new_object/inflate, or seed a typed spec through spec_set/spec_push/
-    spec_merge, which do coerce. t/42_registry_synthesis_roundtrip.t's
-    synthetic-value generator gained a candidate-value branch for a plain
-    (non-array, non-IntOrStr) Str field with its own 'pattern' constraint
-    -- cert-manager's ParentReference and CertificateRenewalWindows are
-    the first shipped fields of that exact shape; benefits every future
-    D3-using provider, not only this one.
-
-  - Cilium cilium.io/v2 modeled to full depth (D5, k95): 17 Kinds'
-    spec/status fields are now typed object graphs -- 138 rendered
-    classes (17 Kinds + 121 nested), named after the upstream cilium/
-    cilium v1.20.1 Go types, checked in under IO::K8s::Cilium::V2::*.
-    An 18th v2 Kind, CiliumExternalWorkload, has no upstream manifest
-    left to render and stays hand-maintained as-is (back-compat, k78),
-    so the namespace ships 139 classes in total.
-    policy/api.Rule -- the shared policy engine struct upstream embeds the
-    literal same in both CiliumNetworkPolicy and
-    CiliumClusterwideNetworkPolicy, at both spec (one Rule) and specs
-    (Rule[]) -- is one shared class, not a copy per Kind or per field; the
-    whole Rule family (EndpointSelector reuses Meta::V1::LabelSelector,
-    reuse_core) follows the same sharing. CiliumEndpoint and CiliumIdentity
-    are the two Kinds with no spec field upstream at all;
-    CiliumEndpoint's status is still fully typed, CiliumIdentity's
-    security-labels is a genuine free-form string map. IO::K8s::Role::
-    NetworkPolicy's Cilium builders (select_pods, allow_ingress_from_pods,
-    deny_all_ingress, ...) needed no changes -- they already only used the
-    coercing spec_set/spec_push paths. Constructing spec/status (or any
-    nested field) via a raw ->new(spec => { ... }) no longer coerces the
-    hashref (k100, pre-existing); build via new_object/inflate, or seed a
-    typed spec through spec_set/spec_push/spec_merge, which do coerce.
-
-  - Cilium cilium.io/v2alpha1 modeled to full depth (D5, k95): the five
-    v2alpha1-only Kinds (CiliumDatapathPlugin, CiliumEndpointSlice,
-    CiliumGatewayClassConfig, CiliumL2AnnouncementPolicy, CiliumPodIPPool)
-    plus the seven BGP/CIDR/LoadBalancerIPPool Kinds still served at
-    v2alpha1 for older clusters (back-compat, k78) are now typed object
-    graphs -- 63 classes total (12 Kinds + 50 nested; an 8th back-compat
-    Kind, CiliumBGPPeeringPolicy, has no upstream manifest left to render
-    and stays hand-maintained as-is). The seven shared BGP/CIDR/
-    LoadBalancerIPPool Kinds reuse the exact overlay entry their v2 render
-    uses -- IO::K8s::CRD::Emitter resolves nested-class names per version
-    directory, so the same upstream Go type never ends up shared *across*
-    v2/v2alpha1, only within one. CiliumEndpointSlice is a third Kind
-    (with CiliumEndpoint and CiliumIdentity from v2) with no spec field
-    upstream at all; its endpoints is still fully typed
-    (IO::K8s::Cilium::V2alpha1::CoreCiliumEndpoint). Constructing spec/
-    status (or any nested field) via a raw ->new(spec => { ... }) no
-    longer coerces the hashref (k100, pre-existing); build via
-    new_object/inflate, or seed a typed spec through spec_set/spec_push/
-    spec_merge, which do coerce. Filed as k108: IO::K8s::Cilium::
-    V2alpha1::AccessLogs (nested under CiliumGatewayClassConfig's
-    spec.telemetry.accessLogs[]) has a real upstream field literally
-    named json, which collided with IO::K8s::Role::Resource's own
-    internal json-encoder attribute (same name at the time); to_json/
-    to_yaml on any AccessLogs instance died. Fixed in this release by
-    renaming the role's internal encoder attribute to _json_encoder (see
-    below) -- AccessLogs is rendered faithfully and to_json/to_yaml now
-    work like any other class.
-
-  - IO::K8s::Role::Resource's internal JSON-encoder attribute is renamed
-    from json to _json_encoder (k108). It previously collided with
-    any k8s-declared field literally named json -- Resource.pm's _k8s()
-    skips creating a Moo attribute when the class already can($attr_name),
-    so such a field's slot silently became the encoder instead, and
-    to_json/to_yaml died trying to serialize it (IO::K8s::Cilium::
-    V2alpha1::AccessLogs is the shipped class this hit). The encoder is
-    implementation-private and was never part of the public API; to_json/
-    to_yaml/TO_JSON/FROM_HASH are unchanged. A class with its own json
-    field now works normally.
+  - Class->to_crd emits Bool defaults as JSON true or false. Numeric defaults,
+    including 0 and 1, remain JSON numbers.
+
+  - Five ExternalSecrets generator field schemas now match upstream.
+    SecretRef key and name patterns are enforced during construction, while
+    to_crd emits the corrected required and default metadata for Grafana,
+    GitHub, GitLab and ACR fields.
+
+  - New maint/crd-schema-audit.pl compares provider field options with their
+    source CRDs, while reporting schema constraints the k8s DSL cannot express
+    separately from actionable differences.
+
+  - Roles and four directly composed classes no longer expose imported helper
+    functions such as HashRef, blessed, croak, Maybe and require_module as
+    methods. Calls to those accidental methods now fail with a missing-method
+    error; genuine role methods and DOES relationships are unchanged.
+
+  - IO::K8s::load_class caches successful loads, reducing realistic inflation
+    time by about 14%. Failed loads are still retried, but deleting a loaded
+    class from %INC no longer forces this path to reload it.
+
+  - NetworkPolicy's allow_egress_to_dns now limits core NetworkPolicy egress
+    to port 53 on CoreDNS pods in kube-system. Regenerated policies are
+    narrower; access to port 53 on other destinations needs an explicit rule.
+    Cilium output is unchanged.
+
+  - Every APIObject now exposes the SpecBuilder spec_* API. Builder roles
+    declare the exact spec_* methods they require, so incompatible role
+    composition fails immediately; calling spec_* on a class without a spec
+    fails with a class-specific error.
+
+  - Routable and NetworkPolicy now load the classes used by their core
+    branches. Ingress add_path_match also rejects its unsupported no-backend
+    path before mutating the object instead of failing partway through.
+
+  - Emitter preserves the original bytes of plain-string CRD patterns, so
+    characters such as @, $, non-ASCII text and an escaped slash are no longer
+    rewritten into different or invalid ECMA262 expressions.
+
+  - Direct Class->new now coerces hashrefs in object, array-of-object and
+    hash-of-object fields, including APIObject metadata and generated nested
+    specs. Already blessed values pass through, and inline-struct input is
+    copied one level rather than aliased.
+
+  - Traefik MiddlewareTCP now composes
+    IO::K8s::Role::MiddlewareTCPBuilder, which provides in_flight_conn,
+    ip_allow_list and ip_white_list. HTTP-only MiddlewareBuilder methods such
+    as rate_limit are removed from MiddlewareTCP and now fail with a
+    missing-method error; HTTP Middleware is unchanged.
+
+  - Class->to_crd converts supported Perl qr// patterns to ECMA262 form,
+    translating anchors and removing the Perl wrapper. Unsupported Perl-only
+    constructs fail with the class, field and construct named; plain-string
+    patterns remain a verbatim escape hatch.
+
+  - reuse_core uses a precomputed core-shape index and loads candidates on
+    demand, keeping first CRD generation, add_crd or inflation near 0.06
+    seconds on the measured tree. It falls back to a live scan if needed,
+    reuse_core => 0 disables reuse, and new
+    IO::K8s::AutoGen::core_class_for_shape lists matching shipped classes.
+
+  - Three full-depth CRD providers are newly bundled and opt in through
+    IO::K8s->new(with => [...]): IO::K8s::PrometheusOperator v0.93.1,
+    IO::K8s::VolumeSnapshot from external-snapshotter v8.6.0, and
+    IO::K8s::ExternalSecrets v2.10.0. ExternalSecrets covers both
+    external-secrets.io and all 19 generators.external-secrets.io/v1alpha1
+    Kinds.
+
+  - Any APIObject Class->to_crd now emits a CustomResourceDefinition from the
+    k8s attribute registry, including all DSL scalar/container types, field
+    options and cycle-safe nested schemas. Known lossy add_crd round trips are
+    Quantity to Str, typed scalar maps to opaque string maps, and arrays of
+    Num, Quantity, Time or IntOrStr to arrays of Str.
+
+  - IO::K8s::CRD->new(classes => [...], storage => $version) assembles a
+    multi-version CRD in caller order and marks only the selected version for
+    storage. Duplicate version names are rejected before an apiserver-invalid
+    CRD can be emitted; Class->to_crd remains the single-version shorthand.
+
+  - New IO::K8s::Unstructured and unknown_kinds => 'unstructured' preserve an
+    unresolved document's apiVersion, kind, metadata and all other wire fields.
+    The fallback is opt-in for inflate and new_object; the default remains a
+    fail-closed unresolved-GVK error.
+
+  - K3s's four Kinds are now modeled to full depth from their upstream Go
+    types despite the schemaless CRDs. Addon and HelmChartConfig have no
+    upstream status field, so their status methods are removed and now fail
+    with a missing-method error.
+
+  - AgentSandbox's four v1beta1 Kinds are now full-depth typed models,
+    including the corrected env and volumeClaimTemplates shapes. The v1alpha1
+    classes remain for older clusters, but the incorrectly modeled
+    SandboxTemplate volumeClaimTemplatesPolicy field is removed from v1alpha1;
+    the field remains available on v1beta1.
+
+  - Gateway API is now modeled to full depth for all 14 served v1/v1beta1
+    GVKs. Routable add_path_match translates Prefix and Regex to Gateway API's
+    PathPrefix and RegularExpression enum values; short names still select the
+    storage version.
+
+  - All ten Traefik Kinds are now full-depth typed models. Their upstream CRDs
+    declare no status fields, so status is no longer a typed accessor; a
+    non-strict unknown status value is still preserved on the wire.
+
+  - All six cert-manager Kinds are now full-depth typed models while retaining
+    the existing CertManaged builder API and shared upstream type identities.
+
+  - Cilium's served v2 and v2alpha1 CRDs are now full-depth typed models, while
+    Kinds with no current upstream manifest remain as back-compat classes.
+    A real field named json now serializes normally after the internal encoder
+    moved to _json_encoder.
+
+  - IO::K8s::AutoGen turns nested OpenAPI objects with properties into typed
+    classes, including array items and map values, so validation, strict mode
+    and unknown-field preservation apply at every modeled depth. New public
+    class_description, class_path and class_root expose their source identity.
+
+  - New IO::K8s::CRD and IO::K8s->add_crd accept CRD objects, hashrefs,
+    YAML/JSON text, paths or lists, generate every served version, and register
+    exact GVKs plus the storage-version short name. Generated CRD classes use
+    an isolated _CRD namespace. For CRDs sharing a bare Kind, add_crd returns
+    every version from every group and retains the first registration's storage
+    selection.
+
+  - New IO::K8s::CRD::Emitter renders registry-backed classes as house-style
+    source, including field options, POD, provider prefixes, role/name overlays
+    and arrays of every supported scalar type. New
+    IO::K8s::Resource::class_prefixes() exposes the read-only prefix map;
+    crd-drift-check --suggest and --suggest-dir expose rendered sources without
+    writing inside lib/.
+
+  - crd-drift-check decodes fetched manifests as UTF-8 before caching them.
+    With --format json, suggestion output goes to stderr so stdout remains one
+    parseable JSON document.
+
+  - AutoGen caps long path-derived nested package names and uses stable hashed
+    fallbacks, preventing deeply nested CRDs from exceeding Perl's identifier
+    limit. class_path and class_root retain the recoverable logical name for
+    Emitter.
+
+  - The k8s DSL accepts per-field required, default, enum, range, pattern,
+    description, nullable and preserve_unknown options. Scalar enum/range/
+    pattern constraints are enforced during construction; defaults are schema
+    metadata only, and invalid option/type combinations fail at class load.
+
+  - AutoGen carries supported OpenAPI field options into the registry.
+    Schema-required fields use required => 'schema' so to_crd retains the
+    requirement without rejecting valid cluster responses that omit
+    server-defaulted or not-yet-populated values; malformed options are
+    dropped.
+
+  - Unknown constructor fields at any modeled depth are retained in
+    _unknown_fields and re-emitted, with declared attributes winning
+    collisions. IO::K8s->new(strict => 1) instead rejects them during that
+    instance's inflate, new_object, json_to_object and struct_to_object calls.
+
+  - SpecBuilder now traverses typed object specs, vivifies declared objects and
+    containers, and coerces inserted hashrefs. New spec_array and spec_hash
+    return vivified containers; scalar-shape conflicts, sparse array writes
+    and other failures no longer clobber data and report the spec path. Unset
+    arrays of Num, Quantity, Time and IntOrStr are supported.
+
+  - CRD provider pins move to Cilium v1.20.1, Traefik v3.7.12, K3s
+    v1.36.4+k3s1 and AgentSandbox v1.0.0. AgentSandbox v1alpha1 remains as a
+    compatibility surface for clusters still using the removed upstream track.
+
+  - Domain-qualified dispatch now reaches retained Cilium v2/v2alpha1 and
+    AgentSandbox v1alpha1 compatibility Kinds, including
+    cilium.io/v2alpha1/CiliumLoadBalancerIPPool. Bare names continue to select
+    each provider's storage version.
+
+  - New maint/crd-drift-check.pl reports provider Kinds and fields that differ
+    from pinned CRD manifests. --render, --check and --suggest support
+    full-depth maintenance; deliberate exceptions remain data-driven and K3s
+    stays marked as schemaless upstream.
+
+  - Distribution metadata now emits x_authority as cpan:JLMARTIN rather than a
+    doubled cpan: prefix, restoring authority-aware tooling for the
+    co-maintainer.
+
+  - Documentation now targets Kubernetes v1.37, describes serialization and
+    fail-closed GVK contracts, and fully documents the builder roles and Net
+    types. The AgentSandbox example no longer uses a nonexistent spec.replicas
+    field.
+
+  - The shipped API surface tracks Kubernetes v1.37.0 with 11 new Kinds, 103
+    supporting types and 48 optional fields on existing classes. New Kinds are
+    registered for exact GVK dispatch and collection resource plurals.
+
+  - Ten fields made required upstream in v1.37 are now required at direct
+    construction, including workload specs, ControllerRevision data and five
+    flow-control fields. Omitting one now fails instead of producing a partial
+    object.
+
+  - resource_plural now returns upstream-derived collection names for shipped
+    Kinds, including group-level fallbacks for retained API tracks no longer
+    served upstream. Subresources and embedded templates still return undef;
+    no plural is guessed.
+
+  - kind, api_version and resource_plural are fail-closed read-only identity
+    accessors and now croak when passed an argument instead of silently
+    ignoring it. Generated GVK classes no longer expose apiVersion or kind as
+    writable data attributes.
+
+  - The k8s DSL adds typed scalar maps such as { Quantity => 1 } for Int, Num,
+    Bool, Quantity, Time and IntOrStr values. Kubernetes resource quantity maps
+    now validate each value during construction; { Str => 1 } remains opaque.
+
+  - The k8s DSL adds array-of-hash and array-of-array forms, and AutoGen maps
+    matching OpenAPI item schemas to them instead of ArrayRef[Str]. Their
+    contents remain opaque but are shape-checked and shallow-copied.
+
+  - The k8s DSL adds Num, and AutoGen maps OpenAPI number fields to it.
+    Fractional values now remain unquoted JSON numbers instead of
+    round-tripping as strings; Quantity remains string-valued.
+
+  - IO::K8s::List can inflate List and *List payloads, derive item GVKs,
+    preserve unknown envelope fields, honor strict mode, and round-trip through
+    from_json/to_json. Generic Lists can still supply item_class when the item
+    type cannot be derived.
+
+  - IO::K8s::List::item_class now accepts only fully qualified class names,
+    with an optional leading +. A short name is no longer guessed; kind returns
+    undef rather than serializing an unverifiable Kind without an apiVersion.
+
+  - Exact GVK requests now fail consistently in new_object, inflate,
+    json_to_object and struct_to_object instead of falling through to unrelated
+    module-loading errors. new_object also honors apiVersion in its params hash
+    and rejects conflicts with an explicit positional version.
+
+  - Bare one-word names are resolved as Kubernetes Kinds before installed
+    same-named Perl packages, while +Name still forces an exact class. Resolved
+    exact class names are no longer re-expanded, and single-segment exact
+    classes now derive their full Kind correctly.
+
+  - add() registers already domain-qualified resource_map keys verbatim instead
+    of producing unusable doubly qualified keys.
+
+  - FROM_HASH now inflates nested objects, making class-level to_json/from_json
+    symmetric rather than rejecting nested hashrefs.
+
+  - from_json now requires a UTF-8 encoded byte string, matching to_json
+    output. Passing an already-decoded non-ASCII character string now fails
+    loudly instead of silently producing mojibake; ASCII input is unchanged.
+
+  - Construction, inflation and TO_JSON now shallow-copy array and hash
+    containers instead of aliasing caller or object state. Inner references
+    below opaque hash fields remain shared.
+
+  - Bool normalization is shared by construction and inflation: \0 and the
+    string "false" remain false, decoded JSON booleans work in scalar and array
+    fields, and malformed references fail with field-aware diagnostics. An
+    explicit undef scalar Bool is omitted; undef inside a Bool array fails at
+    the wire boundary rather than becoming false.
+
+  - Quantity accepts Kubernetes' n (nano) and u (micro) decimal SI suffixes, so
+    real metrics and autoscaling values using those units inflate successfully.
+    Digitless mantissas remain rejected.
+
+  - AutoGen fails at class generation when a $ref cannot be resolved instead of
+    silently dropping the property. OpenAPI x-kubernetes-int-or-string without
+    a type is recognized before ordinary type dispatch.
+
+  - AutoGen accepts boolean additionalProperties schemas as opaque maps and
+    rejects malformed non-schema/non-boolean forms with class and field
+    context. Boolean array items are generated as Bool arrays rather than
+    strings.
+
+  - AutoGen no longer treats apiVersion and kind as data fields on generated
+    GVK classes, preventing a caller from retargeting serialized identity.
+    Classes without a GVK retain ordinary writable identity fields.
+
+  - set_owner refuses owners without a uid and a second controller owner,
+    accepts controller => 0|1, omits controller for non-controller references,
+    and treats adding the same uid twice as an idempotent no-op. It no longer
+    produces ownerReferences Kubernetes will reject.
+
+  - Embedded PodTemplateSpec, JobTemplateSpec, PersistentVolumeClaimTemplate
+    and ResourceClaimTemplateSpec variants no longer serialize apiVersion/kind
+    keys absent from their schemas. They now compose Resource rather than
+    APIObject; metadata remains available, but APIObject identity,
+    label/annotation and convenience methods on those template instances are
+    removed and fail as missing methods.
 
 1.107     2026-08-15 15:37:52Z
 
