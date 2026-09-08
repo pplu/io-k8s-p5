@@ -2,319 +2,107 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added
+    fields, with upstream-derived resource plurals. Ten fields newly required
+    upstream now fail construction when omitted.
+
+  - Add full-depth PrometheusOperator (v0.93.1), VolumeSnapshot (external-
+    snapshotter v8.6.0) and ExternalSecrets (v2.10.0) providers, including all
+    19 ExternalSecrets generator Kinds.
+
+  - Model existing CRD providers to full depth and retain compatible older API
+    tracks. Update Cilium to v1.20.1, Traefik to v3.7.12, K3s to
+    v1.36.4+k3s1 and AgentSandbox to v1.0.0.
+
+  - Add the three VolumeGroupSnapshot Kinds in v1, v1beta1 and v1beta2, with
+    typed version-specific status fields. Bare names select the pinned
+    upstream's storage v1beta2; exact GVKs select any served track.
+
+  - Add CRD loading/add_crd for objects, hashes, YAML/JSON and files. Generate
+    every served version with exact GVKs and storage-version short names;
+    retain the first bare-name binding when groups share a Kind.
+
+  - Generate nested OpenAPI objects at full depth, expose their source metadata
+    and safely shorten deep class names. Reject unresolved references and use
+    process-unique namespaces so later instances cannot inherit old schemas.
+
+  - Add single- and multi-version CRD schema export through to_crd and
+    IO::K8s::CRD, including field options, JSON Bool defaults and supported
+    ECMA262 patterns. Reject duplicate versions and unsupported Perl patterns.
+
+  - CRD schema round trips are not lossless: Quantity becomes Str, typed
+    scalar maps become opaque maps, and arrays of Num, Quantity, Time or
+    IntOrStr re-import as arrays of Str.
+
+  - Add CRD::Emitter rendering with name/role overlays and canonical Quantity
+    recognition. Shared target paths require identical functional declarations;
+    contextual POD may differ, but conflicting aliases fail.
+
+  - Extend the k8s DSL with Num, typed scalar maps, nested containers and
+    schema/validation field options. Enforce scalar enum/range/pattern rules;
+    defaults and schema-requiredness remain metadata, not client-side defaults.
+
+  - Preserve unknown fields at every modeled depth by default; strict => 1
+    rejects them. Opt-in unknown_kinds => 'unstructured' also preserves
+    unresolved resource documents instead of failing GVK resolution.
+
+  - Make GVK resolution consistently exact and fail closed, including version
+    conflicts, qualified map keys and bare names shadowed by Perl packages.
+    kind, api_version and resource_plural reject setter arguments.
+
+  - Coerce nested hashrefs through direct constructors and FROM_HASH, preserve
+    prebuilt objects and shallow-copy input/output containers. Inner references
+    below opaque hashes remain shared.
+
+  - Make class-level JSON round trips recursive, handle fields named json and
+    require UTF-8 bytes for from_json. Already-decoded non-ASCII character
+    strings now fail instead of producing mojibake.
+
+  - Normalize Bool values consistently, including scalar references and JSON
+    booleans. Scalar undef is omitted; undef in Bool arrays fails at the wire
+    boundary. Num stays numeric; Quantity accepts the n and u suffixes.
+
+  - Extend generic List inflation to Kubernetes *List payloads, unknown
+    envelope fields, strict mode and JSON round trips. item_class requires a
+    fully qualified class; unverifiable list identity is not emitted.
+
+  - Make SpecBuilder object-aware on all API objects: typed paths, container
+    vivification, hashref coercion and non-destructive errors. Builder roles
+    declare their requirements; calling spec_* without a spec gives an error.
+
   - Support Ingress path backends via add_path_match(service => ..., port =>
     ...), including named ports; add_backend remains the default backend.
     Gateway/Traefik routing is unchanged, with Gateway path-type translation.
 
-  - Extend VolumeSnapshot with the three VolumeGroupSnapshot Kinds in v1,
-    v1beta1 and v1beta2. Bare names select storage v1beta2; explicit GVKs
-    select any served track, with fully typed version-specific fields.
-
-  - Allocate process-unique AutoGen namespaces even after an IO::K8s instance
-    is destroyed, preventing later instances from reusing generated classes
-    from another openapi_spec.
-
-  - Recognize canonical Quantity patterns in CRD::Emitter; seven
-    PrometheusOperator fields now use Quantity. Numeric quantities serialize
-    as JSON strings rather than numbers; dynamic AutoGen typing is unchanged.
-
-  - Path::Tiny is now declared as a test prerequisite. Installations no longer
-    fail when the shipped test suite runs without a preinstalled Path::Tiny;
-    no runtime dependency is added.
-
-  - Venafi NGTS and TPP credentialsRef fields now use the new
-    IO::K8s::CertManager::V1::CertManagerLocalObjectReference, whose name is
-    schema-required and has no default. The existing LocalObjectReference
-    semantics are unchanged.
-
-  - IO::K8s::CRD::Emitter and maint/crd-drift-check.pl now permit generated
-    classes to share a target path only when their functional source is
-    identical; contextual POD and ABSTRACT text may differ. Conflicting
-    declarations fail before overwriting and identify both classes or GVKs.
-
-  - Class->to_crd emits Bool defaults as JSON true or false. Numeric defaults,
-    including 0 and 1, remain JSON numbers.
-
-  - Five ExternalSecrets generator field schemas now match upstream.
-    SecretRef key and name patterns are enforced during construction, while
-    to_crd emits the corrected required and default metadata for Grafana,
-    GitHub, GitLab and ACR fields.
-
-  - New maint/crd-schema-audit.pl compares provider field options with their
-    source CRDs, while reporting schema constraints the k8s DSL cannot express
-    separately from actionable differences.
-
-  - Roles and four directly composed classes no longer expose imported helper
-    functions such as HashRef, blessed, croak, Maybe and require_module as
-    methods. Calls to those accidental methods now fail with a missing-method
-    error; genuine role methods and DOES relationships are unchanged.
-
-  - IO::K8s::load_class caches successful loads, reducing realistic inflation
-    time by about 14%. Failed loads are still retried, but deleting a loaded
-    class from %INC no longer forces this path to reload it.
-
-  - NetworkPolicy's allow_egress_to_dns now limits core NetworkPolicy egress
-    to port 53 on CoreDNS pods in kube-system. Regenerated policies are
-    narrower; access to port 53 on other destinations needs an explicit rule.
-    Cilium output is unchanged.
-
-  - Every APIObject now exposes the SpecBuilder spec_* API. Builder roles
-    declare the exact spec_* methods they require, so incompatible role
-    composition fails immediately; calling spec_* on a class without a spec
-    fails with a class-specific error.
-
-  - Routable and NetworkPolicy now load the classes used by their core
-    branches. Ingress add_path_match also rejects its unsupported no-backend
-    path before mutating the object instead of failing partway through.
-
-  - Emitter preserves the original bytes of plain-string CRD patterns, so
-    characters such as @, $, non-ASCII text and an escaped slash are no longer
-    rewritten into different or invalid ECMA262 expressions.
-
-  - Direct Class->new now coerces hashrefs in object, array-of-object and
-    hash-of-object fields, including APIObject metadata and generated nested
-    specs. Already blessed values pass through, and inline-struct input is
-    copied one level rather than aliased.
-
-  - Traefik MiddlewareTCP now composes
-    IO::K8s::Role::MiddlewareTCPBuilder, which provides in_flight_conn,
-    ip_allow_list and ip_white_list. HTTP-only MiddlewareBuilder methods such
-    as rate_limit are removed from MiddlewareTCP and now fail with a
-    missing-method error; HTTP Middleware is unchanged.
-
-  - Class->to_crd converts supported Perl qr// patterns to ECMA262 form,
-    translating anchors and removing the Perl wrapper. Unsupported Perl-only
-    constructs fail with the class, field and construct named; plain-string
-    patterns remain a verbatim escape hatch.
-
-  - reuse_core uses a precomputed core-shape index and loads candidates on
-    demand, keeping first CRD generation, add_crd or inflation near 0.06
-    seconds on the measured tree. It falls back to a live scan if needed,
-    reuse_core => 0 disables reuse, and new
-    IO::K8s::AutoGen::core_class_for_shape lists matching shipped classes.
-
-  - Three full-depth CRD providers are newly bundled and opt in through
-    IO::K8s->new(with => [...]): IO::K8s::PrometheusOperator v0.93.1,
-    IO::K8s::VolumeSnapshot from external-snapshotter v8.6.0, and
-    IO::K8s::ExternalSecrets v2.10.0. ExternalSecrets covers both
-    external-secrets.io and all 19 generators.external-secrets.io/v1alpha1
-    Kinds.
-
-  - Any APIObject Class->to_crd now emits a CustomResourceDefinition from the
-    k8s attribute registry, including all DSL scalar/container types, field
-    options and cycle-safe nested schemas. Known lossy add_crd round trips are
-    Quantity to Str, typed scalar maps to opaque string maps, and arrays of
-    Num, Quantity, Time or IntOrStr to arrays of Str.
-
-  - IO::K8s::CRD->new(classes => [...], storage => $version) assembles a
-    multi-version CRD in caller order and marks only the selected version for
-    storage. Duplicate version names are rejected before an apiserver-invalid
-    CRD can be emitted; Class->to_crd remains the single-version shorthand.
-
-  - New IO::K8s::Unstructured and unknown_kinds => 'unstructured' preserve an
-    unresolved document's apiVersion, kind, metadata and all other wire fields.
-    The fallback is opt-in for inflate and new_object; the default remains a
-    fail-closed unresolved-GVK error.
-
-  - K3s's four Kinds are now modeled to full depth from their upstream Go
-    types despite the schemaless CRDs. Addon and HelmChartConfig have no
-    upstream status field, so their status methods are removed and now fail
-    with a missing-method error.
-
-  - AgentSandbox's four v1beta1 Kinds are now full-depth typed models,
-    including the corrected env and volumeClaimTemplates shapes. The v1alpha1
-    classes remain for older clusters, but the incorrectly modeled
-    SandboxTemplate volumeClaimTemplatesPolicy field is removed from v1alpha1;
-    the field remains available on v1beta1.
-
-  - Gateway API is now modeled to full depth for all 14 served v1/v1beta1
-    GVKs. Routable add_path_match translates Prefix and Regex to Gateway API's
-    PathPrefix and RegularExpression enum values; short names still select the
-    storage version.
-
-  - All ten Traefik Kinds are now full-depth typed models. Their upstream CRDs
-    declare no status fields, so status is no longer a typed accessor; a
-    non-strict unknown status value is still preserved on the wire.
-
-  - All six cert-manager Kinds are now full-depth typed models while retaining
-    the existing CertManaged builder API and shared upstream type identities.
-
-  - Cilium's served v2 and v2alpha1 CRDs are now full-depth typed models, while
-    Kinds with no current upstream manifest remain as back-compat classes.
-    A real field named json now serializes normally after the internal encoder
-    moved to _json_encoder.
-
-  - IO::K8s::AutoGen turns nested OpenAPI objects with properties into typed
-    classes, including array items and map values, so validation, strict mode
-    and unknown-field preservation apply at every modeled depth. New public
-    class_description, class_path and class_root expose their source identity.
-
-  - New IO::K8s::CRD and IO::K8s->add_crd accept CRD objects, hashrefs,
-    YAML/JSON text, paths or lists, generate every served version, and register
-    exact GVKs plus the storage-version short name. Generated CRD classes use
-    an isolated _CRD namespace. For CRDs sharing a bare Kind, add_crd returns
-    every version from every group and retains the first registration's storage
-    selection.
-
-  - New IO::K8s::CRD::Emitter renders registry-backed classes as house-style
-    source, including field options, POD, provider prefixes, role/name overlays
-    and arrays of every supported scalar type. New
-    IO::K8s::Resource::class_prefixes() exposes the read-only prefix map;
-    crd-drift-check --suggest and --suggest-dir expose rendered sources without
-    writing inside lib/.
-
-  - crd-drift-check decodes fetched manifests as UTF-8 before caching them.
-    With --format json, suggestion output goes to stderr so stdout remains one
-    parseable JSON document.
-
-  - AutoGen caps long path-derived nested package names and uses stable hashed
-    fallbacks, preventing deeply nested CRDs from exceeding Perl's identifier
-    limit. class_path and class_root retain the recoverable logical name for
-    Emitter.
-
-  - The k8s DSL accepts per-field required, default, enum, range, pattern,
-    description, nullable and preserve_unknown options. Scalar enum/range/
-    pattern constraints are enforced during construction; defaults are schema
-    metadata only, and invalid option/type combinations fail at class load.
-
-  - AutoGen carries supported OpenAPI field options into the registry.
-    Schema-required fields use required => 'schema' so to_crd retains the
-    requirement without rejecting valid cluster responses that omit
-    server-defaulted or not-yet-populated values; malformed options are
-    dropped.
-
-  - Unknown constructor fields at any modeled depth are retained in
-    _unknown_fields and re-emitted, with declared attributes winning
-    collisions. IO::K8s->new(strict => 1) instead rejects them during that
-    instance's inflate, new_object, json_to_object and struct_to_object calls.
-
-  - SpecBuilder now traverses typed object specs, vivifies declared objects and
-    containers, and coerces inserted hashrefs. New spec_array and spec_hash
-    return vivified containers; scalar-shape conflicts, sparse array writes
-    and other failures no longer clobber data and report the spec path. Unset
-    arrays of Num, Quantity, Time and IntOrStr are supported.
-
-  - CRD provider pins move to Cilium v1.20.1, Traefik v3.7.12, K3s
-    v1.36.4+k3s1 and AgentSandbox v1.0.0. AgentSandbox v1alpha1 remains as a
-    compatibility surface for clusters still using the removed upstream track.
-
-  - Domain-qualified dispatch now reaches retained Cilium v2/v2alpha1 and
-    AgentSandbox v1alpha1 compatibility Kinds, including
-    cilium.io/v2alpha1/CiliumLoadBalancerIPPool. Bare names continue to select
-    each provider's storage version.
-
-  - New maint/crd-drift-check.pl reports provider Kinds and fields that differ
-    from pinned CRD manifests. --render, --check and --suggest support
-    full-depth maintenance; deliberate exceptions remain data-driven and K3s
-    stays marked as schemaless upstream.
-
-  - Distribution metadata now emits x_authority as cpan:JLMARTIN rather than a
-    doubled cpan: prefix, restoring authority-aware tooling for the
-    co-maintainer.
-
-  - Documentation now targets Kubernetes v1.37, describes serialization and
-    fail-closed GVK contracts, and fully documents the builder roles and Net
-    types. The AgentSandbox example no longer uses a nonexistent spec.replicas
-    field.
-
-  - The shipped API surface tracks Kubernetes v1.37.0 with 11 new Kinds, 103
-    supporting types and 48 optional fields on existing classes. New Kinds are
-    registered for exact GVK dispatch and collection resource plurals.
-
-  - Ten fields made required upstream in v1.37 are now required at direct
-    construction, including workload specs, ControllerRevision data and five
-    flow-control fields. Omitting one now fails instead of producing a partial
-    object.
-
-  - resource_plural now returns upstream-derived collection names for shipped
-    Kinds, including group-level fallbacks for retained API tracks no longer
-    served upstream. Subresources and embedded templates still return undef;
-    no plural is guessed.
-
-  - kind, api_version and resource_plural are fail-closed read-only identity
-    accessors and now croak when passed an argument instead of silently
-    ignoring it. Generated GVK classes no longer expose apiVersion or kind as
-    writable data attributes.
-
-  - The k8s DSL adds typed scalar maps such as { Quantity => 1 } for Int, Num,
-    Bool, Quantity, Time and IntOrStr values. Kubernetes resource quantity maps
-    now validate each value during construction; { Str => 1 } remains opaque.
-
-  - The k8s DSL adds array-of-hash and array-of-array forms, and AutoGen maps
-    matching OpenAPI item schemas to them instead of ArrayRef[Str]. Their
-    contents remain opaque but are shape-checked and shallow-copied.
-
-  - The k8s DSL adds Num, and AutoGen maps OpenAPI number fields to it.
-    Fractional values now remain unquoted JSON numbers instead of
-    round-tripping as strings; Quantity remains string-valued.
-
-  - IO::K8s::List can inflate List and *List payloads, derive item GVKs,
-    preserve unknown envelope fields, honor strict mode, and round-trip through
-    from_json/to_json. Generic Lists can still supply item_class when the item
-    type cannot be derived.
-
-  - IO::K8s::List::item_class now accepts only fully qualified class names,
-    with an optional leading +. A short name is no longer guessed; kind returns
-    undef rather than serializing an unverifiable Kind without an apiVersion.
-
-  - Exact GVK requests now fail consistently in new_object, inflate,
-    json_to_object and struct_to_object instead of falling through to unrelated
-    module-loading errors. new_object also honors apiVersion in its params hash
-    and rejects conflicts with an explicit positional version.
-
-  - Bare one-word names are resolved as Kubernetes Kinds before installed
-    same-named Perl packages, while +Name still forces an exact class. Resolved
-    exact class names are no longer re-expanded, and single-segment exact
-    classes now derive their full Kind correctly.
-
-  - add() registers already domain-qualified resource_map keys verbatim instead
-    of producing unusable doubly qualified keys.
-
-  - FROM_HASH now inflates nested objects, making class-level to_json/from_json
-    symmetric rather than rejecting nested hashrefs.
-
-  - from_json now requires a UTF-8 encoded byte string, matching to_json
-    output. Passing an already-decoded non-ASCII character string now fails
-    loudly instead of silently producing mojibake; ASCII input is unchanged.
-
-  - Construction, inflation and TO_JSON now shallow-copy array and hash
-    containers instead of aliasing caller or object state. Inner references
-    below opaque hash fields remain shared.
-
-  - Bool normalization is shared by construction and inflation: \0 and the
-    string "false" remain false, decoded JSON booleans work in scalar and array
-    fields, and malformed references fail with field-aware diagnostics. An
-    explicit undef scalar Bool is omitted; undef inside a Bool array fails at
-    the wire boundary rather than becoming false.
-
-  - Quantity accepts Kubernetes' n (nano) and u (micro) decimal SI suffixes, so
-    real metrics and autoscaling values using those units inflate successfully.
-    Digitless mantissas remain rejected.
-
-  - AutoGen fails at class generation when a $ref cannot be resolved instead of
-    silently dropping the property. OpenAPI x-kubernetes-int-or-string without
-    a type is recognized before ordinary type dispatch.
-
-  - AutoGen accepts boolean additionalProperties schemas as opaque maps and
-    rejects malformed non-schema/non-boolean forms with class and field
-    context. Boolean array items are generated as Bool arrays rather than
-    strings.
-
-  - AutoGen no longer treats apiVersion and kind as data fields on generated
-    GVK classes, preventing a caller from retargeting serialized identity.
-    Classes without a GVK retain ordinary writable identity fields.
-
-  - set_owner refuses owners without a uid and a second controller owner,
-    accepts controller => 0|1, omits controller for non-controller references,
-    and treats adding the same uid twice as an idempotent no-op. It no longer
-    produces ownerReferences Kubernetes will reject.
-
-  - Embedded PodTemplateSpec, JobTemplateSpec, PersistentVolumeClaimTemplate
-    and ResourceClaimTemplateSpec variants no longer serialize apiVersion/kind
-    keys absent from their schemas. They now compose Resource rather than
-    APIObject; metadata remains available, but APIObject identity,
-    label/annotation and convenience methods on those template instances are
-    removed and fail as missing methods.
+  - Limit core NetworkPolicy DNS egress to CoreDNS in kube-system. Policies
+    generated by allow_egress_to_dns no longer permit port 53 everywhere;
+    other DNS destinations require an explicit rule. Cilium is unchanged.
+
+  - Give MiddlewareTCP a TCP-only builder. Its former HTTP-only builder
+    methods now fail as missing methods; HTTP Middleware is unchanged.
+
+  - Require owner UIDs and reject a second controller in set_owner. Adding
+    the same UID is an idempotent no-op; controller => 0 creates a
+    non-controller reference without the controller flag.
+
+  - Remove unsupported status accessors from Traefik, K3s Addon and
+    HelmChartConfig, and volumeClaimTemplatesPolicy from AgentSandbox v1alpha1
+    SandboxTemplate. Undeclared wire fields remain preserved outside strict mode.
+
+  - Embedded Pod/Job/PVC template structs and ResourceClaimTemplateSpec lose
+    APIObject identity/convenience methods (missing-method errors); metadata
+    remains, without the incorrect apiVersion/kind output.
+
+  - Remove imported helper functions accidentally exposed as public methods;
+    genuine role methods and composition relationships remain unchanged.
+
+  - Cache successful class loads and precompute core-shape lookup. Removing
+    a cached module from %INC no longer forces a reload through load_class;
+    failed loads are still retried, and reuse_core can be disabled.
+
+  - Add pinned-source CRD drift/schema auditing and render/check/suggest tools,
+    with data-driven exceptions and UTF-8-safe manifests. Correct API/role POD,
+    declare Path::Tiny for tests and fix the distribution authority metadata.
 
 1.107     2026-08-15 15:37:52Z
 
