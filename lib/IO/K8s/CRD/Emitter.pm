@@ -39,6 +39,15 @@ prints, C<--suggest-dir> writes outside C<lib/>).
 Descriptions go into POD, not into the C<description> field option: the
 house format documents every field once, in the C<=attr> block.
 
+For an C<is_int_or_string> registry entry whose pattern is exactly Kubernetes'
+apimachinery Quantity pattern, rendering uses C<Quantity> and removes only that
+redundant pattern from the emitted options; all other options and the dynamic
+AutoGen registry remain unchanged. Exact matching accepts either the pattern
+text or a regexp with only non-semantic C<u> and C<p> flags, so a near match or
+semantic flag stays C<IntOrStr>. Consequently, numeric-looking C<'42'> is a JSON
+string in emitted Quantity code, while the dynamic C<IntOrStr> class still
+serializes it as a JSON number.
+
 =cut
 
 =attr base
@@ -264,6 +273,33 @@ sub _class_ref {
     return "'+$class'";
 }
 
+# The apimachinery Quantity pattern carried by the affected CRD schemas.
+# It is an exact wire contract, so a merely similar pattern must not select
+# Quantity during rendering.
+my $CANONICAL_QUANTITY_PATTERN = q{^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$};
+
+# `u` is the implicit UTF-8 artifact and `p` does not affect matching, the
+# same two flags _pattern_literal ignores. Every other flag changes the
+# contract and keeps the field as IntOrStr.
+sub _is_canonical_quantity_pattern {
+    my ($value) = @_;
+    return defined($value) && $value eq $CANONICAL_QUANTITY_PATTERN unless ref $value;
+    return 0 unless ref $value eq 'Regexp';
+
+    my ($pattern, $flags) = re::regexp_pattern($value);
+    $flags = '' unless defined $flags;
+    $flags =~ s/[up]//g;
+    return $pattern eq $CANONICAL_QUANTITY_PATTERN && !length $flags;
+}
+
+sub _is_quantity_entry {
+    my ($info) = @_;
+    return unless $info->{is_int_or_string};
+    my $opts = $info->{options};
+    return unless $opts && exists $opts->{pattern};
+    return _is_canonical_quantity_pattern($opts->{pattern});
+}
+
 # The DSL type spec for one registry entry, as source. Returns
 # ($source, $nested_class_or_undef). $class/$key are diagnostic context
 # only, for the croak below -- the caller already has both.
@@ -293,6 +329,7 @@ sub _type_source {
     return ('Int')      if $info->{is_int};
     return ('Num')      if $info->{is_num};
     return ('Bool')     if $info->{is_bool};
+    return ('Quantity') if _is_quantity_entry($info);
     return ('IntOrStr') if $info->{is_int_or_string};
     return ('Quantity') if $info->{is_quantity};
     return ('Time')     if $info->{is_time};
@@ -578,6 +615,7 @@ sub _options_source {
     my ($info) = @_;
     my %opts = %{ $info->{options} // {} };
     delete $opts{description};             # goes to POD
+    delete $opts{pattern} if _is_quantity_entry($info);
     $opts{required} = 'schema' if $info->{required};
     return '' unless %opts;
     my @parts = map { "$_ => " . ($_ eq 'pattern' ? _pattern_literal($opts{$_}) : _literal($opts{$_})) }

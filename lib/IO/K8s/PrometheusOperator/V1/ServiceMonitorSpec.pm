@@ -15,7 +15,7 @@ k8s labelNameLengthLimit           => Int, { minimum => 0 };
 k8s labelValueLengthLimit          => Int, { minimum => 0 };
 k8s namespaceSelector              => '+IO::K8s::PrometheusOperator::V1::NamespaceSelector';
 k8s nativeHistogramBucketLimit     => Int, { minimum => 0 };
-k8s nativeHistogramMinBucketFactor => IntOrStr, { pattern => qr/^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$/ };
+k8s nativeHistogramMinBucketFactor => Quantity;
 k8s podTargetLabels                => [Str];
 k8s sampleLimit                    => Int, { minimum => 0 };
 k8s scrapeClass                    => Str;

@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s chunkEncoding                  => '+IO::K8s::PrometheusOperator::V1::ChunkEncodingSpec';
 k8s outOfOrderTimeWindow           => Str, { pattern => qr/^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$/ };
-k8s staleSeriesCompactionThreshold => IntOrStr, { pattern => qr/^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$/ };
+k8s staleSeriesCompactionThreshold => Quantity;
 
 =attr chunkEncoding
 

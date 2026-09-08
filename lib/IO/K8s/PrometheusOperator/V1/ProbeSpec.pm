@@ -19,7 +19,7 @@ k8s labelValueLengthLimit          => Int, { minimum => 0 };
 k8s metricRelabelings              => ['+IO::K8s::PrometheusOperator::V1::RelabelConfig'];
 k8s module                         => Str;
 k8s nativeHistogramBucketLimit     => Int, { minimum => 0 };
-k8s nativeHistogramMinBucketFactor => IntOrStr, { pattern => qr/^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$/ };
+k8s nativeHistogramMinBucketFactor => Quantity;
 k8s oauth2                         => '+IO::K8s::PrometheusOperator::V1::OAuth2';
 k8s params                         => ['+IO::K8s::PrometheusOperator::V1::ProbeParam'];
 k8s prober                         => '+IO::K8s::PrometheusOperator::V1::ProberSpec';

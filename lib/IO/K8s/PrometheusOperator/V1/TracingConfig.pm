@@ -8,7 +8,7 @@ k8s compression      => Str, { enum => [qw(gzip Gzip)] };
 k8s endpoint         => Str, { required => 'schema' };
 k8s headers          => { Str => 1 };
 k8s insecure         => Bool;
-k8s samplingFraction => IntOrStr, { pattern => qr/^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$/ };
+k8s samplingFraction => Quantity;
 k8s timeout          => Str, { pattern => qr/^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$/ };
 k8s tlsConfig        => '+IO::K8s::PrometheusOperator::V1::TLSConfig';
 

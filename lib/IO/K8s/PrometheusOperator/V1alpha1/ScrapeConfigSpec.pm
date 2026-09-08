@@ -39,7 +39,7 @@ k8s metricsPath                    => Str;
 k8s nameEscapingScheme             => Str, { enum => [qw(AllowUTF8 Underscores Dots Values)] };
 k8s nameValidationScheme           => Str, { enum => [qw(UTF8 Legacy)] };
 k8s nativeHistogramBucketLimit     => Int, { minimum => 0 };
-k8s nativeHistogramMinBucketFactor => IntOrStr, { pattern => qr/^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$/ };
+k8s nativeHistogramMinBucketFactor => Quantity;
 k8s noProxy                        => Str;
 k8s nomadSDConfigs                 => ['+IO::K8s::PrometheusOperator::V1alpha1::NomadSDConfig'];
 k8s oauth2                         => '+IO::K8s::PrometheusOperator::V1alpha1::OAuth2';

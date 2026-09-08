@@ -2,6 +2,10 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Recognize canonical Quantity patterns in CRD::Emitter; seven
+    PrometheusOperator fields now use Quantity. Numeric quantities serialize
+    as JSON strings rather than numbers; dynamic AutoGen typing is unchanged.
+
   - Allocate process-unique AutoGen namespaces even after an IO::K8s instance
     is destroyed, preventing later instances from reusing generated classes
     from another openapi_spec.
