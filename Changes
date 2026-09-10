@@ -26,6 +26,10 @@ Revision history for IO-K8s
     and safely shorten deep class names. Reject unresolved references and use
     process-unique namespaces so later instances cannot inherit old schemas.
 
+  - Let generation keep a provider's own named type where its shape matches a
+    core class (AutoGen reuse_core_except), and let the class emitter point a
+    field at an absolute cross-version or core class without emitting a copy.
+
   - Add single- and multi-version CRD schema export through to_crd and
     IO::K8s::CRD, including field options, JSON Bool defaults and supported
     ECMA262 patterns. Reject duplicate versions and unsupported Perl patterns.

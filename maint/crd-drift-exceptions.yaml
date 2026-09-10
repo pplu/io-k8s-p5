@@ -169,3 +169,6 @@ ignore_unrendered:
   - provider: AgentSandbox
     path: IO/K8s/AgentSandbox/V1alpha1/SandboxWarmPool.pm
     reason: "k88: v1alpha1 removed upstream at agent-sandbox v1.0.0 (no api/v1alpha1 manifest left to render from); class kept for clusters still on v0.5.x"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
+    reason: "k120: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; closing it needs a decision (drop the empty class, or teach AutoGen a forced-struct hook) tracked as follow-up, not an overlay mechanism."

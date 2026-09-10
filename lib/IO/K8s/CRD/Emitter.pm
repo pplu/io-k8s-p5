@@ -77,6 +77,18 @@ root class composes that role and C<[]> otherwise, when not given. This
 attribute holds one Kind's overlay, not the whole provider file -- slicing
 C<< $provider_overlay->{kinds}{$kind} >> out of the YAML is the caller's job.
 
+An C<names> value carrying C<::> (k120) is an B<absolute> target -- a
+fully-qualified package this render references but does not itself write a
+file for: a cross-version type another version directory of the same
+provider already ships (C<IO::K8s::ExternalSecrets::V1::AWSAuth> named under a
+v1alpha1 Kind), or a core class the D5 reuse heuristic would not fold on its
+own (a single-key C<{name}> that stays C<IO::K8s::Api::Core::V1::LocalObjectReference>).
+See L</package_for>. The sibling C<no_reuse_core>
+key of a provider overlay file is B<not> read here: it is a generation-time
+concern the render driver passes to L<IO::K8s::AutoGen> as C<reuse_core_except>,
+so that a provider's own named type is generated for such a path before this
+overlay renames it.
+
 =attr version
 
 The C<$VERSION> line to write. Defaults to this distribution's.
@@ -112,6 +124,13 @@ by the generated class's own (possibly hash-shortened) Perl name, else
 L</overlay>'s C<names> when listed there by logical path, otherwise
 L</base> plus the class's path segments below its Kind joined together
 (the Kind itself for the root).
+
+An overlay C<names> value that carries C<::> (k120) is used verbatim as an
+absolute package (a leading C<+> is stripped) rather than joined below
+L</base> -- the cross-version / core external targets described under
+L</overlay>. Such a class satisfies C<_is_external_ref>: L</render> neither
+recurses into it nor writes a file for it, and its reference is emitted the
+way a hand-written class writes that target package.
 
 A class deep enough that L<IO::K8s::AutoGen> had to shorten its own
 namespace-qualified Perl name (past its 251-character identifier limit --
@@ -159,7 +178,18 @@ sub package_for {
     # upstream Go types and has no way to know what (possibly shortened)
     # Perl name AutoGen happened to give a class this run.
     if (length $path and my $overlay_names = $self->overlay->{names}) {
-        return $self->base . '::' . $overlay_names->{$path} if $overlay_names->{$path};
+        if (my $name = $overlay_names->{$path}) {
+            # k120: an overlay name carrying '::' (or a leading '+') is an
+            # ABSOLUTE target -- a fully-qualified package under another
+            # version directory of this same provider (ExternalSecrets'
+            # v1alpha1 generators reuse the v1 Auth types) or any other
+            # checked-in class. It is used verbatim rather than joined below
+            # $base, and _is_external_ref treats it as a bare reference that
+            # this render does not itself emit a file for. A bare name (no
+            # '::') is a package under $base as before.
+            $name =~ s/^\+//;
+            return $name =~ /::/ ? $name : $self->base . '::' . $name;
+        }
     }
 
     my $joined = join '', $kind, split /::/, $path;
@@ -249,9 +279,41 @@ sub _is_generated {
     return $class eq $root || index($class, "$root\::") == 0;
 }
 
+# k120: a generated class an overlay `names` entry redirects to an ABSOLUTE
+# package outside this render's own `base` -- a cross-version reference to a
+# type another version directory already ships. It is still referenced
+# (_class_ref emits '+<that package>' via package_for, exactly as a
+# hand-written class writes it), but this render neither recurses into it nor
+# writes a file for it: the version directory that owns the target renders it.
+# A normal generated class resolves under `base::...` and is not external.
+sub _is_external_ref {
+    my ($self, $class) = @_;
+    return 0 unless $self->_is_generated($class);
+    return index($self->package_for($class), $self->base . '::') != 0;
+}
+
 sub _class_ref {
     my ($self, $class) = @_;
-    return "'+" . $self->package_for($class) . "'" if $self->_is_generated($class);
+
+    # k120: an overlay redirect to an absolute package outside this render
+    # (a cross-version provider type, or a core class the reuse heuristic
+    # would not pick on its own -- a single-key {name} that stays
+    # Core::V1::LocalObjectReference). Reference the TARGET package exactly
+    # as a hand-written class does: a core/apimachinery type by its short
+    # prefix (Core::V1::X, Meta::V1::X), any other package -- a cross-version
+    # provider type -- kept in the full '+IO::K8s::...' form. class_prefixes()
+    # also carries provider prefixes (for the DSL's own expansion), so
+    # restricting the shortening to the core groups here is what keeps a
+    # provider cross-ref from collapsing to 'ExternalSecrets::V1::X' where
+    # lib writes '+IO::K8s::ExternalSecrets::V1::X'.
+    if ($self->_is_external_ref($class)) {
+        my $target = $self->package_for($class);
+        return "'+$target'" unless $target =~ /^IO::K8s::(?:Api|Apimachinery)::/;
+        $class = $target;
+    }
+    elsif ($self->_is_generated($class)) {
+        return "'+" . $self->package_for($class) . "'";
+    }
 
     # IO::K8s::Resource::class_prefixes(), longest full namespace first --
     # see _build__prefix_pairs.
@@ -305,7 +367,8 @@ sub _is_quantity_entry {
 # only, for the croak below -- the caller already has both.
 sub _type_source {
     my ($self, $info, $class, $key) = @_;
-    my $nested = $info->{class} && $self->_is_generated($info->{class}) ? $info->{class} : undef;
+    my $nested = $info->{class} && $self->_is_generated($info->{class})
+        && !$self->_is_external_ref($info->{class}) ? $info->{class} : undef;
     return ($self->_class_ref($info->{class}), $nested)                if $info->{is_object};
     return ('[' . $self->_class_ref($info->{class}) . ']', $nested)    if $info->{is_array_of_objects};
     return ('{ ' . $self->_class_ref($info->{class}) . ' => 1 }', $nested) if $info->{is_hash_of_objects};

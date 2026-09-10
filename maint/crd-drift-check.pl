@@ -914,8 +914,15 @@ sub render_gvk {
     my $ns = 'IO::K8s::_CRDRENDER_' . ++$ns_counter;
     # reuse_core on (D5, and IO::K8s::CRD->generate's own default) -- a
     # nested schema shaped exactly like a shipped core class is typed as
-    # that class rather than a per-provider copy.
-    my $classes = IO::K8s::CRD->generate($u->{doc}, $ns, reuse_core => 1);
+    # that class rather than a per-provider copy. A provider overlay may name
+    # logical nested-class paths under `no_reuse_core` (k120) where that
+    # reuse is suppressed so the provider's own named type is generated
+    # instead (then given its Go name via `names`) -- PrometheusOperator's
+    # Argument, whose {name,value} shape would otherwise reuse
+    # Core::V1::HTTPHeader.
+    my %reuse_core_except = map { $_ => 1 } @{ $overlay->{no_reuse_core} // [] };
+    my $classes = IO::K8s::CRD->generate($u->{doc}, $ns, reuse_core => 1,
+        reuse_core_except => \%reuse_core_except);
     my $root = $classes->{"$u->{group}/$u->{version}"} or return {};
 
     # A --names key is written relative to the Kind (the Kind's own

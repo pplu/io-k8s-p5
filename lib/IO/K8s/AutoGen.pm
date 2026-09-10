@@ -95,6 +95,11 @@ sub is_autogen {
 #                      additionalProperties schema as a shipped core class
 #                      instead of a nested class when its shape matches
 #                      one (D5); see _core_class_for.
+#   reuse_core_except => { 'Spec::Foo' => 1, ... } -- with reuse_core on,
+#                      the logical nested-class paths (root-relative,
+#                      class_path's key space) at which reuse is suppressed
+#                      so a provider's own named type is generated even
+#                      though its shape matches a core class (k120).
 sub get_or_generate {
     my ($def_name, $schema, $all_defs, $namespace, %opts) = @_;
 
@@ -253,6 +258,14 @@ sub _generate_class {
     # additionalProperties schema of exactly its shape, default on.
     my $reuse_core = exists $opts{reuse_core} ? ($opts{reuse_core} ? 1 : 0) : 1;
 
+    # k120: a set of logical nested-class paths (root-relative,
+    # '::'-joined -- the same key space class_path/the render overlay use)
+    # at which core reuse is suppressed even with reuse_core on, so a
+    # provider's own named type is generated where its shape happens to
+    # match a core class (PrometheusOperator's Argument matches
+    # Core::V1::HTTPHeader). Empty/absent -> reuse behaves exactly as before.
+    my $reuse_core_except = $opts{reuse_core_except} || {};
+
     # Generate attributes using k8s DSL
     # Property names with special characters ($ref, x-kubernetes-*) are
     # automatically sanitized to valid Perl identifiers by _k8s(), with
@@ -261,7 +274,7 @@ sub _generate_class {
     for my $prop (sort keys %$properties) {
         next if $role_supplied{$prop};
         my $prop_schema = $properties->{$prop};
-        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class, $reuse_core);
+        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class, $reuse_core, $reuse_core_except);
         next unless defined $type_spec;  # Skip unsupported types
 
         my $opts = _field_options($prop_schema, $type_spec, $required{$prop});
@@ -424,7 +437,7 @@ sub _class_for_path {
 # properties still get the same reuse_core treatment when this new class's
 # own fields are, in turn, typed.
 sub _nested_class {
-    my ($parent_class, $field_name, $suffix, $schema, $all_defs, $namespace, $reuse_core) = @_;
+    my ($parent_class, $field_name, $suffix, $schema, $all_defs, $namespace, $reuse_core, $reuse_core_except) = @_;
     $reuse_core = 1 unless defined $reuse_core;
 
     my $root = $_root_of{$parent_class} // $parent_class;
@@ -449,8 +462,21 @@ sub _nested_class {
     $_class_path{$class} = $path;
 
     my $def_name = class_to_def($parent_class) . '.' . $segment;
-    _generate_class($class, $def_name, $schema, $all_defs, $namespace, reuse_core => $reuse_core);
+    _generate_class($class, $def_name, $schema, $all_defs, $namespace,
+        reuse_core => $reuse_core, reuse_core_except => $reuse_core_except);
     return $class;
+}
+
+# The logical path a nested class for ($parent_class, $field_name, $suffix)
+# WOULD be generated at, computed the same way _nested_class does above --
+# but without generating anything, so the reuse decision in
+# _schema_to_type_spec can consult reuse_core_except before it calls
+# _core_class_for (k120).
+sub _prospective_nested_path {
+    my ($parent_class, $field_name, $suffix) = @_;
+    my $parent_path = $_class_path{$parent_class};
+    my $segment = _class_segment($field_name) . ($suffix // '');
+    return defined($parent_path) ? "$parent_path\::$segment" : $segment;
 }
 
 sub _has_properties {
@@ -728,8 +754,20 @@ sub _core_class_for {
 # $reuse_core (D5, default 1) turns the object / array-items /
 # additionalProperties reuse check on or off (see _core_class_for).
 sub _schema_to_type_spec {
-    my ($schema, $all_defs, $namespace, $field_name, $class, $reuse_core) = @_;
+    my ($schema, $all_defs, $namespace, $field_name, $class, $reuse_core, $reuse_core_except) = @_;
     $reuse_core = 1 unless defined $reuse_core;
+    $reuse_core_except ||= {};
+
+    # k120: reuse core here unless this field's would-be nested class sits
+    # at a path the caller marked for suppression (see reuse_core_except in
+    # _generate_class). $suffix matches the _nested_class call in the same
+    # branch: 'Item' for array items, undef for a plain object, 'Value' for
+    # additionalProperties.
+    my $may_reuse = sub {
+        my ($suffix) = @_;
+        return 0 unless $reuse_core;
+        return !$reuse_core_except->{ _prospective_nested_path($class, $field_name, $suffix) };
+    };
 
     my $where = "field '" . $field_name . "' of " . $class;
 
@@ -810,11 +848,11 @@ sub _schema_to_type_spec {
             }
             _croak_unresolved_ref($ref, "the items of $where");
         }
-        if ($reuse_core and my $core = _core_class_for($items)) {
+        if ($may_reuse->('Item') and my $core = _core_class_for($items)) {
             return [ "+$core" ];
         }
         if (_has_properties($items)) {
-            return [ '+' . _nested_class($class, $field_name, 'Item', $items, $all_defs, $namespace, $reuse_core) ];
+            return [ '+' . _nested_class($class, $field_name, 'Item', $items, $all_defs, $namespace, $reuse_core, $reuse_core_except) ];
         }
         # Type::Tiny objects rather than the barewords: inside an arrayref
         # the DSL reads a plain string as a class name for everything except
@@ -835,10 +873,10 @@ sub _schema_to_type_spec {
     }
     elsif ($type eq 'object') {
         if (_has_properties($schema)) {
-            if ($reuse_core and my $core = _core_class_for($schema)) {
+            if ($may_reuse->(undef) and my $core = _core_class_for($schema)) {
                 return "+$core";
             }
-            return '+' . _nested_class($class, $field_name, undef, $schema, $all_defs, $namespace, $reuse_core);
+            return '+' . _nested_class($class, $field_name, undef, $schema, $all_defs, $namespace, $reuse_core, $reuse_core_except);
         }
         my $addl = $schema->{additionalProperties};
         if (ref $addl eq 'HASH') {
@@ -850,11 +888,11 @@ sub _schema_to_type_spec {
                 }
                 _croak_unresolved_ref($ref, "the additionalProperties of $where");
             }
-            if ($reuse_core and my $core = _core_class_for($addl)) {
+            if ($may_reuse->('Value') and my $core = _core_class_for($addl)) {
                 return { "+$core" => 1 };
             }
             if (_has_properties($addl)) {
-                return { '+' . _nested_class($class, $field_name, 'Value', $addl, $all_defs, $namespace, $reuse_core) => 1 };
+                return { '+' . _nested_class($class, $field_name, 'Value', $addl, $all_defs, $namespace, $reuse_core, $reuse_core_except) => 1 };
             }
             return { Str => 1 };  # Hash of strings
         }
