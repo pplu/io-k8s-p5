@@ -1,0 +1,42 @@
+---
+claimed_at: 2026-09-10T02:11:50Z
+claimed_by: worker-b
+class: standard
+completed: 2026-09-10T02:11:50Z
+created: 2026-09-04T20:43:57Z
+id: 120
+priority: medium
+started: 2026-09-05T00:06:54Z
+status: done
+tags:
+- crd
+- emitter
+- maint
+- d8
+title: 'Drei D8-Provider haben kein maint/crd-render Overlay: 29 strukturelle Differs
+  in --check'
+updated: 2026-09-10T02:11:50Z
+---
+
+Gefunden in der k114-Nachrunde. maint/crd-drift-check.pl --check meldet ueber alle Provider 543 match / 30 differ. 29 davon sind vorbestehende strukturelle Drift der drei bei k97/D8 gebundelten Provider:
+
+  PrometheusOperator  3 match / 13 differ
+  VolumeSnapshot      0 match /  7 differ
+  ExternalSecrets     7 match /  9 differ
+
+Ursache: fuer keinen der drei existiert ein maint/crd-render/<Provider>.yaml. Overlays gibt es nur fuer AgentSandbox, CertManager, Cilium, GatewayAPI und Traefik. Ohne Overlay teilt und benennt der Render verschachtelte Klassen anders als die eingecheckten (z.B. PodMonitor.pm: lib \x27+...::ConfigResourceStatus\x27 vs render \x27+...::PodMonitorStatus\x27), teils weichen ganze Klassenkoerper ab (VolumeSnapshot.pm ab Zeile 2).
+
+Nichts davon ist kaputt - die eingecheckten Klassen sind korrekt und getestet. Aber solange die drei Provider kein Overlay haben, ist --check fuer sie ohne Aussagekraft, und der Emitter kann sie nicht als Quelle fuer Erweiterungen benutzen (relevant fuer k113, das genau diese Provider erweitert).
+
+Die restliche 1 von 30 ist Cilium/V2alpha1/IPPoolSpec.pm und eine andere Sache (kaputter lokaler Cache, Mojibake-Signatur in _slurp).
+
+STATUS KORRIGIERT 2026-09-06: stand auf in-progress, geclaimt von opus-orchestrator seit 2026-09-05T00:06Z -- 27 Stunden bei 1h claim_timeout, und im Verzeichnis laeuft keine Session (die einzige, a07acd06, ist die tote Release-Prep-Session, Control-Socket weg). Niemand hat daran gearbeitet. Claim freigegeben, zurueck auf backlog.
+
+Sachstand unveraendert: VolumeSnapshot-Overlay ist fertig (0f83668e, 'first of three'), PrometheusOperator und ExternalSecrets fehlen. Durch die Maintainer-Entscheidung 'maint/ ist fuer das Release nicht relevant' blockiert das k128 nicht mehr -- die Karte ist normale Backlog-Arbeit und kann nach dem 1.108-Upload angefasst werden.
+
+NEUER READ-ONLY-BEFUND 2026-09-08 vor der k125-Umstellung: Die zwei fehlenden Overlays lassen sich nicht mit reinen names/with/extra-Listen vollständig schließen. PrometheusOperator verliert nominale Provider-Typen durch reuse_core (z.B. Alertmanager.spec.additionalArgs -> Core::V1::HTTPHeader statt bestehendem Argument). ExternalSecrets nutzt bewusst V1-Typen aus V1alpha1-Generatoren (z.B. ECRAuthorizationToken.spec.auth -> V1::AWSAuth); package_for prefixiert overlay.names immer mit dem aktuellen base, absolute/cross-version-Ziele fehlen. Große rohe --check-Missing-Zahlen sind daher ungemappte Pfade, nicht fehlende lib-Klassen. Schema-Audit für beide Provider auf diesem Ausgangsstand: 0 echte Constraint-Differenzen.
+Kein blindes Overlay-/Klassen-Rewrite vorgenommen. Voraussetzung ist eine gezielte Entscheidung/Erweiterung der Overlay-Semantik für nominale Core-Reuse-Overrides und providerinterne Cross-Version-Referenzen; bestehende veröffentlichte Klassennamen nicht zugunsten des Renderers umbenennen. k125-Quantity-Arbeit bleibt separat.
+
+Fleet-Runde Worker B: In Arbeit. Overlay-Semantik erweitern (reuse_core nominal + cross-version), harte Grenze: keine Umbenennung veröffentlichter Klassen. Delegiert an io-k8s-worker im Worktree worktree-k120-overlay-semantics.
+
+Erledigt und unabhaengig verifiziert (Worker B). Design: zwei Overlay-Semantik-Erweiterungen OHNE Umbenennung veroeffentlichter Klassen. 1) reuse_core_except in AutoGen.pm - generation-time Suppression nominaler core-reuse an benannten class_path-Pfaden, damit der providereigene Typ entsteht wo die Form zufaellig einer Core-Klasse gleicht (PrometheusOperator additionalArgs -> Argument statt Core HTTPHeader). Gated, absent laesst Generierung byte-fuer-byte unveraendert. 2) Absolute names-Ziele mit :: in Emitter.pm - render-time Referenz auf ein voll-qualifiziertes Paket ohne eigene Datei; deckt ExternalSecrets cross-version reuse und core-refs. Zwei neue Overlays PrometheusOperator.yaml und ExternalSecrets.yaml, per lockstep-Walk gegen die eingecheckte lib abgeleitet. Commit b0a4802f lokal, kein Push, kein Versions-Bump. VERIFIZIERT: --check PrometheusOperator 134 match, 0 missing-in-lib, 0 not-rendered, 3 differ; ExternalSecrets 277 match, 0 missing-in-lib, 1 not-rendered excepted, 10 differ. Strukturelle Haelfte fuer beide geschlossen. Residual-Differs rein POD/Formatierung, k124-style Follow-up bewusst out-of-scope. Volle Suite 100 Dateien 8806 Tests gruen. Commit-Scope beruehrt KEINE Provider-API-Klasse - harte Grenze eingehalten.
