@@ -1,0 +1,16 @@
+---
+class: standard
+created: 2026-09-10T02:13:14Z
+id: 133
+priority: low
+status: backlog
+tags:
+- crd
+- autogen
+- maint
+- d8
+title: 'UUID: typed-empty vs opaque-hash Entscheidung (ExternalSecrets UUIDSpec, k55/k120)'
+updated: 2026-09-10T02:13:14Z
+---
+
+Aus k120 (Commit b0a4802f) geparkt. Upstream modelliert generators.external-secrets.io uuids .spec als property-loses type-object. AutoGen haelt ein property-loses Objekt opak (k55), daher typisiert der Render UUID.spec als Str-Hash und emittiert kein UUIDSpec, waehrend lib eine benannte leere Struktur shippt. Diese typed-empty vs opaque-hash Wrapper-Wahl liegt ausserhalb jedes Overlay-Mechanismus. In k120 ist UUIDSpec.pm mit Begruendung in ignore_unrendered geparkt; die residualen strukturellen Differs auf UUID.pm brauchen einen Entscheid: leere Klasse fallen lassen, oder AutoGen einen forced-struct-Hook beibringen.
