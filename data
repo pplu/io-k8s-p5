@@ -1,0 +1,16 @@
+---
+class: standard
+created: 2026-09-10T02:12:54Z
+id: 132
+priority: low
+status: backlog
+tags:
+- crd
+- emitter
+- maint
+- d8
+title: Lib formatting-alignment pass fuer PrometheusOperator und ExternalSecrets (k120-Residual-Differs)
+updated: 2026-09-10T02:12:54Z
+---
+
+Nachlauf zu k120 (Commit b0a4802f). Nach dem Schliessen der strukturellen Haelfte (0 missing-in-lib, 0 strukturelle not-rendered) meldet --check weiterhin PrometheusOperator 3 differ und ExternalSecrets 10 differ. Alle Residual-Differs sind reine Body-Formatierung: POD-ABSTRACT-Wortlaut, kontextuelle ABSTRACT auf geteilten Typen, Alignment, handgewrappte Enums, erklaerende Kommentare. Das ist die k124-artige lib-Anpassung, die k120 ausdruecklich verbietet (Renderer an lib anpassen, nie lib an Renderer). Ziel: Residual-Formatierungs-Differs zu MATCH machen. Nicht dringend - die eingecheckten Klassen sind korrekt und getestet.
