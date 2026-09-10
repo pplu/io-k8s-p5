@@ -1,0 +1,16 @@
+---
+class: standard
+created: 2026-09-10T02:13:31Z
+id: 134
+priority: medium
+status: backlog
+tags:
+- crd
+- emitter
+- maint
+- d8
+title: VolumeSnapshot-Overlay deckt VolumeGroupSnapshot nicht ab (k121-Nachlauf)
+updated: 2026-09-10T02:13:31Z
+---
+
+Beim k120-Verify aufgefallen. Die von k121 hinzugefuegte VolumeGroupSnapshot-Familie hat keine Overlay-Eintraege in maint/crd-render/VolumeSnapshot.yaml, daher meldet --check fuer VolumeSnapshot 10 match, 21 differ, 18 missing-in-lib, 12 not-rendered - obwohl k120 VolumeSnapshot als done fuehrt (dessen urspruengliches Overlay 0f83668e ist aelter als k121). Damit ist VolumeSnapshots --check wieder ohne Aussagekraft. Die zwei in k120 ergaenzten Mechanismen (reuse_core_except, absolute ::-names-Ziele) plus der lockstep-gegen-lib-Ansatz schliessen es. Ref k120 Commit b0a4802f, k121.
