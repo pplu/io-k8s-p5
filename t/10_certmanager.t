@@ -307,8 +307,8 @@ subtest 'full depth round-trip: CertificateRequest' => sub {
     isa_ok($cr->spec, 'IO::K8s::CertManager::V1::CertificateRequestSpec');
     isa_ok($cr->spec->issuerRef, 'IO::K8s::CertManager::V1::IssuerReference');
     isa_ok($cr->status, 'IO::K8s::CertManager::V1::CertificateRequestStatus');
-    isa_ok($cr->status->conditions->[0], 'IO::K8s::Api::Core::V1::NamespaceCondition',
-        'reused core NamespaceCondition for conditions (reuse_core, D5)');
+    isa_ok($cr->status->conditions->[0], 'IO::K8s::CertManager::V1::CertificateRequestCondition',
+        'cert-manager-owned CertificateRequestCondition for conditions (k135)');
     is($cr->status->conditions->[0]->type, 'Ready', 'nested status.conditions[0].type');
 
     my $json = $cr->TO_JSON;

@@ -172,6 +172,22 @@ ignore_unrendered:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
     reason: "k120/k133: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; k133 chose Weg 1 -- keep the named empty struct as a superset and accept the two residual reference-site divergences via accept_structural_divergence below."
+  # CertManager (k135): the three cert-manager-owned condition classes. lib gives
+  # cert-manager its own Issuer/Certificate/CertificateRequest condition classes
+  # (only [type,status] required, matching the CRD) so live message-less
+  # conditions no longer drop on inflate; the emitter's reuse_core reuses the
+  # shared Meta::V1::Condition / Core::V1::NamespaceCondition and renders no
+  # per-provider condition class, so --render produces none of these. Emitter fix
+  # tracked as k136.
+  - provider: CertManager
+    path: IO/K8s/CertManager/V1/IssuerCondition.pm
+    reason: "k135: cert-manager-owned condition class (only [type,status] required, unlike metav1.Condition) so live message-less conditions no longer drop; the emitter's reuse_core reuses Meta::V1::Condition and renders no per-provider condition class. Emitter fix tracked as k136."
+  - provider: CertManager
+    path: IO/K8s/CertManager/V1/CertificateCondition.pm
+    reason: "k135: cert-manager-owned condition class (only [type,status] required, unlike metav1.Condition) so live message-less conditions no longer drop; the emitter's reuse_core reuses Meta::V1::Condition and renders no per-provider condition class. Emitter fix tracked as k136."
+  - provider: CertManager
+    path: IO/K8s/CertManager/V1/CertificateRequestCondition.pm
+    reason: "k135: cert-manager-owned condition class (only [type,status] required) so live message-less conditions no longer drop; the emitter's reuse_core reuses Core::V1::NamespaceCondition and renders no per-provider condition class. Emitter fix tracked as k136."
 
 # --check's COSMETIC status (k132): a DIFFERS whose ONLY divergence from the
 # emitter render is presentation -- the `# ABSTRACT:` summary, POD prose
@@ -376,3 +392,18 @@ accept_structural_divergence:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/ClusterGeneratorGenerator.pm
     reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types uuidSpec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque { Str => 1 }"
+  # CertManager (k135): the three status classes type their conditions as
+  # cert-manager-owned condition classes (only [type,status] required, matching
+  # the CRD, so live message-less conditions no longer drop); the emitter's
+  # reuse_core still renders the shared Meta::V1::Condition (message required) /
+  # Core::V1::NamespaceCondition. lib is upstream-correct; the emitter carries the
+  # same latent over-constraint that caused the k135 drop. Emitter fix tracked as k136.
+  - provider: CertManager
+    path: IO/K8s/CertManager/V1/IssuerStatus.pm
+    reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::IssuerCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core still renders Meta::V1::Condition (message required). lib upstream-correct; emitter fix tracked as k136."
+  - provider: CertManager
+    path: IO/K8s/CertManager/V1/CertificateStatus.pm
+    reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::CertificateCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core still renders Meta::V1::Condition (message required). lib upstream-correct; emitter fix tracked as k136."
+  - provider: CertManager
+    path: IO/K8s/CertManager/V1/CertificateRequestStatus.pm
+    reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::CertificateRequestCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core still renders Core::V1::NamespaceCondition. lib upstream-correct; emitter fix tracked as k136."

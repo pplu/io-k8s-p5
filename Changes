@@ -14,6 +14,12 @@ Revision history for IO-K8s
     tracks. Update Cilium to v1.20.1, Traefik to v3.7.12, K3s to
     v1.36.4+k3s1 and AgentSandbox to v1.0.0.
 
+  - Fix CertManager status conditions silently dropping live objects: Issuer,
+    ClusterIssuer, Certificate and CertificateRequest now type their conditions
+    with cert-manager's own condition classes, which require only type and
+    status per the CRD, so real objects that omit message no longer fail to
+    inflate.
+
   - Add the three VolumeGroupSnapshot Kinds in v1, v1beta1 and v1beta2, with
     typed version-specific status fields. Bare names select the pinned
     upstream's storage v1beta2; exact GVKs select any served track.

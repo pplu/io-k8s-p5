@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s acme                     => '+IO::K8s::CertManager::V1::CertificateACMEStatus';
-k8s conditions               => ['Meta::V1::Condition'];
+k8s conditions               => ['+IO::K8s::CertManager::V1::CertificateCondition'];
 k8s failedIssuanceAttempts   => Int;
 k8s lastFailureTime          => Time;
 k8s nextPrivateKeySecretName => Str;
