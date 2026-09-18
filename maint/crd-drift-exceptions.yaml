@@ -172,3 +172,174 @@ ignore_unrendered:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
     reason: "k120: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; closing it needs a decision (drop the empty class, or teach AutoGen a forced-struct hook) tracked as follow-up, not an overlay mechanism."
+
+# --check's COSMETIC status (k132): a DIFFERS whose ONLY divergence from the
+# emitter render is presentation -- the `# ABSTRACT:` summary, POD prose
+# (=description/=attr/=seealso wording and line-wrapping), ordinary comments,
+# =>-alignment, or where the k8s lines sit relative to their POD. The k8s
+# declarations themselves (name/type/required/enum, plus the identity/scope
+# `use IO::K8s::APIObject|Resource ...;` and any `with '...';`) are byte-
+# identical once whitespace is normalised, so the class round-trips exactly as
+# the emitter would; only the hand-authored documentation differs, which is
+# deliberately NOT aligned to the renderer (k120: never align lib to the
+# emitter). Listing a file here reclassifies its DIFFERS as COSMETIC --
+# dropped from the failing-differs count so --check exits 0 on it -- but the
+# listing is only ever a candidate: check_for suppresses it ONLY when
+# _structural_signature(render) eq _structural_signature(lib). A listed file
+# whose k8s declarations actually drift still trips as a real DIFFERS, flagged
+# as a stale entry (an exception must never hide a real change).
+#
+# `path` is lib/-relative ("IO/K8s/<Provider>/<Version>/<File>.pm"), matching
+# what --check itself reports. Under --verbose these are listed individually;
+# a routine --check shows only their count.
+#
+# VolumeSnapshot (k132/k134): the 33 groupsnapshot.storage.k8s.io classes
+# across V1/V1beta1/V1beta2. k134 extended maint/crd-render/VolumeSnapshot.yaml
+# so the emitter renders the whole VolumeGroupSnapshot* family; every residual
+# differ against it is presentation-only (hand-authored ABSTRACT/POD plus the
+# emitter's own grouped-k8s/aligned layout).
+#
+# PrometheusOperator (k132): Argument (POD re-wrap), HostPort (ABSTRACT),
+# RuleGroup (a kept k110 explanatory comment on a flagged pattern).
+#
+# ExternalSecrets (k132): 8 generators.external-secrets.io/v1alpha1 (+ one v1)
+# classes differing only in ABSTRACT/POD. NOT listed here, deliberately:
+# V1alpha1/UUID.pm and V1alpha1/ClusterGeneratorGenerator.pm, whose `spec`/
+# `uuidSpec` the emitter types as { Str => 1 } while lib ships the named empty
+# struct UUIDSpec -- the unresolved k120 typed-empty-vs-opaque-hash decision
+# (see ignore_unrendered's UUIDSpec.pm entry). Those are genuine k8s-
+# declaration differences, not cosmetic; the guard would refuse them anyway,
+# and they remain real DIFFERS until k120's follow-up is settled.
+ignore_cosmetic_differs:
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/GroupSnapshotHandles.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshot.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotClass.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotContent.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotContentSource.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotContentSpec.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotContentStatus.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotSource.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotSpec.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeGroupSnapshotStatus.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1/VolumeSnapshotInfo.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/GroupSnapshotHandles.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshot.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotClass.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotContent.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotContentSource.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotContentSpec.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotContentStatus.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotSource.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotSpec.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeGroupSnapshotStatus.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta1/VolumeSnapshotHandlePair.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/GroupSnapshotHandles.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshot.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotClass.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotContent.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotContentSource.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotContentSpec.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotContentStatus.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotSource.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotSpec.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeGroupSnapshotStatus.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: VolumeSnapshot
+    path: IO/K8s/VolumeSnapshot/V1beta2/VolumeSnapshotInfo.pm
+    reason: "k132/k134: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary, k8s-line grouping and =>-alignment and POD prose only"
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/Argument.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is POD prose only"
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/HostPort.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/RuleGroup.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is a retained explanatory comment and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1/SecretKeySelector.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/ACRAccessTokenSpec.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/ClusterGeneratorSpec.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is k8s-line grouping and =>-alignment and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/Fake.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/GCRWorkloadIdentity.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/GitlabDeployTokenSecretRef.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/PushSecretMetadata.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/WebhookSpec.pm
+    reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"

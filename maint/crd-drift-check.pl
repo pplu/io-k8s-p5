@@ -163,11 +163,16 @@ Options:
   --check             Render every served GVK to memory and compare each
                        rendered file against the checked-in
                        lib/IO/K8s/<Provider>/<Version>/<File>.pm: MATCH,
-                       DIFFERS (a short hand-rolled diff), MISSING IN LIB,
-                       or NOT RENDERED (a file under the provider directory
-                       the render does not produce -- see
-                       ignore_unrendered in the exceptions file for a kept
-                       back-compat track). Exits 1 if anything differs.
+                       DIFFERS (a short hand-rolled diff), COSMETIC (a
+                       DIFFERS whose file is listed in
+                       ignore_cosmetic_differs AND whose k8s declarations
+                       still match the render after whitespace normalisation
+                       -- POD/ABSTRACT/whitespace only; suppressed, listed
+                       under --verbose), MISSING IN LIB, or NOT RENDERED (a
+                       file under the provider directory the render does not
+                       produce -- see ignore_unrendered in the exceptions
+                       file for a kept back-compat track). Exits 1 if
+                       anything but a MATCH or a suppressed COSMETIC remains.
   --overlay FILE      Overlay YAML for --render/--check (default:
                        maint/crd-render/<Provider>.yaml when it exists;
                        requires exactly one --provider).
@@ -625,6 +630,7 @@ sub load_exceptions {
     $data->{ignore_missing_fields} //= [];
     $data->{ignore_extra_fields}   //= [];
     $data->{ignore_unrendered}     //= [];
+    $data->{ignore_cosmetic_differs} //= [];
     return $data;
 }
 
@@ -658,6 +664,23 @@ sub field_excepted {
 # own file keys already use ("IO/K8s/<Provider>/<Version>/<File>.pm") --
 # one canonical form throughout, nothing to translate between.
 sub unrendered_excepted {
+    my ($provider, $path, $entries) = @_;
+    for my $e (@$entries) {
+        next unless ref $e eq 'HASH';
+        next unless ($e->{path} // '') eq $path;
+        next if defined $e->{provider} && $e->{provider} ne $provider;
+        return (1, $e->{reason});
+    }
+    return (0, undef);
+}
+
+# --check's COSMETIC reclassification (k132) matches on provider + path, the
+# same lib/-relative form ("IO/K8s/<Provider>/<Version>/<File>.pm") that
+# ignore_unrendered uses and that --check itself reports. Being *listed* is
+# necessary but never sufficient: check_for only suppresses a listed file
+# when _structural_signature() confirms its k8s declarations still match the
+# render (see the guard there).
+sub cosmetic_differ_excepted {
     my ($provider, $path, $entries) = @_;
     for my $e (@$entries) {
         next unless ref $e eq 'HASH';
@@ -1059,6 +1082,60 @@ sub _diff_lines {
     return @out;
 }
 
+# The guard behind ignore_cosmetic_differs (k132). A file may be suppressed
+# as a cosmetic differ ONLY when its STRUCTURAL content is byte-identical
+# between the rendered source and the checked-in lib source after whitespace
+# is normalised away -- so that a listed exception can never hide a real
+# change (house rule: a red test is a claim before it is a failure). The
+# structural content is exactly the statements the k8s DSL and the identity
+# import carry: every `k8s <name> => <type>[, <opts>];` declaration
+# (name/type/required/enum) plus the `use IO::K8s::APIObject|Resource ...;`
+# and any `with '...';` (api_version/scope/roles). Everything else in the
+# file -- the `# ABSTRACT:` line, POD (=attr/=description/=seealso ...),
+# ordinary comments, blank lines, =>-alignment and where the k8s lines sit
+# relative to their POD -- is cosmetic and never enters the signature.
+#
+# This is textual, not a Perl parse, and that is sufficient here: both sides
+# are emitter-shaped source whose only load-bearing lines are those three
+# statement kinds, each terminated by `;`. The normalisation collapses every
+# whitespace run to one space and drops the spaces just inside brackets, so a
+# qw() enum wrapped across several lines in lib compares equal to the same
+# enum on one line from the emitter, while a changed member, type or
+# required-ness does not.
+sub _structural_signature {
+    my ($src) = @_;
+    my @code;
+    my $in_pod = 0;
+    for my $line (split /\n/, $src, -1) {
+        if (!$in_pod && $line =~ /^=\w/) { $in_pod = 1; next; }
+        if ($in_pod) { $in_pod = 0 if $line =~ /^=cut\b/; next; }
+        next if $line =~ /^\s*#/;      # comment-only line (incl. # ABSTRACT:)
+        next unless $line =~ /\S/;     # blank
+        push @code, $line;
+    }
+    my @stmts;
+    my $buf;
+    for my $line (@code) {
+        if (!defined $buf) {
+            next unless $line =~ /^\s*(?:use\s+IO::K8s::(?:APIObject|Resource)\b|with\b|k8s\b)/;
+            $buf = $line;
+        }
+        else {
+            $buf .= "\n" . $line;
+        }
+        if ($buf =~ /;\s*\z/) { push @stmts, $buf; undef $buf; }
+    }
+    push @stmts, $buf if defined $buf;    # unterminated -- keep it, so it shows
+    for my $stmt (@stmts) {
+        $stmt =~ s/\s+/ /g;               # collapse every whitespace run
+        $stmt =~ s/([(\[{])\s+/$1/g;      # no space just inside an opening bracket
+        $stmt =~ s/\s+([)\]}])/$1/g;      # ... nor just inside a closing one
+        $stmt =~ s/\A\s+//;
+        $stmt =~ s/\s+\z//;
+    }
+    return join("\n", @stmts);
+}
+
 # Renders every served GVK of $provider (already computed in $rendered, a
 # provider->file map from render_for) and diffs each file against
 # lib/IO/K8s/<Provider>/. Returns { provider, rows => [...], bad => 0|1 }.
@@ -1090,10 +1167,23 @@ sub check_for {
         my $want = $rendered->{$rel};
         if ($have eq $want) {
             push @rows, { status => 'MATCH', path => $rel };
-        } else {
-            push @rows, { status => 'DIFFERS', path => $rel, diff => [ _diff_lines($have, $want) ] };
-            $bad = 1;
+            next;
         }
+        my ($ign, $reason) = cosmetic_differ_excepted($provider, $rel, $exceptions->{ignore_cosmetic_differs});
+        if ($ign && _structural_signature($have) eq _structural_signature($want)) {
+            # Listed AND the k8s declarations still match the render: the
+            # difference is POD/ABSTRACT/whitespace only. Suppress it -- not a
+            # failing differ, does not set $bad.
+            push @rows, { status => 'COSMETIC', path => $rel, excepted => 1, reason => $reason };
+            next;
+        }
+        # A real DIFFERS. If it was listed as cosmetic yet the structural
+        # content deviates, the guard refused it: flag the stale/wrong entry
+        # loudly rather than swallowing the change (k132).
+        my $row = { status => 'DIFFERS', path => $rel, diff => [ _diff_lines($have, $want) ] };
+        $row->{guard_tripped} = 1 if $ign;
+        push @rows, $row;
+        $bad = 1;
     }
     for my $rel (sort keys %shipped) {
         my ($ign, $reason) = unrendered_excepted($provider, $rel, $exceptions->{ignore_unrendered});
@@ -1104,22 +1194,31 @@ sub check_for {
 }
 
 sub render_check_report {
-    my ($c) = @_;
+    my ($c, $verbose) = @_;
     my @out;
     push @out, sprintf('########## %s --check (rendered vs lib/IO/K8s/%s) ##########', $c->{provider}, $c->{provider});
     my %count;
     for my $row (@{ $c->{rows} }) {
         $count{ $row->{status} }++;
+        # Cosmetic (suppressed) differs are listed only under --verbose -- the
+        # same discipline render_provider uses for exception-suppressed drift
+        # (k132), so a routine --check stays structurally readable.
+        next if $row->{status} eq 'COSMETIC' && !$verbose;
         my $line = sprintf('  %-16s %s', $row->{status}, $row->{path});
         $line .= '  -- ' . $row->{reason} if $row->{excepted} && defined $row->{reason};
+        $line .= '  -- LISTED cosmetic but structural content deviates; guard kept it as a real DIFFERS'
+            if $row->{guard_tripped};
         push @out, $line;
         push @out, "    $_" for @{ $row->{diff} // [] };
     }
+    my $cosmetic = $count{COSMETIC} // 0;
     push @out, sprintf(
-        '--- SUMMARY: %d match, %d differ, %d missing in lib, %d not rendered ---',
-        $count{MATCH} // 0, $count{DIFFERS} // 0,
+        '--- SUMMARY: %d match, %d differ, %d cosmetic (suppressed), %d missing in lib, %d not rendered ---',
+        $count{MATCH} // 0, $count{DIFFERS} // 0, $cosmetic,
         $count{'MISSING IN LIB'} // 0, $count{'NOT RENDERED'} // 0,
     );
+    push @out, '  (cosmetic differs suppressed by ignore_cosmetic_differs -- rerun with --verbose to list them)'
+        if $cosmetic && !$verbose;
     push @out, '';
     return join("\n", @out) . "\n";
 }
@@ -1208,7 +1307,7 @@ if ($opt->{check}) {
         }
         my $c = check_for($opt, $r->{provider}, $rendered_by_provider{ $r->{provider} }, $exceptions);
         $check_failed = 1 if $c->{bad};
-        print $out render_check_report($c);
+        print $out render_check_report($c, $opt->{verbose});
     }
 }
 
