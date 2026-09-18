@@ -171,7 +171,7 @@ ignore_unrendered:
     reason: "k88: v1alpha1 removed upstream at agent-sandbox v1.0.0 (no api/v1alpha1 manifest left to render from); class kept for clusters still on v0.5.x"
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
-    reason: "k120: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; closing it needs a decision (drop the empty class, or teach AutoGen a forced-struct hook) tracked as follow-up, not an overlay mechanism."
+    reason: "k120/k133: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; k133 chose Weg 1 -- keep the named empty struct as a superset and accept the two residual reference-site divergences via accept_structural_divergence below."
 
 # --check's COSMETIC status (k132): a DIFFERS whose ONLY divergence from the
 # emitter render is presentation -- the `# ABSTRACT:` summary, POD prose
@@ -206,10 +206,10 @@ ignore_unrendered:
 # classes differing only in ABSTRACT/POD. NOT listed here, deliberately:
 # V1alpha1/UUID.pm and V1alpha1/ClusterGeneratorGenerator.pm, whose `spec`/
 # `uuidSpec` the emitter types as { Str => 1 } while lib ships the named empty
-# struct UUIDSpec -- the unresolved k120 typed-empty-vs-opaque-hash decision
-# (see ignore_unrendered's UUIDSpec.pm entry). Those are genuine k8s-
-# declaration differences, not cosmetic; the guard would refuse them anyway,
-# and they remain real DIFFERS until k120's follow-up is settled.
+# struct UUIDSpec (see ignore_unrendered's UUIDSpec.pm entry). Those are
+# genuine k8s-declaration differences, not cosmetic; the guard would refuse
+# them anyway. k133 settled the k120 follow-up (Weg 1): they are kept as a
+# superset and accepted via accept_structural_divergence below, never here.
 ignore_cosmetic_differs:
   - provider: VolumeSnapshot
     path: IO/K8s/VolumeSnapshot/V1/GroupSnapshotHandles.pm
@@ -343,3 +343,36 @@ ignore_cosmetic_differs:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/WebhookSpec.pm
     reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
+
+# --check's ACCEPTED DIVERGENCE status (k133, Weg 1): a DIFFERS whose k8s
+# declarations GENUINELY differ from the emitter render and which the
+# maintainer has decided to KEEP as a documented, file-exact divergence. This
+# is deliberately a category of its own, NOT part of ignore_cosmetic_differs:
+# a cosmetic differ is one whose structural signature still matches (only
+# POD/ABSTRACT/whitespace differ) and is verified by the _structural_signature
+# guard; an accepted divergence is the opposite -- the k8s declarations really
+# do differ, so it can never pass that guard and must not be smuggled through
+# it. Listing a file here reclassifies its DIFFERS as ACCEPTED DIVERGENCE:
+# dropped from the failing-differs count so --check exits 0 on it, listed with
+# its diff under --verbose. Matching is strictly provider + exact `path`
+# (lib/-relative "IO/K8s/<Provider>/<Version>/<File>.pm") with no globs or
+# regex, so the category can only ever affect the exact files it names and can
+# never mask structural drift on any other file. Kept deliberately small; each
+# entry needs a one-line reason and a ticket ref.
+#
+# ExternalSecrets (k133 Weg 1 / k55 / k120): the typed-empty-vs-opaque-hash
+# UUIDSpec choice. generators.external-secrets.io/v1alpha1 models uuids .spec
+# (and ClusterGenerator's uuid generator, uuidSpec) as a property-less
+# {type: object}; AutoGen keeps a property-less object opaque (k55), so the
+# emitter types both reference sites as { Str => 1 } and emits no UUIDSpec,
+# while lib deliberately keeps the named empty struct UUIDSpec as a superset.
+# k133 chose Weg 1 -- keep lib as-is and accept these two residual
+# reference-site divergences here, rather than drop the class (Deprecated) or
+# teach AutoGen a forced-struct hook.
+accept_structural_divergence:
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/UUID.pm
+    reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types spec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque { Str => 1 }"
+  - provider: ExternalSecrets
+    path: IO/K8s/ExternalSecrets/V1alpha1/ClusterGeneratorGenerator.pm
+    reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types uuidSpec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque { Str => 1 }"

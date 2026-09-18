@@ -168,11 +168,17 @@ Options:
                        ignore_cosmetic_differs AND whose k8s declarations
                        still match the render after whitespace normalisation
                        -- POD/ABSTRACT/whitespace only; suppressed, listed
-                       under --verbose), MISSING IN LIB, or NOT RENDERED (a
-                       file under the provider directory the render does not
-                       produce -- see ignore_unrendered in the exceptions
-                       file for a kept back-compat track). Exits 1 if
-                       anything but a MATCH or a suppressed COSMETIC remains.
+                       under --verbose), ACCEPTED DIVERGENCE (a DIFFERS whose
+                       file is listed in accept_structural_divergence -- a
+                       genuine, documented, file-exact k8s-declaration
+                       difference the maintainer chose to keep, NOT gated on
+                       the cosmetic signature guard; suppressed, listed with
+                       its diff under --verbose), MISSING IN LIB, or NOT
+                       RENDERED (a file under the provider directory the
+                       render does not produce -- see ignore_unrendered in the
+                       exceptions file for a kept back-compat track). Exits 1
+                       if anything but a MATCH, a suppressed COSMETIC or a
+                       suppressed ACCEPTED DIVERGENCE remains.
   --overlay FILE      Overlay YAML for --render/--check (default:
                        maint/crd-render/<Provider>.yaml when it exists;
                        requires exactly one --provider).
@@ -631,6 +637,7 @@ sub load_exceptions {
     $data->{ignore_extra_fields}   //= [];
     $data->{ignore_unrendered}     //= [];
     $data->{ignore_cosmetic_differs} //= [];
+    $data->{accept_structural_divergence} //= [];
     return $data;
 }
 
@@ -681,6 +688,29 @@ sub unrendered_excepted {
 # when _structural_signature() confirms its k8s declarations still match the
 # render (see the guard there).
 sub cosmetic_differ_excepted {
+    my ($provider, $path, $entries) = @_;
+    for my $e (@$entries) {
+        next unless ref $e eq 'HASH';
+        next unless ($e->{path} // '') eq $path;
+        next if defined $e->{provider} && $e->{provider} ne $provider;
+        return (1, $e->{reason});
+    }
+    return (0, undef);
+}
+
+# --check's ACCEPTED DIVERGENCE reclassification (k133, Weg 1) matches on
+# provider + path, the same lib/-relative form ("IO/K8s/<Provider>/<Version>/
+# <File>.pm") the other --check exceptions use. Deliberately SEPARATE from
+# ignore_cosmetic_differs and its _structural_signature guard: this category
+# accepts a GENUINE structural difference between the render and lib -- the
+# k55/k120 typed-empty-vs-opaque-hash UUIDSpec case, where lib names the empty
+# struct '+IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec' and the emitter types
+# it opaquely as { Str => 1 } -- so it cannot go through the cosmetic guard,
+# which by design refuses anything whose k8s declarations drift. The scope
+# limit here is exactness, not a signature: only the EXACT provider+path pairs
+# listed are reclassified, so an unlisted file's structural drift is never
+# masked (and a listed file's diff is still printed under --verbose).
+sub accept_divergence_excepted {
     my ($provider, $path, $entries) = @_;
     for my $e (@$entries) {
         next unless ref $e eq 'HASH';
@@ -1177,6 +1207,21 @@ sub check_for {
             push @rows, { status => 'COSMETIC', path => $rel, excepted => 1, reason => $reason };
             next;
         }
+        # A genuine structural difference the maintainer chose to keep as a
+        # documented, file-exact divergence (k133 Weg 1) -- distinct from a
+        # cosmetic differ: it is NOT gated on _structural_signature (the whole
+        # point is that the k8s declarations DO differ). Not a failing differ;
+        # does not set $bad. The diff rides along so --verbose shows exactly
+        # what is being accepted, and matching stays strictly provider+path so
+        # no other file's drift can hide behind it.
+        my ($accept, $accept_reason) =
+            accept_divergence_excepted($provider, $rel, $exceptions->{accept_structural_divergence});
+        if ($accept) {
+            push @rows, { status => 'ACCEPTED DIVERGENCE', path => $rel,
+                          excepted => 1, reason => $accept_reason,
+                          diff => [ _diff_lines($have, $want) ] };
+            next;
+        }
         # A real DIFFERS. If it was listed as cosmetic yet the structural
         # content deviates, the guard refused it: flag the stale/wrong entry
         # loudly rather than swallowing the change (k132).
@@ -1200,10 +1245,12 @@ sub render_check_report {
     my %count;
     for my $row (@{ $c->{rows} }) {
         $count{ $row->{status} }++;
-        # Cosmetic (suppressed) differs are listed only under --verbose -- the
-        # same discipline render_provider uses for exception-suppressed drift
-        # (k132), so a routine --check stays structurally readable.
-        next if $row->{status} eq 'COSMETIC' && !$verbose;
+        # Cosmetic and accepted-divergence (both suppressed) rows are listed
+        # only under --verbose -- the same discipline render_provider uses for
+        # exception-suppressed drift (k132/k133), so a routine --check stays
+        # structurally readable.
+        next if ($row->{status} eq 'COSMETIC'
+                 || $row->{status} eq 'ACCEPTED DIVERGENCE') && !$verbose;
         my $line = sprintf('  %-16s %s', $row->{status}, $row->{path});
         $line .= '  -- ' . $row->{reason} if $row->{excepted} && defined $row->{reason};
         $line .= '  -- LISTED cosmetic but structural content deviates; guard kept it as a real DIFFERS'
@@ -1212,13 +1259,16 @@ sub render_check_report {
         push @out, "    $_" for @{ $row->{diff} // [] };
     }
     my $cosmetic = $count{COSMETIC} // 0;
+    my $accepted = $count{'ACCEPTED DIVERGENCE'} // 0;
     push @out, sprintf(
-        '--- SUMMARY: %d match, %d differ, %d cosmetic (suppressed), %d missing in lib, %d not rendered ---',
-        $count{MATCH} // 0, $count{DIFFERS} // 0, $cosmetic,
+        '--- SUMMARY: %d match, %d differ, %d cosmetic (suppressed), %d accepted divergence (suppressed), %d missing in lib, %d not rendered ---',
+        $count{MATCH} // 0, $count{DIFFERS} // 0, $cosmetic, $accepted,
         $count{'MISSING IN LIB'} // 0, $count{'NOT RENDERED'} // 0,
     );
     push @out, '  (cosmetic differs suppressed by ignore_cosmetic_differs -- rerun with --verbose to list them)'
         if $cosmetic && !$verbose;
+    push @out, '  (accepted divergences suppressed by accept_structural_divergence -- rerun with --verbose to list them)'
+        if $accepted && !$verbose;
     push @out, '';
     return join("\n", @out) . "\n";
 }
