@@ -1,0 +1,26 @@
+---
+claimed_at: 2026-09-18T03:38:38Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-18T03:38:32Z
+created: 2026-09-10T02:12:54Z
+id: 132
+priority: low
+started: 2026-09-17T22:44:34Z
+status: done
+tags:
+- crd
+- emitter
+- maint
+- d8
+title: Lib formatting-alignment pass fuer PrometheusOperator und ExternalSecrets (k120-Residual-Differs)
+updated: 2026-09-18T03:38:38Z
+---
+
+Nachlauf zu k120 (Commit b0a4802f). Nach dem Schliessen der strukturellen Haelfte (0 missing-in-lib, 0 strukturelle not-rendered) meldet --check weiterhin PrometheusOperator 3 differ und ExternalSecrets 10 differ. Alle Residual-Differs sind reine Body-Formatierung: POD-ABSTRACT-Wortlaut, kontextuelle ABSTRACT auf geteilten Typen, Alignment, handgewrappte Enums, erklaerende Kommentare. Das ist die k124-artige lib-Anpassung, die k120 ausdruecklich verbietet (Renderer an lib anpassen, nie lib an Renderer). Ziel: Residual-Formatierungs-Differs zu MATCH machen. Nicht dringend - die eingecheckten Klassen sind korrekt und getestet.
+
+Entscheidung Maintainer: Kosmetik-Exceptions parken (weder lib noch Emitter anfassen). Scope erweitert um VolumeSnapshot k121-Gruppenklassen (33 differ) aus k134 -> Gesamt: ExternalSecrets 10 + PrometheusOperator 3 + VolumeSnapshot 33. An io-k8s-worker delegiert: neue kategorisierte Exception in crd-drift-exceptions.yaml + Guard in crd-drift-check.pl (nur suppressen, wenn k8s-Deklarationen strukturell identisch).
+
+Erledigt (io-k8s-worker): Kategorie ignore_cosmetic_differs (44 Eintraege: VolumeSnapshot 33, PrometheusOperator 3, ExternalSecrets 8) + struktureller Guard _structural_signature in crd-drift-check.pl + Regressionstest t/99 (12 Tests). Suite gruen 101 Files/8818 Tests. lib/overlays unberuehrt, kein git. --check exit weiter 1: 2 ExternalSecrets-Dateien (UUID.pm, ClusterGeneratorGenerator.pm) sind STRUKTURELL (typed-empty UUIDSpec vs opaque-hash), bewusst nicht geparkt -> = k133. Nach k133 wird --check exit 0.
+
+Committet als 4914cf66 auf branch crd-drift-followups.
