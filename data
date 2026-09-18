@@ -1,0 +1,39 @@
+---
+claimed_at: 2026-09-18T14:59:04Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-18T14:58:59Z
+created: 2026-09-18T02:43:42Z
+id: 135
+priority: high
+started: 2026-09-18T04:04:29Z
+status: done
+tags:
+- crd
+- certmanager
+- bug
+- fidelity
+title: 'CertManager ClusterIssuer wird beim Inflate gedroppt: nested required ''message''
+  vs. echtes Live-Objekt (k98-Befund)'
+updated: 2026-09-18T14:59:04Z
+---
+
+Beim k98-Live-Lauf gegen Cluster pichu gefunden (kubernetes-rest t/46_crd_live_crossdist.t). Eine real installierte ClusterIssuer selfsigned-issuer wird beim Inflate verworfen -> stiller Datenverlust:
+
+inflate_list: dropped 1 of 1 IO::K8s::CertManager::V1::ClusterIssuer items ... item 0 (name selfsigned-issuer): Missing required arguments: message at lib/IO/K8s.pm line 940.
+
+Ein verschachtelter cert-manager-Typ (vermutlich eine Status-Condition) markiert message als required, obwohl das Live-Objekt es weglaesst -> list(ClusterIssuer) liefert 0 statt 1 Item.
+
+Repro: gegen einen Cluster mit cert-manager + einer ClusterIssuer (z.B. selfsigned) list(ClusterIssuer) -> 0 statt 1.
+
+Fix-Richtung (io-k8s-worker): required-ness der cert-manager-Nested-Typen (Condition.message o.ae.) gegen die echten CRD-Schemata pruefen; message ist upstream vermutlich optional. Regressionstest gegen ein Fixture ohne message. Quelle k98 (D18); deshalb nutzt Claim 5 CiliumNode statt cert-manager.
+
+An io-k8s-worker delegiert (network-free Repro + Fix + Regressionstest). Branch crd-drift-followups.
+
+Root-Cause (io-k8s-worker, STOP-and-report da GETEILTER Typ): Drop kommt von Meta::V1::Condition (message required, korrekt fuer core metav1.Condition, 56 Klassen dist-weit) -- referenziert von CertManager IssuerStatus.pm:7 (Issuer+ClusterIssuer) und CertificateStatus.pm:7. Upstream cert-manager v1.21.1 CRD: conditions required NUR [status,type], message optional. Geteilten Typ NICHT aendern (56 Klassen + core-swagger-Drift). Zusatz: CertificateRequestStatus.pm:8 nutzt faelschlich Core::V1::NamespaceCondition. Empfohlener Fix (in CertManager, geteilte Typen unberuehrt): 3 neue cert-manager-eigene Condition-Klassen (IssuerCondition/CertificateCondition/CertificateRequestCondition, nur type+status required) + Rewire der 3 Status-Klassen + Regressionstest. crd-drift-CertManager danach neu pruefen (evtl. neuer Differ). Repro: scratchpad/repro_k135.pl. Wartet auf Maintainer-Richtung.
+
+Maintainer: voller Fix freigegeben. Worker (fortgesetzt) implementiert: 3 neue cert-manager-eigene Condition-Klassen + Rewire der 3 Status-Klassen + Regressionstest, geteilte Typen unberuehrt. Danach crd-drift-CertManager pruefen + volle Suite.
+
+Fix implementiert + alle 8856 Tests gruen (neu: t/101; Datenverlust behoben, Repro vorher/nachher). 3 neue Condition-Klassen + Rewire 3 Status-Klassen, geteilte Typen unberuehrt, t/10-Assertion nachgezogen. ABER: Fix legt offen, dass der Emitter denselben Bug traegt -- crd-drift --provider CertManager = 75 match, 3 differ, 3 not-rendered (lib korrekt, Emitter reuse_core/D5 rendert weiter Meta::V1::Condition). Worker hat NICHT geparkt/Emitter angefasst. Drift-Handling + moeglicher breiterer reuse_core-Latenzbug (andere Provider) = Maintainer-Entscheidung offen. Commit von k135 haengt daran.
+
+Committet auf branch crd-drift-followups. Fix: 3 cert-manager-eigene Condition-Klassen + Rewire 3 Status-Klassen, geteilte Typen unberuehrt, t/101 Regressionstest, Changes-Bullet. Drift (Emitter reuse_core) via accept_structural_divergence (3) + ignore_unrendered (3) geparkt, Ref k136. crd-drift-check exit 0, Suite 8856 PASS. Follow-ups: k136 (Emitter), k137 (Audit).
