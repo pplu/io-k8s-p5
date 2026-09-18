@@ -1,0 +1,27 @@
+---
+claimed_at: 2026-09-18T23:24:32Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-18T23:24:26Z
+created: 2026-09-18T14:49:43Z
+id: 137
+priority: high
+started: 2026-09-18T22:32:30Z
+status: done
+tags:
+- crd
+- fidelity
+- bug
+- audit
+title: 'Audit: reuse_core Meta::V1::Condition / NamespaceCondition dist-weit auf ueberkonstrainte
+  Condition-required-sets pruefen (k135-Breitband)'
+updated: 2026-09-18T23:24:32Z
+---
+
+Aus k135. Der k135-Datenverlust (message-lose cert-manager Condition wird beim Inflate gedroppt, weil lib Meta::V1::Condition mit required message wiederverwendet, obwohl die CRD nur [type,status] verlangt) ist potenziell KEIN Einzelfall: Meta::V1::Condition wird dist-weit von ~56 Klassen wiederverwendet, Core::V1::NamespaceCondition von ~12. Jede Provider-CRD mit lockererem Condition-required-set (nur [type,status]) traegt denselben latenten Drop-Bug bei echten Objekten. Aufgabe: die Condition-Wiederverwendungsstellen (Cilium, ExternalSecrets, AgentSandbox, GatewayAPI, VolumeSnapshot, PrometheusOperator u.a.) gegen die echten CRD-required-sets pruefen; betroffene lib-Klassen wie in k135 auf Provider-eigene Condition-Klassen umstellen. Repro-Muster: k135 scratchpad/repro_k135.pl. Ref k135.
+
+Audit an io-k8s-worker delegiert (nur Untersuchung + Repro, STOP vor Mass-Fix). Ref k135-Commit 2af94782.
+
+Audit fertig (io-k8s-worker): k135-Muster NICHT dist-weit. Genau 1 weiterer Provider betroffen: PrometheusOperator (V1::AlertmanagerStatus, V1::PrometheusStatus, V1::WorkloadBinding, V1alpha1::WorkloadBinding), Drop network-free reproduziert. TWIST: PromOp-CRD required = [lastTransitionTime,status,type] (nicht [type,status] wie cert-manager). Alle anderen Provider false-positive geprueft+ausgeschlossen. K3s HelmChartCondition nicht verifizierbar (kein CRD eingecheckt) -> k138. Fix (1 Provider, klein) wird unter k137 umgesetzt (io-k8s-worker).
+
+Fix committet: PromOp Condition-Klasse (required=>schema, [lastTransitionTime,status,type]) + Rewire 4 Status-Klassen + t/102 + Drift-Park; k135 cert-manager-Klassen auf schema angeglichen (t/101 angepasst) -- 0 plain-required in allen Providern. crd-drift-check exit 0, Suite 8867 PASS. Zwei Commits auf master (lokal). Emitter-Rest = k136.
