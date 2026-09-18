@@ -1,0 +1,26 @@
+---
+claimed_at: 2026-09-18T03:38:50Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-18T03:38:44Z
+created: 2026-09-10T02:13:31Z
+id: 134
+priority: medium
+started: 2026-09-17T22:21:07Z
+status: done
+tags:
+- crd
+- emitter
+- maint
+- d8
+title: VolumeSnapshot-Overlay deckt VolumeGroupSnapshot nicht ab (k121-Nachlauf)
+updated: 2026-09-18T03:38:50Z
+---
+
+Beim k120-Verify aufgefallen. Die von k121 hinzugefuegte VolumeGroupSnapshot-Familie hat keine Overlay-Eintraege in maint/crd-render/VolumeSnapshot.yaml, daher meldet --check fuer VolumeSnapshot 10 match, 21 differ, 18 missing-in-lib, 12 not-rendered - obwohl k120 VolumeSnapshot als done fuehrt (dessen urspruengliches Overlay 0f83668e ist aelter als k121). Damit ist VolumeSnapshots --check wieder ohne Aussagekraft. Die zwei in k120 ergaenzten Mechanismen (reuse_core_except, absolute ::-names-Ziele) plus der lockstep-gegen-lib-Ansatz schliessen es. Ref k120 Commit b0a4802f, k121.
+
+Overlay-Fix an io-k8s-worker delegiert (Hauptagent koordiniert). Ausgangslage bestaetigt: crd-drift-check --provider VolumeSnapshot --check = 10 match, 21 differ, 18 missing-in-lib, 12 not-rendered.
+
+Erledigt (io-k8s-worker). Overlay maint/crd-render/VolumeSnapshot.yaml deckt jetzt VolumeGroupSnapshot-Familie ab; --check VolumeSnapshot = 10 match, 33 differ, 0 missing-in-lib, 0 not-rendered (strukturelle Haelfte geschlossen). Nur Overlay geaendert, lib unberuehrt; Suite gruen (prove -lr t/ 8806 Tests, t/25+t/26 PASS). Working-tree-Change, noch nicht committed. Die 33 verbliebenen DIFFERS sind rein POD/Formatierung (k8s-Deklarationen byte-identisch) -> gehoeren zu k132.
+
+Committet als ebd35ac8 auf branch crd-drift-followups.
