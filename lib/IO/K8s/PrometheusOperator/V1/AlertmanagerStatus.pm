@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s availableReplicas   => Int;
-k8s conditions          => ['Meta::V1::Condition'];
+k8s conditions          => ['+IO::K8s::PrometheusOperator::V1::Condition'];
 k8s paused              => Bool;
 k8s replicas            => Int;
 k8s selector            => Str;

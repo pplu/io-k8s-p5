@@ -188,6 +188,16 @@ ignore_unrendered:
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateRequestCondition.pm
     reason: "k135: cert-manager-owned condition class (only [type,status] required) so live message-less conditions no longer drop; the emitter's reuse_core reuses Core::V1::NamespaceCondition and renders no per-provider condition class. Emitter fix tracked as k136."
+  # PrometheusOperator (k137): the prometheus-operator-owned condition class. lib
+  # gives the provider its own monitoringv1.Condition (required [lastTransitionTime,
+  # status,type] -- schema-required, matching the CRD and the provider's own
+  # required=>'schema' convention) so live message/reason-less conditions no longer
+  # drop on inflate; the emitter's reuse_core reuses the shared Meta::V1::Condition
+  # (message/reason required) and renders no per-provider condition class. Emitter
+  # fix tracked as k136.
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/Condition.pm
+    reason: "k137: prometheus-operator-owned condition class (required [lastTransitionTime,status,type], unlike metav1.Condition) so live message/reason-less conditions no longer drop; the emitter's reuse_core reuses Meta::V1::Condition and renders no per-provider condition class. Emitter fix tracked as k136."
 
 # --check's COSMETIC status (k132): a DIFFERS whose ONLY divergence from the
 # emitter render is presentation -- the `# ABSTRACT:` summary, POD prose
@@ -407,3 +417,21 @@ accept_structural_divergence:
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateRequestStatus.pm
     reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::CertificateRequestCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core still renders Core::V1::NamespaceCondition. lib upstream-correct; emitter fix tracked as k136."
+  # PrometheusOperator (k137): the four status classes type their conditions as the
+  # prometheus-operator-owned Condition class (required [lastTransitionTime,status,
+  # type], matching the CRD, so live message/reason-less conditions no longer drop);
+  # the emitter's reuse_core still renders the shared Meta::V1::Condition (message/
+  # reason required). lib is upstream-correct; the emitter carries the same latent
+  # over-constraint that caused the k135/k137 drop. Emitter fix tracked as k136.
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/AlertmanagerStatus.pm
+    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/PrometheusStatus.pm
+    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/WorkloadBinding.pm
+    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1alpha1/WorkloadBinding.pm
+    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."

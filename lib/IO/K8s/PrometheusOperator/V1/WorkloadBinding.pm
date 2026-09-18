@@ -3,7 +3,7 @@ package IO::K8s::PrometheusOperator::V1::WorkloadBinding;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s conditions => ['Meta::V1::Condition'];
+k8s conditions => ['+IO::K8s::PrometheusOperator::V1::Condition'];
 k8s group      => Str, { required => 'schema', enum => [qw(monitoring.coreos.com)] };
 k8s name       => Str, { required => 'schema' };
 k8s namespace  => Str, { required => 'schema' };
