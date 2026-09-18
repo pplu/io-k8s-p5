@@ -1,0 +1,28 @@
+---
+claimed_at: 2026-09-18T04:03:29Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-18T04:03:24Z
+created: 2026-09-10T02:13:14Z
+id: 133
+priority: low
+started: 2026-09-18T03:39:04Z
+status: done
+tags:
+- crd
+- autogen
+- maint
+- d8
+title: 'UUID: typed-empty vs opaque-hash Entscheidung (ExternalSecrets UUIDSpec, k55/k120)'
+updated: 2026-09-18T04:03:29Z
+---
+
+Aus k120 (Commit b0a4802f) geparkt. Upstream modelliert generators.external-secrets.io uuids .spec als property-loses type-object. AutoGen haelt ein property-loses Objekt opak (k55), daher typisiert der Render UUID.spec als Str-Hash und emittiert kein UUIDSpec, waehrend lib eine benannte leere Struktur shippt. Diese typed-empty vs opaque-hash Wrapper-Wahl liegt ausserhalb jedes Overlay-Mechanismus. In k120 ist UUIDSpec.pm mit Begruendung in ignore_unrendered geparkt; die residualen strukturellen Differs auf UUID.pm brauchen einen Entscheid: leere Klasse fallen lassen, oder AutoGen einen forced-struct-Hook beibringen.
+
+Entscheidung offen: Maintainer wollte genauere Erklaerung, bevor er zwischen (1) so lassen + Exception, (2) leere Klasse fallenlassen (Breaking/Deprecated-Protokoll), (3) AutoGen forced-struct-Hook waehlt. Erklaerung geliefert; Empfehlung Weg 1. Wartet auf Wahl.
+
+Scope praezisiert aus k132-Verify: ZWEI Referenzstellen von UUIDSpec -- ExternalSecrets/V1alpha1/UUID.pm (spec) und ClusterGeneratorGenerator.pm (uuidSpec). Das sind die einzigen verbleibenden echten crd-drift-check-Differs. k133-Entscheid loest zugleich diesen Rest. Wartet auf Maintainer-Wahl (Empfehlung Weg 1).
+
+Entscheidung Maintainer: Weg 1 (so lassen + Exception). An io-k8s-worker delegiert. Branch crd-drift-followups.
+
+Weg 1 umgesetzt (io-k8s-worker): neue Kategorie accept_structural_divergence (file-exakt) fuer UUID.pm + ClusterGeneratorGenerator.pm; --check jetzt exit 0 ueber alle Provider, lib unberuehrt, Regressionstest t/100. Committet auf branch crd-drift-followups.
