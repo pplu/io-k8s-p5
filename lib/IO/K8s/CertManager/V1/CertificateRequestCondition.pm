@@ -30,7 +30,7 @@ transition.
 
 =cut
 
-k8s status => Str, 'required';
+k8s status => Str, { required => 'schema' };
 
 =attr status
 
@@ -38,7 +38,7 @@ Status of the condition, one of (`True`, `False`, `Unknown`).
 
 =cut
 
-k8s type => Str, 'required';
+k8s type => Str, { required => 'schema' };
 
 =attr type
 

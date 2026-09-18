@@ -118,16 +118,33 @@ subtest 'Issuer + Certificate + CertificateRequest also accept message-less cond
     is($cr->status->conditions->[0]->message, undef, 'CertificateRequest condition.message optional');
 };
 
-subtest 'type and status stay required on the cert-manager condition classes' => sub {
+subtest 'type and status stay required (schema fidelity) on the cert-manager condition classes' => sub {
+    # These classes follow the cert-manager provider's required=>'schema'
+    # convention (like the k137 PrometheusOperator::V1::Condition): required-ness
+    # is recorded in the attribute registry -- for the emitter, compare_to_schema
+    # and to_crd -- but NOT enforced at construction, so a partial live document
+    # never drops. The required SET ([type,status]) is asserted against the
+    # registry; construction is deliberately permissive.
     for my $class (qw(
         IO::K8s::CertManager::V1::IssuerCondition
         IO::K8s::CertManager::V1::CertificateCondition
         IO::K8s::CertManager::V1::CertificateRequestCondition
     )) {
-        dies_ok { $class->new(type => 'Ready') } "$class requires status";
-        dies_ok { $class->new(status => 'True') } "$class requires type";
+        my $reg = $IO::K8s::Resource::_attr_registry{$class};
+        ok($reg, "$class is in the attribute registry");
+        ok($reg->{type}{required},   "$class: type recorded required");
+        ok($reg->{status}{required}, "$class: status recorded required");
+        for my $opt (qw(message reason lastTransitionTime observedGeneration)) {
+            next unless exists $reg->{$opt};   # CertificateRequestCondition has no observedGeneration
+            ok(!$reg->{$opt}{required}, "$class: $opt NOT required (matches cert-manager CRD)");
+        }
+        # required=>'schema' is not Moo-enforced: construction is permissive.
+        lives_ok { $class->new(type => 'Ready') }
+            "$class constructs without status (required is schema-only, not enforced)";
+        lives_ok { $class->new(status => 'True') }
+            "$class constructs without type (required is schema-only, not enforced)";
         lives_ok { $class->new(type => 'Ready', status => 'True') }
-            "$class needs only type + status";
+            "$class constructs with type + status";
     }
 };
 
