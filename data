@@ -1,0 +1,80 @@
+---
+claimed_at: 2026-09-19T04:25:48Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-19T04:25:48Z
+created: 2026-09-18T14:49:37Z
+id: 136
+priority: medium
+started: 2026-09-19T03:56:49Z
+status: done
+tags:
+- crd
+- emitter
+- d5
+- certmanager
+title: 'Emitter reuse_core (D5) ueberkonstrained Condition-required-set: rendert Meta::V1::Condition
+  wo CRD nur [type,status] verlangt (k135-Nachlauf)'
+updated: 2026-09-19T04:25:48Z
+---
+
+Aus k135. Nach dem k135-lib-Fix zeigt crd-drift --provider CertManager 3 differ + 3 not-rendered, weil der Emitter (reuse_core/D5) weiter Meta::V1::Condition rendert, waehrend lib jetzt korrekte cert-manager-eigene Condition-Klassen nutzt (IssuerCondition/CertificateCondition/CertificateRequestCondition). Ursache: reuse_core beruecksichtigt nicht, dass die CRD Conditions nur [type,status] required macht (message etc. optional). Fix-Richtung: reuse_core soll eine Provider-eigene Condition-Klasse emittieren, wenn das CRD-required-set vom wiederverwendeten Core-Typ abweicht, statt Meta::V1::Condition. Bis dahin in k135 via accept_structural_divergence (3 Status-Klassen) + ignore_unrendered (3 Condition-Klassen) geparkt. Ref k135.
+
+Betrifft nicht nur CertManager: k137-Audit zeigt, dass der Emitter-reuse_core-Over-Constraint auch PrometheusOperator-Conditions trifft (4 Klassen). Der Emitter-Fix (reuse_core soll bei abweichendem required-Set eine Provider-eigene Condition-Klasse emittieren) muss beide Provider abdecken. PromOp-CRD verlangt [lastTransitionTime,status,type].
+
+test
+
+2026-09-19 04:19 Fixed. lib/IO/K8s/AutoGen.pm: added _overrequires() and a required-compatibility
+filter in _core_class_for (k136) -- a reuse candidate is dropped if it marks a
+shared key `required` (plain or `required=>'schema'`) that the schema's own
+`required` list leaves optional. Only applied when the schema declares a
+`required` key at all (absent `required` is treated as "no claim", not
+"nothing required" -- real upstream schemas for LabelSelector/{key,operator,
+values}/{name,value} always declare required explicitly when relevant, so
+this changes nothing for them; it protects those ~140/~160 established
+reuses from a fixture/third-party schema that simply omits `required`).
+Verified via t/75_reuse_core.t and t/98_k120_overlay_semantics.t, which
+initially broke with the naive "absent==empty" semantics and now pass.
+
+Result for CertManager/PrometheusOperator: the fix removes the *data-loss*
+risk (reuse_core no longer picks Meta::V1::Condition, whose required
+message/reason/lastTransitionTime don't match the CRD's [status,type] or
+[lastTransitionTime,status,type]) but does NOT make the emitter render the
+provider-owned classes -- reuse_core is purely structural/type/required
+compatibility, not domain-aware, so for the 6-key (with observedGeneration)
+Issuer/Certificate/PrometheusOperator condition shape it now picks the next
+required-compatible candidate, Autoscaling::V2::HorizontalPodAutoscalerCondition
+(also [status,type] required only) instead. CertManager's 5-key
+CertificateRequestCondition shape (no observedGeneration) already reused
+Core::V1::NamespaceCondition, which was already required-compatible before
+k136, so that one is unchanged/unaffected by the fix.
+
+So "0 differ / 0 not-rendered" from the ticket's stated goal is NOT reached --
+these 3 CertManager NOT RENDERED / 3 accepted-divergence entries and 1
+PrometheusOperator NOT RENDERED / 4 accepted-divergence entries all still
+show up under --check, just against a different (still domain-unrelated)
+reused class. Updated all their `reason` texts in
+maint/crd-drift-exceptions.yaml to say so precisely (per-shape: which class
+is now reused, and that NamespaceCondition's entry was never affected).
+Verified via --check --exceptions <empty> to see the real, un-suppressed diff
+target class name for each. Kept the entries (did not remove) since the
+divergence is real, just no longer a correctness bug.
+
+No scope creep: only the required filter was added to _core_class_for/
+reuse_core; _wire_identical's required-blindness (comparing candidates to
+EACH OTHER) is untouched by design, as instructed.
+
+Full suite: dzil test PASS, 10794 tests (includes t/25_real_world.t,
+t/26_build_verify.t, t/85_core_shape_index.t, t/101_k135_certmanager_
+condition_message.t). Ran maint/crd-drift-check.pl --check across all 8
+providers (cached CRDs) before and after: identical summary counts
+everywhere except the intended CertManager/PrometheusOperator Condition
+entries -- no other reuse (LabelSelector, {key,operator,values}, {name,value},
+etc.) regressed.
+
+Files changed: lib/IO/K8s/AutoGen.pm (_overrequires + _core_class_for +
+block comment), maint/crd-drift-exceptions.yaml (reason text updates only,
+no entries removed), Changes ({{$NEXT}} bullet added). Not committed --
+left for review per the ticket's own instruction.
+
+Commit a38a6ec4. Verifiziert: dzil test lokal nachgefahren (10794 Tests, PASS), crd-drift-check --check --provider CertManager/PrometheusOperator nachgefahren -- Zahlen decken sich mit Subagent-Report (CertManager 0 differ/3 not-rendered, PrometheusOperator 0 differ/1 not-rendered). Diff gelesen: _overrequires-Logik und required-Kodierung in _k8s_attr_info gegen Resource.pm-Doku (Zeile ~895) verifiziert.
