@@ -172,32 +172,47 @@ ignore_unrendered:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
     reason: "k120/k133: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; k133 chose Weg 1 -- keep the named empty struct as a superset and accept the two residual reference-site divergences via accept_structural_divergence below."
-  # CertManager (k135): the three cert-manager-owned condition classes. lib gives
-  # cert-manager its own Issuer/Certificate/CertificateRequest condition classes
-  # (only [type,status] required, matching the CRD) so live message-less
-  # conditions no longer drop on inflate; the emitter's reuse_core reuses the
-  # shared Meta::V1::Condition / Core::V1::NamespaceCondition and renders no
-  # per-provider condition class, so --render produces none of these. Emitter fix
-  # tracked as k136.
+  # CertManager (k135) / PrometheusOperator (k137): the provider-owned condition
+  # classes. lib gives each provider its own Issuer/Certificate/
+  # CertificateRequest/monitoringv1.Condition class, required exactly as its own
+  # CRD requires, so live conditions that omit message/reason/lastTransitionTime
+  # no longer drop on inflate. k136 taught reuse_core (D5) to refuse a candidate
+  # that marks a shared key required beyond what the schema itself requires --
+  # that closed the data-loss risk (reuse_core no longer picks a candidate whose
+  # extra-required fields would reject or drop a valid live object) but reuse_core
+  # is still purely structural/type/required-compatibility, not domain-aware, so
+  # it now reuses whichever OTHER shipped class matches the shape and required
+  # set instead of falling back to a per-provider class:
+  #   - Issuer/Certificate condition shape (6 keys, with observedGeneration,
+  #     schema requires [status,type]) -- Meta::V1::Condition (message/reason/
+  #     lastTransitionTime required) is now filtered out; the emitter instead
+  #     reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (also required
+  #     [status,type] only) -- same shape, unrelated domain, but no longer lossy.
+  #   - CertificateRequest condition shape (5 keys, no observedGeneration, schema
+  #     requires [status,type]) -- Core::V1::NamespaceCondition already required
+  #     only [status,type] before k136, so this one is unaffected by the fix.
+  #   - PrometheusOperator's condition shape (6 keys, schema requires
+  #     [lastTransitionTime,status,type]) -- same as Issuer/Certificate: the
+  #     emitter now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition
+  #     (required [status,type], a subset of the schema's required set, so still
+  #     safe) instead of Meta::V1::Condition.
+  # So these stay parked: --render still produces none of these per-provider
+  # classes, and the corresponding status classes still DIFFER from the render
+  # (now against a different, still-unrelated core class) -- not a data-loss gap
+  # any more, but D5 has no reuse-preference notion of "shares this Kind's own
+  # domain", so it never reaches for the provider's own condition class here.
   - provider: CertManager
     path: IO/K8s/CertManager/V1/IssuerCondition.pm
-    reason: "k135: cert-manager-owned condition class (only [type,status] required, unlike metav1.Condition) so live message-less conditions no longer drop; the emitter's reuse_core reuses Meta::V1::Condition and renders no per-provider condition class. Emitter fix tracked as k136."
+    reason: "k135/k136: cert-manager-owned condition class (only [type,status] required); the emitter's reuse_core now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition, but still not this per-provider class -- D5's reuse is structural only, not domain-aware."
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateCondition.pm
-    reason: "k135: cert-manager-owned condition class (only [type,status] required, unlike metav1.Condition) so live message-less conditions no longer drop; the emitter's reuse_core reuses Meta::V1::Condition and renders no per-provider condition class. Emitter fix tracked as k136."
+    reason: "k135/k136: cert-manager-owned condition class (only [type,status] required); the emitter's reuse_core now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition, but still not this per-provider class -- D5's reuse is structural only, not domain-aware."
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateRequestCondition.pm
-    reason: "k135: cert-manager-owned condition class (only [type,status] required) so live message-less conditions no longer drop; the emitter's reuse_core reuses Core::V1::NamespaceCondition and renders no per-provider condition class. Emitter fix tracked as k136."
-  # PrometheusOperator (k137): the prometheus-operator-owned condition class. lib
-  # gives the provider its own monitoringv1.Condition (required [lastTransitionTime,
-  # status,type] -- schema-required, matching the CRD and the provider's own
-  # required=>'schema' convention) so live message/reason-less conditions no longer
-  # drop on inflate; the emitter's reuse_core reuses the shared Meta::V1::Condition
-  # (message/reason required) and renders no per-provider condition class. Emitter
-  # fix tracked as k136.
+    reason: "k135: cert-manager-owned condition class (only [type,status] required); the emitter's reuse_core reuses Core::V1::NamespaceCondition, which was already required-compatible before k136 and so is unaffected by that fix -- still not this per-provider class."
   - provider: PrometheusOperator
     path: IO/K8s/PrometheusOperator/V1/Condition.pm
-    reason: "k137: prometheus-operator-owned condition class (required [lastTransitionTime,status,type], unlike metav1.Condition) so live message/reason-less conditions no longer drop; the emitter's reuse_core reuses Meta::V1::Condition and renders no per-provider condition class. Emitter fix tracked as k136."
+    reason: "k137/k136: prometheus-operator-owned condition class (required [lastTransitionTime,status,type]); the emitter's reuse_core now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition, but still not this per-provider class -- D5's reuse is structural only, not domain-aware."
 
 # --check's COSMETIC status (k132): a DIFFERS whose ONLY divergence from the
 # emitter render is presentation -- the `# ABSTRACT:` summary, POD prose
@@ -402,36 +417,42 @@ accept_structural_divergence:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/ClusterGeneratorGenerator.pm
     reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types uuidSpec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque { Str => 1 }"
-  # CertManager (k135): the three status classes type their conditions as
-  # cert-manager-owned condition classes (only [type,status] required, matching
-  # the CRD, so live message-less conditions no longer drop); the emitter's
-  # reuse_core still renders the shared Meta::V1::Condition (message required) /
-  # Core::V1::NamespaceCondition. lib is upstream-correct; the emitter carries the
-  # same latent over-constraint that caused the k135 drop. Emitter fix tracked as k136.
+  # CertManager (k135) / PrometheusOperator (k137): the status classes type
+  # their conditions as the provider-owned condition classes (required exactly
+  # what each CRD requires, so live conditions omitting message/reason/
+  # lastTransitionTime no longer drop). k136 fixed reuse_core's (D5) over-
+  # constraint bug -- it now refuses a candidate that marks a shared key
+  # required beyond what the schema requires -- so it no longer renders
+  # Meta::V1::Condition here (message/reason/lastTransitionTime required,
+  # unlike these CRDs). It still doesn't render these per-provider classes
+  # though: reuse_core has no notion of "same domain as this Kind", only
+  # shape/type/required compatibility, so for the two 6-key (with
+  # observedGeneration) shapes here it now picks the next required-compatible
+  # candidate -- Autoscaling::V2::HorizontalPodAutoscalerCondition (also
+  # [status,type] required only) -- and for the 5-key CertificateRequest shape
+  # (no observedGeneration) it still picks Core::V1::NamespaceCondition, which
+  # was already required-compatible before k136 and so unaffected by it. lib
+  # is upstream-correct in every case; the remaining divergence is a reuse
+  # class-name/domain choice, not a data-loss risk. See k136 / the matching
+  # ignore_unrendered entries above for the per-shape detail.
   - provider: CertManager
     path: IO/K8s/CertManager/V1/IssuerStatus.pm
-    reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::IssuerCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core still renders Meta::V1::Condition (message required). lib upstream-correct; emitter fix tracked as k136."
+    reason: "k135/k136: lib types conditions as +IO::K8s::CertManager::V1::IssuerCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateStatus.pm
-    reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::CertificateCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core still renders Meta::V1::Condition (message required). lib upstream-correct; emitter fix tracked as k136."
+    reason: "k135/k136: lib types conditions as +IO::K8s::CertManager::V1::CertificateCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateRequestStatus.pm
-    reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::CertificateRequestCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core still renders Core::V1::NamespaceCondition. lib upstream-correct; emitter fix tracked as k136."
-  # PrometheusOperator (k137): the four status classes type their conditions as the
-  # prometheus-operator-owned Condition class (required [lastTransitionTime,status,
-  # type], matching the CRD, so live message/reason-less conditions no longer drop);
-  # the emitter's reuse_core still renders the shared Meta::V1::Condition (message/
-  # reason required). lib is upstream-correct; the emitter carries the same latent
-  # over-constraint that caused the k135/k137 drop. Emitter fix tracked as k136.
+    reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::CertificateRequestCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core renders Core::V1::NamespaceCondition, already required-compatible before k136 and so unaffected by that fix. lib upstream-correct; still not this per-provider class."
   - provider: PrometheusOperator
     path: IO/K8s/PrometheusOperator/V1/AlertmanagerStatus.pm
-    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."
+    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
   - provider: PrometheusOperator
     path: IO/K8s/PrometheusOperator/V1/PrometheusStatus.pm
-    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."
+    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
   - provider: PrometheusOperator
     path: IO/K8s/PrometheusOperator/V1/WorkloadBinding.pm
-    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."
+    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
   - provider: PrometheusOperator
     path: IO/K8s/PrometheusOperator/V1alpha1/WorkloadBinding.pm
-    reason: "k137: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core still renders Meta::V1::Condition (message/reason required). lib upstream-correct; emitter fix tracked as k136."
+    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."

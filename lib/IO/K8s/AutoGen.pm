@@ -508,9 +508,23 @@ sub _has_properties {
 #      instance. This is checked before anything else, since a name match
 #      alone says nothing about the wire shape.
 #
-#   3. Exactly one type-compatible candidate -> reuse it.
+#   3. Every remaining candidate must not OVER-CONSTRAIN the schema (k136,
+#      see _overrequires): a candidate that marks some shared key
+#      `required` (plain Moo-enforced or registry-only `required =>
+#      'schema'`) which the schema's own `required` list leaves optional is
+#      dropped. Reusing it would reject or silently drop a real cluster
+#      object that (validly, per the CRD) omits that key -- the metav1.
+#      Condition shape reused for a CRD condition that requires only
+#      [type,status] is the case this exists for (k135/k137): message,
+#      reason and lastTransitionTime are required on Condition but not on
+#      the CRD, so a message-less live condition failed to inflate. Only
+#      this direction is checked -- a schema requiring MORE than the
+#      candidate leaves the reused class merely looser than the schema
+#      promises, never lossy.
 #
-#   4. Several do -- reused only when they are wire-identical: the same
+#   4. Exactly one candidate survives both filters -> reuse it.
+#
+#   5. Several do -- reused only when they are wire-identical: the same
 #      type flags (NOT required-ness -- a field being optional on one
 #      shipped class and mandatory on another doesn't change what value it
 #      holds) and the same referenced class per key, where a key has one.
@@ -720,6 +734,41 @@ sub _wire_identical {
     return 1;
 }
 
+# Does $candidate mark some shared key `required` (Moo-enforced plain
+# `required => 1`, or registry-only `required => 'schema'` -- both are
+# recorded as `required => 1` in _k8s_attr_info, see IO::K8s::Resource's
+# k8s()) that $schema_required does NOT list? One direction only (k136): a
+# candidate requiring MORE than the schema is unsafe to reuse -- a real
+# cluster object that omits that key would fail ->new() (plain required) or
+# be silently dropped on inflate (required => 'schema'), even though the
+# schema never promised the field. A schema requiring MORE than the
+# candidate is the opposite, harmless direction -- the reused class is
+# merely looser than the schema, never lossy -- and is not checked here.
+#
+# Only called (see _core_class_for) when $schema itself carries a `required`
+# key at all -- a schema fragment that omits `required` entirely is treated
+# as making no required-ness claim one way or the other, not as an explicit
+# "nothing required" (which, strictly, is what JSON Schema says an absent
+# `required` means). Every upstream CRD schema actually seen to embed one of
+# these reused shapes (LabelSelector's {key,operator,values}, {name,value},
+# ...) does carry an explicit `required` list matching the reused class, so
+# this distinction changes nothing for real schemas; what it avoids is
+# treating a schema fragment that simply never bothered to state `required`
+# (as this function's own test fixtures do, and as a hand-written or
+# less careful third-party CRD might) as if it had positively declared every
+# field optional, which would fall back dozens of well-established, safe
+# reuses (LabelSelectorRequirement, HTTPHeader, ...) to nested classes for no
+# safety gain.
+sub _overrequires {
+    my ($keys, $schema_required, $candidate) = @_;
+    my $info = IO::K8s::Role::Resource::_k8s_attr_info($candidate);
+    my %by_json; $by_json{ $info->{$_}{json_key} // $_ } = $info->{$_} for keys %$info;
+    for my $key (@$keys) {
+        return 1 if $by_json{$key}{required} && !$schema_required->{$key};
+    }
+    return 0;
+}
+
 # The class to reuse for a nested object schema, or undef.
 sub _core_class_for {
     my ($schema) = @_;
@@ -737,10 +786,24 @@ sub _core_class_for {
         !grep { !_entry_compatible($by_json{$_}, _schema_type_kind($schema->{properties}{$_})) } @keys;
     } @candidates;
     return undef unless @candidates;
+
+    # Required-compatibility filter (k136): drop any candidate that
+    # over-constrains the schema -- see _overrequires. Only applied when the
+    # schema itself declares a `required` list (see that function's comment
+    # for why an absent one is not treated as an explicit "nothing
+    # required"). Checked before the single-candidate shortcut and the
+    # wire-identical tie-break alike, so an over-constrained candidate can
+    # never be "the one" reuse picks, whether it was alone or one of several
+    # wire-identical options.
+    if (defined $schema->{required}) {
+        my %schema_required = map { $_ => 1 } @{ $schema->{required} };
+        @candidates = grep { !_overrequires(\@keys, \%schema_required, $_) } @candidates;
+        return undef unless @candidates;
+    }
     return $candidates[0] if @candidates == 1;
 
-    # Several type-compatible candidates: reuse the preferred one only if
-    # they are wire-identical (already preference-sorted by
+    # Several type- and required-compatible candidates: reuse the preferred
+    # one only if they are wire-identical (already preference-sorted by
     # core_class_for_shape, and filtering above preserves that order).
     return _wire_identical(\@keys, @candidates) ? $candidates[0] : undef;
 }

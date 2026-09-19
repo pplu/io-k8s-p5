@@ -26,6 +26,12 @@ Revision history for IO-K8s
     required per the CRD, message and reason optional), so real objects that
     omit message no longer fail to inflate.
 
+  - Fix AutoGen's core-class reuse (D5, reuse_core) picking a shipped class
+    that requires a field the schema's own required list leaves optional.
+    A nested object generated from a caller-supplied openapi_spec, or by
+    CRD::Emitter, no longer reuses a class whose extra required field would
+    reject or silently drop a real object that omits it.
+
   - Add the three VolumeGroupSnapshot Kinds in v1, v1beta1 and v1beta2, with
     typed version-specific status fields. Bare names select the pinned
     upstream's storage v1beta2; exact GVKs select any served track.
