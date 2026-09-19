@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-18T22:42:24Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-19T03:56:02Z
+created: 2026-09-18T22:42:24Z
+id: 138
+priority: low
+started: 2026-09-19T03:56:02Z
+status: done
+tags:
+- crd
+- fidelity
+- k3s
+- audit
+title: K3s HelmChartCondition required-set gegen upstream helm.cattle.io pruefen (k137-Nachlauf,
+  hier nicht verifizierbar)
+updated: 2026-09-19T03:56:02Z
+---
+
+Aus k137-Audit. K3s HelmChartStatus.conditions nutzt eine provider-lokale HelmChartCondition (kein geteilter Core-Typ), aber unter spec/crd/ ist KEIN K3s-CRD-Schema eingecheckt, daher konnte das required-set im k137-Audit nicht gegen die echte CRD verglichen werden. Aufgabe: HelmChartCondition required-Felder gegen das echte upstream helm.cattle.io CRD pruefen; falls ueberkonstrainter als die CRD -> wie k135/k137 fixen (provider-eigene Condition-Klasse), sonst schliessen. Niedrige Prio: provider-lokaler Typ, kein geteilter Blast-Radius.
+
+Verifiziert gegen k3s-io/helm-controller (master @71be4991, identisch mit getaggtem v0.17.8 bis auf controller-gen-Annotation): helm.cattle.io_helmcharts.yaml CRD verlangt fuer conditions[] nur [status,type] (message/reason optional). lib/IO/K8s/K3s/V1/HelmChartCondition.pm hat bereits genau status/type als required => 'schema', message/reason unrequired -- kein Ueberkonstrain, kein Fix noetig. Live-Cluster-Check (pichu/rke2) nicht gebraucht; API-Server dort haengt aktuell bei list/get-Requests (context deadline exceeded trotz erreichbarem /version) -- separates, hier nicht verfolgtes Problem.
