@@ -1,0 +1,25 @@
+---
+claimed_at: 2026-09-20T16:23:52Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-20T16:23:52Z
+created: 2026-09-19T19:09:25Z
+id: 140
+priority: low
+started: 2026-09-20T05:47:55Z
+status: done
+tags:
+- crd
+- emitter
+- d5
+- certmanager
+title: CertificateRequestCondition reused Core::V1::NamespaceCondition (Shared-Vocab)
+  -- k139-Domain-Filter greift hier nicht
+updated: 2026-09-20T16:23:52Z
+---
+
+Aus k139. Die k139-Nachschaerfung (rank-3-Kandidat nur droppen, wenn ein Shared-Vocab-Kandidat vom k136-Required-Filter eliminiert wurde) loest CertManager/V1/CertificateRequestCondition NICHT: die 5-Key-Shape (ohne observedGeneration) reused Core::V1::NamespaceCondition -- rank-2, gilt als Shared-Vocab und wird von keinem Filter dieser Bauart gedroppt. Damit bleiben ignore_unrendered: CertificateRequestCondition.pm und accept_structural_divergence: CertificateRequestStatus.pm geparkt. Strukturelle Grenze des Shared-Vocab-behalten-Ansatzes: eine domaenenfremde Core::V1-Condition gilt als geteiltes Vokabular. Loesung braucht anderen Mechanismus (z.B. Shape-spezifisches domain-foreign-Signal statt reiner Namespace-Klassifikation) -- bewusst nicht in k139 gezogen, um den Fix chirurgisch zu halten.
+
+Richtung entschieden (2026-09-20): Option A — reuse_core-Predikat verschaerfen. Nur Meta::V1::Condition zaehlt als geteiltes Condition-Vokabular; kind-spezifische *Condition (Core::V1::NamespaceCondition, Apps::V1::*Condition, Flowcontrol::*Condition ...) gelten als domain-foreign, damit k139s Refusal auch dann greift, wenn ein solcher Kandidat den k136-Required-Filter ueberlebt. Erst Blast-Radius ueber alle 5 Provider messen (crd-drift-check), dann Implementierung via io-k8s-worker. Ziel: ignore_unrendered CertificateRequestCondition.pm + accept_structural_divergence CertificateRequestStatus.pm entfallen.
+
+GELÖST in b93cadd3. Overlay-Weg (no_reuse_core + D6-Name für CertificateRequest::Status::ConditionsItem), kein AutoGen-Predikat — globales Predikat verworfen (kann echten PVC-Embed nicht von Look-alike trennen, brach im Blast-Radius 3 Renders). lib CertificateRequestCondition: status-Enum [True,False,Unknown] + grupp. Layout -> byte-MATCH. Beide Exceptions entfernt (CertManager accepted divergence 2->0). Regression t/105. Generalisierung auf Cilium/ExternalSecrets = k142.
