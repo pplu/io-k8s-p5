@@ -50,6 +50,7 @@ kinds:
       Status::Acme: CertificateACMEStatus
       Status::Acme::Ari: CertificateACMEARIStatus
       Status::Acme::Ari::SuggestedWindow: ACMERenewalWindow
+      Status::ConditionsItem: CertificateCondition
     with:
     - IO::K8s::Role::Namespaced
     - IO::K8s::Role::CertManaged
@@ -189,6 +190,7 @@ kinds:
       Spec::Venafi::Tpp::CredentialsRef: CertManagerLocalObjectReference
       Status: IssuerStatus
       Status::Acme: ACMEIssuerStatus
+      Status::ConditionsItem: IssuerCondition
     with:
     - IO::K8s::Role::CertManaged
   Issuer:
@@ -270,6 +272,7 @@ kinds:
       Spec::Venafi::Tpp::CredentialsRef: CertManagerLocalObjectReference
       Status: IssuerStatus
       Status::Acme: ACMEIssuerStatus
+      Status::ConditionsItem: IssuerCondition
     with:
     - IO::K8s::Role::Namespaced
     - IO::K8s::Role::CertManaged

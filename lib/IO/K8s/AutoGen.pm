@@ -797,8 +797,38 @@ sub _core_class_for {
     # wire-identical options.
     if (defined $schema->{required}) {
         my %schema_required = map { $_ => 1 } @{ $schema->{required} };
+
+        # k139: remember the shared-vocab candidates (Meta::V1 / Core::V1,
+        # _core_rank below @CORE_PREFERENCE) that ENTER the required filter,
+        # to catch the specific fallback the check just below rejects.
+        my @shared_vocab_before = grep { _core_rank($_) < scalar @CORE_PREFERENCE } @candidates;
+
         @candidates = grep { !_overrequires(\@keys, \%schema_required, $_) } @candidates;
         return undef unless @candidates;
+
+        # k139: a shared-vocab candidate matched this shape but the required
+        # filter above eliminated every one of them, leaving only a
+        # domain-foreign candidate (_core_rank == @CORE_PREFERENCE) to reuse.
+        # That is the k135/k137 condition case: metav1.Condition matches a
+        # CRD condition's {lastTransitionTime,message,observedGeneration,
+        # reason,status,type} shape but over-requires (message/reason/
+        # lastTransitionTime) relative to a CRD that requires only
+        # [status,type], so k136 drops it -- and reuse would otherwise fall
+        # back to an unrelated class that merely shares the shape and the
+        # narrower required set (Autoscaling::V2::HorizontalPodAutoscaler-
+        # Condition for a cert-manager IssuerCondition). Return undef so the
+        # provider's own nested class is generated instead of reusing a
+        # foreign one. This fires ONLY once a shared-vocab candidate has been
+        # removed HERE: a shape whose candidates were always domain-specific
+        # (no Meta/Core member ever) is a genuine sole-family reuse of the
+        # one real embedded upstream type (NetworkPolicyPort,
+        # CrossVersionObjectReference, ParamKind, ...) and is left untouched,
+        # as is a shape where a shared-vocab candidate still survives the
+        # required filter (Core::V1::NamespaceCondition for the 5-key
+        # CertificateRequest condition, which requires only [status,type]).
+        return undef
+            if @shared_vocab_before
+            && !grep { _core_rank($_) < scalar @CORE_PREFERENCE } @candidates;
     }
     return $candidates[0] if @candidates == 1;
 

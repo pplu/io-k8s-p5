@@ -33,12 +33,19 @@ use Test::Exception;
 use IO::K8s;
 use IO::K8s::PrometheusOperator;
 use IO::K8s::PrometheusOperator::V1::Condition;
+use IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition;
 use IO::K8s::PrometheusOperator::V1::WorkloadBinding;
 use IO::K8s::PrometheusOperator::V1alpha1::WorkloadBinding;
 
 my $k8s = IO::K8s->new(with => ['IO::K8s::PrometheusOperator']);
 
 my $COND = 'IO::K8s::PrometheusOperator::V1::Condition';
+# k139 split the hand-merged monitoringv1.Condition into two lib classes: the
+# enum-free Condition (Alertmanager/Prometheus .status.conditions[]) and the
+# WorkloadBinding-specific WorkloadBindingCondition, whose `type` carries the
+# CRD's enum [Accepted]. The k137 claim below (message/reason-less conditions
+# never drop) holds for BOTH; only the class a WorkloadBinding points at changed.
+my $WBCOND = 'IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition';
 
 # A Prometheus exactly as a live cluster returns it: an Available condition
 # with NO `message` and NO `reason` (both optional per the CRD).
@@ -134,7 +141,7 @@ subtest 'Alertmanager + WorkloadBinding also accept message/reason-less conditio
             conditions => [ { type => 'Accepted', status => 'True',
                               lastTransitionTime => '2026-09-18T00:00:00Z' } ],
         }) } "$wb_class inflates a message/reason-less binding condition";
-        isa_ok($wb->conditions->[0], $COND, "$wb_class condition type");
+        isa_ok($wb->conditions->[0], $WBCOND, "$wb_class condition type (k139: WorkloadBindingCondition)");
         is($wb->conditions->[0]->message, undef, "$wb_class condition.message optional");
     }
 };
@@ -152,16 +159,25 @@ subtest 'required set matches the CRD: [lastTransitionTime, status, type] record
     ok($reg->{observedGeneration}{is_int}, 'observedGeneration is integer');
 };
 
-subtest 'the four status classes point their conditions at the owned Condition class' => sub {
+subtest 'the status/binding classes point their conditions at the right owned class (k139 split)' => sub {
+    # Alertmanager/Prometheus .status.conditions[] -> the enum-free Condition.
     for my $status_class (qw(
         IO::K8s::PrometheusOperator::V1::AlertmanagerStatus
         IO::K8s::PrometheusOperator::V1::PrometheusStatus
-        IO::K8s::PrometheusOperator::V1::WorkloadBinding
-        IO::K8s::PrometheusOperator::V1alpha1::WorkloadBinding
     )) {
         my $c = $IO::K8s::Resource::_attr_registry{$status_class}{conditions};
         is($c->{class}, $COND, "$status_class conditions -> $COND");
         ok($c->{is_array_of_objects}, "$status_class conditions is an array of objects");
+    }
+    # WorkloadBinding .conditions[] (both versions) -> the enum-bearing
+    # WorkloadBindingCondition; the V1alpha1 class references the V1 class.
+    for my $wb_class (qw(
+        IO::K8s::PrometheusOperator::V1::WorkloadBinding
+        IO::K8s::PrometheusOperator::V1alpha1::WorkloadBinding
+    )) {
+        my $c = $IO::K8s::Resource::_attr_registry{$wb_class}{conditions};
+        is($c->{class}, $WBCOND, "$wb_class conditions -> $WBCOND");
+        ok($c->{is_array_of_objects}, "$wb_class conditions is an array of objects");
     }
 };
 

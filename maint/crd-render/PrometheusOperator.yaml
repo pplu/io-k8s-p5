@@ -104,6 +104,7 @@ kinds:
       Spec::Web::TlsConfig::Cert: SecretOrConfigMap
       Spec::Web::TlsConfig::Client_ca: SecretOrConfigMap
       Status: AlertmanagerStatus
+      Status::ConditionsItem: Condition
   PodMonitor:
     extra: []
     with:
@@ -127,6 +128,7 @@ kinds:
       Spec::PodMetricsEndpointsItem::TlsConfig::Cert: SecretOrConfigMap
       Status: ConfigResourceStatus
       Status::BindingsItem: WorkloadBinding
+      Status::BindingsItem::ConditionsItem: '+IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition'
   Probe:
     extra: []
     with:
@@ -154,6 +156,7 @@ kinds:
       Spec::TlsConfig::Cert: SecretOrConfigMap
       Status: ConfigResourceStatus
       Status::BindingsItem: WorkloadBinding
+      Status::BindingsItem::ConditionsItem: '+IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition'
   Prometheus:
     extra: []
     with:
@@ -265,6 +268,7 @@ kinds:
       Spec::Web::TlsConfig::Cert: SecretOrConfigMap
       Spec::Web::TlsConfig::Client_ca: SecretOrConfigMap
       Status: PrometheusStatus
+      Status::ConditionsItem: Condition
       Status::ShardStatusesItem: ShardStatus
   PrometheusRule:
     extra: []
@@ -276,6 +280,7 @@ kinds:
       Spec::GroupsItem::RulesItem: Rule
       Status: ConfigResourceStatus
       Status::BindingsItem: WorkloadBinding
+      Status::BindingsItem::ConditionsItem: '+IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition'
   ScrapeConfig:
     extra: []
     with:
@@ -481,6 +486,7 @@ kinds:
       Spec::TlsConfig::Cert: SecretOrConfigMap
       Status: ConfigResourceStatus
       Status::BindingsItem: WorkloadBinding
+      Status::BindingsItem::ConditionsItem: '+IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition'
   ServiceMonitor:
     extra: []
     with:
@@ -504,3 +510,4 @@ kinds:
       Spec::NamespaceSelector: NamespaceSelector
       Status: ConfigResourceStatus
       Status::BindingsItem: WorkloadBinding
+      Status::BindingsItem::ConditionsItem: '+IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition'

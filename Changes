@@ -21,16 +21,22 @@ Revision history for IO-K8s
     inflate.
 
   - Fix PrometheusOperator status conditions dropping live objects the same
-    way: Alertmanager, Prometheus and WorkloadBinding now use a
-    PrometheusOperator condition class (lastTransitionTime, status and type
-    required per the CRD, message and reason optional), so real objects that
-    omit message no longer fail to inflate.
+    way: Alertmanager and Prometheus now use a PrometheusOperator condition
+    class (lastTransitionTime, status and type required per the CRD, message
+    and reason optional), so real objects that omit message no longer fail to
+    inflate. WorkloadBinding, whose upstream condition is a distinct type with
+    its type constrained to the Accepted enum, uses its own
+    WorkloadBindingCondition class.
 
   - Fix AutoGen's core-class reuse (D5, reuse_core) picking a shipped class
     that requires a field the schema's own required list leaves optional.
     A nested object generated from a caller-supplied openapi_spec, or by
     CRD::Emitter, no longer reuses a class whose extra required field would
-    reject or silently drop a real object that omits it.
+    reject or silently drop a real object that omits it. When that filter
+    removes the only shared apimachinery or core type a nested object matched,
+    reuse no longer falls back to an unrelated class of the same shape from
+    another API group; the object's own class is generated instead, so a
+    provider's condition is modelled by that provider's class.
 
   - Add the three VolumeGroupSnapshot Kinds in v1, v1beta1 and v1beta2, with
     typed version-specific status fields. Bare names select the pinned

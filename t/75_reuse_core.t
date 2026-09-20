@@ -129,4 +129,72 @@ subtest 'metadata is part of an embedded type\'s shape, not a top-level Kind\'s'
     );
 };
 
+# k139: a shipped condition-shaped struct (the metav1.Condition 6-key shape,
+# with observedGeneration) matches a shared-vocab candidate
+# (Meta::V1::Condition) on shape, but that candidate over-requires relative
+# to a CRD condition that requires only [status,type] (or
+# [lastTransitionTime,status,type]) -- so the k136 required filter drops it.
+# reuse must then fall back to the provider's own nested class, NOT to an
+# unrelated domain-foreign class that merely shares the shape and the
+# narrower required set (Autoscaling::V2::HorizontalPodAutoscalerCondition).
+subtest 'k139: a rank-3 fallback after the required filter drops the shared-vocab candidate is not reused' => sub {
+    my %cond6 = (
+        lastTransitionTime => { type => 'string', format => 'date-time' },
+        message            => { type => 'string' },
+        observedGeneration => { type => 'integer' },
+        reason             => { type => 'string' },
+        status             => { type => 'string' },
+        type               => { type => 'string' },
+    );
+    is(IO::K8s::AutoGen::_core_class_for({ type => 'object', required => [qw(status type)], properties => { %cond6 } }),
+        undef, 'cert-manager IssuerCondition shape ([status,type] required) is not reused as HorizontalPodAutoscalerCondition');
+    is(IO::K8s::AutoGen::_core_class_for({ type => 'object', required => [qw(lastTransitionTime status type)], properties => { %cond6 } }),
+        undef, 'prometheus-operator Condition shape ([lastTransitionTime,status,type] required) likewise falls back to a provider class');
+
+    # Scope guard: the rule fires only once the required filter has removed a
+    # shared-vocab candidate. With no `required` at all the filter never runs,
+    # the shared-vocab metav1.Condition survives, and it is still reused --
+    # unchanged from before k139 (a schema that states no required set makes
+    # no required-ness claim, see _overrequires).
+    is(IO::K8s::AutoGen::_core_class_for({ type => 'object', properties => { %cond6 } }),
+        'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::Condition',
+        'the same shape without a required list keeps reusing metav1.Condition');
+};
+
+# k139: the regression guard for the established, wanted reuses. These shapes
+# have NO Meta/Core candidate at all -- the rank-3 class is the genuine, sole
+# embedded upstream type -- so k139 must leave them reusable. Breaking any of
+# these would regress Cilium, ExternalSecrets, AgentSandbox or
+# PrometheusOperator, all --check-green on these classes today.
+subtest 'k139: genuine sole-family rank-3 reuses (no shared-vocab candidate) are preserved' => sub {
+    is(IO::K8s::AutoGen::_core_class_for({ type => 'object', properties => {
+        endPort => { type => 'integer' }, port => { type => 'integer' }, protocol => { type => 'string' } } }),
+        'IO::K8s::Api::Networking::V1::NetworkPolicyPort',
+        'NetworkPolicyPort {endPort,port,protocol} still reused (Cilium PortRule/PortDenyRule)');
+    is(IO::K8s::AutoGen::_core_class_for({ type => 'object', properties => {
+        apiVersion => { type => 'string' }, kind => { type => 'string' }, name => { type => 'string' } } }),
+        'IO::K8s::Api::Autoscaling::V1::CrossVersionObjectReference',
+        'CrossVersionObjectReference {apiVersion,kind,name} still reused (ExternalSecrets store refs)');
+
+    # And a genuine shared-vocab reuse stays green: the LabelSelector shape,
+    # whose candidate is Meta::V1 (rank below @CORE_PREFERENCE), is untouched.
+    is(IO::K8s::AutoGen::_core_class_for({ type => 'object', properties => {
+        matchLabels      => { type => 'object', additionalProperties => { type => 'string' } },
+        matchExpressions => { type => 'array', items => { type => 'object', properties => {
+            key => { type => 'string' }, operator => { type => 'string' }, values => { type => 'array', items => { type => 'string' } } } } } } }),
+        'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector',
+        'LabelSelector still reused');
+
+    # k140 boundary: the 5-key CertificateRequest condition shape (no
+    # observedGeneration) reuses Core::V1::NamespaceCondition, which requires
+    # only [status,type] and therefore SURVIVES the required filter -- a
+    # shared-vocab candidate still remains, so k139 does not fire. Kept
+    # reused here on purpose; replacing it with a provider class is k140.
+    is(IO::K8s::AutoGen::_core_class_for({ type => 'object', required => [qw(status type)], properties => {
+        lastTransitionTime => { type => 'string', format => 'date-time' }, message => { type => 'string' },
+        reason => { type => 'string' }, status => { type => 'string' }, type => { type => 'string' } } }),
+        'IO::K8s::Api::Core::V1::NamespaceCondition',
+        'the 5-key CertificateRequest condition shape still reuses NamespaceCondition (k140, out of scope)');
+};
+
 done_testing;

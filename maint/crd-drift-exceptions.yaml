@@ -172,47 +172,49 @@ ignore_unrendered:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
     reason: "k120/k133: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; k133 chose Weg 1 -- keep the named empty struct as a superset and accept the two residual reference-site divergences via accept_structural_divergence below."
-  # CertManager (k135) / PrometheusOperator (k137): the provider-owned condition
-  # classes. lib gives each provider its own Issuer/Certificate/
+  # CertManager (k135/k139) / PrometheusOperator (k137): the provider-owned
+  # condition classes. lib gives each provider its own Issuer/Certificate/
   # CertificateRequest/monitoringv1.Condition class, required exactly as its own
   # CRD requires, so live conditions that omit message/reason/lastTransitionTime
   # no longer drop on inflate. k136 taught reuse_core (D5) to refuse a candidate
-  # that marks a shared key required beyond what the schema itself requires --
-  # that closed the data-loss risk (reuse_core no longer picks a candidate whose
-  # extra-required fields would reject or drop a valid live object) but reuse_core
-  # is still purely structural/type/required-compatibility, not domain-aware, so
-  # it now reuses whichever OTHER shipped class matches the shape and required
-  # set instead of falling back to a per-provider class:
+  # that marks a shared key required beyond what the schema itself requires;
+  # k139 went further -- when the k136 required filter drops the ONLY
+  # shared-vocab (Meta/Core) candidate a shape had and leaves just a
+  # domain-foreign one, reuse_core now returns undef so the provider's own
+  # nested condition class is generated (see IO::K8s::AutoGen::_core_class_for).
   #   - Issuer/Certificate condition shape (6 keys, with observedGeneration,
-  #     schema requires [status,type]) -- Meta::V1::Condition (message/reason/
-  #     lastTransitionTime required) is now filtered out; the emitter instead
-  #     reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (also required
-  #     [status,type] only) -- same shape, unrelated domain, but no longer lossy.
-  #   - CertificateRequest condition shape (5 keys, no observedGeneration, schema
-  #     requires [status,type]) -- Core::V1::NamespaceCondition already required
-  #     only [status,type] before k136, so this one is unaffected by the fix.
-  #   - PrometheusOperator's condition shape (6 keys, schema requires
-  #     [lastTransitionTime,status,type]) -- same as Issuer/Certificate: the
-  #     emitter now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition
-  #     (required [status,type], a subset of the schema's required set, so still
-  #     safe) instead of Meta::V1::Condition.
-  # So these stay parked: --render still produces none of these per-provider
-  # classes, and the corresponding status classes still DIFFER from the render
-  # (now against a different, still-unrelated core class) -- not a data-loss gap
-  # any more, but D5 has no reuse-preference notion of "shares this Kind's own
-  # domain", so it never reaches for the provider's own condition class here.
-  - provider: CertManager
-    path: IO/K8s/CertManager/V1/IssuerCondition.pm
-    reason: "k135/k136: cert-manager-owned condition class (only [type,status] required); the emitter's reuse_core now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition, but still not this per-provider class -- D5's reuse is structural only, not domain-aware."
-  - provider: CertManager
-    path: IO/K8s/CertManager/V1/CertificateCondition.pm
-    reason: "k135/k136: cert-manager-owned condition class (only [type,status] required); the emitter's reuse_core now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition, but still not this per-provider class -- D5's reuse is structural only, not domain-aware."
+  #     schema requires [status,type]): metav1.Condition is dropped by the k136
+  #     required filter; k139 then stops the fallback to Autoscaling::V2::
+  #     HorizontalPodAutoscalerCondition, so the emitter now renders
+  #     IssuerCondition/CertificateCondition (overlay names in
+  #     maint/crd-render/CertManager.yaml). RESOLVED -- removed from this list,
+  #     and IssuerStatus/CertificateStatus now MATCH (removed from
+  #     accept_structural_divergence below). The one residual is a value
+  #     constraint: the render carries the CRD's `status` enum
+  #     [True,False,Unknown] which the hand-written lib classes omit -- accepted
+  #     below (accept_structural_divergence), pending a lib-completeness
+  #     follow-up that adds the enum to the two lib classes.
+  #   - CertificateRequest condition shape (5 keys, no observedGeneration,
+  #     schema requires [status,type]): reuses Core::V1::NamespaceCondition,
+  #     which IS shared-vocab (Core::V1) and SURVIVES the k136 required filter,
+  #     so k139 never fires -- the emitter still reuses it rather than rendering
+  #     CertificateRequestCondition. Still parked here (k140).
+  #   - PrometheusOperator's condition shape (6 keys): k139 stops the
+  #     HorizontalPodAutoscalerCondition reuse. lib had hand-merged two
+  #     schema-distinct variants -- the enum-free Alertmanager/Prometheus
+  #     `.status.conditions[]` and the WorkloadBinding `.conditions[]` whose
+  #     `type` carries enum [Accepted] -- into one Condition class, which made
+  #     the render collide. k139 splits them in lib: Condition stays enum-free
+  #     (Alertmanager/Prometheus) and the new WorkloadBindingCondition carries
+  #     the type enum (referenced by both the V1 and V1alpha1 WorkloadBinding).
+  #     Both render now (overlay names in maint/crd-render/PrometheusOperator.yaml)
+  #     and MATCH modulo POD -- RESOLVED, removed from this list; the two
+  #     condition classes' POD-only diffs are in ignore_cosmetic_differs below,
+  #     and the four status classes now MATCH (removed from
+  #     accept_structural_divergence).
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateRequestCondition.pm
-    reason: "k135: cert-manager-owned condition class (only [type,status] required); the emitter's reuse_core reuses Core::V1::NamespaceCondition, which was already required-compatible before k136 and so is unaffected by that fix -- still not this per-provider class."
-  - provider: PrometheusOperator
-    path: IO/K8s/PrometheusOperator/V1/Condition.pm
-    reason: "k137/k136: prometheus-operator-owned condition class (required [lastTransitionTime,status,type]); the emitter's reuse_core now reuses Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition, but still not this per-provider class -- D5's reuse is structural only, not domain-aware."
+    reason: "k135/k139: cert-manager-owned condition class (only [type,status] required); the emitter's reuse_core reuses Core::V1::NamespaceCondition, which is shared-vocab and survives the k136 required filter, so k139 does not fire and the emitter still does not render this per-provider class (k140)."
 
 # --check's COSMETIC status (k132): a DIFFERS whose ONLY divergence from the
 # emitter render is presentation -- the `# ABSTRACT:` summary, POD prose
@@ -360,6 +362,12 @@ ignore_cosmetic_differs:
   - provider: PrometheusOperator
     path: IO/K8s/PrometheusOperator/V1/RuleGroup.pm
     reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is a retained explanatory comment and POD prose only"
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/Condition.pm
+    reason: "k139: cosmetic differ -- k8s declarations identical to the emitter render (enum-free Alertmanager/Prometheus condition) after whitespace normalisation; diff is hand-authored POD prose only"
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/WorkloadBindingCondition.pm
+    reason: "k139: cosmetic differ -- k8s declarations identical to the emitter render (the WorkloadBinding condition variant, type enum [Accepted]) after whitespace normalisation; diff is hand-authored POD prose only"
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1/SecretKeySelector.pm
     reason: "k132: cosmetic differ -- k8s declarations identical to the emitter render after whitespace normalisation; diff is the # ABSTRACT summary and POD prose only"
@@ -417,42 +425,37 @@ accept_structural_divergence:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/ClusterGeneratorGenerator.pm
     reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types uuidSpec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque { Str => 1 }"
-  # CertManager (k135) / PrometheusOperator (k137): the status classes type
-  # their conditions as the provider-owned condition classes (required exactly
-  # what each CRD requires, so live conditions omitting message/reason/
-  # lastTransitionTime no longer drop). k136 fixed reuse_core's (D5) over-
-  # constraint bug -- it now refuses a candidate that marks a shared key
-  # required beyond what the schema requires -- so it no longer renders
-  # Meta::V1::Condition here (message/reason/lastTransitionTime required,
-  # unlike these CRDs). It still doesn't render these per-provider classes
-  # though: reuse_core has no notion of "same domain as this Kind", only
-  # shape/type/required compatibility, so for the two 6-key (with
-  # observedGeneration) shapes here it now picks the next required-compatible
-  # candidate -- Autoscaling::V2::HorizontalPodAutoscalerCondition (also
-  # [status,type] required only) -- and for the 5-key CertificateRequest shape
-  # (no observedGeneration) it still picks Core::V1::NamespaceCondition, which
-  # was already required-compatible before k136 and so unaffected by it. lib
-  # is upstream-correct in every case; the remaining divergence is a reuse
-  # class-name/domain choice, not a data-loss risk. See k136 / the matching
-  # ignore_unrendered entries above for the per-shape detail.
+  # CertManager (k135/k139) / PrometheusOperator (k137): the provider-owned
+  # condition classes and the status classes that reference them. k136 stopped
+  # reuse_core (D5) rendering Meta::V1::Condition here (it over-requires vs
+  # these CRDs); k139 then stopped the fallback to the domain-foreign
+  # Autoscaling::V2::HorizontalPodAutoscalerCondition, so the emitter now
+  # renders the provider's own condition class where a shared-vocab candidate
+  # existed but was required-filtered out (see ignore_unrendered above).
+  #   - CertManager Issuer/Certificate: fully RESOLVED -- IssuerStatus and
+  #     CertificateStatus now MATCH the render and were removed from this list.
+  #     The condition classes themselves (IssuerCondition/CertificateCondition)
+  #     render now but DIFFER by one value constraint: the render carries the
+  #     CRD's `status` enum [True,False,Unknown] which the hand-written lib
+  #     classes omit. Kept here as a documented divergence pending a
+  #     lib-completeness follow-up that adds the enum to the two lib classes
+  #     (after which these two entries can be removed).
+  #   - CertManager CertificateRequestStatus: still reuses
+  #     Core::V1::NamespaceCondition (shared-vocab, survives the k136 filter),
+  #     so k139 does not fire; unchanged, kept (k140).
+  #   - PrometheusOperator: RESOLVED by k139's lib split -- Condition stays
+  #     enum-free (Alertmanager/Prometheus) and the new WorkloadBindingCondition
+  #     carries the type enum [Accepted] (referenced by both the V1 and V1alpha1
+  #     WorkloadBinding). AlertmanagerStatus, PrometheusStatus and both
+  #     WorkloadBinding classes now MATCH the render and were removed from this
+  #     list; the two condition classes' POD-only diffs are in
+  #     ignore_cosmetic_differs above.
   - provider: CertManager
-    path: IO/K8s/CertManager/V1/IssuerStatus.pm
-    reason: "k135/k136: lib types conditions as +IO::K8s::CertManager::V1::IssuerCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
+    path: IO/K8s/CertManager/V1/IssuerCondition.pm
+    reason: "k139: rendered now (k139 stops the Autoscaling::V2::HorizontalPodAutoscalerCondition reuse and the emitter generates cert-manager's own IssuerCondition). Residual: the render carries the CRD's status enum [True,False,Unknown]; the hand-written lib class omits it. Kept pending a lib-completeness follow-up that adds the enum, after which this entry is removed."
   - provider: CertManager
-    path: IO/K8s/CertManager/V1/CertificateStatus.pm
-    reason: "k135/k136: lib types conditions as +IO::K8s::CertManager::V1::CertificateCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (also [status,type] required, k136-safe) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
+    path: IO/K8s/CertManager/V1/CertificateCondition.pm
+    reason: "k139: rendered now (k139 stops the Autoscaling::V2::HorizontalPodAutoscalerCondition reuse and the emitter generates cert-manager's own CertificateCondition). Residual: the render carries the CRD's status enum [True,False,Unknown]; the hand-written lib class omits it. Kept pending a lib-completeness follow-up that adds the enum, after which this entry is removed."
   - provider: CertManager
     path: IO/K8s/CertManager/V1/CertificateRequestStatus.pm
     reason: "k135: lib types conditions as +IO::K8s::CertManager::V1::CertificateRequestCondition (cert-manager CRD requires only [type,status]); the emitter's reuse_core renders Core::V1::NamespaceCondition, already required-compatible before k136 and so unaffected by that fix. lib upstream-correct; still not this per-provider class."
-  - provider: PrometheusOperator
-    path: IO/K8s/PrometheusOperator/V1/AlertmanagerStatus.pm
-    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
-  - provider: PrometheusOperator
-    path: IO/K8s/PrometheusOperator/V1/PrometheusStatus.pm
-    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
-  - provider: PrometheusOperator
-    path: IO/K8s/PrometheusOperator/V1/WorkloadBinding.pm
-    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
-  - provider: PrometheusOperator
-    path: IO/K8s/PrometheusOperator/V1alpha1/WorkloadBinding.pm
-    reason: "k137/k136: lib types conditions as +IO::K8s::PrometheusOperator::V1::Condition (CRD requires [lastTransitionTime,status,type]); the emitter's reuse_core now renders Autoscaling::V2::HorizontalPodAutoscalerCondition (required [status,type], a k136-safe subset) instead of Meta::V1::Condition. lib upstream-correct; still not this per-provider class."
