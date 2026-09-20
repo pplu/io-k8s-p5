@@ -1,0 +1,28 @@
+---
+claimed_at: 2026-09-20T20:19:17Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-20T20:19:17Z
+created: 2026-09-20T15:52:58Z
+id: 142
+priority: low
+started: 2026-09-20T19:48:26Z
+status: done
+tags:
+- crd
+- emitter
+- d5
+- reuse-core
+title: 'reuse_core: Look-alike-Conditions per-provider (Cilium/ExternalSecrets)'
+updated: 2026-09-20T20:19:17Z
+---
+
+Generalisierung aus k140 (dort auf CertManager beschraenkt geloest). Sechs Look-alike-Sites reusen im Render Core::V1::NamespaceCondition, obwohl es eigene Domain-Conditions sind (kein Wire-Bug, reine Emitter-Fidelity): Cilium/V2/CiliumNetworkPolicyStatus (x1) und ExternalSecrets V1/SecretStoreStatus, V1/ExternalSecretStatus, V1alpha1/{ClusterPushSecretStatus,PushSecretStatus,GeneratorStateStatus} (x5).
+
+Loesungsweg = derselbe etablierte Overlay-Mechanismus wie k140: pro Site no_reuse_core + names (Upstream-Go-Typname, D6) + neue per-provider *Condition-Klasse in lib. WICHTIG: echte Core-Embeds NICHT anfassen -- PrometheusOperator/V1/PersistentVolumeClaimStatus reused legitim Core::V1::PersistentVolumeClaimCondition (eingebettete k8s-PVC via EmbeddedPersistentVolumeClaim/StorageSpec). Ein globales AutoGen-Predikat wurde deshalb verworfen (kann Embed nicht von Look-alike trennen; brach 3 Provider-Renders im k140-Blast-Radius).
+
+Namensproblem geteilter Status-Klassen (non-identical GVK sources) loest sich, wenn beide GVKs den ConditionsItem via names auf denselben Overlay-Namen mappen (Cilium: CiliumNetworkPolicy/CiliumClusterwideNetworkPolicy; ExternalSecrets: SecretStore/ClusterSecretStore).
+
+Vorab: Upstream-Go-Typnamen der Cilium- und ExternalSecrets-Condition-Typen recherchieren. Eigener Spec/Plan-Zyklus (architectural). Entscheidung dokumentiert: k140-Analyse 2026-09-20.
+
+GELÖST in a3fc2aa5. Mechanische k140-Replikation: 5 neue per-provider *Condition-Klassen (NetworkPolicyCondition + ExternalSecrets SecretStore/ExternalSecret/PushSecret[shared]/GeneratorState StatusCondition), no_reuse_core+names in Cilium.yaml/ExternalSecrets.yaml, 6 Parent-Status umgestellt. ExternalSecret type-Enum [Ready,Deleted] client-side. crd-drift-check: Cilium 201 match/0 div, ExternalSecrets 281 match (8 cosmetic/2 accepted pre-existing UUIDSpec unverändert). Regression t/106; t/14+t/83 reframed. Suite 8913 grün. PrometheusOperator-PVC-Embed unangetastet, kein AutoGen-Predikat.
