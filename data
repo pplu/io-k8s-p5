@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-20T02:45:46Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-20T02:45:46Z
+created: 2026-09-19T20:58:42Z
+id: 141
+priority: low
+started: 2026-09-20T02:24:39Z
+status: done
+tags:
+- crd
+- certmanager
+- d5
+- lib-completeness
+title: 'CertManager IssuerCondition/CertificateCondition: lib laesst CRD status-Enum
+  [True,False,Unknown] weg (k139-Befund A)'
+updated: 2026-09-20T02:45:46Z
+---
+
+Aus k139 (Finding A). Die von k139 jetzt gerenderten cert-manager-eigenen IssuerCondition/CertificateCondition tragen das CRD-status-Enum [True,False,Unknown]; die hand-geschriebenen lib-Klassen lassen es weg. Aktuell via accept_structural_divergence (k139) geparkt -> CertManager --check exit 0. Fix: enum => [qw(True False Unknown)] am status-Feld beider lib-Klassen ergaenzen (upstream-treu, client-seitige Type::Tiny-Constraint gem. D3), dann die 2 accept_structural_divergence-Eintraege entfernen -> MATCH. Achtung: eine client-seitige Constraint-Verschaerfung kann bisher akzeptierte status-Werte ablehnen; upstream-korrekt. Unabhaengig von reuse_core (rein lib-completeness).
