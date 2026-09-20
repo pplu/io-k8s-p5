@@ -4,6 +4,10 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s lastTransitionTime => Time;
+k8s message            => Str;
+k8s reason             => Str;
+k8s status             => Str, { required => 'schema', enum => [qw(True False Unknown)] };
+k8s type               => Str, { required => 'schema' };
 
 =attr lastTransitionTime
 
@@ -12,16 +16,12 @@ change of this condition.
 
 =cut
 
-k8s message => Str;
-
 =attr message
 
 Message is a human readable description of the details of the last
 transition, complementing reason.
 
 =cut
-
-k8s reason => Str;
 
 =attr reason
 
@@ -30,15 +30,11 @@ transition.
 
 =cut
 
-k8s status => Str, { required => 'schema' };
-
 =attr status
 
 Status of the condition, one of (`True`, `False`, `Unknown`).
 
 =cut
-
-k8s type => Str, { required => 'schema' };
 
 =attr type
 

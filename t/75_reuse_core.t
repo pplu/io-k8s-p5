@@ -185,16 +185,25 @@ subtest 'k139: genuine sole-family rank-3 reuses (no shared-vocab candidate) are
         'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector',
         'LabelSelector still reused');
 
-    # k140 boundary: the 5-key CertificateRequest condition shape (no
-    # observedGeneration) reuses Core::V1::NamespaceCondition, which requires
-    # only [status,type] and therefore SURVIVES the required filter -- a
-    # shared-vocab candidate still remains, so k139 does not fire. Kept
-    # reused here on purpose; replacing it with a provider class is k140.
+    # k140: the reuse predicate is deliberately LEFT returning
+    # NamespaceCondition for the 5-key CertificateRequest condition shape (no
+    # observedGeneration). That shape reuses Core::V1::NamespaceCondition, which
+    # requires only [status,type] and therefore SURVIVES the k136 required
+    # filter -- a shared-vocab candidate still remains, so k139 never fires.
+    # k140 did NOT touch this predicate (a global predicate was rejected: it
+    # cannot tell a genuine core embed like PVC from a domain look-alike). It
+    # suppressed the reuse one layer up, in the CertManager emitter overlay
+    # (no_reuse_core on the conditions item path + a D6 name), so the emitter
+    # now renders the per-provider CertificateRequestCondition while this
+    # predicate stays exactly as it was. This assertion now guards that the
+    # predicate is untouched; the per-provider render and its serialization are
+    # guarded by t/105_k140_certmanager_certificaterequest_condition.t and by
+    # maint/crd-drift-check.pl --check.
     is(IO::K8s::AutoGen::_core_class_for({ type => 'object', required => [qw(status type)], properties => {
         lastTransitionTime => { type => 'string', format => 'date-time' }, message => { type => 'string' },
         reason => { type => 'string' }, status => { type => 'string' }, type => { type => 'string' } } }),
         'IO::K8s::Api::Core::V1::NamespaceCondition',
-        'the 5-key CertificateRequest condition shape still reuses NamespaceCondition (k140, out of scope)');
+        'k140 leaves the reuse predicate untouched: the 5-key shape still resolves to NamespaceCondition (the fix is the CertManager overlay no_reuse_core, not the predicate)');
 };
 
 done_testing;

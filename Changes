@@ -20,10 +20,10 @@ Revision history for IO-K8s
     status per the CRD, so real objects that omit message no longer fail to
     inflate.
 
-  - Constrain cert-manager IssuerCondition and CertificateCondition status to
-    the CRD's True/False/Unknown enum, enforced client-side at construction
-    like the other schema enums; a status outside that set now fails to
-    construct, matching upstream.
+  - Constrain cert-manager IssuerCondition, CertificateCondition and
+    CertificateRequestCondition status to the CRD's True/False/Unknown enum,
+    enforced client-side at construction like the other schema enums; a status
+    outside that set now fails to construct, matching upstream.
 
   - Fix PrometheusOperator status conditions dropping live objects the same
     way: Alertmanager and Prometheus now use a PrometheusOperator condition

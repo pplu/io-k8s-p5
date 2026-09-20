@@ -56,8 +56,11 @@ kinds:
     - IO::K8s::Role::CertManaged
   CertificateRequest:
     extra: []
+    no_reuse_core:
+    - Status::ConditionsItem
     names:
       Spec::IssuerRef: IssuerReference
+      Status::ConditionsItem: CertificateRequestCondition
     with:
     - IO::K8s::Role::Namespaced
   Challenge:
