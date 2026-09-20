@@ -43,6 +43,15 @@ Revision history for IO-K8s
     another API group; the object's own class is generated instead, so a
     provider's condition is modelled by that provider's class.
 
+  - Model Cilium and ExternalSecrets status conditions with each provider's own
+    condition class instead of reusing Core::V1::NamespaceCondition for a look-
+    alike shape that survives the required filter: Cilium's CiliumNetworkPolicy
+    conditions are now NetworkPolicyCondition, and ExternalSecrets' SecretStore,
+    ExternalSecret, PushSecret and GeneratorState status conditions each their
+    own class. The field shape is unchanged, but a condition now blesses as the
+    provider's class, and ExternalSecret's condition type is constrained to the
+    CRD's Ready/Deleted enum, enforced client-side at construction.
+
   - Add the three VolumeGroupSnapshot Kinds in v1, v1beta1 and v1beta2, with
     typed version-specific status fields. Bare names select the pinned
     upstream's storage v1beta2; exact GVKs select any served track.

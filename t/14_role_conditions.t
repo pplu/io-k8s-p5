@@ -13,7 +13,10 @@ use IO::K8s::Cilium;
 # coercing path (k100: a direct ->new(status => {...}) does not inflate
 # nested hashrefs into typed objects) -- and reads a returned condition
 # through its accessors rather than as a raw hashref, since it is now a
-# blessed Core::V1::NamespaceCondition (reuse_core), not a plain hash.
+# blessed per-provider NetworkPolicyCondition (k142: this look-alike condition
+# shape survives the k136 required filter, so reuse_core reused the
+# domain-foreign Core::V1::NamespaceCondition until the Cilium emitter overlay
+# named it per-provider -- the fields are identical either way), not a plain hash.
 
 my $k8s = IO::K8s->new(with => ['IO::K8s::Cilium']);
 
@@ -31,7 +34,7 @@ subtest 'conditions from typed status' => sub {
 
     my $conds = $cnp->conditions;
     is(scalar @$conds, 3, 'conditions returns all 3');
-    isa_ok($conds->[0], 'IO::K8s::Api::Core::V1::NamespaceCondition', 'reused core NamespaceCondition (reuse_core, D5)');
+    isa_ok($conds->[0], 'IO::K8s::Cilium::V2::NetworkPolicyCondition', 'per-provider NetworkPolicyCondition (k142)');
 
     ok($cnp->is_ready, 'is_ready true when Ready=True');
     ok($cnp->is_condition_true('Initialized'), 'Initialized is True');
@@ -39,7 +42,7 @@ subtest 'conditions from typed status' => sub {
     ok(!$cnp->is_condition_true('NonExistent'), 'non-existent condition is false');
 
     my $cond = $cnp->get_condition('Ready');
-    isa_ok($cond, 'IO::K8s::Api::Core::V1::NamespaceCondition', 'get_condition returns the typed object');
+    isa_ok($cond, 'IO::K8s::Cilium::V2::NetworkPolicyCondition', 'get_condition returns the typed object');
     is($cond->status, 'True', 'condition status');
 
     is($cnp->condition_message('Ready'), 'all good', 'condition_message');

@@ -3,7 +3,7 @@ package IO::K8s::ExternalSecrets::V1alpha1::GeneratorStateStatus;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s conditions => ['Core::V1::NamespaceCondition'];
+k8s conditions => ['+IO::K8s::ExternalSecrets::V1alpha1::GeneratorStateStatusCondition'];
 
 =attr conditions
 

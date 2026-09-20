@@ -4,7 +4,7 @@ our $VERSION = '1.108';
 use IO::K8s::Resource;
 
 k8s binding               => '+IO::K8s::ExternalSecrets::V1::LocalObjectReference';
-k8s conditions            => ['Core::V1::NamespaceCondition'];
+k8s conditions            => ['+IO::K8s::ExternalSecrets::V1::ExternalSecretStatusCondition'];
 k8s refreshTime           => Time, { nullable => 1 };
 k8s syncedResourceVersion => Str;
 

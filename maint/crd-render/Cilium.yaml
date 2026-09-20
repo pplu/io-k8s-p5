@@ -131,6 +131,8 @@ kinds:
   CiliumClusterwideNetworkPolicy:
     extra:
     - sub _netpol_format { 'cilium' }
+    no_reuse_core:
+    - Status::ConditionsItem
     names:
       Spec: Rule
       Spec::EgressDenyItem: EgressDenyRule
@@ -247,6 +249,7 @@ kinds:
       SpecsItem::LabelsItem: Label
       SpecsItem::Log: LogConfig
       Status: CiliumNetworkPolicyStatus
+      Status::ConditionsItem: NetworkPolicyCondition
       Status::DerivativePoliciesValue: CiliumNetworkPolicyNodeStatus
     with:
     - IO::K8s::Role::NetworkPolicy
@@ -306,6 +309,8 @@ kinds:
   CiliumNetworkPolicy:
     extra:
     - sub _netpol_format { 'cilium' }
+    no_reuse_core:
+    - Status::ConditionsItem
     names:
       Spec: Rule
       Spec::EgressDenyItem: EgressDenyRule
@@ -422,6 +427,7 @@ kinds:
       SpecsItem::LabelsItem: Label
       SpecsItem::Log: LogConfig
       Status: CiliumNetworkPolicyStatus
+      Status::ConditionsItem: NetworkPolicyCondition
       Status::DerivativePoliciesValue: CiliumNetworkPolicyNodeStatus
     with:
     - IO::K8s::Role::Namespaced

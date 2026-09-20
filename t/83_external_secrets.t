@@ -535,7 +535,7 @@ subtest 'full depth round-trip: ClusterPushSecret' => sub {
         },
     );
     isa_ok($with_status->status, 'IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecretStatus');
-    isa_ok($with_status->status->conditions->[0], 'IO::K8s::Api::Core::V1::NamespaceCondition');
+    isa_ok($with_status->status->conditions->[0], 'IO::K8s::ExternalSecrets::V1alpha1::PushSecretStatusCondition');
     isa_ok($with_status->status->failedNamespaces->[0], 'IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecretNamespaceFailure');
     is($with_status->TO_JSON->{status}{failedNamespaces}[0]{reason}, 'forbidden',
         'TO_JSON status.failedNamespaces[0].reason');
@@ -793,7 +793,7 @@ subtest 'full depth round-trip: GeneratorState' => sub {
         },
     );
     isa_ok($gs->status, 'IO::K8s::ExternalSecrets::V1alpha1::GeneratorStateStatus');
-    isa_ok($gs->status->conditions->[0], 'IO::K8s::Api::Core::V1::NamespaceCondition');
+    isa_ok($gs->status->conditions->[0], 'IO::K8s::ExternalSecrets::V1alpha1::GeneratorStateStatusCondition');
 
     my $json = $gs->TO_JSON;
     is($json->{spec}{state}, '{"value":"generated"}', 'TO_JSON state (opaque preserve-unknown blob)');

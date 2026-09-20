@@ -3,7 +3,7 @@ package IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecretStatus;
 our $VERSION = '1.108';
 use IO::K8s::Resource;
 
-k8s conditions            => ['Core::V1::NamespaceCondition'];
+k8s conditions            => ['+IO::K8s::ExternalSecrets::V1alpha1::PushSecretStatusCondition'];
 k8s failedNamespaces      => ['+IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecretNamespaceFailure'];
 k8s provisionedNamespaces => [Str];
 k8s pushSecretName        => Str;
