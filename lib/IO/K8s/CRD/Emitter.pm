@@ -4,6 +4,9 @@ our $VERSION = '1.108';
 use v5.10;
 use Moo;
 use Carp qw( croak );
+# Deliberate exception to the "no Data::Dumper in shipped code" house rule:
+# _scalar_literal below renders a single scalar as a Perl literal via Dumper,
+# to reproduce its number-vs-string quoting byte-for-byte. Codegen, not debug.
 use Data::Dumper ();
 use Digest::SHA qw( sha1_hex );
 use re ();
