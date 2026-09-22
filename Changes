@@ -1,6 +1,6 @@
 Revision history for IO-K8s
 
-{{$NEXT}}
+1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added
     fields, with upstream-derived resource plurals. Ten fields newly required
