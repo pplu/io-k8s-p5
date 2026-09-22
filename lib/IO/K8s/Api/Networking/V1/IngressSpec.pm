@@ -1,6 +1,6 @@
 package IO::K8s::Api::Networking::V1::IngressSpec;
 # ABSTRACT: IngressSpec describes the Ingress the user wishes to exist.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s defaultBackend => 'Networking::V1::IngressBackend';

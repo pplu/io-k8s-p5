@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::RateLimit;
 # ABSTRACT: RateLimit holds the rate limit configuration.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s average         => Int, { minimum => 0 };

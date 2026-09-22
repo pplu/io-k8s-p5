@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::ArbitraryFSAccessThroughSMsConfig;
 # ABSTRACT: arbitraryFSAccessThroughSMs when true, ServiceMonitor, PodMonitor and Probe object are forbidden to reference arbitrary files on the file system of the 'prometheus' container.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s deny => Bool;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1::NodeAllocatableResourceMapping;
 # ABSTRACT: NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s allocationMultiplier => Quantity;

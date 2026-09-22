@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::ClusterGeneratorGenerator;
 # ABSTRACT: Generator the spec for this generator, must match the kind.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s acrAccessTokenSpec => '+IO::K8s::ExternalSecrets::V1alpha1::ACRAccessTokenSpec';

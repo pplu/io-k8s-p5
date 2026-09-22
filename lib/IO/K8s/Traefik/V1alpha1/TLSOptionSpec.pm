@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::TLSOptionSpec;
 # ABSTRACT: TLSOptionSpec defines the desired state of a TLSOption.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s alpnProtocols            => [Str];

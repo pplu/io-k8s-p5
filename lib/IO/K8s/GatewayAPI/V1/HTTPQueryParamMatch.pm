@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::HTTPQueryParamMatch;
 # ABSTRACT: HTTPQueryParamMatch describes how to select a HTTP route by matching HTTP query parameters.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s name  => Str, { required => 'schema', pattern => '^[A-Za-z0-9!#$%&\'*+\\-.^_\\x60|~]+$' };

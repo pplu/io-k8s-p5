@@ -1,6 +1,6 @@
 package IO::K8s::Role::Resource;
 # ABSTRACT: Role providing Kubernetes resource instance behavior
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use v5.10;
 use Moo ();
 use mro ();

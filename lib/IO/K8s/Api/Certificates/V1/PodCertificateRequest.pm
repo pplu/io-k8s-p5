@@ -1,6 +1,6 @@
 package IO::K8s::Api::Certificates::V1::PodCertificateRequest;
 # ABSTRACT: PodCertificateRequest encodes a pod requesting a certificate from a given signer. Kubelets use this API to implement podCertificate projected volumes
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

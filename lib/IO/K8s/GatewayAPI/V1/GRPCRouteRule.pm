@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::GRPCRouteRule;
 # ABSTRACT: GRPCRouteRule defines the semantics for matching a gRPC request based on conditions (matches), processing it (filters), and forwarding the request to an API object (backendRefs).
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s backendRefs => ['+IO::K8s::GatewayAPI::V1::GRPCBackendRef'];

@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMEIssuerStatus;
 # ABSTRACT: ACME specific status options.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s lastPrivateKeyHash  => Str;

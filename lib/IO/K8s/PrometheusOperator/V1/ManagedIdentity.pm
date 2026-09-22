@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::ManagedIdentity;
 # ABSTRACT: managedIdentity defines the Azure User-assigned Managed identity.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s clientId => Str;

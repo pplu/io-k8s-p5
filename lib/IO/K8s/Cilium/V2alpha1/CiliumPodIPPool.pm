@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumPodIPPool;
 # ABSTRACT: CiliumPodIPPool defines an IP pool that can be used for pooled IPAM (i.e.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2alpha1',
     resource_plural => 'ciliumpodippools';

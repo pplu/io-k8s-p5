@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ContainerUser;
 # ABSTRACT: ContainerUser represents user identity information
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s linux => 'Core::V1::LinuxContainerUser';

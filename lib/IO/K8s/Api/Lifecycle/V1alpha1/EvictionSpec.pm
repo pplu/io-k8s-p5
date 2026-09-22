@@ -1,6 +1,6 @@
 package IO::K8s::Api::Lifecycle::V1alpha1::EvictionSpec;
 # ABSTRACT: EvictionSpec is a specification of an Eviction.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s target => 'Lifecycle::V1alpha1::EvictionTarget', 'required';

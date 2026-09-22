@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::GRPCMethodMatch;
 # ABSTRACT: Method specifies a gRPC request service/method matcher.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s method  => Str;

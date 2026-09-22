@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::PushSecretStatus;
 # ABSTRACT: PushSecretStatus indicates the history of the status of PushSecret.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s conditions            => ['+IO::K8s::ExternalSecrets::V1alpha1::PushSecretStatusCondition'];

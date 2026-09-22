@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::PushSecretDataTo;
 # ABSTRACT: PushSecretDataTo defines how to bulk-push secrets to providers without explicit per-key mappings.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s conversionStrategy => Str, { enum => [qw(None ReverseUnicode)], default => 'None' };

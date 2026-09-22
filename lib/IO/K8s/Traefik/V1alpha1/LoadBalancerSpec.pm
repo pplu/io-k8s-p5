@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::LoadBalancerSpec;
 # ABSTRACT: Service defines the main service to use.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s healthCheck        => '+IO::K8s::Traefik::V1alpha1::ServerHealthCheck';

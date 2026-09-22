@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::AuthorizationProtocol;
 # ABSTRACT: Auth specifies a authorization protocol.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s ntlm => '+IO::K8s::ExternalSecrets::V1::NTLMProtocol';

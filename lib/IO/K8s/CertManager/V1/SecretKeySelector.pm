@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::SecretKeySelector;
 # ABSTRACT: The SecretAccessKey is used for authentication.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s key  => Str;

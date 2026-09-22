@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::CertificateDNSNameSelector;
 # ABSTRACT: Selector selects a set of DNSNames on the Certificate resource that should be solved using this challenge solver.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s dnsNames    => [Str];

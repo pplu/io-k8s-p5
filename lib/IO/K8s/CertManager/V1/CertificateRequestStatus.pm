@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::CertificateRequestStatus;
 # ABSTRACT: Status of the CertificateRequest.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s ca          => Str;

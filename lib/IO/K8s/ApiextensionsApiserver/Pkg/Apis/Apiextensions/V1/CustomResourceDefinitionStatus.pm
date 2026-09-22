@@ -1,6 +1,6 @@
 package IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::CustomResourceDefinitionStatus;
 # ABSTRACT: CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s acceptedNames => 'Apiextensions::V1::CustomResourceDefinitionNames';

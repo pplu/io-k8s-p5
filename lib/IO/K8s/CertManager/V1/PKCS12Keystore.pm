@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::PKCS12Keystore;
 # ABSTRACT: PKCS12 configures options for storing a PKCS12 keystore in the `spec.secretName` Secret resource.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s create            => Bool, { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::GithubProvider;
 # ABSTRACT: Github configures this store to push GitHub Actions or Dependabot secrets using the GitHub API provider.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s appID               => Int, { required => 'schema' };

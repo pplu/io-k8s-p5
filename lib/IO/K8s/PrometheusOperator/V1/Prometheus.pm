@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::Prometheus;
 # ABSTRACT: The `Prometheus` custom resource definition (CRD) defines a desired [Prometheus](https://prometheus.io/docs/prometheus) setup to run in a Kubernetes cluster.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'monitoring.coreos.com/v1',
     resource_plural => 'prometheuses';

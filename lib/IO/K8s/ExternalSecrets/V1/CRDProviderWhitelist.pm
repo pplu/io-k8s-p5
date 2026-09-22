@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::CRDProviderWhitelist;
 # ABSTRACT: Whitelist optionally restricts which object names and requested properties are allowed to be read.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s rules => ['+IO::K8s::ExternalSecrets::V1::CRDProviderWhitelistRule'];

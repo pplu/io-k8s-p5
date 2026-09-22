@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::EurekaSDConfig;
 # ABSTRACT: Eureka SD configurations allow retrieving scrape targets using the Eureka REST API.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authorization        => '+IO::K8s::PrometheusOperator::V1alpha1::SafeAuthorization';

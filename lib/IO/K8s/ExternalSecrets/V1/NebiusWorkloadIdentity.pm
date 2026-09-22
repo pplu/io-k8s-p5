@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::NebiusWorkloadIdentity;
 # ABSTRACT: WorkloadIdentity defines configuration for workload identity authentication to Nebius IAM.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s iamServiceAccountID => Str, { required => 'schema', pattern => qr/^serviceaccount-[a-z][a-z0-9]{2}/ };

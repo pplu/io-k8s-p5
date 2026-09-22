@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::IngressRouteTCPSpec;
 # ABSTRACT: IngressRouteTCPSpec defines the desired state of IngressRouteTCP.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s entryPoints      => [Str];

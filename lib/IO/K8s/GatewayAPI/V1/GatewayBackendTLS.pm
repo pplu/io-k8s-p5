@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::GatewayBackendTLS;
 # ABSTRACT: Backend describes TLS configuration for gateway when connecting to backends.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s clientCertificateRef => '+IO::K8s::GatewayAPI::V1::SecretObjectReference';

@@ -1,6 +1,6 @@
 package IO::K8s::Role::SpecBuilder;
 # ABSTRACT: Role for deep-path spec manipulation on CRD objects
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use Scalar::Util qw(blessed);
 use Carp qw(croak);
 use Module::Runtime qw(use_module);

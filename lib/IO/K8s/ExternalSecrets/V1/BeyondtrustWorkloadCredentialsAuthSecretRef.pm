@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::BeyondtrustWorkloadCredentialsAuthSecretRef;
 # ABSTRACT: APIKey configures API token authentication for BeyondTrust Workload Credentials.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s token => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector', { required => 'schema' };

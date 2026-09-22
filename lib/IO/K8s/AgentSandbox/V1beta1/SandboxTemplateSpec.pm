@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1beta1::SandboxTemplateSpec;
 # ABSTRACT: SandboxTemplateSpec
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s envVarsInjectionPolicy     => Str, { enum => [qw(Allowed Overrides Disallowed)], default => 'Disallowed' };

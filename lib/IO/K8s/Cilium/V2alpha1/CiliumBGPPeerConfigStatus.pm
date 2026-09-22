@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumBGPPeerConfigStatus;
 # ABSTRACT: Status is the running status of the CiliumBGPPeerConfig
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s conditions => ['Meta::V1::Condition'];

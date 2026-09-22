@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::Argument;
 # ABSTRACT: Argument as part of the AdditionalArgs list.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s name  => Str, { required => 'schema' };

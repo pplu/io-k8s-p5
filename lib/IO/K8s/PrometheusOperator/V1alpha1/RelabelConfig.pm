@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::RelabelConfig;
 # ABSTRACT: RelabelConfig allows dynamic rewriting of the label set for targets, alerts, scraped samples and remote write samples.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s action       => Str, { enum => [qw(replace Replace keep Keep drop Drop hashmod HashMod labelmap LabelMap labeldrop LabelDrop labelkeep LabelKeep lowercase Lowercase uppercase Uppercase keepequal KeepEqual dropequal DropEqual)], default => 'replace' };

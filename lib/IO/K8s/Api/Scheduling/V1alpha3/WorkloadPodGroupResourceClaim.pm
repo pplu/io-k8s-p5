@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1alpha3::WorkloadPodGroupResourceClaim;
 # ABSTRACT: WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s name => Str, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::ScrapeConfig;
 # ABSTRACT: ScrapeConfig defines a namespaced Prometheus scrape_config to be aggregated across multiple namespaces into the Prometheus configuration.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'monitoring.coreos.com/v1alpha1',
     resource_plural => 'scrapeconfigs';

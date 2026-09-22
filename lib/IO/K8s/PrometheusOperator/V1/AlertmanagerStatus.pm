@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::AlertmanagerStatus;
 # ABSTRACT: status defines the most recent observed status of the Alertmanager cluster.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s availableReplicas   => Int;

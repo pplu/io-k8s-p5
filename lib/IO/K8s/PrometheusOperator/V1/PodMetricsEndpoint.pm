@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::PodMetricsEndpoint;
 # ABSTRACT: PodMetricsEndpoint defines an endpoint serving Prometheus metrics to be scraped by Prometheus.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authorization            => '+IO::K8s::PrometheusOperator::V1::SafeAuthorization';

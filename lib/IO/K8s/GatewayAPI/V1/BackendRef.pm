@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::BackendRef;
 # ABSTRACT: BackendRef defines how a Route should forward a request to a Kubernetes resource.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s group     => Str, { pattern => qr/^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/, default => '' };

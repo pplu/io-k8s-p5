@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumL2AnnouncementPolicy;
 # ABSTRACT: CiliumL2AnnouncementPolicy is a Kubernetes third-party resource which is used to defined which nodes should announce what services on the L2 network.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2alpha1',
     resource_plural => 'ciliuml2announcementpolicies';

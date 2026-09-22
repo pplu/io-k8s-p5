@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::TCPRouteSpec;
 # ABSTRACT: Spec defines the desired state of TCPRoute.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s parentRefs => ['+IO::K8s::GatewayAPI::V1::ParentReference'];

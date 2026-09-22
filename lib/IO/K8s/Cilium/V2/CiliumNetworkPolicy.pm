@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumNetworkPolicy;
 # ABSTRACT: CiliumNetworkPolicy is a Kubernetes third-party resource with an extended version of NetworkPolicy.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
     resource_plural => 'ciliumnetworkpolicies';

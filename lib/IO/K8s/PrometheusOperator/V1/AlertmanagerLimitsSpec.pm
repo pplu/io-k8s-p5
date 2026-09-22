@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::AlertmanagerLimitsSpec;
 # ABSTRACT: limits defines the limits command line flags when starting Alertmanager.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s maxPerSilenceBytes => Str, { pattern => qr/(^0|([0-9]*[.])?[0-9]+((K|M|G|T|E|P)i?)?B)$/ };

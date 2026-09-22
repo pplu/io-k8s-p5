@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::OnePasswordSDKAuth;
 # ABSTRACT: Auth defines the information necessary to authenticate against OnePassword API.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s serviceAccountSecretRef => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector', { required => 'schema' };

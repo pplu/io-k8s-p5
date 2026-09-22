@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::MiddlewareTCPSpec;
 # ABSTRACT: MiddlewareTCPSpec defines the desired state of a MiddlewareTCP.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s inFlightConn => '+IO::K8s::Traefik::V1alpha1::TCPInFlightConn';

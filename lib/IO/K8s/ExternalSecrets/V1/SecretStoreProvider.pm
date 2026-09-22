@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::SecretStoreProvider;
 # ABSTRACT: Used to configure the provider.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use utf8;
 use IO::K8s::Resource;
 

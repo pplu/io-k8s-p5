@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1beta1::CompositePodGroupSchedulingConstraints;
 # ABSTRACT: CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s topology => ['Scheduling::V1beta1::TopologyConstraint'];

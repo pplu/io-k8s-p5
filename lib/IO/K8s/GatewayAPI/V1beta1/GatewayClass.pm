@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1beta1::GatewayClass;
 # ABSTRACT: GatewayClass describes a class of Gateways available to the user for creating Gateway resources.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1beta1',
     resource_plural => 'gatewayclasses';

@@ -1,6 +1,6 @@
 package IO::K8s::K3s::V1::ETCDSnapshotError;
 # ABSTRACT: ETCDSnapshotError describes an error encountered during snapshot creation.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s message => Str;

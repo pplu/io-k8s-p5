@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::IPv6PoolSpec;
 # ABSTRACT: IPv6 specifies the IPv6 CIDRs and mask sizes of the pool
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s cidrs    => [Str], { required => 'schema' };

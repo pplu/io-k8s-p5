@@ -1,6 +1,6 @@
 package IO::K8s::Api::Lifecycle::V1alpha1::Requester;
 # ABSTRACT: Requester allows you to identify the entity, that requested the eviction of the target.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s intent => Str, 'required';

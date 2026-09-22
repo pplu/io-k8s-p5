@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ExternalSecretFind;
 # ABSTRACT: Used to find secrets based on tags or regular expressions Note: Find does not support sourceRef.Generator or sourceRef.GeneratorRef.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s conversionStrategy => Str, { enum => [qw(Default Unicode)] };

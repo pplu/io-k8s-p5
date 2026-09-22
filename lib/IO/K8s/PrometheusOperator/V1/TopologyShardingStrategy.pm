@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::TopologyShardingStrategy;
 # ABSTRACT: topology defines the configuration for topology-aware sharding.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s externalLabelName => Str;

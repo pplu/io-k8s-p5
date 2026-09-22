@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::GeneratorStateSpec;
 # ABSTRACT: GeneratorStateSpec defines the desired state of a generator state resource.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s garbageCollectionDeadline => Time;

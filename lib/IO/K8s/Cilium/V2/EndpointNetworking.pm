@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::EndpointNetworking;
 # ABSTRACT: Networking is the networking properties of the endpoint.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s addressing => ['+IO::K8s::Cilium::V2::AddressPair'], { required => 'schema' };

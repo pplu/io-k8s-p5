@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1alpha3::PartitionTypeStatus;
 # ABSTRACT: PartitionTypeStatus reports allocatability for a single partition type, identified by the value of a grouping attribute.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s allocatable => Int, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::FileSDConfig;
 # ABSTRACT: FileSDConfig defines a Prometheus file service discovery configuration See https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s files           => [Str], { required => 'schema', pattern => qr/^[^*]*(\*[^\/]*)?\.(json|yml|yaml|JSON|YML|YAML)$/ };

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Certificates::V1::ClusterTrustBundleSpec;
 # ABSTRACT: ClusterTrustBundleSpec contains the signer and trust anchors.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s signerName => Str;

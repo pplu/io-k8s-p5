@@ -1,6 +1,6 @@
 package IO::K8s::VolumeSnapshot::V1beta2::VolumeGroupSnapshotClass;
 # ABSTRACT: VolumeGroupSnapshotClass specifies parameters for a volume group snapshot
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'groupsnapshot.storage.k8s.io/v1beta2',
     resource_plural => 'volumegroupsnapshotclasses';

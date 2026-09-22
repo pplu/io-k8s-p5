@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::PasswordDepotProvider;
 # ABSTRACT: PasswordDepotProvider configures a store to sync secrets with a Password Depot instance.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s auth     => '+IO::K8s::ExternalSecrets::V1::PasswordDepotAuth', { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::KumaSDConfig;
 # ABSTRACT: KumaSDConfig allow retrieving scrape targets from Kuma's control plane.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authorization        => '+IO::K8s::PrometheusOperator::V1alpha1::SafeAuthorization';

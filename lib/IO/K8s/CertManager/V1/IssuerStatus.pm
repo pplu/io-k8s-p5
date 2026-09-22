@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::IssuerStatus;
 # ABSTRACT: Status of the Issuer.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s acme       => '+IO::K8s::CertManager::V1::ACMEIssuerStatus';

@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::CloudruSMProvider;
 # ABSTRACT: CloudruSM configures this store to sync secrets using the Cloud.ru Secret Manager provider
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s auth      => '+IO::K8s::ExternalSecrets::V1::CSMAuth', { required => 'schema' };

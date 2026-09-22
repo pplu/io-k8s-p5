@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1alpha3::CompositePodGroupStatus;
 # ABSTRACT: CompositePodGroupStatus represents information about the status of a composite pod group.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s conditions => ['Meta::V1::Condition'];

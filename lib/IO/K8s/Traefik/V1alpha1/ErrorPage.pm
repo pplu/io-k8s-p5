@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::ErrorPage;
 # ABSTRACT: ErrorPage holds the custom error middleware configuration.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s errorRequestHeaders => [Str];

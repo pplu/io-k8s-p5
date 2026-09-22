@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::AzureManagedIdentity;
 # ABSTRACT: Auth: Azure Workload Identity or Azure Managed Service Identity: Settings to enable Azure Workload Identity or Azure Managed Service Identity If set, ClientID, ClientSecret and TenantID must not be set.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s clientID   => Str;

@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::PulumiProviderSecretRef;
 # ABSTRACT: AccessToken authenticates using a Pulumi access token stored in a Kubernetes Secret.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s secretRef => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector';

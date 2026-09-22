@@ -1,6 +1,6 @@
 package IO::K8s::VolumeSnapshot::V1::VolumeSnapshotContentSpec;
 # ABSTRACT: spec defines properties of a VolumeSnapshotContent created by the underlying storage system.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use utf8;
 use IO::K8s::Resource;
 

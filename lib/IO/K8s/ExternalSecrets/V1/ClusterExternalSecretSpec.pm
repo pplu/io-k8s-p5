@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ClusterExternalSecretSpec;
 # ABSTRACT: ClusterExternalSecretSpec defines the desired state of ClusterExternalSecret.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s externalSecretMetadata => '+IO::K8s::ExternalSecrets::V1::ExternalSecretMetadata';

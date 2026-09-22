@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1beta1::Fraction;
 # ABSTRACT: Fraction represents the fraction of requests that should be mirrored to BackendRef.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s denominator => Int, { minimum => 1, default => 100 };

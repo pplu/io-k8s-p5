@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMEIssuerDNS01ProviderWebhook;
 # ABSTRACT: Configure an external webhook based DNS01 challenge solver to manage DNS01 challenge records.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s config     => Str, { preserve_unknown => 1 };

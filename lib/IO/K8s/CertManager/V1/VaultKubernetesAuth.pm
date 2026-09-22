@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::VaultKubernetesAuth;
 # ABSTRACT: Kubernetes authenticates with Vault by passing the ServiceAccount token stored in the named Secret resource to the Vault server.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s mountPath         => Str;

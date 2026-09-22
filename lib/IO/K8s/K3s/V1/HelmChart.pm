@@ -1,6 +1,6 @@
 package IO::K8s::K3s::V1::HelmChart;
 # ABSTRACT: HelmChart represents configuration and state for the deployment of a Helm chart.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'helm.cattle.io/v1',
     resource_plural => 'helmcharts';

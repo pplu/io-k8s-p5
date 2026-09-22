@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::VaultJwtAuth;
 # ABSTRACT: Jwt authenticates with Vault by passing role and JWT token using the JWT/OIDC authentication method
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s kubernetesServiceAccountToken => '+IO::K8s::ExternalSecrets::V1::VaultKubernetesServiceAccountTokenAuth';

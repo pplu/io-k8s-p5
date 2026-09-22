@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::OpenBaoKubernetesAuth;
 # ABSTRACT: Kubernetes authenticates with OpenBao by passing a ServiceAccount token to the [Kubernetes auth mechanism].
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s path              => Str, { required => 'schema', default => 'kubernetes' };

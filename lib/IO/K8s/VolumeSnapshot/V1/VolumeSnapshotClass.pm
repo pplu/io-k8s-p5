@@ -1,6 +1,6 @@
 package IO::K8s::VolumeSnapshot::V1::VolumeSnapshotClass;
 # ABSTRACT: VolumeSnapshotClass specifies parameters that a underlying storage system uses when creating a volume snapshot.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'snapshot.storage.k8s.io/v1',
     resource_plural => 'volumesnapshotclasses';

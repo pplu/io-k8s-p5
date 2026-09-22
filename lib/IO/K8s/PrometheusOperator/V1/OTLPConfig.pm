@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::OTLPConfig;
 # ABSTRACT: otlp defines the settings related to the OTLP receiver feature.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s convertHistogramsToNHCB              => Bool;

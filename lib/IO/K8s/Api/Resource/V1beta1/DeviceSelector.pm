@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1beta1::DeviceSelector;
 # ABSTRACT: DeviceSelector must have exactly one field set.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s cel => 'Resource::V1beta1::CELDeviceSelector';

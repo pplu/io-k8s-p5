@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Route53Auth;
 # ABSTRACT: Auth configures how cert-manager authenticates.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s kubernetes => '+IO::K8s::CertManager::V1::Route53KubernetesAuth', { required => 'schema' };

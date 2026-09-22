@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::IngressRule;
 # ABSTRACT: IngressRule contains all rule types which can be applied at ingress, i.e.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authentication => '+IO::K8s::Cilium::V2::Authentication';

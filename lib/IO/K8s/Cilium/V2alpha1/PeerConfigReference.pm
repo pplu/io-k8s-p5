@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::PeerConfigReference;
 # ABSTRACT: PeerConfigRef is a reference to a peer configuration resource.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s group => Str, { default => 'cilium.io' };

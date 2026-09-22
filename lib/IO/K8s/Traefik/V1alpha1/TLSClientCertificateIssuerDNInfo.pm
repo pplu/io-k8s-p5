@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::TLSClientCertificateIssuerDNInfo;
 # ABSTRACT: Issuer defines the client certificate issuer details to add to the X-Forwarded-Tls-Client-Cert-Info header.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s commonName      => Bool;

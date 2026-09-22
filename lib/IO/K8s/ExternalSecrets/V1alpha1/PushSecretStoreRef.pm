@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::PushSecretStoreRef;
 # ABSTRACT: StoreRef specifies which SecretStore to push to.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s kind          => Str, { enum => [qw(SecretStore ClusterSecretStore)], default => 'SecretStore' };

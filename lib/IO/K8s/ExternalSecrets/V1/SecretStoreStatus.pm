@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::SecretStoreStatus;
 # ABSTRACT: SecretStoreStatus defines the observed state of the SecretStore.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s capabilities => Str;

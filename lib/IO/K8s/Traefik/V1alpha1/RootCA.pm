@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::RootCA;
 # ABSTRACT: RootCA defines a reference to a Secret or a ConfigMap that holds a CA certificate.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s configMap => Str;

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::VolumeHealthStatus;
 # ABSTRACT: VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s healthConditions => ['Core::V1::VolumeHealthCondition'];

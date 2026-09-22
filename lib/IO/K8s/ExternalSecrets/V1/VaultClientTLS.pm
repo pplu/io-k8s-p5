@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::VaultClientTLS;
 # ABSTRACT: The configuration used for client side related TLS communication, when the Vault server requires mutual authentication.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s certSecretRef => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector';

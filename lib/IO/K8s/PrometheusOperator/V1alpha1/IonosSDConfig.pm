@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::IonosSDConfig;
 # ABSTRACT: IonosSDConfig configurations allow retrieving scrape targets from IONOS resources.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authorization        => '+IO::K8s::PrometheusOperator::V1alpha1::SafeAuthorization', { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::ListenerSetSpec;
 # ABSTRACT: Spec defines the desired state of ListenerSet.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s listeners => ['+IO::K8s::GatewayAPI::V1::ListenerEntry'], { required => 'schema' };

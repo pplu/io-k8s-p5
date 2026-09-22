@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::StaticConfig;
 # ABSTRACT: StaticConfig defines a Prometheus static configuration.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s labels  => { Str => 1 };

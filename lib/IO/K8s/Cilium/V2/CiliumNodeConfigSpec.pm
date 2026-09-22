@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumNodeConfigSpec;
 # ABSTRACT: Spec is the desired Cilium configuration overrides for a given node
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s defaults     => { Str => 1 }, { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::VolumeSnapshot::V1::VolumeGroupSnapshotStatus;
 # ABSTRACT: VolumeGroupSnapshotStatus defines the observed state of a volume group snapshot
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s boundVolumeGroupSnapshotContentName => Str;

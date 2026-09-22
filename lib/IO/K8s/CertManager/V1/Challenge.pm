@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Challenge;
 # ABSTRACT: Challenge is a type to represent a Challenge request with an ACME server
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'acme.cert-manager.io/v1',
     resource_plural => 'challenges';

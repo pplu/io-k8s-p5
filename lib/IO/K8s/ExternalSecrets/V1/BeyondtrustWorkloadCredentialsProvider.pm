@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::BeyondtrustWorkloadCredentialsProvider;
 # ABSTRACT: BeyondtrustWorkloadCredentials configures this store to sync secrets using the BeyondTrust Workload Credentials provider.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s auth       => '+IO::K8s::ExternalSecrets::V1::BeyondtrustWorkloadCredentialsAuth', { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMERenewalWindow;
 # ABSTRACT: SuggestedWindow is the suggested renewal window as returned by the ACME server in accordance with RFC 9773.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s end   => Time, { required => 'schema' };

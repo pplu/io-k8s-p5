@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::RuleGroup;
 # ABSTRACT: RuleGroup is a list of sequentially evaluated recording and alerting rules.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s interval                  => Str, { pattern => qr/^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$/ };

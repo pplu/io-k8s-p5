@@ -1,6 +1,6 @@
 package IO::K8s::Api::Storage::V1::StorageHealthCondition;
 # ABSTRACT: StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s accessMode => Str;

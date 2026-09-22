@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMEChallenge;
 # ABSTRACT: Challenge specifies a challenge offered by the ACME server for an Order.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s token => Str, { required => 'schema' };

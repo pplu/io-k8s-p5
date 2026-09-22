@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1beta1::EnvVar;
 # ABSTRACT: EnvVar
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s containerName => Str;

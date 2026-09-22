@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1beta1::Sandbox;
 # ABSTRACT: Sandbox
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'agents.x-k8s.io/v1beta1',
     resource_plural => 'sandboxes';

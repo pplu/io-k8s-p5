@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::SafeAuthorization;
 # ABSTRACT: authorization defines the header configuration to authenticate against the PuppetDB API.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s credentials => 'Core::V1::ConfigMapKeySelector';

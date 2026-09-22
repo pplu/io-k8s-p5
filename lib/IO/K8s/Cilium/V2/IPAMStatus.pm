@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::IPAMStatus;
 # ABSTRACT: IPAM is the IPAM status of the node.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s 'assigned-static-ip' => Str;

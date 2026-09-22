@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1alpha3::WorkloadPodGroupSchedulingConstraints;
 # ABSTRACT: WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s topology => ['Scheduling::V1alpha3::TopologyConstraint'];

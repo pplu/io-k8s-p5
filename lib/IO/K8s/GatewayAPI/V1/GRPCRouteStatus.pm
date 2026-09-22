@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::GRPCRouteStatus;
 # ABSTRACT: Status defines the current state of GRPCRoute.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s parents => ['+IO::K8s::GatewayAPI::V1::RouteParentStatus'], { required => 'schema' };

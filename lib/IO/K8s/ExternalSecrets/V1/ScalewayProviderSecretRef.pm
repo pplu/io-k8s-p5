@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ScalewayProviderSecretRef;
 # ABSTRACT: SecretKey is the non-secret part of the api key.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s secretRef => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector';

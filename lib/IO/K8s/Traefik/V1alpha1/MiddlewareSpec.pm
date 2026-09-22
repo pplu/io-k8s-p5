@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::MiddlewareSpec;
 # ABSTRACT: MiddlewareSpec defines the desired state of a Middleware.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s addPrefix         => '+IO::K8s::Traefik::V1alpha1::AddPrefix';

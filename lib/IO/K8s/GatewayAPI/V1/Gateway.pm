@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::Gateway;
 # ABSTRACT: Gateway represents an instance of a service-traffic handling infrastructure by binding Listeners to a set of IP addresses.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1',
     resource_plural => 'gateways';

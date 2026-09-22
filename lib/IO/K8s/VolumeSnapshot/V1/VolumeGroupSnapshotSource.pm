@@ -1,6 +1,6 @@
 package IO::K8s::VolumeSnapshot::V1::VolumeGroupSnapshotSource;
 # ABSTRACT: VolumeGroupSnapshotSource specifies a new or pre-existing group snapshot source
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s selector => 'Meta::V1::LabelSelector';

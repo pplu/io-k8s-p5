@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1beta1::GatewayStatus;
 # ABSTRACT: Status defines the current state of Gateway.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s addresses            => ['+IO::K8s::GatewayAPI::V1beta1::GatewayStatusAddress'];

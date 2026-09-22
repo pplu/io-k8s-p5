@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::AccessLogs;
 # ABSTRACT: AccessLogs defines an Envoy access log configuration, including its output format and the generated proxy components that should emit it.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s format  => Str, { required => 'schema', enum => [qw(JSON Text)] };

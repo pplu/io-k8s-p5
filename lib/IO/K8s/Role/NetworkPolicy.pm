@@ -1,6 +1,6 @@
 package IO::K8s::Role::NetworkPolicy;
 # ABSTRACT: Role for building network policies (core K8s and Cilium)
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Types::Net qw( cidr_contains );
 use Carp qw(croak);
 # Imports above `use Moo::Role` on purpose: Role::Tiny treats subs already in

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ImageVolumeStatus;
 # ABSTRACT: ImageVolumeStatus represents the image-based volume status.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s imageRef => Str, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::Api::Lifecycle::V1alpha1::ResponderStatus;
 # ABSTRACT: ResponderStatus represents the last observed status of the eviction process of the responder. It should be only updated by the designated responder whose name is .name field.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s completionTime => Time;

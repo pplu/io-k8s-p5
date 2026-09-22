@@ -1,6 +1,6 @@
 package IO::K8s::Api::Scheduling::V1beta1::CompositePodGroupSchedulingPolicy;
 # ABSTRACT: CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s basic => 'Scheduling::V1beta1::CompositeBasicSchedulingPolicy';

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::HTTPSDConfig;
 # ABSTRACT: HTTPSDConfig defines a prometheus HTTP service discovery configuration See https://prometheus.io/docs/prometheus/latest/configuration/configuration/#http_sd_config
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authorization        => '+IO::K8s::PrometheusOperator::V1alpha1::SafeAuthorization';

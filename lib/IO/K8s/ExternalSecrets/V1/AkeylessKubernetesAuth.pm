@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::AkeylessKubernetesAuth;
 # ABSTRACT: Kubernetes authenticates with Akeyless by passing the ServiceAccount token stored in the named Secret resource.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s accessID          => Str, { required => 'schema' };

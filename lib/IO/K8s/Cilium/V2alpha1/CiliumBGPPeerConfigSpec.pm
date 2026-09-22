@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumBGPPeerConfigSpec;
 # ABSTRACT: Spec is the specification of the desired behavior of the CiliumBGPPeerConfig.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authSecretRef   => Str;

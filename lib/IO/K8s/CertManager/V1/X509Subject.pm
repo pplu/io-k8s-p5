@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::X509Subject;
 # ABSTRACT: Requested set of X509 certificate subject attributes.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s countries           => [Str];

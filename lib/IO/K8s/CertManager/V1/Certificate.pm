@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Certificate;
 # ABSTRACT: A Certificate resource should be created to ensure an up to date and signed X.509 certificate is stored in the Kubernetes Secret resource named in `spec.secretName`.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cert-manager.io/v1',
     resource_plural => 'certificates';

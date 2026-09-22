@@ -1,6 +1,6 @@
 package IO::K8s::Api::Storage::V1::CSINodeStatus;
 # ABSTRACT: CSINodeStatus contains health and status information for storage on a node.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s storageHealth => ['Storage::V1::StorageHealth'];

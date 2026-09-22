@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1beta1::SandboxSpec;
 # ABSTRACT: SandboxSpec
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s operatingMode        => Str, { enum => [qw(Running Suspended)], default => 'Running' };

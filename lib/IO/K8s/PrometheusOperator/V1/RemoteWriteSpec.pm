@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::RemoteWriteSpec;
 # ABSTRACT: RemoteWriteSpec defines the configuration to write samples from Prometheus to a remote endpoint.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s authorization        => '+IO::K8s::PrometheusOperator::V1::Authorization';

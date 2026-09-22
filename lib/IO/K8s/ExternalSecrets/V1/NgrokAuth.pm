@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::NgrokAuth;
 # ABSTRACT: Auth configures how the ngrok provider authenticates with the ngrok API.
-our $VERSION = '1.108';
+our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s apiKey => '+IO::K8s::ExternalSecrets::V1::NgrokProviderSecretRef';
