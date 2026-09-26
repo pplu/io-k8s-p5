@@ -14,6 +14,10 @@ Revision history for IO-K8s
     (get_condition, is_condition_true, is_ready, condition_message) read a
     top-level conditions field wherever a class declares one.
 
+  - Serialize numeric Perl values in Str fields and [Str] elements as JSON
+    strings: EnvVar value => 8080 now emits "8080" instead of a bare number
+    the API server rejects. Opaque { Str => 1 } maps are unchanged.
+
   - Declare Sub::Util as a direct runtime prerequisite.
 
 1.108     2026-09-22 00:53:53Z

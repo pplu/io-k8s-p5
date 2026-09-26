@@ -275,9 +275,14 @@ encoding -- the canonical wire format Kubernetes accepts. Walks the
 attribute registry of the class and emits each declared field with the
 right JSON type: integers unquoted, booleans as C<true>/C<false>, nested
 objects recursively via their own C<TO_JSON>, hashes and arrays of objects
-in their canonical shape. For classes that compose
-L<IO::K8s::Role::APIObject>, the C<apiVersion>, C<kind> and C<metadata>
-fields are prepended.
+in their canonical shape. A C<Str> field and each element of a C<[Str]>
+array are always emitted as a JSON string, even when the Perl value itself
+is numeric (k145): C<< EnvVar->new(value => 8080) >> serializes C<value> as
+C<"8080">, not a bare C<8080>. The opaque C<< { Str => 1 } >> hash form
+(labels, annotations, C<fieldsV1>, ...) is exempt from that coercion -- its
+values are copied through unchanged, keeping whatever JSON type they
+already had. For classes that compose L<IO::K8s::Role::APIObject>, the
+C<apiVersion>, C<kind> and C<metadata> fields are prepended.
 
 This is the entry point L</to_json> builds on, and the inverse of
 L</FROM_HASH>.
@@ -320,6 +325,15 @@ sub TO_JSON {
             $data{$key} = $value + 0;
         } elsif ($attr_info->{is_int_or_string}) {
             $data{$key} = ($value =~ /\A-?\d+\z/) ? int($value) : $value;
+        } elsif ($attr_info->{is_str}) {
+            # A JSON string on the wire whatever Perl scalar it holds (k145):
+            # JSON::MaybeXS encodes a numeric scalar as a JSON number, so
+            # EnvVar value => 8080 used to go out as 8080 where Kubernetes
+            # expects "8080". Interpolating builds a fresh string, so the
+            # object's own value is left as it was. A ref cannot pass the
+            # Str constraint; the guard only keeps one that got into the
+            # slot some other way on the old pass-through.
+            $data{$key} = ref $value ? $value : "$value";
         } elsif ($attr_info->{is_object} && blessed($value) && $value->can('TO_JSON')) {
             $data{$key} = $value->TO_JSON;
         } elsif ($attr_info->{is_array_of_objects}) {
@@ -341,6 +355,13 @@ sub TO_JSON {
             } keys %$value };
         } elsif ($attr_info->{is_array_of_int}) {
             $data{$key} = [ map { int($_) } @$value ];
+        } elsif ($attr_info->{is_array_of_str}) {
+            # Each element a JSON string, as for is_str above (k145), in a
+            # new outer array -- the same one-level copy the generic ARRAY
+            # branch below makes (k54). An element the constructor never
+            # saw (spec_push, or a push onto the accessor's arrayref) may be
+            # undef or a ref; it goes out exactly as before.
+            $data{$key} = [ map { defined($_) && !ref($_) ? "$_" : $_ } @$value ];
         } elsif ($attr_info->{is_array_of_bool}) {
             # An undef ELEMENT dies rather than becoming a silent false
             # (k51). ArrayRef[Bool] accepts undef because
