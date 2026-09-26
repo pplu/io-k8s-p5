@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-26T18:30:19Z
+claimed_by: class-foundation
+class: standard
+completed: 2026-09-26T18:30:19Z
+created: 2026-09-26T04:13:06Z
+id: 147
+priority: high
+started: 2026-09-26T15:58:35Z
+status: done
+tags:
+- specbuilder
+- types
+- architecture
+title: SpecBuilder-Elementmutationen umgehen Typprüfung und Bool-Coercion
+updated: 2026-09-26T18:30:19Z
+---
+
+Strukturreview 2026-09-26, unabhängig reproduziert. Custom APIObject mit k8s spec => { flags => [Bool] }: spec_push("flags", "false") serialisiert flags:[true]; spec_set("flags", ["false"]) dagegen flags:[false]. Role/SpecBuilder.pm:139-155 schreibt Elemente direkt, :162-168 erhält nur Objekt-Elementklassen; spec_push :391-397 ruft den Feldaccessor nicht auf. Das ist kein Wunsch nach zusätzlichem strict nach der Konstruktion (bewusstes Non-Goal), sondern inkonsistente Semantik im selben typisierten Feld. Agent bestätigte zusätzlich Pod spec_push("containers", "bad") und spec_set("containers.0", "bad"): Schreiben gelingt, erst to_json scheitert an fehlendem TO_JSON. Gemeinsame Element-Coercion/Validation für unterstützte Builder-Operationen herstellen, Array-/Hash-Elementpfade und Whole-Field-Setter gegeneinander testen. Keine Implementierung im Review.
+
+Test-Lücke: t/87_k100_named_class_coercion.t:135-171 vergleicht direct new mit FROM_HASH; t/68_specbuilder_objects.t:134-142 prüft spec_push nur isoliert. Gemeinsame Fixtures über Factory, direkten Konstruktor und Builder fehlen für diese Gegenbeispiele.
+
+2026-09-26 18:30 Committed as 24db0c48 (Run SpecBuilder element writes through the field's coercion and type check). Verified: prove -l t/02_compile_all.t t/112_k147_specbuilder_element_writes.t t/68_specbuilder_objects.t PASS in isolated worktree.
