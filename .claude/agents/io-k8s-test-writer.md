@@ -2,7 +2,6 @@
 name: io-k8s-test-writer
 description: "Write and extend IO::K8s tests in t/. Network-free and cluster-free: exercise the k8s DSL, class resolution, serialization round-trips, roles and resource maps against literal fixtures. Use for test additions, regression scaffolding and reproducing reported bugs."
 model: sonnet
-allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 briefing:
   skills:
     - getty-perl-core

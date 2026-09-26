@@ -2,7 +2,6 @@
 name: io-k8s-release-manager
 description: "Owns io-k8s's commits and release readiness — cuts commits from the worker's commit-ready tree, writes commit messages and Changes entries, moves karr cards to done. Release audit: IO-K8s before a release — cpanfile deps declared and pinned, dist.ini metadata intact, $VERSION consistent across all modules, Changes current, dzil build clean and the built META.json complete. Workers never commit; this agent does. Never pushes, tags or releases."
 model: sonnet
-allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 briefing:
   skills:
     - getty-git-commit-style
