@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-26T18:30:10Z
+claimed_by: class-foundation
+class: standard
+completed: 2026-09-26T18:30:10Z
+created: 2026-09-26T04:11:43Z
+id: 145
+priority: high
+started: 2026-09-26T15:40:54Z
+status: done
+tags:
+- serialization
+- types
+- architecture
+title: Str-Felder können Zahlen statt JSON-Strings serialisieren
+updated: 2026-09-26T18:30:10Z
+---
+
+Strukturreview 2026-09-26, unabhängig reproduziert: perl -Ilib -MIO::K8s::Api::Core::V1::EnvVar -e 'print IO::K8s::Api::Core::V1::EnvVar->new(name=>"PORT",value=>8080)->to_json' emittiert {"name":"PORT","value":8080}, obwohl value ein Str-Feld ist und Kubernetes dort einen JSON-String erwartet. Type::Tiny Str akzeptiert numerische Perl-Skalare; Role::Resource::TO_JSON normalisiert Int/Num/Bool, aber nicht Str. Der aktuelle README-Vertrag verspricht korrekte Wire-Typen. Vor Implementierung festlegen: numerische Skalare in Str-Feldern stringifizieren oder ablehnen; IntOrStr und Quantity nicht versehentlich semantisch verändern. Auch Containerformen von Str mit eigenständigen Tests prüfen. Im Review keine Codeänderung.
+
+2026-09-26 18:30 Committed as 76825c49 (Serialize numeric Str/[Str] values as JSON strings). Verified: prove -l t/02_compile_all.t t/108_k145_str_wire_type.t t/46_class_namespaces_inflate.t PASS in isolated worktree.
