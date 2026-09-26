@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-26T18:30:30Z
+claimed_by: class-foundation
+class: standard
+completed: 2026-09-26T18:30:30Z
+created: 2026-09-26T04:13:06Z
+id: 148
+priority: medium
+started: 2026-09-26T15:55:52Z
+status: done
+tags:
+- autogen
+- crd
+- architecture
+title: AutoGen reuse_core verwechselt Arrays mit verschiedenen Elementtypen
+updated: 2026-09-26T18:30:30Z
+---
+
+Strukturreview 2026-09-26, unabhängig reproduziert. AutoGen.pm:695-699 akzeptiert jedes Schema-array gegen jedes is_array_of_*. Schema spec mit key:string, operator:string, values:array<object{item:string}> und required:[key,operator] wird bei reuse_core=>1 als Apimachinery::Pkg::Apis::Meta::V1::LabelSelectorRequirement wiederverwendet. Dessen values ist jedoch [Str]; gültige Schema-Daten {key:"a",operator:"In",values:[{item:"x"}]} scheitern beim Inflate. Dasselbe Schema mit reuse_core=>0 funktioniert und round-tript korrekt. Betroffene Auswahl :781-838. Requiredness- und Domain-Filter aus k136/k139 lösen diese unabhängige Container-Inkompatibilität nicht. Formgleichheit rekursiv inkl. Elementtypen prüfen oder bei nicht nachgewiesener Kompatibilität auf eigene Klasse zurückfallen. Kein Umbau im Review.
+
+Test-Lücke: t/75_reuse_core.t:14-29 und :74-92 prüfen kompatible Formen. Negativfall mit gleichem Feldsatz, aber anderem items-Schema hinzufügen.
+
+2026-09-26 18:30 Committed as 70ab77d9 (Recursively verify reuse_core container shapes before reusing a class). Verified: prove -l t/02_compile_all.t t/111_k148_reuse_core_containers.t t/75_reuse_core.t PASS in isolated worktree. All 7 tickets (k143-k149) verified together: prove -lr t/ PASS 114 files/8982 tests; dzil test PASS 116 files/10915 tests (1 expected skip: release-changes_has_content.t). git diff 8f013b94..HEAD -- lib t cpanfile Changes matches the pre-commit working tree exactly (verified byte-for-byte).
