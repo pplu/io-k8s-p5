@@ -2,6 +2,20 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - A colliding k8s declaration now fails at class load instead of silently
+    corrupting the class: two JSON keys that sanitize to one Perl accessor
+    (x-value and x_value, also across inheritance), or a field named like a
+    role method that is not an attribute. A subclass redeclaring an
+    inherited field under the same JSON key now really replaces its type,
+    coercion, required flag and init_arg, not only its registry entry.
+
+  - ComponentStatus keeps its top-level conditions: they were dropped on
+    inflate and new and serialized as an empty list. The condition helpers
+    (get_condition, is_condition_true, is_ready, condition_message) read a
+    top-level conditions field wherever a class declares one.
+
+  - Declare Sub::Util as a direct runtime prerequisite.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

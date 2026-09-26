@@ -110,10 +110,11 @@ sub import {
     # composes for every top-level Kind rather than only for CRDs)
     Moo::Role->apply_roles_to_package($caller, 'IO::K8s::Role::APIObject');
 
-    # Register metadata attribute using the k8s DSL
-    # This allows _inflate_struct to properly inflate metadata as ObjectMeta
-    # The k8s function skips attribute creation if it already exists (from the role)
-    $caller->can('k8s')->('metadata', 'Meta::V1::ObjectMeta');
+    # Register the role's metadata attribute for the registry readers, so
+    # _inflate_struct inflates metadata as ObjectMeta. Adopted, not declared:
+    # the role already created the attribute, and the public k8s refuses to
+    # register over an attribute it did not create itself (k144).
+    IO::K8s::Resource->_k8s_adopt($caller, 'metadata', 'Meta::V1::ObjectMeta');
 }
 
 1;

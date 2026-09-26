@@ -5,6 +5,7 @@ use Types::Standard qw( InstanceOf Maybe );
 use IO::K8s::Resource ();
 use Scalar::Util qw(blessed);
 use Carp qw( croak );
+use mro ();
 # Imports above `use Moo::Role` on purpose: Role::Tiny treats subs already in
 # the package as not-methods, so their names stay off every consumer. A `use`
 # below that line composes its exports onto all shipped classes (k118).
@@ -32,12 +33,11 @@ with 'IO::K8s::Role::SpecBuilder';
 my $OBJECT_META = 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta';
 
 # metadata is the one object-bearing field of a top-level Kind that the k8s
-# DSL does not create: this role composes first, so by the time
-# IO::K8s::APIObject::import runs `k8s metadata => 'Meta::V1::ObjectMeta'`
-# the attribute already exists and _k8s's "don't overwrite a role's
-# attribute" guard registers it without installing anything. That guard is
-# right and stays; what it means is that the coercion has to be declared
-# here instead. _object_coercer is _k8s's own, so `metadata` coerces exactly
+# DSL does not create: this role composes first, and IO::K8s::APIObject::import
+# (like IO::K8s::AutoGen) then only registers it through
+# IO::K8s::Resource::_k8s_adopt, which installs nothing (k144). What that
+# means is that the coercion has to be declared here instead.
+# _object_coercer is _k8s's own, so `metadata` coerces exactly
 # like every other is_object field -- Pod->new(metadata => { name => 'x' })
 # builds an ObjectMeta through the same call FROM_HASH makes (k115).
 #
@@ -872,8 +872,23 @@ sub remove_annotation {
 # Status condition convenience methods
 # ============================================================
 
+# The helpers of this role that give way to a declared k8s wire field of
+# the same name: a class that declares such a field gets it installed over
+# the composed helper instead of being refused by IO::K8s::Resource's
+# declaration preflight (k144), which reads this table from whichever role
+# a colliding method comes from. Exactly conditions, because upstream's
+# core/v1 ComponentStatus carries its conditions at the top level rather
+# than under status. Every other helper here stays a collision.
+our %YIELDS_TO_K8S_FIELD = ( conditions => 1 );
+
 sub _extract_conditions {
     my ($self) = @_;
+    # A class that declares its own top-level conditions field (merged
+    # registry, so inherited counts too) keeps its conditions there.
+    if ($self->can('_k8s_attr_info') && $self->_k8s_attr_info->{conditions}) {
+        my $conds = $self->_conditions_field_value;
+        return ref $conds eq 'ARRAY' ? $conds : [];
+    }
     return [] unless $self->can('status') && defined $self->status;
     my $status = $self->status;
 
@@ -892,6 +907,26 @@ sub _extract_conditions {
     return [];
 }
 
+# The value of that top-level conditions field, through its accessor --
+# but never through $self->conditions blindly: where the field won, that is
+# the accessor, yet a subclass that composes this role again gets the
+# helper back in its own stash, and calling the helper from here would
+# recurse. So the first conditions sub along the MRO that is not this
+# role's helper is the accessor. Any arguments go to it unchanged, so the
+# helper can forward a setter call (see conditions below).
+sub _conditions_field_value {
+    my ($self, @args) = @_;
+    my $helper = \&conditions;
+    no strict 'refs';
+    for my $class (@{ mro::get_linear_isa(ref $self) }) {
+        next unless defined &{"${class}::conditions"};
+        my $code = \&{"${class}::conditions"};
+        next if $code == $helper;
+        return $self->$code(@args);
+    }
+    return;
+}
+
 sub _condition_field {
     my ($cond, $field) = @_;
     if (blessed($cond) && $cond->can($field)) {
@@ -907,12 +942,25 @@ sub _condition_field {
 
     my $conds = $obj->conditions;  # => ArrayRef
 
-Returns all status conditions as an arrayref.
+Returns all status conditions as an arrayref, read from
+C<< $obj->status->conditions >>. A class that declares its own top-level
+C<conditions> field via the C<k8s> DSL -- rather than nesting it under
+C<status> -- replaces this helper with that field's own accessor instead
+(k144): L<IO::K8s::Api::Core::V1::ComponentStatus> is the one shipped Kind
+that does, since upstream carries its conditions at the top level.
 
 =cut
 
 sub conditions {
-    my ($self) = @_;
+    my ($self, @args) = @_;
+    # Where a declared conditions field won, this helper is normally gone
+    # from the class's stash. But Role::Tiny composes against the target's
+    # own stash only, so a subclass that composes this role again gets the
+    # helper back, shadowing the inherited accessor -- and a setter call
+    # landing here would silently do nothing. So with such a field the
+    # helper is transparent: it hands every argument to the accessor.
+    return $self->_conditions_field_value(@args)
+        if $self->can('_k8s_attr_info') && $self->_k8s_attr_info->{conditions};
     return $self->_extract_conditions;
 }
 

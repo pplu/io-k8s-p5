@@ -306,9 +306,10 @@ sub _generate_class {
         require IO::K8s::Role::APIObject;
         Moo::Role->apply_roles_to_package($class, 'IO::K8s::Role::APIObject');
 
-        # Register metadata attribute via k8s DSL so _inflate_struct knows the type
-        # (same as IO::K8s::APIObject::import does for hand-written classes)
-        $k8s->('metadata', 'Meta::V1::ObjectMeta');
+        # Register the role's metadata attribute so _inflate_struct knows the
+        # type -- adopted, the same way IO::K8s::APIObject::import does it
+        # for hand-written classes (k144)
+        IO::K8s::Resource->_k8s_adopt($class, 'metadata', 'Meta::V1::ObjectMeta');
 
         # Apply Namespaced role if requested or schema suggests it
         if ($is_namespaced) {

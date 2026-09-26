@@ -66,20 +66,39 @@ sub _collect_known_init_args {
     for my $attr (keys %$info) {
         $known{ $info->{$attr}{json_key} // $attr } = 1;
     }
-    for my $ancestor (@{ mro::get_linear_isa($class) }) {
-        my $maker = Moo->_constructor_maker_for($ancestor) or next;
-        my $specs = $maker->all_attribute_specs;
-        for my $name (keys %$specs) {
-            my $spec = $specs->{$name};
-            my $init = exists $spec->{init_arg} ? $spec->{init_arg} : $name;
-            $known{$init} = 1 if defined $init;
-        }
+    my $specs = _effective_attribute_specs($class);
+    for my $name (keys %$specs) {
+        my $spec = $specs->{$name};
+        my $init = exists $spec->{init_arg} ? $spec->{init_arg} : $name;
+        $known{$init} = 1 if defined $init;
     }
     if ($class->can('_is_resource')) {
         $known{apiVersion} = 1;
         $known{kind}       = 1;
     }
     return \%known;
+}
+
+# The Moo attribute specs that are in effect for $class: attribute name ->
+# spec, nearest first over mro::get_linear_isa, so a subclass's own `has`
+# for a name hides every ancestor's spec of that name. Read from each
+# ancestor's constructor maker for the reasons given above
+# _known_init_args. Private, uncached and free of side effects on the
+# registry: _collect_known_init_args uses it for the constructor keys,
+# IO::K8s::Resource's declaration preflight (k144) to tell a real Moo
+# attribute from a same-named method -- the registry alone never proves an
+# attribute exists.
+sub _effective_attribute_specs {
+    my ($class) = @_;
+    my %specs;
+    for my $ancestor (@{ mro::get_linear_isa($class) }) {
+        my $maker = Moo->_constructor_maker_for($ancestor) or next;
+        my $own = $maker->all_attribute_specs;
+        for my $name (keys %$own) {
+            $specs{$name} = $own->{$name} unless exists $specs{$name};
+        }
+    }
+    return \%specs;
 }
 
 # One level of copying for a plain container -- the same depth TO_JSON and

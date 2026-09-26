@@ -11,6 +11,7 @@ use IO::K8s::Types qw( IntOrStr Quantity Time );
 use IO::K8s::Role::Resource ();
 use Scalar::Util qw( blessed reftype looks_like_number );
 use Carp qw( croak );
+use Sub::Util qw( subname );
 
 # Registry: class -> attr -> { type, class, is_array, is_hash, is_bool, is_int }
 # Use 'our' to make it a proper package variable accessible via symbol table
@@ -330,11 +331,10 @@ sub _normalize_bool {
 # Named rather than written inline in that branch for the same reason
 # _normalize_bool above is: a second caller needs exactly this, and the two
 # must not drift. That caller is IO::K8s::Role::APIObject, whose `metadata`
-# is a plain `has` -- the role composes before any k8s declaration runs, so
-# _k8s's "don't overwrite a role's attribute" guard means it registers
-# metadata but never creates it, and a coercer installed here would never
-# reach it (k115). The role therefore declares metadata with this coercion
-# from the start.
+# is a plain `has` -- the role composes before any k8s declaration runs, and
+# metadata is then only registered through _k8s_adopt, which never calls
+# has(), so a coercer installed here would never reach it (k115). The role
+# therefore declares metadata with this coercion from the start.
 #
 # $class_name is captured; IO::K8s::Role::Resource::_default_k8s() is
 # touched at COERCION time only, never while the attribute is installed --
@@ -357,12 +357,135 @@ sub _generate_inline_struct {
     }
 }
 
+# The nearest registry entry for a Perl attribute name: $class's own, else
+# the first one found walking @ISA depth-first, left to right -- the order
+# IO::K8s::Role::Resource::_merged_attr_info resolves in, so this answers
+# for the same view TO_JSON and FROM_HASH read. Returns the declaring class
+# and its entry, or nothing. Uncached: it runs while classes are still
+# being declared, and populating the role's merged-view cache from here
+# would be a side effect of a declaration that may yet be rejected.
+sub _nearest_registration {
+    my ($class, $attr_name) = @_;
+    my $own = $_attr_registry{$class};
+    return ($class, $own->{$attr_name}) if $own && $own->{$attr_name};
+    no strict 'refs';
+    for my $parent (@{"${class}::ISA"}) {
+        my @found = _nearest_registration($parent, $attr_name);
+        return @found if @found;
+    }
+    return;
+}
+
+# The role that $class's method $attr_name comes from, when that role lists
+# the name in its %YIELDS_TO_K8S_FIELD -- a role helper meant to give way to
+# a declared wire field of the same name (IO::K8s::Role::APIObject's
+# conditions, for ComponentStatus). Found through the method's own name
+# rather than a list of classes, and checked against the role itself: the
+# code must be the role's sub, and $class must do the role. Anything else --
+# a method the class wrote, one a role does not declare as yielding, a
+# modifier-wrapped helper -- returns nothing and stays a collision.
+sub _yielding_role_helper {
+    my ($class, $attr_name) = @_;
+    my $code = $class->can($attr_name) or return;
+    my ($role, $sub) = subname($code) =~ /\A(.+)::([^:]+)\z/ or return;
+    return unless $sub eq $attr_name && Moo::Role->is_role($role);
+    no strict 'refs';
+    return unless ${"${role}::YIELDS_TO_K8S_FIELD"}{$attr_name};
+    return unless defined &{"${role}::${attr_name}"}
+        && \&{"${role}::${attr_name}"} == $code;
+    return unless $class->can('does') && $class->does($role);
+    return $role;
+}
+
+# The `k8s` DSL entry point. A thin wrapper so that every argument a caller
+# of `k8s` can pass has a meaning; the adopt switch below is not one of them.
 sub _k8s {
     my ($class, $caller, $name, $type_spec, $marker) = @_;
+    return $class->_declare_field($caller, $name, $type_spec, $marker, 0);
+}
+
+# Register a wire field for a Moo attribute the class already has, without
+# calling has() -- the one field this exists for is metadata, which
+# IO::K8s::Role::APIObject declares itself (with the ObjectMeta coercion)
+# and which IO::K8s::APIObject::import and IO::K8s::AutoGen then register
+# for the registry readers. Private on purpose: the public `k8s` never
+# adopts, so a field can no longer end up registered over an attribute
+# nobody declared for it (k144). Refused unless an attribute of that name
+# is in effect and its init_arg is the field's JSON key.
+sub _k8s_adopt {
+    my ($class, $caller, $name, $type_spec, $marker) = @_;
+    return $class->_declare_field($caller, $name, $type_spec, $marker, 1);
+}
+
+sub _declare_field {
+    my ($class, $caller, $name, $type_spec, $marker, $adopt) = @_;
 
     my $json_key  = $name;
     my $attr_name = _sanitize_attr_name($name);
     my $where     = "field '$name' of $caller";
+
+    # Declaration preflight (k144). Every conflict is refused here, before
+    # anything below builds an inline-struct class, calls has() or writes
+    # the registry, the attribute list or the merged-view cache -- a
+    # rejected declaration leaves the class exactly as it was.
+    #
+    # Two JSON keys, one accessor: _sanitize_attr_name is not injective
+    # (x-value and x_value both become x_value), so a second key reaching
+    # an attribute name another key already holds -- in this class or,
+    # nearest wins, in an ancestor -- would silently retarget that field.
+    my ($declarer, $registered) = _nearest_registration($caller, $attr_name);
+    if ($registered) {
+        my $other_key = $registered->{json_key} // $attr_name;
+        croak "k8s: $where collides with field '$other_key' of $declarer: "
+            . "both map to the Perl attribute '$attr_name'"
+            if $other_key ne $json_key;
+    }
+    # A method that is not a Moo attribute -- an IO::K8s::Role::APIObject
+    # helper such as get_condition, a Moo keyword -- used to make the old
+    # `return if $caller->can($attr_name)` register the field and skip
+    # has(), leaving the wire field served by that method. What counts is
+    # the effective Moo spec; a registry entry proves nothing. The one way
+    # past this is a role helper its role declares as yielding to a wire
+    # field of the same name (see _yielding_role_helper): the field is then
+    # installed over it.
+    my ($spec, $local, $yielding);
+    if ($caller->can($attr_name)) {
+        $spec = IO::K8s::Role::Resource::_effective_attribute_specs($caller)->{$attr_name};
+        $yielding = _yielding_role_helper($caller, $attr_name) unless $spec;
+        croak "k8s: $where collides with the method '$attr_name' of $caller, "
+            . 'which is not an attribute'
+            unless $spec || $yielding;
+        no strict 'refs';
+        $local = defined &{"${caller}::${attr_name}"};
+    }
+    # Moo refuses has() for an accessor this very package already defines,
+    # so a fresh declaration can replace an inherited attribute (nearest
+    # wins, below) but never one of the class's own. That leaves three
+    # cases where has() is not called at all:
+    #   * adopt -- the explicit path above; the attribute must exist and
+    #     take the JSON key as its constructor argument;
+    #   * a field this class already declared through k8s, declared again
+    #     with the same JSON key -- the registry takes the new entry and Moo
+    #     keeps the first spec, unchanged from before k144;
+    #   * anything else the class defines itself (a role's attribute, a
+    #     plain has) -- refused, since the field would be registered over
+    #     an attribute that does not follow its declaration.
+    my $install = 1;
+    if ($adopt) {
+        my $init = $spec && exists $spec->{init_arg} ? $spec->{init_arg} : $attr_name;
+        croak "k8s: cannot adopt $where: $caller has no attribute '$attr_name' "
+            . "taking '$json_key' as its constructor argument"
+            unless $spec && defined $init && $init eq $json_key;
+        $install = 0;
+    } elsif ($yielding) {
+        # Installed below; a helper composed into this very package is
+        # removed right before has(), which refuses to overwrite it.
+    } elsif ($local) {
+        croak "k8s: $where would take over the attribute '$attr_name' that "
+            . "$caller defines outside the k8s DSL"
+            unless $registered && $declarer eq $caller;
+        $install = 0;
+    }
 
     # Inline-struct form: name => [ Type, { options } ]. Exactly two elements
     # with a hashref second is unambiguous -- every array type spec ([Str],
@@ -412,9 +535,6 @@ sub _k8s {
     } elsif (ref $type_spec eq 'ARRAY' && !ref($type_spec->[0]) && $type_spec->[0] =~ s/!$//) {
         $required = $required_recorded = 1;
     }
-
-    # Ensure the registry entry exists
-    $_attr_registry{$caller} = {} unless exists $_attr_registry{$caller};
 
     # Every branch below sets $inner, the type of a present value; the
     # Maybe wrapping for an optional field happens once at the end.
@@ -570,17 +690,9 @@ sub _k8s {
     # Store json_key when it differs from the Perl attribute name
     $info{json_key} = $json_key if $attr_name ne $json_key;
 
-    # Register - use hash slice to copy values, not reference
-    $_attr_registry{$caller}{$attr_name} = { %info };
-    no strict 'refs';
-    push @{"${caller}::_k8s_attributes"}, $attr_name;
-
-    # The merged @ISA views in IO::K8s::Role::Resource are cached; a new
-    # registration must not leave a stale merged view behind.
-    IO::K8s::Role::Resource::_invalidate_k8s_attr_cache($caller);
-
-    # Only create the attribute if it doesn't already exist (e.g., from a role)
-    return if $caller->can($attr_name);
+    # Adopted, or redeclared in the class that declared it: see the
+    # preflight above for why there is nothing to install.
+    return _register_field($caller, $attr_name, \%info) unless $install;
 
     # Call Moo's has — use init_arg to map JSON key to Perl-safe attribute name
     my $has = $caller->can('has');
@@ -714,10 +826,40 @@ sub _k8s {
             return \%out;
         });
     }
+    # A yielding role helper composed into this package goes first, so the
+    # accessor can take its name -- after every check above, so a rejected
+    # declaration never gets this far.
+    Package::Stash->new($caller)->remove_symbol('&'.$attr_name)
+        if $yielding && $local;
+
+    # A complete spec, never has('+name'). For a field redeclared under the
+    # same JSON key in a subclass this is what makes nearest-wins real
+    # (k144): the subclass's spec replaces the inherited one outright, so
+    # the parent's coercion, required flag and init_arg go with it --
+    # has('+name') would merge them back in, and refuses coerce => undef.
+    # The parent class is left untouched.
     $has->($attr_name, is => 'rw', isa => $isa, @coerce,
         ($required ? (required => 1) : ()),
         ($attr_name ne $json_key ? (init_arg => $json_key) : ()),
     );
+    return _register_field($caller, $attr_name, \%info);
+}
+
+# Record a declared field, only once its attribute is in place (k144): a
+# has() that dies must not leave a registry entry behind that no attribute
+# backs, nor a name in the attribute list or a merged view already rebuilt
+# around it.
+sub _register_field {
+    my ($caller, $attr_name, $info) = @_;
+    # Copy the values, not the reference
+    $_attr_registry{$caller}{$attr_name} = { %$info };
+    no strict 'refs';
+    push @{"${caller}::_k8s_attributes"}, $attr_name;
+
+    # The merged @ISA views in IO::K8s::Role::Resource are cached; a new
+    # registration must not leave a stale merged view behind.
+    IO::K8s::Role::Resource::_invalidate_k8s_attr_cache($caller);
+    return;
 }
 
 1;
@@ -891,6 +1033,44 @@ class, an inline struct, or an array or map of objects -- is exempt from
 that last check: no plain hash or array default can ever satisfy an
 C<InstanceOf> constraint, so there is nothing useful to check, and the
 default is recorded as given.
+
+Class load also fails, before any field option above is even considered,
+on a declaration that collides with something already in place (k144):
+
+=over 4
+
+=item * Two different JSON keys that sanitize to the same Perl attribute
+name (C<x-value> and C<x_value> both become C<x_value>), in this class or,
+nearest wins, in an ancestor: C<k8s: field '<name>' of <class> collides
+with field '<other key>' of <declaring class>: both map to the Perl
+attribute '<attr>'>.
+
+=item * A field name that is already a method on the class but not a Moo
+attribute -- a role helper such as L<IO::K8s::Role::APIObject/is_ready> --
+unless the role that provides it has declared the helper as yielding to a
+wire field of the same name, which today only C<conditions> is:
+C<k8s: field '<name>' of <class> collides with the method '<attr>' of
+<class>, which is not an attribute>.
+
+=item * A field that would take over an attribute the class defines
+itself outside the C<k8s> DSL (a plain C<has>): C<k8s: field '<name>' of
+<class> would take over the attribute '<attr>' that <class> defines
+outside the k8s DSL>.
+
+=back
+
+A rejected declaration leaves the class exactly as it was -- nothing is
+installed, registered in C<_k8s_attr_info>, or added to the attribute
+list. A subclass that redeclares an inherited C<k8s> field under the same
+JSON key replaces it outright, in the subclass only: nearest wins, so the
+new declaration's type, coercion, C<required> and C<init_arg> take over
+there, while the ancestor's own declaration is left completely untouched.
+Redeclaring the same field a second time within the very same class is
+not rejected either, but has no such effect: only the C<_k8s_attr_info>
+registry entry takes the new declaration, while the underlying Moo
+attribute -- and with it the actual type check, coercion and C<required>
+enforcement -- keeps whatever the first declaration in that class set up.
+Declare each field once per class.
 
 The registry (C<_k8s_attr_info>) keeps C<required> as a plain C<1> (absent
 when not required, matching the pre-D3 shape) and every other given option,
