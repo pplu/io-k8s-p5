@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-26T18:30:00Z
+claimed_by: class-foundation
+class: standard
+completed: 2026-09-26T18:30:00Z
+created: 2026-09-26T04:08:50Z
+id: 143
+priority: medium
+started: 2026-09-26T04:49:40Z
+status: done
+tags:
+- tests
+- emitter
+- maintenance
+title: Emitter-Tests erwarten nach Versionsbump weiterhin fest 1.108
+updated: 2026-09-26T18:30:00Z
+---
+
+Beim rein lesenden Strukturreview am 2026-09-26 auf sauberem master reproduziert: prove -lr t/ endet mit FAIL (108 Dateien, 8913 Tests); ausschließlich t/74_crd_emitter.t hat zwei fehlgeschlagene Top-Level-Subtests (2 und 6). Die Assertions in Zeile 42 und 249 erwarten hart 1.108. lib/IO/K8s/CRD/Emitter.pm nimmt für die Default-Version dagegen korrekt sein aktuelles $VERSION (1.109). Die Behauptungen der Tests sind Versionszeile vorhanden bzw. use utf8 direkt danach, nicht eine dauerhaft eingefrorene Distributionsversion. Minimal beheben, ohne diese Behauptungen abzuschwächen: Version im Test explizit vorgeben oder Erwartung von der aktuellen Emitter-Version ableiten. Keine Codeänderung im Review vorgenommen.
+
+2026-09-26 18:29 Committed as b134dc65 (Fix t/74_crd_emitter.t default-version assertions after 1.108 bump). Verified: prove -l t/02_compile_all.t t/74_crd_emitter.t PASS in isolated worktree.
