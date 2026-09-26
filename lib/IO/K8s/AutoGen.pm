@@ -8,7 +8,7 @@ use Carp qw(croak);
 use Digest::SHA qw( sha1_hex );
 use Module::Runtime qw( use_module );
 use Package::Stash;
-use Scalar::Util qw(blessed reftype looks_like_number);
+use Scalar::Util qw(blessed reftype refaddr looks_like_number);
 use Types::Standard qw( Bool Int Str );
 
 # Cache of generated classes -- only classes whose generation run completed
@@ -593,7 +593,8 @@ sub _has_properties {
 #      key by key (see %_TYPE_COMPAT below) -- a schema string field can't
 #      reuse a class that declares the same-named field as an array, for
 #      instance. This is checked before anything else, since a name match
-#      alone says nothing about the wire shape.
+#      alone says nothing about the wire shape. It is coarse for arrays and
+#      maps (any array, any map); step 6 settles what they hold.
 #
 #   3. Every remaining candidate must not OVER-CONSTRAIN the schema (k136,
 #      see _overrequires): a candidate that marks some shared key
@@ -629,6 +630,13 @@ sub _has_properties {
 #      A shape shared by candidates that are NOT wire-identical (an
 #      optional field naming a different type, a different value type
 #      under the same key) stays a nested class rather than guess.
+#
+#   6. The class steps 4/5 picked must hold the schema all the way down
+#      (k148, see _field_compatible): an array's elements, a map's values
+#      and every nested object's fields, recursively. Otherwise nothing is
+#      reused -- an array of objects can't reuse a class whose same-named
+#      field is an array of strings, which is what LabelSelectorRequirement
+#      was reused for before.
 #
 # A class's own `metadata` is part of its shape only for an embedded type
 # (PodTemplateSpec: {metadata,spec}, a real schema-visible field) -- never
@@ -771,7 +779,10 @@ sub _schema_type_kind {
 
 # Registry type flags compatible with each schema kind (rule 2 above).
 # 'array'/'object' match by prefix/membership rather than an exhaustive
-# list -- see _flag_compatible.
+# list -- see _flag_compatible. That coarse array/object match is only the
+# pre-selection the tie-break works on; what the array holds and what the
+# map's values are is decided by _field_compatible below (k148), which asks
+# _flag_compatible about scalar kinds only.
 my %_TYPE_COMPAT = (
     string  => { map { $_ => 1 } qw( is_str is_int_or_string is_quantity is_time ) },
     integer => { map { $_ => 1 } qw( is_int is_int_or_string ) },
@@ -794,6 +805,198 @@ sub _flag_compatible {
 sub _entry_compatible {
     my ($entry, $kind) = @_;
     return !!grep { /^is_/ && $entry->{$_} && _flag_compatible($kind, $_) } keys %$entry;
+}
+
+# ---------------------------------------------------------------------------
+# Container compatibility (k148)
+#
+# A flag alone cannot tell whether a candidate's array or map field holds
+# what the schema says: "an array" matched every is_array_of_* and "an
+# object" every is_object / is_hash_of_*, so LabelSelectorRequirement
+# ({key,operator,values}, values [Str]) was reused for a schema whose values
+# are an array of objects, and the schema's own valid data then failed to
+# inflate. _field_compatible instead compares the candidate's field with
+# the type _schema_to_type_spec WOULD give the schema fragment -- read off
+# the schema the same way that function dispatches on it, without
+# generating anything -- and recurses into element, value and nested
+# object shapes:
+#
+#   scalar          -> the scalar rules above, unchanged
+#   array           -> items decide: a scalar item kind needs the matching
+#                      is_array_of_<scalar> (the scalar rules one level
+#                      down); items with properties need is_array_of_objects
+#                      whose class matches them (_class_compatible); bare
+#                      `type: object` / `type: array` items need
+#                      is_array_of_hash / is_array_of_array, what the
+#                      generator types them as
+#   object + props  -> is_object whose class matches them
+#   object + map    -> additionalProperties with properties needs
+#                      is_hash_of_objects whose class matches it; a scalar
+#                      value kind a typed scalar map (is_hash_of_quantity,
+#                      ...) by the scalar rules
+#   opaque object   -> see below
+#
+# The opaque map, { Str => 1 } / is_hash_of_str (arbitrary JSON, labels,
+# fieldsV1), is its own case and is not read as a string map: it matches
+# exactly the schema fragments the generator itself types as { Str => 1 } --
+# an object with neither properties nor a structured additionalProperties
+# (a scalar or unstructured additionalProperties, a boolean one, or none;
+# a $ref to %OPAQUE_TYPES). Reusing it there changes nothing about the
+# field. It does not match a map of structured objects, a structured
+# object, an array or a scalar, however permissive a plain HashRef is: that
+# would reuse a class that loses the schema's typing, and a match that
+# cannot be shown is not one. Nor does an opaque schema match a typed map
+# or a structured class -- the schema allows values those reject -- with
+# the one exception of ObjectMeta ($OBJECT_META below).
+#
+# A $ref is resolved read-only against the definitions _core_class_for was
+# handed, the way _schema_to_type_spec resolves it: the three apimachinery
+# scalars stay the 'string' kind they always were here, %OPAQUE_TYPES is the
+# opaque map, anything else is the object its definition describes. A $ref
+# that does not resolve cannot be shown compatible.
+#
+# Nested classes: every schema property must be declared by the class and
+# hold a compatible value (an undeclared one would end in the unknown-field
+# bag, or die under strict), the class must not require a key the schema
+# lacks, and _overrequires applies as it does one level up -- a nested
+# class the nested decision would refuse must not come in through its
+# parent. Keys only the class declares are fine otherwise: the reused class
+# is looser than the schema there, never lossy (the same direction
+# _overrequires accepts).
+#
+# Recursion: a (class, schema) pair met again while it is still being
+# checked further up (a recursive $ref'd definition against a recursive
+# class) counts as compatible at the repeat -- that pair's every other field
+# is being checked by the frame that entered it, so nothing unchecked is
+# waved through, and any finite value of the schema is held by the class.
+# The set is path-scoped, like IO::K8s::CRD's own, so a pair that recurs as
+# an unrelated sibling is checked again rather than taken on trust.
+# ---------------------------------------------------------------------------
+
+# The one structured class an unstructured object schema stands for. Below
+# the root, controller-gen renders an embedded metav1.ObjectMeta as a bare
+# `type: object` (the apiserver owns its shape) -- a PVC template's metadata
+# inside core Volume's ephemeral source, for one -- so there the schema IS
+# ObjectMeta, not some other opaque value, and ObjectMeta holds it, with any
+# key it does not declare kept in the unknown-field bag. Refusing it would
+# refuse the whole core Volume for every pod template a CRD embeds.
+my $OBJECT_META = 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta';
+
+sub _field_compatible {
+    my ($entry, $schema, $ctx) = @_;
+    return 0 unless ref $entry eq 'HASH' && ref $schema eq 'HASH';
+    if (defined(my $ref = $schema->{'$ref'})) {
+        $ref =~ s{^#/definitions/}{};
+        return _entry_compatible($entry, 'string') if _scalar_ref_type($ref);
+        return !!$entry->{is_hash_of_str} if $OPAQUE_TYPES{$ref};
+        my $def = _ref_definition($ref, $ctx) or return 0;
+        return $entry->{is_object} && _class_compatible($entry->{class}, $def, $ctx);
+    }
+    my $kind = _schema_type_kind($schema);
+    return _array_compatible($entry, $schema, $ctx)  if $kind eq 'array';
+    return _object_compatible($entry, $schema, $ctx) if $kind eq 'object';
+    return _entry_compatible($entry, $kind);
+}
+
+sub _array_compatible {
+    my ($entry, $schema, $ctx) = @_;
+    my $items = $schema->{items} // {};
+    return 0 unless ref $items eq 'HASH';
+    # items with a $ref: an array of the definition's class, no special-cased
+    # scalars -- the generator's items branch has none either
+    if (defined(my $ref = $items->{'$ref'})) {
+        $ref =~ s{^#/definitions/}{};
+        my $def = _ref_definition($ref, $ctx) or return 0;
+        return $entry->{is_array_of_objects} && _class_compatible($entry->{class}, $def, $ctx);
+    }
+    return $entry->{is_array_of_objects} && _class_compatible($entry->{class}, $items, $ctx)
+        if _has_properties($items);
+    my $kind = _schema_type_kind($items);
+    return !!$entry->{is_array_of_hash}  if $kind eq 'object';
+    return !!$entry->{is_array_of_array} if $kind eq 'array';
+    return _element_compatible($entry, 'is_array_of_', $kind);
+}
+
+sub _object_compatible {
+    my ($entry, $schema, $ctx) = @_;
+    return $entry->{is_object} && _class_compatible($entry->{class}, $schema, $ctx)
+        if _has_properties($schema);
+    my $addl = $schema->{additionalProperties};
+    # a boolean additionalProperties, or none: the opaque map -- or an
+    # embedded ObjectMeta (see $OBJECT_META)
+    unless (ref $addl eq 'HASH') {
+        return 1 if $entry->{is_hash_of_str};
+        return $entry->{is_object} && ($entry->{class} // '') eq $OBJECT_META;
+    }
+    if (defined(my $ref = $addl->{'$ref'})) {
+        $ref =~ s{^#/definitions/}{};
+        my $def = _ref_definition($ref, $ctx) or return 0;
+        return $entry->{is_hash_of_objects} && _class_compatible($entry->{class}, $def, $ctx);
+    }
+    return $entry->{is_hash_of_objects} && _class_compatible($entry->{class}, $addl, $ctx)
+        if _has_properties($addl);
+    # anything else the generator types as the opaque map, whatever the
+    # value schema says
+    return 1 if $entry->{is_hash_of_str};
+    my $kind = _schema_type_kind($addl);
+    return 0 if $kind eq 'array' || $kind eq 'object';
+    return _element_compatible($entry, 'is_hash_of_', $kind);
+}
+
+# Does $entry carry a scalar-element container flag ($prefix plus a scalar
+# name: is_array_of_int, is_hash_of_quantity, ...) whose scalar is
+# compatible with $kind under the scalar rules? is_hash_of_str is the
+# opaque map, not a string-valued one, and never counts here.
+sub _element_compatible {
+    my ($entry, $prefix, $kind) = @_;
+    for my $flag (grep { $entry->{$_} } keys %$entry) {
+        next if $flag eq 'is_hash_of_str';
+        next unless $flag =~ /^\Q$prefix\E(.+)\z/;
+        return 1 if _flag_compatible($kind, 'is_' . $1);
+    }
+    return 0;
+}
+
+# Does $class hold every value the object schema $schema describes? See
+# the block comment above for the rules and the recursion guard.
+sub _class_compatible {
+    my ($class, $schema, $ctx) = @_;
+    return 0 unless defined $class && _has_properties($schema);
+    my $pair = $class . '|' . refaddr($schema);
+    return 1 if $ctx->{active}{$pair};
+    return 0 unless $class->can('_k8s_attr_info') || eval { use_module($class); 1 };
+    local $ctx->{active}{$pair} = 1;
+
+    my $by_json = _attrs_by_json_key($class);
+    my $props   = $schema->{properties};
+    for my $key (keys %$props) {
+        return 0 unless _field_compatible($by_json->{$key}, $props->{$key}, $ctx);
+    }
+    for my $key (keys %$by_json) {
+        return 0 if $by_json->{$key}{required} && !exists $props->{$key};
+    }
+    if (defined $schema->{required}) {
+        my %schema_required = map { $_ => 1 } @{ $schema->{required} };
+        return 0 if _overrequires([ keys %$props ], \%schema_required, $class);
+    }
+    return 1;
+}
+
+# The definition a $ref names, from the definitions handed to
+# _core_class_for, or undef.
+sub _ref_definition {
+    my ($ref, $ctx) = @_;
+    my $def = $ctx->{defs} && $ctx->{defs}{$ref};
+    return ref $def eq 'HASH' ? $def : undef;
+}
+
+# $class's registry entries keyed by JSON key rather than attribute name.
+sub _attrs_by_json_key {
+    my ($class) = @_;
+    my $info = IO::K8s::Role::Resource::_k8s_attr_info($class);
+    my %by_json;
+    $by_json{ $info->{$_}{json_key} // $_ } = $info->{$_} for keys %$info;
+    return \%by_json;
 }
 
 # Do every one of @candidates agree, key by key, on type flags (ignoring
@@ -856,9 +1059,10 @@ sub _overrequires {
     return 0;
 }
 
-# The class to reuse for a nested object schema, or undef.
+# The class to reuse for a nested object schema, or undef. $all_defs, the
+# definitions the schema's $refs resolve against, is only read (k148).
 sub _core_class_for {
-    my ($schema) = @_;
+    my ($schema, $all_defs) = @_;
     return undef unless _has_properties($schema);
     my @keys = sort keys %{ $schema->{properties} };
     return undef if @keys < 2;  # a single shared key name is too common to trust
@@ -917,12 +1121,36 @@ sub _core_class_for {
             if @shared_vocab_before
             && !grep { _core_rank($_) < scalar @CORE_PREFERENCE } @candidates;
     }
-    return $candidates[0] if @candidates == 1;
-
     # Several type- and required-compatible candidates: reuse the preferred
     # one only if they are wire-identical (already preference-sorted by
     # core_class_for_shape, and filtering above preserves that order).
-    return _wire_identical(\@keys, @candidates) ? $candidates[0] : undef;
+    my $chosen = @candidates == 1                     ? $candidates[0]
+               : _wire_identical(\@keys, @candidates) ? $candidates[0]
+               :                                        undef;
+    return undef unless defined $chosen;
+
+    # k148: the class picked above must hold what the schema describes all
+    # the way down -- array elements, map values, nested objects (see
+    # _field_compatible) -- or nothing is reused. A gate on the pick rather
+    # than a sharper filter ahead of the tie-break, on purpose: this can
+    # only ever withdraw a reuse, never turn a shape that was ambiguous
+    # before into a new one, so every reuse that was already sound stays
+    # exactly as it was. Wire-identical candidates share their verdict here
+    # (same flags, same classes per key), so checking the preferred one is
+    # checking them all.
+    return _class_compatible($chosen, $schema, { defs => $all_defs, active => {} }) ? $chosen : undef;
+}
+
+# The scalar type a property-level $ref to one of the special apimachinery
+# types stands for (they are values, not object references), or undef.
+# Shared by _schema_to_type_spec and the reuse check (_field_compatible), so
+# the two read a $ref the same way.
+sub _scalar_ref_type {
+    my ($ref) = @_;
+    return 'IntOrStr' if $ref =~ /intstr\.IntOrString$/;
+    return 'Quantity' if $ref =~ /resource\.Quantity$/;
+    return 'Time'     if $ref =~ /meta\.v1\.(Micro)?Time$/;
+    return undef;
 }
 
 # Convert OpenAPI schema to k8s() type spec
@@ -956,14 +1184,8 @@ sub _schema_to_type_spec {
         $ref =~ s{^#/definitions/}{};
 
         # Special apimachinery types - not object references
-        if ($ref =~ /intstr\.IntOrString$/) {
-            return 'IntOrStr';
-        }
-        if ($ref =~ /resource\.Quantity$/) {
-            return 'Quantity';
-        }
-        if ($ref =~ /meta\.v1\.(Micro)?Time$/) {
-            return 'Time';
+        if (my $scalar = _scalar_ref_type($ref)) {
+            return $scalar;
         }
 
         # Opaque types should be HashRef, not object references
@@ -1028,7 +1250,7 @@ sub _schema_to_type_spec {
             }
             _croak_unresolved_ref($ref, "the items of $where");
         }
-        if ($may_reuse->('Item') and my $core = _core_class_for($items)) {
+        if ($may_reuse->('Item') and my $core = _core_class_for($items, $all_defs)) {
             return [ "+$core" ];
         }
         if (_has_properties($items)) {
@@ -1053,7 +1275,7 @@ sub _schema_to_type_spec {
     }
     elsif ($type eq 'object') {
         if (_has_properties($schema)) {
-            if ($may_reuse->(undef) and my $core = _core_class_for($schema)) {
+            if ($may_reuse->(undef) and my $core = _core_class_for($schema, $all_defs)) {
                 return "+$core";
             }
             return '+' . _nested_class($class, $field_name, undef, $schema, $all_defs, $namespace, $reuse_core, $reuse_core_except);
@@ -1068,7 +1290,7 @@ sub _schema_to_type_spec {
                 }
                 _croak_unresolved_ref($ref, "the additionalProperties of $where");
             }
-            if ($may_reuse->('Value') and my $core = _core_class_for($addl)) {
+            if ($may_reuse->('Value') and my $core = _core_class_for($addl, $all_defs)) {
                 return { "+$core" => 1 };
             }
             if (_has_properties($addl)) {
@@ -1461,6 +1683,27 @@ matching C<PodTemplateSpec>, C<JobTemplateSpec>,
 C<ResourceClaimTemplateSpec> and others, each with C<spec> typed
 differently -- stays a nested class rather than guess which one is meant.
 
+Surviving all of that is still not enough (k148): the chosen class must also
+hold what the schema describes all the way down, not merely match it key by
+key at the top level -- an array field's C<items>, a map's
+C<additionalProperties> values, and any nested object field are checked the
+same way, recursively. A C<$ref> met along the way is resolved read-only
+against the same definitions the schema's own C<$ref>s resolve against; one
+that does not resolve counts as not held, never as a pass. An opaque
+C<{ Str => 1 }> field on the candidate matches only a schema fragment that
+would itself become an opaque hash -- no C<properties>, no structured
+C<additionalProperties> -- with one exception: a bare C<{type: object}>
+field matches a candidate field typed as C<ObjectMeta>, since that is how
+C<controller-gen> renders an embedded C<metav1.ObjectMeta> below a CRD's
+root. A nested schema fragment that never states its own C<required> list
+makes no requiredness claim at that level either, the same rule the
+top-level check above follows. This is a final gate on the pick above, not a
+sharper filter ahead of it: it can only withdraw a reuse the checks above
+already chose, never manufacture a new one -- C<LabelSelectorRequirement>'s
+C<{key,operator,values}> shape stops being reused the moment a schema's own
+C<values> turns out to hold an array of objects rather than scalars; that
+schema gets its own nested class instead.
+
 =head1 FUNCTIONS
 
 =head2 get_or_generate($def_name, $schema, $all_defs, $namespace)
@@ -1619,7 +1862,11 @@ C<boolean> matches C<is_bool>; C<array> matches any C<is_array_of_*>;
 C<object>, whether the schema property has C<properties> of its own or is
 a map, matches C<is_object>, C<is_inline_struct> or any C<is_hash_of_*>),
 and -- when several type-compatible candidates remain -- requires them to
-be wire-identical before picking the preferred one.
+be wire-identical before picking the preferred one. Picking a class this way
+is still not the final word: it must also hold the schema all the way down
+-- array items, map values, nested object fields, checked recursively -- or
+nothing is reused after all (k148; see above for the full rule, including
+the C<$ref>, opaque-map and C<ObjectMeta> special cases).
 
 The index itself is precomputed and shipped as
 L<IO::K8s::AutoGen::CoreShapes>, regenerated by

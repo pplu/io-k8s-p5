@@ -35,6 +35,13 @@ Revision history for IO-K8s
     even after clear_cache. This includes add_crd; load a repaired schema
     into a fresh IO::K8s instance.
 
+  - AutoGen's reuse_core no longer types a nested schema as a shipped core
+    class whose array, map or nested field holds a different element type
+    (an array of objects as LabelSelectorRequirement's [Str] values), which
+    made valid data fail to inflate. Element types, map values and nested
+    fields are now compared recursively; reuse decisions for the bundled
+    providers are unchanged.
+
   - Declare Sub::Util as a direct runtime prerequisite.
 
 1.108     2026-09-22 00:53:53Z
