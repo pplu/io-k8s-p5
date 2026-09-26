@@ -488,6 +488,14 @@ attribute registry -- the same inflation L<IO::K8s/inflate> performs, so a
 struct from L</TO_JSON> round-trips back (k59). Before 1.108 this was a
 bare C<< $class->new(%$hash) >> and any nested field had to be pre-built.
 
+A defined value at an object-bearing position that is not a hashref (or
+already an object of the right class) -- an arrayref, a plain string, a
+code or scalar reference -- fails closed the same way inflation does
+everywhere else (k146): it croaks naming the target class, the shape it
+actually received, and, for a nested field, the field itself, rather than
+silently building an empty object. See L<IO::K8s/new_object> for the exact
+message. C<undef> and an omitted field are unaffected and remain allowed.
+
 =cut
 
 sub FROM_HASH {

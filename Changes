@@ -18,6 +18,11 @@ Revision history for IO-K8s
     strings: EnvVar value => 8080 now emits "8080" instead of a bare number
     the API server rejects. Opaque { Str => 1 } maps are unchanged.
 
+  - new_object, inflate, struct_to_object, json_to_object and FROM_HASH
+    refuse a non-hash value (array, string, code or scalar reference) at an
+    object position instead of silently building an empty object, with or
+    without strict. The error names the target class and the field.
+
   - Declare Sub::Util as a direct runtime prerequisite.
 
 1.108     2026-09-22 00:53:53Z

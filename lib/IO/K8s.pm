@@ -923,8 +923,12 @@ sub struct_to_object {
 # caller's class. It also forced expand_class()'s loadable-class probe to
 # stay broad enough to catch already-resolved names, which is what kept the
 # shadow window open.
+#
+# $where is optional and only ever read for an error message: _inflate_struct
+# passes the parent class and field a nested value sits under, so a refused
+# value can be found in the caller's manifest.
 sub _struct_to_object_expanded {
-    my ($self, $class, $params) = @_;
+    my ($self, $class, $params, $where) = @_;
 
     # Already an object of the right class — pass through as-is
     return $params if Scalar::Util::blessed($params) && $params->isa($class);
@@ -935,6 +939,23 @@ sub _struct_to_object_expanded {
     # alternatives) take over completely: they serialize as a bare value, not as
     # a hashref of attributes, so the generic path below would lose the data.
     return $class->FROM_STRUCT($params, $self) if $class->can('FROM_STRUCT');
+
+    # Every other class is built from a hash (a JSON object) and nothing
+    # else. A defined value of any other shape -- an array, a plain string,
+    # a CODE or SCALAR ref -- used to reach _inflate_struct's `return {}`
+    # fallback and come out as an empty object, so metadata => [] built a
+    # Pod with `metadata: {}` while Pod->new(metadata => []) failed its type
+    # check (k146). Refused here, after FROM_STRUCT, because the union
+    # classes above legitimately take arrays and booleans. Left alone on
+    # purpose: undef (no value, handled like an absent field) and any
+    # blessed object of another class, which _inflate_struct still reads
+    # through its TO_JSON. Independent of strict, which is about undeclared
+    # keys, not shape.
+    if (ref $params ne 'HASH' && defined $params && !Scalar::Util::blessed($params)) {
+        croak 'Cannot inflate '.$class.': expected a hash (a JSON object), got '
+            .(ref $params ? 'a reference of type '.ref($params) : 'a plain scalar')
+            .(defined $where ? ' while inflating '.$where : '');
+    }
 
     my $inflated = $self->_inflate_struct($class, $params);
     return $class->new(%$inflated);
@@ -1133,14 +1154,26 @@ sub _inflate_struct {
         # So these go straight to the pre-expanded path — sending them back
         # through expand_class() would re-interpret a name that is already
         # resolved (k35).
+        #
+        # The third argument names where a nested value sits, for the shape
+        # error _struct_to_object_expanded raises (k146) -- worded like the
+        # Bool message below and the element/key suffixes of the object
+        # coercers in IO::K8s::Resource.
         if ($info->{is_array_of_objects}) {
             my $inner_class = $info->{class};
-            $args{$attr} = [ map { $self->_struct_to_object_expanded($inner_class, $_) } @$value ];
+            $args{$attr} = [ map {
+                $self->_struct_to_object_expanded($inner_class, $value->[$_],
+                    $class.' field '.$attr.' at element '.$_)
+            } 0 .. $#$value ];
         } elsif ($info->{is_hash_of_objects}) {
             my $inner_class = $info->{class};
-            $args{$attr} = { map { $_ => $self->_struct_to_object_expanded($inner_class, $value->{$_}) } keys %$value };
+            $args{$attr} = { map {
+                $_ => $self->_struct_to_object_expanded($inner_class, $value->{$_},
+                    $class.' field '.$attr." at key '".$_."'")
+            } keys %$value };
         } elsif ($info->{is_object}) {
-            $args{$attr} = $self->_struct_to_object_expanded($info->{class}, $value);
+            $args{$attr} = $self->_struct_to_object_expanded($info->{class}, $value,
+                $class.' field '.$attr);
         } elsif ($info->{is_bool}) {
             # Same normalization the Bool coercer in IO::K8s::Resource applies.
             # It has to be the same one: this runs before $class->new(%args),
@@ -1813,6 +1846,23 @@ class doesn't exist either, the failure is Perl's own module-loading error
 This same fail-closed behaviour applies uniformly across C<new_object>,
 C<inflate>, C<json_to_object> and C<struct_to_object>.
 
+Independently of GVK resolution, a defined value at an object-bearing
+position -- a nested field such as C<spec> or C<metadata> anywhere inside
+the params, or (via L</struct_to_object> and L</json_to_object>) the
+top-level value itself -- must be a hashref, or an already-inflated object
+of the right class; anything else (an arrayref, a plain string, a code or
+scalar reference) dies naming the target class, the shape actually
+received, and, for a nested field, the field itself (k146):
+
+    Cannot inflate IO::K8s::Api::Core::V1::Pod: expected a hash (a JSON object), got a reference of type ARRAY
+    Cannot inflate IO::K8s::Api::Core::V1::PodSpec: expected a hash (a JSON object), got a plain scalar while inflating IO::K8s::Api::Core::V1::Pod field spec
+
+This applies uniformly across C<new_object>, C<inflate>, C<json_to_object>,
+C<struct_to_object> and L<IO::K8s::Role::Resource/FROM_HASH> on every
+class, and independently of C<strict> -- C<strict> only governs a
+constructor key no attribute claims, not the shape of a value that is
+present. C<undef> and an omitted field are unaffected and remain allowed.
+
 =head2 inflate
 
     my $obj = $k8s->inflate($json_string);
@@ -1827,6 +1877,10 @@ If C<kind>/C<apiVersion> amount to a GVK request that cannot be resolved, this
 dies with the same fail-closed error as L</new_object> -- see there for the
 exact message and the bare-Kind exemption.
 
+Independently of that, a defined non-hash value at an object-bearing
+position anywhere in the data also fails closed -- see L</new_object> for
+the exact message.
+
 =head2 json_to_object
 
     my $obj = $k8s->json_to_object($json_with_kind);
@@ -1840,6 +1894,10 @@ C<api_version>) that cannot be resolved, this dies with the same fail-closed
 error as L</new_object> -- see there for the exact message and the bare-Kind
 exemption.
 
+Independently of that, a defined non-hash value at an object-bearing
+position anywhere in the data also fails closed -- see L</new_object> for
+the exact message.
+
 =head2 struct_to_object
 
     my $obj = $k8s->struct_to_object(\%hashref_with_kind);
@@ -1852,6 +1910,10 @@ When the class argument is a GVK request (domain-qualified, or paired with an
 C<api_version>) that cannot be resolved, this dies with the same fail-closed
 error as L</new_object> -- see there for the exact message and the bare-Kind
 exemption.
+
+Independently of that, a defined non-hash value at an object-bearing
+position anywhere in the data also fails closed -- see L</new_object> for
+the exact message.
 
 If the target class provides a C<FROM_STRUCT> class method, it is called as
 C<< $class->FROM_STRUCT($struct, $k8s) >> and its return value is used as-is,
