@@ -41,7 +41,7 @@ principle, the lanes and this repo's hazards are in `.claude/rules/io-k8s-rules.
 | Implement / refactor / debug anything under `lib/` | `io-k8s-worker` (default) |
 | Write or extend tests in `t/` | `io-k8s-test-writer` |
 | POD, on the core or the API classes | `io-k8s-doc-writer` |
-| Pre-release audit | `io-k8s-release-checker` |
+| Commits, `Changes`, card → done, pre-release audit | `io-k8s-release-manager` |
 
 `io-k8s-doc-writer` is this repo's documentation lane.
 

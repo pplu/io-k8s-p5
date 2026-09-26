@@ -32,7 +32,7 @@ Depends on whether the Agent/Task tool is available to you.
 
 - **You can spawn subagents** (orchestrating main agent): Do NOT touch behavior-relevant
   code yourself — delegate. Your lane: coordinate, inspect, plan, review diffs, run tests,
-  manage git, edit `Changes`/`README`. When in doubt, delegate. Why: only the `io-k8s-*`
+  edit `Changes`/`README`. When in doubt, delegate. Why: only the `io-k8s-*`
   agents get their skills force-loaded via `briefing.skills`; you get no briefing and would
   touch the DSL and role mesh with too little context.
 
@@ -41,7 +41,7 @@ Depends on whether the Agent/Task tool is available to you.
   | Implement / refactor / debug anything under `lib/` | `io-k8s-worker` (default) |
   | Write or extend tests in `t/` | `io-k8s-test-writer` |
   | POD, on the core or the API classes | `io-k8s-doc-writer` |
-  | Pre-release audit | `io-k8s-release-checker` |
+  | Commits, `Changes`, card → done, pre-release audit | `io-k8s-release-manager` |
 
 - **You cannot spawn subagents** (you ARE an `io-k8s-*` agent): the lock does not apply —
   implement, refactor, debug and test per these rules.
@@ -49,6 +49,9 @@ Depends on whether the Agent/Task tool is available to you.
 Behavior-relevant = everything under `lib/`, the `k8s` DSL, the role mesh, types,
 serialization, resource maps, AutoGen, and the tests. Prose in `README.md` and `Changes`
 bullets are not.
+
+**Only `io-k8s-release-manager` commits.** A worker leaves a commit-ready tree and hands its card
+to `review`; you then dispatch `io-k8s-release-manager` to cut the commit and close the card.
 
 ## Coordination — karr board (always in scope)
 
@@ -58,7 +61,7 @@ repo (single distribution, one board, no cross-repo handoff).
 
 - `karr list --compact` / `karr board` — open work · `karr show ID` — detail
 - `karr create "Title" --priority high --tags a,b --body '…'` · `karr edit ID -a "note"`
-  · `--claim NAME` · `--block "why"` · `karr move ID in-progress` — full surface: skill `kanban-issues-karr-cli`
+  · `--claim NAME` · `--block "why"` · `karr move ID in-progress` — full surface: skill `kanban-issues-karr-coordination`
 
 Record drift and follow-up work as tickets rather than growing the current change.
 **Serialize board mutations when fanning out** — parallel implementation is fine, but collect

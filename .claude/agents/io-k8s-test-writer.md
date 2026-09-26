@@ -8,7 +8,7 @@ briefing:
     - getty-perl-core
     - io-k8s-core
     - perl-io-k8s-kubernetes-classes
-    - kanban-issues-karr-cli
+    - kanban-issues-karr-ticket
 ---
 
 You write tests for **IO::K8s**.
