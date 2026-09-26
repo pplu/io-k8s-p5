@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-26T18:30:04Z
+claimed_by: class-foundation
+class: standard
+completed: 2026-09-26T18:30:04Z
+created: 2026-09-26T04:11:43Z
+id: 144
+priority: high
+started: 2026-09-26T15:01:40Z
+status: done
+tags:
+- architecture
+- dsl
+- serialization
+title: DSL-Feldnamen können Methoden und normalisierte Attributnamen still überdecken
+updated: 2026-09-26T18:30:04Z
+---
+
+Strukturreview 2026-09-26, auf unverändertem master unabhängig reproduziert. Resource.pm:574 registriert ein Feld vor dem can()-Guard :583; ein bereits vorhandener Methodenname verhindert has(), ohne die Registrierung abzulehnen. Beispiel: Custom APIObject mit k8s conditions => Str; ->new(conditions => 'expected')->to_json emittiert conditions:[] über den Rollenhelper statt den eingegebenen Wert. Zweiter Fall: _sanitize_attr_name (:278) bildet x-value und x_value auf denselben Namen ab. k8s 'x-value' => Str; k8s x_value => Int; ->new('x-value' => 'text', x_value => 7) emittiert nur {x_value:0} und eine Numeric-Warnung. Registry und tatsächlicher Moo-Accessor laufen auseinander. Minimalrichtung: Kollisionen bei Deklaration deterministisch erkennen/abweisen; zulässiges Wiederverwenden geerbter Attribute ausdrücklich von Methoden- und JSON-Key-Kollisionen unterscheiden. k108 behob nur den konkreten json-Encoder-Konflikt, nicht dieses allgemeine Problem. Regressionsfälle müssen den Wire-Output prüfen. Im Review keine Codeänderung.
+
+Test-Lücke: t/77_json_field_collision.t:17-77 deckt nur json ab; t/42_registry_synthesis_roundtrip.t:397-504 erzeugt nur bereits vorhandene Registry-Klassen. t/56_serialization_k51_54_59.t:193-220 prüft einzelne normalisierte Namen, aber kein kollidierendes Paar; t/72_autogen_nested_objects.t:172-211 deckt Klassennamen statt Accessor-Namen ab.
+
+2026-09-26 18:30 Committed as 5d2b6392 (Reject k8s field declarations that collide with methods or attributes). Verified: prove -l t/02_compile_all.t t/107_k144_declaration_contract.t t/77_json_field_collision.t t/07_cilium.t PASS in isolated worktree.
