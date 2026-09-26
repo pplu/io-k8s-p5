@@ -23,6 +23,12 @@ Revision history for IO-K8s
     object position instead of silently building an empty object, with or
     without strict. The error names the target class and the field.
 
+  - SpecBuilder element writes (spec_push, indexed spec_set, map keys and
+    spec_merge) go through the field's own coercion and type check, like a
+    whole-field assignment: 'false' pushed into a [Bool] stays false, and a
+    bad element croaks at the write instead of later in to_json. A failed
+    multi-value spec_push changes nothing.
+
   - Declare Sub::Util as a direct runtime prerequisite.
 
 1.108     2026-09-22 00:53:53Z

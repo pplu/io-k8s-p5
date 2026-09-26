@@ -132,38 +132,91 @@ sub _sb_elem {
     return IO::K8s::Role::Resource::_default_k8s()->_struct_to_object_expanded($elem_class, $value);
 }
 
+# The collection an object's declared field holds, as a walk context: the
+# owning object, the attribute, the field's JSON key and its registry entry.
+# A walk that enters a container through such a field carries this along,
+# so a write into one of the container's elements can answer to the field's
+# own Moo coercion and type check (k147). undef when $node is not an object
+# or does not declare $seg -- a container reached as an element of another
+# container, or kept in the _unknown_fields bag, answers to no field and
+# keeps the free JSON rules of a plain hash or array.
+sub _sb_coll_ctx {
+    my ($node, $seg) = @_;
+    return undef unless _sb_is_obj($node);
+    my ($attr, $info) = _sb_attr($node, $seg);
+    return undef unless defined $attr;
+    return { owner => $node, attr => $attr, field => $seg, info => $info };
+}
+
+# Run the elements about to be written into a typed collection through the
+# field's own setter rules (k147). $new is a fresh container of the same
+# kind as the collection holding only those elements -- [ @values ] for a
+# push, [ $value ] for an index, { $key => $value } for a map key. The
+# field's effective Moo coercion and type check (the spec in force for the
+# owner's class, nearest first) run on it in the setter's order, coerce
+# before isa, and the coerced container comes back for the caller to write
+# into the collection in place -- so a reference spec_array or spec_hash
+# handed out earlier stays the live one, and nothing is written unless
+# every element passed.
+#
+# Checking the written elements alone is exact, not an approximation: every
+# coercion a collection field gets (the [Bool] and array/hash-of-objects
+# coercers in IO::K8s::Resource) maps element by element, and every isa it
+# gets is ArrayRef[X]/HashRef[X] (Maybe-wrapped when optional) -- the DSL
+# has no constraint on the collection as a whole. It also keeps the cost of
+# a write independent of the collection's size, and leaves elements that
+# arrived by direct mutation of the container alone (not checked, D1/D2).
+# A failure's element index counts from the first written element.
+sub _sb_coll_check {
+    my ($new, $ctx, $path, $what) = @_;
+    my $spec = IO::K8s::Role::Resource::_effective_attribute_specs(ref $ctx->{owner})
+        ->{ $ctx->{attr} } // {};
+    return _sb_guard($path, $what, sub {
+        my $value = $new;
+        $value = $spec->{coerce}->($value) if $spec->{coerce};
+        $spec->{isa}->($value) if $spec->{isa};
+        return $value;
+    });
+}
+
 # Store $value under $seg of $node. A declared field on an object goes
 # through its accessor (hashrefs inflated first, so the type constraint sees
-# an object); an undeclared one goes into the _unknown_fields bag. Returns
-# the value as stored.
+# an object); an undeclared one goes into the _unknown_fields bag. Inside a
+# collection a walk entered through a declared field ($ctx), the element
+# passes _sb_coll_check first; anywhere else it is stored as given.
+# Returns the value as stored -- after the setter's or the collection's
+# coercion, not the value handed in.
 sub _sb_store {
-    my ($node, $seg, $value, $path, $elem_class) = @_;
+    my ($node, $seg, $value, $path, $ctx) = @_;
     if (_sb_is_obj($node)) {
         my ($attr, $info) = _sb_attr($node, $seg);
         if (defined $attr) {
             $value = _sb_inflate($info, $value);
             _sb_guard($path, "cannot set '$seg'", sub { $node->$attr($value) });
-            return $value;
+            return $node->$attr;
         }
         return $node->_unknown_fields->{$seg} = $value;
     }
     if (ref $node eq 'ARRAY') {
         my $i = _sb_index($node, $seg, $path);
-        return $node->[$i] = _sb_elem($elem_class, $value);
+        ($value) = @{ _sb_coll_check([ $value ], $ctx, $path,
+            "cannot set '$seg' in '$ctx->{field}'") } if $ctx;
+        return $node->[$i] = $value;
     }
     if (ref $node eq 'HASH') {
-        return $node->{$seg} = _sb_elem($elem_class, $value);
+        $value = _sb_coll_check({ $seg => $value }, $ctx, $path,
+            "cannot set '$seg' in '$ctx->{field}'")->{$seg} if $ctx;
+        return $node->{$seg} = $value;
     }
     croak "spec path '$path': cannot store '$seg' in a " . (ref($node) || 'scalar');
 }
 
-# The class of the elements under an array/hash-of-objects field, when the
-# node is an object and the field is one; undef otherwise.
+# The class a new element of the collection $ctx describes must be: the
+# declared class of an array/hash-of-objects field; undef otherwise.
 sub _sb_elem_class {
-    my ($node, $seg) = @_;
-    return undef unless _sb_is_obj($node);
-    my (undef, $info) = _sb_attr($node, $seg);
-    return undef unless $info;
+    my ($ctx) = @_;
+    return undef unless $ctx;
+    my $info = $ctx->{info};
     return $info->{class} if $info->{is_array_of_objects} || $info->{is_hash_of_objects};
     return undef;
 }
@@ -171,10 +224,11 @@ sub _sb_elem_class {
 # What to create in an empty slot so a walk can continue. On an object the
 # registry decides: the declared class for a struct/object field, [] or {}
 # for the container forms, croak for a scalar. Inside an array or hash of
-# objects the element class. Elsewhere the next segment decides: an index
-# means an array, anything else a hash.
+# objects ($ctx) the element class. Elsewhere the next segment decides: an
+# index means an array, anything else a hash.
 sub _sb_fresh {
-    my ($node, $seg, $next, $elem_class, $path) = @_;
+    my ($node, $seg, $next, $ctx, $path) = @_;
+    my $elem_class = _sb_is_obj($node) ? undef : _sb_elem_class($ctx);
     if (_sb_is_obj($node)) {
         my (undef, $info) = _sb_attr($node, $seg);
         if ($info) {
@@ -228,19 +282,20 @@ sub _sb_root {
         ? _sb_guard($path, "cannot create $info->{class} for 'spec'", sub { use_module($info->{class})->new })
         : {};
     $self->spec($spec);
-    return $spec;
+    return $self->spec;
 }
 
 # Walk to the parent of the last segment, creating what is missing. Returns
-# ($parent, $last_segment, $elem_class): $elem_class names the class a new
-# element of $parent must be when $parent is an array or hash of objects.
+# ($parent, $last_segment, $ctx): $ctx is the collection context (see
+# _sb_coll_ctx) when $parent is a container held by a declared field --
+# spec itself included -- and undef otherwise.
 sub _sb_walk_vivify {
     my ($self, $path) = @_;
     my @segs = split /\./, $path;
     my $last = pop @segs;
     croak "spec path '$path' is empty" unless defined $last && length $last;
     my $node = $self->_sb_root(1, $path);
-    my $elem_class;
+    my $ctx  = _sb_coll_ctx($self, 'spec');
     for my $i (0 .. $#segs) {
         my $seg  = $segs[$i];
         my $next = $i < $#segs ? $segs[$i + 1] : $last;
@@ -248,17 +303,16 @@ sub _sb_walk_vivify {
         if (defined $child && !ref $child) {
             croak "spec path '$path': cannot descend through scalar field '$seg'";
         }
-        my $child_elem_class = _sb_elem_class($node, $seg);
         unless (ref $child) {
-            $child = _sb_fresh($node, $seg, $next, $elem_class, $path);
-            $child = _sb_store($node, $seg, $child, $path, $elem_class);
+            $child = _sb_fresh($node, $seg, $next, $ctx, $path);
+            $child = _sb_store($node, $seg, $child, $path, $ctx);
         }
-        # Elements of a container we just entered are typed only when the
-        # object we came from declared the container as one of objects.
-        $elem_class = $child_elem_class;
+        # A container we just entered answers to a field only when the
+        # object we came from declares it; an element of a container does not.
+        $ctx  = _sb_coll_ctx($node, $seg);
         $node = $child;
     }
-    return ($node, $last, $elem_class);
+    return ($node, $last, $ctx);
 }
 
 =method spec_get
@@ -318,8 +372,8 @@ yourself and hand it to C<spec_set> as the value.
 
 sub spec_set {
     my ($self, $path, $value) = @_;
-    my ($parent, $last, $elem_class) = $self->_sb_walk_vivify($path);
-    _sb_store($parent, $last, $value, $path, $elem_class);
+    my ($parent, $last, $ctx) = $self->_sb_walk_vivify($path);
+    _sb_store($parent, $last, $value, $path, $ctx);
     return $self;
 }
 
@@ -334,17 +388,28 @@ or iterate in place. Croaks if the path already holds a defined,
 non-array value. Vivifies intermediates the same way C<spec_set> does,
 including the required-attribute croak described there.
 
+The returned arrayref is the same one the object holds, not a copy:
+pushing, splicing or otherwise mutating it directly bypasses the
+declared field's coercion and type check that C<spec_push>/C<spec_set>
+apply (k147) -- use those when a new element needs checking.
+
     push @{ $ir->spec_array('entryPoints') }, 'websecure';
 
 =cut
 
 sub spec_array {
     my ($self, $path) = @_;
-    my ($parent, $last, $elem_class) = $self->_sb_walk_vivify($path);
+    return _sb_array($self->_sb_walk_vivify($path), $path);
+}
+
+# The array under $last of $parent, stored there first when the slot is
+# empty; spec_array and spec_push share it so a push walks the path once.
+sub _sb_array {
+    my ($parent, $last, $ctx, $path) = @_;
     my $array = _sb_child($parent, $last);
     return $array if ref $array eq 'ARRAY';
     croak "spec path '$path': '$last' holds a non-array value" if defined $array;
-    return _sb_store($parent, $last, [], $path, $elem_class);
+    return _sb_store($parent, $last, [], $path, $ctx);
 }
 
 =method spec_hash
@@ -358,18 +423,25 @@ field is a typed struct or referenced class. Croaks if the path already
 holds a defined scalar. Vivifies intermediates the same way C<spec_set>
 does, including the required-attribute croak described there.
 
+The returned container is the same one the object holds, not a copy:
+writing into it directly does not run the declared field's coercion or
+type check the way C<spec_set> does (k147) -- on a plain hash or an
+opaque spec value that is nothing new, but on a typed value map (C<<
+{ Quantity => 1 } >>) a value written this way skips the per-key
+validation C<spec_set> would apply.
+
     $ir->spec_hash('tls')->{secretName} = 'my-cert';
 
 =cut
 
 sub spec_hash {
     my ($self, $path) = @_;
-    my ($parent, $last, $elem_class) = $self->_sb_walk_vivify($path);
+    my ($parent, $last, $ctx) = $self->_sb_walk_vivify($path);
     my $node = _sb_child($parent, $last);
     return $node if ref $node;
     croak "spec path '$path': '$last' holds a scalar" if defined $node;
-    my $fresh = _sb_fresh($parent, $last, undef, $elem_class, $path);
-    return _sb_store($parent, $last, $fresh, $path, $elem_class);
+    my $fresh = _sb_fresh($parent, $last, undef, $ctx, $path);
+    return _sb_store($parent, $last, $fresh, $path, $ctx);
 }
 
 =method spec_push
@@ -390,10 +462,13 @@ value is kept as is. Returns C<$self> for chaining.
 
 sub spec_push {
     my ($self, $path, @values) = @_;
-    my $array = $self->spec_array($path);
-    my ($parent, $last) = $self->_sb_walk_vivify($path);
-    my $item_class = _sb_elem_class($parent, $last);
-    push @$array, map { _sb_elem($item_class, $_) } @values;
+    my ($parent, $last, $ctx) = $self->_sb_walk_vivify($path);
+    my $array = _sb_array($parent, $last, $ctx, $path);
+    # The array's own field, not its parent's: the values become its elements.
+    my $array_ctx = _sb_coll_ctx($parent, $last);
+    @values = @{ _sb_coll_check([ @values ], $array_ctx, $path,
+        "cannot push onto '$last'") } if $array_ctx;
+    push @$array, @values;
     return $self;
 }
 
@@ -416,7 +491,7 @@ sub spec_merge {
     my ($self, %data) = @_;
     for my $key (keys %data) {
         my $root = $self->_sb_root(1, $key);
-        _sb_store($root, $key, $data{$key}, $key);
+        _sb_store($root, $key, $data{$key}, $key, _sb_coll_ctx($self, 'spec'));
     }
     return $self;
 }
@@ -522,6 +597,23 @@ or writing a declared field is re-raised with that prefix, such as:
     spec path 'PATH': cannot set 'SEG': ORIGINAL MESSAGE
     spec path 'PATH': cannot create CLASS for 'SEG': ORIGINAL MESSAGE
     spec path 'PATH': cannot clear 'SEG': ORIGINAL MESSAGE
+    spec path 'PATH': cannot set 'SEG' in 'FIELD': ORIGINAL MESSAGE
+    spec path 'PATH': cannot push onto 'FIELD': ORIGINAL MESSAGE
+
+The last two are element writes into a typed collection (k147):
+C<spec_push>, an indexed C<spec_set>, a map key written through
+C<spec_set>, and C<spec_merge> all run the value through the same
+coercion and type check the collection's declared field applies to a
+whole-field assignment, not a looser per-element rule -- C<<
+->spec_set('flags.0', 'false') >> on a field typed C<[Bool]> stores plain
+C<0>, exactly as C<< ->flags(['false']) >> would, and an element the
+field's type rejects croaks at the write instead of surviving until
+C<to_json> serializes it. A multi-value C<spec_push> checks and coerces
+every new value together before appending any of them, so one bad value
+among several leaves the array unchanged. This applies only to a
+collection reached through a declared field; an element inside the
+C<_unknown_fields> bag or an opaque C<< { Str => 1 } >> spec value keeps
+the free JSON rules of a plain hash or array instead, unchecked.
 
 The walk's own checks use the same C<spec path 'PATH':> prefix for the
 failures they detect directly, too: an invalid or out-of-range array
