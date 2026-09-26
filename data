@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-26T18:30:24Z
+claimed_by: class-foundation
+class: standard
+completed: 2026-09-26T18:30:24Z
+created: 2026-09-26T04:13:07Z
+id: 149
+priority: medium
+started: 2026-09-26T15:40:54Z
+status: done
+tags:
+- autogen
+- cache
+- architecture
+title: Fehlgeschlagene AutoGen-Erzeugung hinterlässt eine nutzbare Teilklasse im Cache
+updated: 2026-09-26T18:30:24Z
+---
+
+Strukturreview 2026-09-26, unabhängig reproduziert. IO::K8s mit openapi_spec für review.example/v1 Widget: Feld okay:string, Feld zbroken mit $ref #/definitions/Missing. Erster identischer inflate-Aufruf scheitert erwartungsgemäß an fehlendem Ref; zweiter gelingt, liefert aber ein Objekt ohne api_version-Methode. Die Unknown-Field-Bag erhält das JSON und verdeckt die fehlende APIObject-Rollenkomposition. AutoGen.pm:103-110 gibt Cachetreffer zurück; :209-210 markiert die Klasse vor der fehlerfähigen Feldgenerierung :274-281 als generiert; Identität/Rolle kommt erst :284-311. Die für rekursive Typen nötige In-progress-Markierung von erfolgreich fertigen Klassen unterscheiden und Fehlerzustand sauber invalidieren; dabei partielle Perl-Package-/Registry-Zustände sowie erneuten Versuch im selben Prozess testen. Keine Implementierung im Review.
+
+2026-09-26 18:30 Committed as 1ac9db2c (Fail closed after a failed AutoGen generation run). Verified: prove -l t/02_compile_all.t t/110_k149_autogen_failed_generation.t t/73_add_crd.t PASS in isolated worktree.
