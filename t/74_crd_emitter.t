@@ -19,10 +19,23 @@ my $classes = IO::K8s::CRD->generate($crd, 'IO::K8s::_AUTOGEN_emit');
 my $root = $classes->{'opts.example.com/v1'};
 
 my $emitter = IO::K8s::CRD::Emitter->new(
-    base  => 'TestEmit::V1',
-    names => { "$root\::Spec::Limit" => 'RateLimit' },
+    base    => 'TestEmit::V1',
+    names   => { "$root\::Spec::Limit" => 'RateLimit' },
+    version => '1.108',
 );
 my $files = $emitter->render($root);
+
+subtest 'default version follows the Emitter module version' => sub {
+    my $default = IO::K8s::CRD::Emitter->new(base => 'TestEmitDefault::V1');
+    is($default->version, $IO::K8s::CRD::Emitter::VERSION,
+        'default version is the current Emitter module version');
+
+    my $default_files = $default->render($root);
+    my ($rendered_version) = $default_files->{'TestEmitDefault/V1/Knob.pm'}
+        =~ /^our \$VERSION = '([^']+)';$/m;
+    is($rendered_version, $IO::K8s::CRD::Emitter::VERSION,
+        'rendered source writes the default Emitter module version');
+};
 
 subtest 'one file per class, named from the base and the name map' => sub {
     is_deeply([ sort keys %$files ], [
@@ -218,7 +231,10 @@ subtest 'non-ASCII patterns, enum values and descriptions render UTF-8-safely' =
     my ($u_crd) = @{ IO::K8s::CRD->load("$FindBin::Bin/data/crd-utf8.yaml") };
     my $u_classes = IO::K8s::CRD->generate($u_crd, 'IO::K8s::_AUTOGEN_utf8emit');
     my $u_root = $u_classes->{'utf8.example.com/v1'};
-    my $u_emitter = IO::K8s::CRD::Emitter->new(base => 'TestUtf8::V1');
+    my $u_emitter = IO::K8s::CRD::Emitter->new(
+        base    => 'TestUtf8::V1',
+        version => '1.108',
+    );
     my $u_files = $u_emitter->render($u_root);
 
     is_deeply([ sort keys %$u_files ], [
