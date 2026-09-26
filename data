@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-26T18:30:14Z
+claimed_by: class-foundation
+class: standard
+completed: 2026-09-26T18:30:14Z
+created: 2026-09-26T04:11:44Z
+id: 146
+priority: high
+started: 2026-09-26T15:40:54Z
+status: done
+tags:
+- inflation
+- validation
+- architecture
+title: Factory-Inflation ersetzt ungültige Objektwerte durch leere Objekte
+updated: 2026-09-26T18:30:14Z
+---
+
+Strukturreview 2026-09-26, unabhängig reproduziert: IO::K8s->new(strict=>1)->new_object('Pod', metadata=>[]) gelingt und emittiert metadata:{}, während IO::K8s::Api::Core::V1::Pod->new(metadata=>[]) korrekt an Maybe[InstanceOf[ObjectMeta]] scheitert. Es geht NICHT um strengere Unknown-Field- oder Schema-required-Regeln: Ein Array im bekannten Objektfeld wird still zu einem anderen Datentyp umgeschrieben. Factory und direkter Konstruktor müssen für dieselbe deklarierte Feldform kompatible Fehler-/Konversionsregeln haben. Den Fallback in _inflate_struct prüfen, der aus nicht-Hash-Werten {} konstruiert; Regression über inflate/new_object/direct new, inkl. verschachtelter Felder. Im Review keine Codeänderung.
+
+2026-09-26 18:30 Committed as 32a23e19 (Refuse non-hash values at object-bearing positions during inflation). Verified: prove -l t/02_compile_all.t t/109_k146_object_shape.t PASS in isolated worktree.
