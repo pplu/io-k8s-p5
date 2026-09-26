@@ -11,8 +11,41 @@ use Package::Stash;
 use Scalar::Util qw(blessed reftype looks_like_number);
 use Types::Standard qw( Bool Int Str );
 
-# Cache of generated classes
+# Cache of generated classes -- only classes whose generation run completed
+# (see "Generation runs" below). generated_classes() lists exactly these.
 my %_generated;
+
+# ---------------------------------------------------------------------------
+# Generation runs (k149)
+#
+# A root get_or_generate call is one small transaction, a "run". Every class
+# first begun during it -- the root, each $ref'd definition generated on the
+# way, each nested class -- stays pending until the whole run, identity
+# methods and roles included, has succeeded; only then do they all become
+# complete together. A class is marked begun early, before its own fields
+# exist, because a recursive type (A.child => A, A => B => A) must be able to
+# name it; a pending class is only ever handed back to that same run's
+# recursion, never as a public cache hit.
+#
+# If the run dies, every class it began is recorded as failed, keyed by
+# class name (so per namespace), with the run's original error -- including
+# a dependency whose own fields finished cleanly, since it may well point
+# back at the class that died. Nothing is rolled back: the packages, the Moo
+# internals and the attribute registry keep whatever the run built. Any
+# later request that would hand out one of those classes, directly or as a
+# dependency, rethrows that original error instead. Classes that were
+# already complete before the run are untouched. The failure record is never
+# cleared, not even by clear_cache(), which would otherwise revive a
+# half-built package; a repaired schema is generated into a fresh namespace
+# (a fresh IO::K8s instance gets one).
+# ---------------------------------------------------------------------------
+
+# class name -> the original error of the run that began it and died
+my %_failed;
+
+# The classes begun by the generation run in progress, as a { $class => 1 }
+# hashref; undef between runs. Only _in_generation_run sets or clears it.
+my $_run;
 
 # Perl's own limit on a fully qualified identifier is 251 characters. A
 # path-derived nested class name (see _nested_class below) is kept while it
@@ -104,10 +137,59 @@ sub get_or_generate {
     my ($def_name, $schema, $all_defs, $namespace, %opts) = @_;
 
     my $class = _class_name_for($def_name, $schema, $namespace, $opts{api_version});
-    return $class if $_generated{$class};
+    return $class if _class_usable($class);
 
-    _generate_class($class, $def_name, $schema, $all_defs, $namespace, %opts);
+    _in_generation_run(sub {
+        _generate_class($class, $def_name, $schema, $all_defs, $namespace, %opts);
+    });
     return $class;
+}
+
+# Run $code as a generation run (see "Generation runs" above). A request made
+# while a run is already in progress -- a $ref reached from inside the
+# property loop -- joins that run instead of opening its own, so the root
+# call's run is the one unit that commits or fails.
+sub _in_generation_run {
+    my ($code) = @_;
+    return $code->() if $_run;
+
+    $_run = {};
+    my $ok  = eval { $code->(); 1 };
+    my $err = $@ || 'IO::K8s::AutoGen: class generation died without an error message';
+    my @begun = keys %$_run;
+    undef $_run;
+
+    if ($ok) {
+        $_generated{$_} = 1 for @begun;
+        return;
+    }
+    $_failed{$_} = $err for @begun;
+    die $err;  # rethrow unchanged: croak would restamp it with our caller
+}
+
+# Rethrow the original error of the failed run that began $class, if any.
+# The first failure reaches the caller unchanged (_in_generation_run); a
+# later request gets it again behind a prefix saying it is a remembered
+# failure -- otherwise a dependency asked for directly would die naming
+# another class's field and the first call's line. The original message is
+# kept whole. An exception object is rethrown as it is, never stringified.
+sub _rethrow_failed {
+    my ($class) = @_;
+    return unless exists $_failed{$class};
+    my $err = $_failed{$class};
+    die $err if ref $err;
+    chomp $err;
+    croak 'IO::K8s::AutoGen: '.$class.' failed to generate earlier in this namespace '
+        .'and stays failed; load a repaired schema into a fresh IO::K8s instance. '
+        .'Original error: '.$err;
+}
+
+# True when $class can be handed out as it is: complete, or begun earlier in
+# the run in progress (recursion). Rethrows instead when its run failed.
+sub _class_usable {
+    my ($class) = @_;
+    _rethrow_failed($class);
+    return $_generated{$class} || ($_run && $_run->{$class});
 }
 
 # Class identity for a definition. A definition whose
@@ -186,9 +268,10 @@ sub _generate_class {
     my ($class, $def_name, $schema, $all_defs, $namespace, %opts) = @_;
 
     # Determine api_version/kind from schema or explicit options. This has
-    # to happen before the class is marked generated: a fail-closed error
-    # here (ambiguous or non-matching api_version) must not leave a
-    # half-generated stub in the cache that a later retry would return.
+    # to happen before the class is marked begun: a fail-closed error here
+    # (ambiguous or non-matching api_version) builds nothing, so it must not
+    # record the class as failed either -- a retry with a matching
+    # api_version resolves to the same class name and has to work.
     my ($api_ver, $kind_val, $res_plural, $is_namespaced);
     if (my $gvk = $schema->{'x-kubernetes-group-version-kind'}) {
         my $entry = _select_gvk_entry($gvk, $opts{api_version}, $def_name);
@@ -206,8 +289,9 @@ sub _generate_class {
     $res_plural    = $opts{resource_plural} if exists $opts{resource_plural};
     $is_namespaced = $opts{is_namespaced}   if exists $opts{is_namespaced};
 
-    return if $_generated{$class};
-    $_generated{$class} = 1;  # Mark early to prevent recursion
+    return if _class_usable($class);
+    croak "IO::K8s::AutoGen: $class generated outside a generation run" unless $_run;
+    $_run->{$class} = 1;  # Mark begun early to allow recursion; pending until the run commits
     $_descriptions{$class} = $schema->{description} if defined $schema->{description};
 
     # Ensure parent packages exist
@@ -454,7 +538,9 @@ sub _nested_class {
                 . "its class name $logical_name is already taken by field '$existing' "
                 . "-- two schema keys collapse to the same class segment; rename one of them";
         }
-        return _class_for_path($root, $path);
+        my $existing_class = _class_for_path($root, $path);
+        _rethrow_failed($existing_class);
+        return $existing_class;
     }
     $_nested_origin{$logical_name} = $field_name;
 
@@ -1192,7 +1278,9 @@ sub _ensure_package_exists {
     }
 }
 
-# Clear generated class cache (mainly for testing)
+# Clear generated class cache (mainly for testing). %_failed is left alone on
+# purpose: forgetting a failure would let the next request return the
+# half-built package that failed run left behind (k149).
 sub clear_cache {
     %_generated = ();
     %_nested_origin = ();
@@ -1227,7 +1315,8 @@ sub class_path {
     return $_class_path{$class};
 }
 
-# List all generated classes
+# List all generated classes -- complete ones only; a class begun by a run
+# that failed is never listed (k149)
 sub generated_classes {
     return keys %_generated;
 }
@@ -1417,6 +1506,31 @@ selection fails closed rather than pick a version.
 
 =back
 
+A failure anywhere in this process is a failure of the whole generation run
+(k149), not just of the one class being built: the root class, every
+C<$ref>'d definition generated on the way, and every nested class -- the
+"run" -- succeed or fail together. The one exception is the GVK-selection
+failure above (the third bullet): it happens before the class is marked as
+begun, so it builds, and poisons, nothing -- a retry with a matching
+C<api_version> resolves to the same class name and works normally. Any other
+failure during the run -- an unresolved C<$ref> surfacing from a nested
+class several levels down, a bad C<additionalProperties>, or anything else
+the run's own code raises -- marks every class the run began, in this call's
+C<$namespace>, as permanently failed with that run's original error, even a
+dependency whose own fields had already finished cleanly (it may well point
+back at the class that died). Nothing already built is rolled back -- the
+packages and their Moo internals stay exactly as the run left them -- but a
+later request for any of those classes, whether asked for directly or
+reached again as another class's dependency, re-raises the original error
+behind a prefix explaining that the class failed earlier and stays failed,
+rather than handing back a half-typed package or silently rebuilding it.
+This failure record survives L</clear_cache()>; the only way to retry is to
+load a repaired schema into a fresh C<IO::K8s> instance, which gets its own
+AutoGen namespace and so a class name the earlier failure never touched.
+C<add_crd> in L<IO::K8s::CRD>, which calls this function, inherits the same
+contract: a CRD that fails to generate stays failed for that C<IO::K8s>
+instance.
+
 One partial-spec shape still generates successfully by design: a top-level
 CRD schema whose C<metadata> C<$ref>s the standard C<ObjectMeta> without
 shipping its definition. C<metadata> is supplied by the role and is skipped
@@ -1445,9 +1559,20 @@ but regenerating the same names into the same namespace afterward is
 unsupported: Moo cannot rebuild an existing package, and L</"class_path($class)"> /
 L</"class_root($class)"> forget what they knew about the classes this cleared.
 
+A class that failed to generate (see
+L</get_or_generate($def_name, $schema, $all_defs, $namespace)>) is not reset
+by this call -- its failure record is kept on purpose, so a later request
+for it still re-raises the run's original error instead of handing back the
+half-built package the failed run left behind (k149). The only way to retry
+that class is to generate it into a fresh C<IO::K8s> instance's namespace.
+
 =head2 generated_classes()
 
-List all generated class names.
+List the class names whose generation run completed successfully. A class
+begun by a run that later failed is never listed here, even though its
+package may still exist in memory and even though it can never be generated
+again in this namespace (k149; see
+L</get_or_generate($def_name, $schema, $all_defs, $namespace)>).
 
 =head2 class_description($class)
 

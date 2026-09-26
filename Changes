@@ -29,6 +29,12 @@ Revision history for IO-K8s
     bad element croaks at the write instead of later in to_json. A failed
     multi-value spec_push changes nothing.
 
+  - AutoGen fails closed after a failed generation: every class the failed
+    run began stays failed, and later requests die with the original error
+    behind an explanatory prefix instead of returning a half-built class,
+    even after clear_cache. This includes add_crd; load a repaired schema
+    into a fresh IO::K8s instance.
+
   - Declare Sub::Util as a direct runtime prerequisite.
 
 1.108     2026-09-22 00:53:53Z
