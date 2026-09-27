@@ -13,6 +13,13 @@ use IO::K8s ();
 use IO::K8s::AutoGen ();
 use IO::K8s::Resource ();
 
+# Carp treats IO::K8s as part of this module (k165): a croak from load or
+# generate reached through IO::K8s->add_crd names the line that called
+# add_crd, not add_crd's own line in lib/IO/K8s.pm, and the "Cannot open"
+# IO::K8s->_slurp_utf8 raises for load names load's caller, not this file.
+# A caller in any other package still sees its own line.
+our @CARP_NOT = ('IO::K8s');
+
 # The typed class crd_for_class() and new() build and return (D9). Kept as
 # a constant rather than spelled out at each call site -- the brief's own
 # shorthand ('IO::K8s::Apiextensions::Pkg::...') drops the
