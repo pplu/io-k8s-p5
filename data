@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T20:53:59Z
+claimed_by: followups-3
+class: standard
+completed: 2026-09-27T20:53:54Z
+created: 2026-09-27T04:55:44Z
+id: 158
+priority: low
+started: 2026-09-27T19:53:06Z
+status: done
+tags:
+- crd
+title: 'to_crd: Subresources deklarierbar, nullable Felder mit explizitem null'
+updated: 2026-09-27T20:53:59Z
+---
+
+Aus Kubernetes::Comb: (1) Eine Klasse kann für to_crd keine Subresources (status, scale) deklarieren; Kubernetes::Comb::CRD::Comb erweitert to_crd deshalb selbst. (2) Ein JSON null wird beim Lesen verworfen und nie geschrieben; SPEC von Kubernetes::Comb unterscheidet spec.upstream: null (explizit lokal) von fehlendem Key. CombSpec überschreibt dafür FROM_STRUCT/TO_JSON. Ein k8s-Attribut-Flag wie nullable (Schema nullable: true, null bleibt erhalten, Prädikat für "existiert") würde beide Erweiterungen überflüssig machen.
+
+Umgesetzt auf fix/followups-3, uncommittet (io-k8s-worker). Teil 1 nullable (has_/clear_, null bleibt erhalten), Teil 2 subresources-Importparameter. prove -lr t/ 130 Dateien 9134 Tests PASS, t/25/t/26 PASS, Drift-Check byte-identisch, Kubernetes::Comb-Suite gegen den Baum grün.
+
+Commit 3e9a7d1d (nullable), fffc21f9 (subresources)
