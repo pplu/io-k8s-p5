@@ -830,15 +830,28 @@ sub core_class_for_shape {
 }
 
 # The JSON-schema "kind" a property's type dispatches on for reuse-safety
-# purposes -- string / integer / number / boolean / array / object.
-# Mirrors _schema_to_type_spec's own dispatch (including its
-# x-kubernetes-int-or-string check and its Str fallback for anything
-# unmodeled) without generating anything, since _core_class_for needs this
-# for a schema fragment it may end up NOT typing as an object at all.
+# purposes -- string / int-or-string / integer / number / boolean / array /
+# object. Mirrors _schema_to_type_spec's own dispatch (including its
+# x-kubernetes-int-or-string and `format: int-or-string` checks and its Str
+# fallback for anything unmodeled) without generating anything, since
+# _core_class_for needs this for a schema fragment it may end up NOT typing
+# as an object at all.
+#
+# int-or-string is a kind of its own (k181), not 'string': it used to be
+# read as one, which made a Str field -- or [Str] one level down -- a match,
+# and since k145 a Str goes out as a JSON string, so a reused class turned
+# the schema's 8080 into "8080". It matches an IntOrStr field, and a
+# Quantity one: controller-gen renders a resource.Quantity as
+# x-kubernetes-int-or-string with the quantity pattern (the emitter reads
+# that back as Quantity, k125), and a CRD embedding a pod template or a
+# ResourceList would otherwise stop reusing every core class that holds a
+# Quantity. A Time -- no int-or-string value passes its check -- it never
+# matches.
 sub _schema_type_kind {
     my ($schema) = @_;
-    return 'string' if eval { IO::K8s::Resource::_normalize_bool($schema->{'x-kubernetes-int-or-string'}) };
+    return 'int-or-string' if eval { IO::K8s::Resource::_normalize_bool($schema->{'x-kubernetes-int-or-string'}) };
     my $type = $schema->{type} // '';
+    return 'int-or-string' if $type eq 'string' && ($schema->{format} // '') eq 'int-or-string';
     return 'integer' if $type eq 'integer';
     return 'number'  if $type eq 'number';
     return 'boolean' if $type eq 'boolean';
@@ -854,10 +867,11 @@ sub _schema_type_kind {
 # map's values are is decided by _field_compatible below (k148), which asks
 # _flag_compatible about scalar kinds only.
 my %_TYPE_COMPAT = (
-    string  => { map { $_ => 1 } qw( is_str is_int_or_string is_quantity is_time ) },
-    integer => { map { $_ => 1 } qw( is_int is_int_or_string ) },
-    number  => { map { $_ => 1 } qw( is_num ) },
-    boolean => { map { $_ => 1 } qw( is_bool ) },
+    string          => { map { $_ => 1 } qw( is_str is_int_or_string is_quantity is_time ) },
+    'int-or-string' => { map { $_ => 1 } qw( is_int_or_string is_quantity ) },
+    integer         => { map { $_ => 1 } qw( is_int is_int_or_string ) },
+    number          => { map { $_ => 1 } qw( is_num ) },
+    boolean         => { map { $_ => 1 } qw( is_bool ) },
 );
 
 sub _flag_compatible {
@@ -920,8 +934,10 @@ sub _entry_compatible {
 # the one exception of ObjectMeta ($OBJECT_META below).
 #
 # A $ref is resolved read-only against the definitions _core_class_for was
-# handed, the way _schema_to_type_spec resolves it: the three apimachinery
-# scalars stay the 'string' kind they always were here, %OPAQUE_TYPES is the
+# handed, the way _schema_to_type_spec resolves it: the apimachinery scalars
+# are values -- IntOrString the int-or-string kind (k181), Quantity and Time
+# the 'string' kind they always were here -- as a property, as items and as
+# map values alike (k178, see _scalar_ref_kind), %OPAQUE_TYPES is the
 # opaque map, an apiextensions union name is its shipped class
 # (%UNION_TYPES), anything else is the object its definition describes. A
 # $ref that does not resolve cannot be shown compatible.
@@ -958,7 +974,9 @@ sub _field_compatible {
     return 0 unless ref $entry eq 'HASH' && ref $schema eq 'HASH';
     if (defined(my $ref = $schema->{'$ref'})) {
         $ref =~ s{^#/definitions/}{};
-        return _entry_compatible($entry, 'string') if _scalar_ref_type($ref);
+        if (my $kind = _scalar_ref_kind($ref)) {
+            return _entry_compatible($entry, $kind);
+        }
         return !!$entry->{is_hash_of_str} if $OPAQUE_TYPES{$ref};
         if (my $union = _union_class($ref)) {
             return $entry->{is_object} && ($entry->{class} // '') eq $union;
@@ -976,10 +994,14 @@ sub _array_compatible {
     my ($entry, $schema, $ctx) = @_;
     my $items = $schema->{items} // {};
     return 0 unless ref $items eq 'HASH';
-    # items with a $ref: an array of the definition's class, no special-cased
-    # scalars -- the generator's items branch has none either
+    # items with a $ref: an array of the scalar an apimachinery $ref stands
+    # for, as the generator's items branch types it (k178), else an array of
+    # the definition's class
     if (defined(my $ref = $items->{'$ref'})) {
         $ref =~ s{^#/definitions/}{};
+        if (my $kind = _scalar_ref_kind($ref)) {
+            return _element_compatible($entry, 'is_array_of_', $kind);
+        }
         if (my $union = _union_class($ref)) {
             return $entry->{is_array_of_objects} && ($entry->{class} // '') eq $union;
         }
@@ -1007,6 +1029,11 @@ sub _object_compatible {
     }
     if (defined(my $ref = $addl->{'$ref'})) {
         $ref =~ s{^#/definitions/}{};
+        # the typed map the generator makes of an apimachinery scalar (k178);
+        # not the opaque one, which _element_compatible never counts
+        if (my $kind = _scalar_ref_kind($ref)) {
+            return _element_compatible($entry, 'is_hash_of_', $kind);
+        }
         if (my $union = _union_class($ref)) {
             return $entry->{is_hash_of_objects} && ($entry->{class} // '') eq $union;
         }
@@ -1221,8 +1248,9 @@ sub _core_class_for {
     return _class_compatible($chosen, $schema, { defs => $all_defs, active => {} }) ? $chosen : undef;
 }
 
-# The scalar type a property-level $ref to one of the special apimachinery
-# types stands for (they are values, not object references), or undef.
+# The scalar type a $ref to one of the special apimachinery types stands for
+# (they are values, not object references), or undef -- as a property, as
+# an array's items and as a map's additionalProperties alike (k178).
 # Shared by _schema_to_type_spec and the reuse check (_field_compatible), so
 # the two read a $ref the same way.
 sub _scalar_ref_type {
@@ -1232,6 +1260,37 @@ sub _scalar_ref_type {
     return 'Time'     if $ref =~ /meta\.v1\.(Micro)?Time$/;
     return undef;
 }
+
+# The reuse-check kind (see _schema_type_kind) of such a $ref, or undef:
+# IntOrString is the int-or-string kind (k181), Quantity and Time stay the
+# string kind they always were here.
+sub _scalar_ref_kind {
+    my ($ref) = @_;
+    my $scalar = _scalar_ref_type($ref) or return undef;
+    return $scalar eq 'IntOrStr' ? 'int-or-string' : 'string';
+}
+
+# The element types of a generated class's scalar arrays (k178). The scalar
+# fields of a generated class are the barewords 'Quantity' and 'Time', which
+# the DSL builds on Str: any string, so a value the API server stores as
+# written -- a custom resource's date-time with a lowercase 't' or 'z' is
+# valid RFC 3339 -- never fails to inflate. An array element has to follow
+# the same rule, but inside an arrayref the DSL reads a bareword as a class
+# name, and the library's Time and Quantity carry the strict regexes a
+# hand-written class keeps. So each is Str under the kind's name: the DSL
+# and _scalar_kind classify a Type::Tiny element by its name, which is what
+# gives it the is_array_of_time / is_array_of_quantity registry flag and
+# with that its TO_JSON rule, its to_crd schema and its emitter spelling. A
+# Type::Library cannot hold a second Time, so these stay private here
+# rather than becoming an export of IO::K8s::Types. IntOrStr is Str in the
+# library already.
+my $GENERATED_TIME     = Str->create_child_type(name => 'Time');
+my $GENERATED_QUANTITY = Str->create_child_type(name => 'Quantity');
+my %GENERATED_ITEM_TYPE = (
+    IntOrStr => IntOrStr,
+    Quantity => $GENERATED_QUANTITY,
+    Time     => $GENERATED_TIME,
+);
 
 # Convert OpenAPI schema to k8s() type spec
 #
@@ -1329,6 +1388,12 @@ sub _schema_to_type_spec {
         my $items = $schema->{items} // {};
         if (my $ref = $items->{'$ref'}) {
             $ref =~ s{^#/definitions/}{};
+            # The apimachinery scalars are values here too (k178): generated
+            # from their definitions -- a bare `type: string` -- they used to
+            # become an empty class no element could inflate into.
+            if (my $scalar = _scalar_ref_type($ref)) {
+                return [ $GENERATED_ITEM_TYPE{$scalar} ];
+            }
             if (my $union = _union_class($ref)) {
                 return ["+$union"];
             }
@@ -1356,15 +1421,15 @@ sub _schema_to_type_spec {
         # date-time items are the same gap for the scalar IntOrStr / Time
         # cases above (k167), read off the items exactly as those read the
         # property: the extension first, a format only with `type: string`.
-        # [IntOrStr] keeps an element 8080 a number on the wire; [Time]
-        # validates each element as RFC 3339 -- the DSL's only [Time], the
-        # same constraint a hand-written or emitted [Time] field carries.
+        # [IntOrStr] keeps an element 8080 a number on the wire; a [Time]
+        # element accepts what the scalar Time of a generated class accepts
+        # (k178, see %GENERATED_ITEM_TYPE).
         return [ IntOrStr ]
             if eval { IO::K8s::Resource::_normalize_bool($items->{'x-kubernetes-int-or-string'}) };
         if (($items->{type} // '') eq 'string') {
             my $format = $items->{format} // '';
-            return [ IntOrStr ] if $format eq 'int-or-string';
-            return [ Time ]     if $format eq 'date-time';
+            return [ IntOrStr ]        if $format eq 'int-or-string';
+            return [ $GENERATED_TIME ] if $format eq 'date-time';
         }
         my $item_type = $items->{type} // 'string';
         return [ Int ]  if $item_type eq 'integer';
@@ -1389,6 +1454,16 @@ sub _schema_to_type_spec {
         if (ref $addl eq 'HASH') {
             if (my $ref = $addl->{'$ref'}) {
                 $ref =~ s{^#/definitions/}{};
+                # The DSL's typed map of the scalar (k178), as for items
+                # above: { Quantity => 1 } is what a ResourceList is. It is
+                # the DSL's one typed map, so its values are checked against
+                # the library types -- for Quantity and Time the strict
+                # form a hand-written map carries. A $ref only comes from a
+                # swagger definition (a CRD schema has none), and the API
+                # server writes both of those scalars in canonical form.
+                if (my $scalar = _scalar_ref_type($ref)) {
+                    return { $scalar => 1 };
+                }
                 if (my $union = _union_class($ref)) {
                     return { "+$union" => 1 };
                 }
@@ -1548,7 +1623,11 @@ sub _field_options {
         }
     }
     if ($kind && $kind ne 'Bool') {
-        my $src = ($prop_schema->{type} // '') eq 'array' ? ($prop_schema->{items} // {}) : $prop_schema;
+        # A typed map (k178) constrains each value, as an array each
+        # element: its constraints sit on additionalProperties.
+        my $src = ($prop_schema->{type} // '') eq 'array' ? ($prop_schema->{items} // {})
+                : ref $type_spec eq 'HASH'                ? $prop_schema->{additionalProperties}
+                :                                           $prop_schema;
         if (ref $src->{enum} eq 'ARRAY' && @{ $src->{enum} } && !grep { !defined } @{ $src->{enum} }) {
             my %seen;
             $seen{$_}++ for @{ $src->{enum} };
@@ -1578,16 +1657,20 @@ sub _field_options {
     # against the schema instead (Important 3 of the k93 review; _k8s's own
     # default check now skips those fields too).
     if (exists $opts{default} && $kind) {
-        # An array's element type is the Type::Tiny object in the spec: for
-        # [Time] that is the RFC 3339 constraint _k8s checks the default
-        # against, not the Str a scalar 'Time' bareword gets (k167).
-        my $base = ref $type_spec eq 'ARRAY' && blessed($type_spec->[0])
-            ? $type_spec->[0]
-            : IO::K8s::Resource::_scalar_base_for($kind);
+        # An array's element type is the Type::Tiny object in the spec (k167);
+        # a typed map's value type is the library type of that name, the one
+        # IO::K8s::Resource's { X => 1 } form checks each value against --
+        # the strict Quantity and Time among them (k178). A default that is
+        # a hash, for a map, is checked value by value.
+        my $base = ref $type_spec eq 'ARRAY' && blessed($type_spec->[0]) ? $type_spec->[0]
+                 : ref $type_spec eq 'HASH'                             ? IO::K8s::Types->get_type($kind)
+                 :                                                        IO::K8s::Resource::_scalar_base_for($kind);
         my %check_opts = map { $_ => $opts{$_} } grep { exists $opts{$_} } qw(enum minimum maximum pattern);
         my $constrained = IO::K8s::Resource::_constrain($base, $kind, \%check_opts, 'AutoGen default check');
         my $default_ok = ref $type_spec eq 'ARRAY'
             ? (ref $opts{default} eq 'ARRAY' && !grep { !$constrained->check($_) } @{ $opts{default} })
+            : ref $type_spec eq 'HASH'
+            ? (ref $opts{default} eq 'HASH' && !grep { !$constrained->check($_) } values %{ $opts{default} })
             : $constrained->check($opts{default});
         delete $opts{default} unless $default_ok;
     }
@@ -1749,11 +1832,31 @@ C<Int> and C<[Int]>. C<x-kubernetes-int-or-string: true> (or C<type:
 string> with C<format: int-or-string>) becomes C<IntOrStr> and, on
 C<items>, C<[IntOrStr]>, so an element C<8080> stays a JSON number and
 C<'25%'> a string; C<type: string> with C<format: date-time> becomes
-C<Time> and C<[Time]> (k167). An array element of C<[Time]> is checked as
-an RFC 3339 timestamp, as on a hand-written C<[Time]> field; the scalar
-C<Time> of a generated class accepts any string. A map whose
-C<additionalProperties> is one of these scalar schemas stays the opaque
-hash, which writes its values back unchanged.
+C<Time> and C<[Time]> (k167). A map whose C<additionalProperties> is one
+of these scalar schemas stays the opaque hash, which writes its values back
+unchanged.
+
+A C<$ref> to one of the apimachinery scalar definitions --
+C<resource.Quantity>, C<intstr.IntOrString>, C<meta.v1.Time> and
+C<meta.v1.MicroTime> -- is typed as that scalar wherever it sits (k178): a
+property becomes C<Quantity>, C<IntOrStr> or C<Time>, an array's C<items>
+C<[Quantity]>, C<[IntOrStr]> or C<[Time]>, and a map's
+C<additionalProperties> C<< { Quantity => 1 } >>, C<< { IntOrStr => 1 } >>
+or C<< { Time => 1 } >>, whether or not the spec carries the definition.
+Before, the C<items> and C<additionalProperties> forms were generated from
+the definition, a bare C<type: string>, as an empty class that no quantity
+or timestamp could inflate into.
+
+The C<Time> and C<Quantity> of a generated class accept any string, as a
+scalar field and as an array element alike (k178): a custom resource's
+C<date-time> is stored as written, and RFC 3339 allows a lowercase C<t> and
+C<z> the strict check of a hand-written C<Time> field refuses, so a
+generated class never fails to inflate what the API server returned. The
+API server validates the format regardless. A hand-written or emitted
+class keeps the strict checks, and so does the typed map above -- the DSL
+has only the one C<< { Quantity => 1 } >> and C<< { Time => 1 } >> -- which
+only a swagger C<$ref> reaches, whose values the API server writes in
+canonical form.
 
 An inline C<type: object> schema with its own non-empty C<properties> also
 becomes a typed class now (D10, k94), named after its place in the parent --
@@ -1888,7 +1991,9 @@ when:
 =item *
 
 a property, an array's C<items>, or an C<additionalProperties> schema
-carries a C<$ref> to a definition not present in C<$all_defs>. A partial
+carries a C<$ref> to a definition not present in C<$all_defs> -- other than
+the apimachinery scalars and the apiextensions union types, which are
+resolved by name (see L</DESCRIPTION>). A partial
 spec that references definitions it does not ship used to generate the
 class anyway, minus those fields -- losing their data on every round-trip.
 It now dies naming the C<$ref> and where it appeared (k56).
@@ -2031,8 +2136,12 @@ nothing about whether reusing any listed class is actually safe for a
 given schema; that is D5's C<reuse_core> reuse decision (see above), which
 consults this same index but additionally requires a type-compatible
 candidate (a per-key check against the schema: C<string> -- including
-C<x-kubernetes-int-or-string> and C<format: date-time> -- matches
-C<is_str>/C<is_int_or_string>/C<is_quantity>/C<is_time>; C<integer>
+C<format: date-time> -- matches
+C<is_str>/C<is_int_or_string>/C<is_quantity>/C<is_time>; int-or-string --
+C<x-kubernetes-int-or-string>, or C<type: string> with C<format:
+int-or-string> -- matches C<is_int_or_string> or C<is_quantity> (the form
+C<controller-gen> gives a C<resource.Quantity>), never a C<Str> field that
+would write C<8080> back as C<"8080"> nor a C<Time> (k181); C<integer>
 matches C<is_int> or C<is_int_or_string>; C<number> matches C<is_num>;
 C<boolean> matches C<is_bool>; C<array> matches any C<is_array_of_*>;
 C<object>, whether the schema property has C<properties> of its own or is

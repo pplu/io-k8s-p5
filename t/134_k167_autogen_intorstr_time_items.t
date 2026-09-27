@@ -22,8 +22,10 @@
 #   * a [Quantity] and a [Time] element go out as JSON strings, the wire form
 #     Kubernetes gives both; undef and reference elements are left alone,
 #     and the struct TO_JSON returns is a copy that does not alias the object;
-#   * a [Time] array default whose elements are not timestamps is dropped
-#     like any other malformed default, not fatal to the class generation;
+#   * a [Time] array default whose elements a [Time] cannot hold is dropped
+#     like any other malformed default, not fatal to the class generation
+#     (since k178 a generated [Time] element takes any string, as the
+#     scalar Time of a generated class does, so that is a reference);
 #   * a map whose additionalProperties is int-or-string or date-time has no
 #     such gap: it stays the opaque { Str => 1 } map, which copies values
 #     unchanged;
@@ -98,8 +100,10 @@ subtest 'wire JSON keeps date-time elements as strings' => sub {
     is($obj->to_json, '{"stamps":["2026-09-27T12:00:00Z"]}', '->new: a [Time] element is a JSON string');
     is($class->from_json('{"stamps":["2026-09-27T12:00:00Z"]}')->to_json,
         '{"stamps":["2026-09-27T12:00:00Z"]}', 'from_json -> to_json');
-    throws_ok { $class->new(stamps => ['yesterday']) }
-        qr/stamps/, 'an element that is not an RFC 3339 timestamp fails the [Time] constraint';
+    # k178: a generated [Time] element follows the scalar rule (any string);
+    # t/144 has the one-rule claim. It still refuses what no Time can be.
+    throws_ok { $class->new(stamps => [ {} ]) }
+        qr/stamps/, 'a reference element fails the [Time] constraint';
 };
 
 subtest 'a [Time] default the elements cannot hold is dropped, not fatal' => sub {
@@ -109,14 +113,14 @@ subtest 'a [Time] default the elements cannot hold is dropped, not fatal' => sub
             type       => 'object',
             properties => {
                 bad  => { type => 'array', items => { type => 'string', format => 'date-time' },
-                          default => ['yesterday'] },
+                          default => [ {} ] },
                 good => { type => 'array', items => { type => 'string', format => 'date-time' },
                           default => ['2026-09-27T12:00:00Z'] },
                 flex => { type => 'array', items => { 'x-kubernetes-int-or-string' => $true },
                           default => [1, '25%'] },
             },
         }, {}, 'IO::K8s::_AUTOGEN_k167_defaults');
-    } 'a malformed date-time array default does not fail class generation';
+    } 'a date-time array default no [Time] can hold does not fail class generation';
     my $info = $gen->_k8s_attr_info;
     ok(!exists $info->{bad}{options}{default}, 'the malformed default is dropped');
     is_deeply($info->{good}{options}{default}, ['2026-09-27T12:00:00Z'], 'a valid one is kept');

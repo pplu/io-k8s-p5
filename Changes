@@ -23,9 +23,8 @@ Revision history for IO-K8s
     types an array of type: number as [Num], whose elements always go out
     as JSON numbers, and arrays of int-or-string and date-time items as
     [IntOrStr] and [Time] instead of [Str], so to_crd and the emitter keep
-    them; a [Time] element must be an RFC 3339 timestamp. [IntOrStr]
-    elements serialize like an IntOrStr field, [Quantity] and [Time]
-    elements as JSON strings.
+    them. [IntOrStr] elements serialize like an IntOrStr field, [Quantity]
+    and [Time] elements as JSON strings.
 
   - new_object, inflate, struct_to_object, json_to_object and FROM_HASH
     refuse a non-hash value (array, string, code or scalar reference) at an
@@ -47,9 +46,10 @@ Revision history for IO-K8s
   - AutoGen's reuse_core no longer types a nested schema as a shipped core
     class whose array, map or nested field holds a different element type
     (an array of objects as LabelSelectorRequirement's [Str] values), which
-    made valid data fail to inflate. Element types, map values and nested
-    fields are now compared recursively; reuse decisions for the bundled
-    providers are unchanged.
+    made valid data fail to inflate, nor an int-or-string field as a Str or
+    [Str] one, which wrote 8080 back as "8080". Element types, map values
+    and nested fields are now compared recursively; reuse decisions for the
+    bundled providers are unchanged.
 
   - Declare Sub::Util as a direct runtime prerequisite.
 
@@ -149,6 +149,12 @@ Revision history for IO-K8s
     HelmChartSpec->new(values => [1, 2]) and JSONSchemaProps->new(enum =>
     ['a']) used to die on the type check. Other object fields still refuse
     a non-hash value.
+
+  - AutoGen types a $ref to Quantity, IntOrString, Time or MicroTime in an
+    array's items or a map's additionalProperties as that scalar, as it
+    already did for a property: [Quantity], { Quantity => 1 } and so on.
+    It used to generate an empty class that real values failed to inflate
+    into, or refuse a spec that did not ship the definition.
 
 1.108     2026-09-22 00:53:53Z
 
