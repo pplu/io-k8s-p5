@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-27T23:05:49Z
+claimed_by: followups-5
+class: standard
+completed: 2026-09-27T23:05:43Z
+created: 2026-09-27T21:47:40Z
+id: 182
+priority: low
+started: 2026-09-27T22:06:36Z
+status: done
+tags:
+- dsl
+- k174-followup
+title: 'use IO::K8s::APIObject: ungerade Argumentzahl und leere Werte'
+updated: 2026-09-27T23:05:49Z
+---
+
+Gefunden bei k174 (2026-09-27). use IO::K8s::APIObject 'api_version'; ergibt nur eine Warnung (odd number), ein leeres api_version oder resource_plural ('') wird still ignoriert. Beides croaken lassen wie unbekannte Parameter seit k174.
+
+Commit 1b39fb1a, prove -lr t/ 142 Dateien 9222 Tests PASS.
