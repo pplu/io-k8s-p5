@@ -45,13 +45,24 @@ sub _build__json_encoder {
 
     my $json = $class->FROM_STRUCT($struct, $k8s);
 
-Inflation hook called by L<IO::K8s/struct_to_object>. Wraps C<$struct> verbatim.
+Inflation hook called by L<IO::K8s/struct_to_object>. Wraps C<$struct>
+unchanged, except that a hash or an array is copied one level -- the rule
+inflation applies to every array or hash of scalars (k54, k169). A key added
+to or removed from the source hash, or an element pushed onto the source
+array, after inflation does not reach the object. A container nested inside
+the value is not copied and still shares its contents with the source. A
+plain scalar, C<undef> or a JSON boolean is kept as given.
 
 =cut
 
 sub FROM_STRUCT {
     my ($class, $struct, $k8s) = @_;
-    return $class->new(value => $struct);
+    # One level, not deeper (k169): the depth IO::K8s::_inflate_struct
+    # copies an untyped value to (k54). _copy_one_level is the role's,
+    # composed into this package by the `with` below and reached unqualified,
+    # as IO::K8s::List does -- IO::K8s::_shallow_copy is the same rule but
+    # would need IO::K8s loaded for a direct FROM_STRUCT call.
+    return $class->new(value => _copy_one_level($struct));
 }
 
 =method TO_JSON
