@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T23:06:00Z
+claimed_by: followups-5
+class: standard
+completed: 2026-09-27T23:05:54Z
+created: 2026-09-27T21:33:52Z
+id: 175
+priority: low
+started: 2026-09-27T22:06:41Z
+status: done
+tags:
+- errors
+- k170-followup
+title: 'Restliche Carp-Grenzen: Role::Resource, SpecBuilder, Manifest, AutoGen, Union-Klassen,
+  inflate ohne kind'
+updated: 2026-09-27T23:06:00Z
+---
+
+Gefunden bei k164/k170 (2026-09-27). Nach derselben Regel (@CARP_NOT pro Modul, _blame_caller für Moo/Type::Tiny) fehlen noch: (1) Class->FROM_HASH, unknown_kinds => 'unstructured' über new_object/inflate, spec_set/spec_push - Shape-Fehler nennen Role/Resource.pm (Kandidat: @CARP_NOT = ('IO::K8s') in Role::Resource und Role::SpecBuilder). (2) load('fehlt.pk8s') meldet Manifest.pm line 54 (@CARP_NOT in IO::K8s::Manifest). (3) AutoGen-Fehler über eine openapi_spec-Instanz nennen lib/IO/K8s.pm (AutoGen vertraut IO::K8s). (4) Shape-Croaks der Union-Klassen JSON/JSONSchemaPropsOr* nennen deren Dateien. (5) inflate: die ohne Newline bei fehlendem kind statt croak. Vorsicht: direktes $class->new(spec => {...}) mit verschachtelter Coercion - vertraut IO::K8s::Resource einfach IO::K8s, landet Carps Antwort im (eval N)-Frame von Moos Konstruktor.
+
+Commit efe91d5d, prove -lr t/ 142 Dateien 9222 Tests PASS.
