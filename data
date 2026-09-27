@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-27T22:04:20Z
+claimed_by: followups-4
+class: standard
+completed: 2026-09-27T22:04:14Z
+created: 2026-09-27T20:16:10Z
+id: 171
+priority: low
+started: 2026-09-27T20:55:03Z
+status: done
+tags:
+- serialization
+- k169-followup
+title: V1::JSON->TO_JSON gibt den gespeicherten Wert selbst zurück
+updated: 2026-09-27T22:04:20Z
+---
+
+Gefunden bei k169 (2026-09-27). Wer die Ausgabe von $props->TO_JSON->{default} ändert, ändert das Objekt mit (Ausgabeseite von k54/k169). JSONSchemaPropsOrStringArray kopiert dort schon. Eine Ebene kopieren wie TO_JSON der Rolle.
+
+2026-09-27 22:04 Commit 237a484b
