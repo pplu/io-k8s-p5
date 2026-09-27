@@ -1326,27 +1326,10 @@ sub load_yaml {
 
     require YAML::PP;
 
-    # One argument, two readings (k159). Without a newline it may name a
-    # file: an existing one is read as UTF-8, a directory is refused.
-    # Everything else is YAML text, expected as decoded characters and
-    # parsed as given, never re-encoded.
-    my $one_line = $file_or_string !~ /\n/;
-    croak "load_yaml: '".$file_or_string."' is a directory, not a file or YAML text"
-        if $one_line && -d $file_or_string;
-    my $is_file = $one_line && -f $file_or_string;
-    my $content = $is_file ? $self->_slurp_utf8($file_or_string) : $file_or_string;
-
-    # Parse multi-document YAML (Load returns all docs in list context)
-    my @docs = YAML::PP::Load($content);
-
-    # A one-line argument that is no file and parses to plain scalars only,
-    # not a single mapping or sequence, is a path with a typo --
-    # 'manifests/app.yaml' is valid YAML for that very string -- and used to
-    # come back as [] without a word. Empty or whitespace-only text, a bare
-    # '---' or a comment parse to nothing defined and still give [].
-    croak "load_yaml: '".$file_or_string."' is neither an existing file nor YAML text"
-        if $one_line && !$is_file
-        && !grep({ ref } @docs) && grep({ defined } @docs);
+    # A file or YAML text, multi-document, by the rule IO::K8s::CRD->load
+    # shares (k159, k162). YAML::PP->new is what YAML::PP::Load used here.
+    my ($refused, @docs) = $self->_yaml_documents($file_or_string, YAML::PP->new);
+    croak "load_yaml: '".$file_or_string."' ".$refused if defined $refused;
 
     my $collect_errors = $opts{collect_errors};
     my @objects;
@@ -1377,9 +1360,37 @@ sub load_yaml {
     return \@objects;
 }
 
+# The YAML documents in a load_yaml or IO::K8s::CRD->load argument: one
+# argument, two readings (k159, k162). Without a newline it may name a
+# file: an existing one is read as UTF-8, a directory is refused.
+# Everything else is YAML text, expected as decoded characters and parsed
+# as given, never re-encoded. A one-line argument that is no file and
+# parses to plain scalars only, not a single mapping or sequence, is a path
+# with a typo -- 'manifests/app.yaml' is valid YAML for that very string --
+# and used to come back as [] without a word. Empty or whitespace-only
+# text, a bare '---' or a comment parse to nothing defined and still give
+# no documents.
+#
+# $yaml is the caller's YAML::PP, so each keeps its own boolean setting.
+# Returns undef and the documents, or a refusal to follow the quoted
+# argument in the caller's croak. The callers croak themselves, with their
+# own name: a croak from in here would be reported at IO::K8s::CRD's line,
+# not at its caller's.
+sub _yaml_documents {
+    my ($self, $file_or_string, $yaml) = @_;
+    my $one_line = $file_or_string !~ /\n/;
+    return 'is a directory, not a file or YAML text' if $one_line && -d $file_or_string;
+    my $is_file = $one_line && -f $file_or_string;
+    my @docs = $yaml->load_string($is_file ? $self->_slurp_utf8($file_or_string) : $file_or_string);
+    return 'is neither an existing file nor YAML text'
+        if $one_line && !$is_file && !grep({ ref } @docs) && grep({ defined } @docs);
+    return (undef, @docs);
+}
+
 # A whole file as text, read as UTF-8 -- the encoding Kubernetes manifests
 # are written in, and YAML::PP and a string eval both want characters, not
-# bytes (k159, k160). The same layer IO::K8s::CRD->load reads a file with.
+# bytes (k159, k160). IO::K8s::CRD->load reads a file through it as well,
+# by way of _yaml_documents (k162).
 sub _slurp_utf8 {
     my ($self, $file) = @_;
     open my $fh, '<:encoding(UTF-8)', $file or croak 'Cannot open '.$file.': '.$!;

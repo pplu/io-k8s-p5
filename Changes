@@ -64,7 +64,8 @@ Revision history for IO-K8s
   - load_yaml reads a file as UTF-8 instead of handing its bytes to
     YAML::PP, which mangled or died on non-ASCII text. A one-line argument
     that is neither an existing file nor YAML text, typically a mistyped
-    path, now dies instead of returning an empty list; so does a directory.
+    path, now dies instead of returning an empty list, in load_yaml as in
+    IO::K8s::CRD->load and add_crd; so does a directory.
 
   - load no longer leaves a loader package behind on every call (about
     850 KB each, unbounded in a process that reloads manifests), and reads

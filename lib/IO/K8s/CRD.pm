@@ -9,6 +9,7 @@ use Scalar::Util qw( blessed );
 use Module::Runtime qw( require_module );
 use JSON::MaybeXS ();
 use re ();
+use IO::K8s ();
 use IO::K8s::AutoGen ();
 use IO::K8s::Resource ();
 
@@ -64,6 +65,18 @@ file, or an arrayref of any of those. Dies on a document that is not a
 C<CustomResourceDefinition> or lacks C<spec.group>, C<spec.names.kind> or
 C<spec.versions>.
 
+A string is read by the same rule as L<IO::K8s/load_yaml> (k162): without
+a newline and naming an existing file, it is read from that file, as UTF-8;
+anything else is YAML or JSON text in decoded characters. A one-line string
+that is no existing file and parses to plain scalars only -- typically a
+mistyped path -- dies instead of returning an empty list, and so does a
+directory; the same happens through L<IO::K8s/add_crd>:
+
+    IO::K8s::CRD->load: 'crds/knobs.yaml' is neither an existing file nor YAML text
+
+Empty or whitespace-only text still returns an empty arrayref (and
+C<add_crd> registers nothing), and a one-line JSON document is still text.
+
 =cut
 
 sub load {
@@ -82,16 +95,14 @@ sub load {
         @docs = ($input);
     }
     elsif (!ref $input) {
-        my $text = $input;
-        if ($input !~ /\n/ && -f $input) {
-            open my $fh, '<:encoding(UTF-8)', $input
-                or croak "IO::K8s::CRD->load: cannot open $input: $!";
-            $text = do { local $/; <$fh> };
-            close $fh;
-        }
+        # A file or YAML text by load_yaml's rule (k162): a file is read as
+        # UTF-8, a directory is refused, and a one-line argument that is no
+        # file and only parses to plain scalars -- a mistyped path -- dies
+        # instead of giving [] and an add_crd that registers nothing.
         require YAML::PP;
-        my $yp = YAML::PP->new(boolean => 'JSON::PP');
-        @docs = grep { ref $_ eq 'HASH' } $yp->load_string($text);
+        my ($refused, @found) = IO::K8s->_yaml_documents($input, YAML::PP->new(boolean => 'JSON::PP'));
+        croak "IO::K8s::CRD->load: '".$input."' ".$refused if defined $refused;
+        @docs = grep { ref $_ eq 'HASH' } @found;
     }
     else {
         croak 'IO::K8s::CRD->load: unsupported input ' . ref($input);
