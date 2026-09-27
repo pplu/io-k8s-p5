@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T23:06:23Z
+claimed_by: followups-5
+class: standard
+completed: 2026-09-27T23:06:17Z
+created: 2026-09-27T21:47:34Z
+id: 181
+priority: low
+started: 2026-09-27T22:06:25Z
+status: done
+tags:
+- autogen
+- reuse
+- k167-followup
+title: AutoGen-Reuse liest int-or-string als string und macht 8080 zu "8080"
+updated: 2026-09-27T23:06:23Z
+---
+
+Gefunden bei k167 (2026-09-27), vorbestehend. Der Reuse-Check liest x-kubernetes-int-or-string als Art string, damit werden Kernklassen mit Str/[Str] wiederverwendbar; seit k145 geht 8080 dann als "8080" raus. int-or-string nur mit IntOrStr-Feldern kompatibel werten.
+
+Commit 6dd81af0, prove -lr t/ 142 Dateien 9222 Tests PASS.
