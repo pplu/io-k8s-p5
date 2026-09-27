@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-27T19:51:39Z
+claimed_by: followups-2
+class: standard
+completed: 2026-09-27T19:51:33Z
+created: 2026-09-27T18:35:35Z
+id: 162
+priority: low
+started: 2026-09-27T18:54:32Z
+status: done
+tags:
+- crd
+- load
+- k159-followup
+title: 'IO::K8s::CRD->load: Tippfehler im Pfad liefert still eine leere Liste'
+updated: 2026-09-27T19:51:39Z
+---
+
+Gefunden bei k159 (2026-09-27). IO::K8s::CRD->load hat dieselbe Lücke wie load_yaml vor k159: ein einzeiliges Argument, das keine Datei ist, wird als YAML-Text geparst und liefert []. Dieselbe Regel wie in load_yaml anwenden (Datei als UTF-8, Tippfehler und Verzeichnis sterben).
+
+Umgesetzt auf fix/followups-2, uncommittet (io-k8s-worker). Eigene Tests grün, Vollsuite vor den Edits des Parallel-Workers 122 Dateien 9078 Tests PASS.
+
+Commit e3fe60a9 (Refuse a mistyped path or a directory in IO::K8s::CRD->load)
