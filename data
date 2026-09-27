@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-27T18:52:17Z
+claimed_by: followups
+class: standard
+completed: 2026-09-27T18:52:17Z
+created: 2026-09-27T05:41:33Z
+id: 159
+priority: medium
+started: 2026-09-27T18:06:23Z
+status: done
+tags:
+- yaml
+- load
+title: 'load_yaml: Datei als UTF-8 lesen, fehlender Pfad ist kein YAML-Text'
+updated: 2026-09-27T18:52:17Z
+---
+
+IO::K8s->load_yaml($path) öffnet die Datei ohne Encoding-Layer und gibt Bytes an YAML::PP::Load, das Zeichen erwartet: jede Datei mit Nicht-ASCII-Zeichen stirbt bzw. wird verstümmelt. Außerdem wird ein Argument ohne Zeilenumbruch, das keine existierende Datei ist (Tippfehler im Pfad), still als YAML-Text geparst und liefert nichts statt eines Fehlers. Vorschlag: Datei mit :encoding(UTF-8) lesen; separate, eindeutige API für Pfad vs. String (oder ein Pfad, der nicht existiert und wie ein Pfad aussieht, stirbt). Aufgefallen in Kubernetes::Comb::Role::Static, das die Datei deshalb selbst als UTF-8 liest und den String übergibt.
+
+Umgesetzt auf fix/followups, uncommittet (io-k8s-worker). prove -lr t/ 118 Dateien 9041 Tests PASS, t/25 und t/26 PASS, dzil build sauber.
+
+2026-09-27 18:52 Commit f46211c4
