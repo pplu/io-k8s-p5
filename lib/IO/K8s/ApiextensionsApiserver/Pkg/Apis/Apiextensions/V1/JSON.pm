@@ -24,6 +24,11 @@ of attributes.
     $props->default->value;    # 'nginx'
     $props->TO_JSON->{default} # 'nginx' — bare, not { value => 'nginx' }
 
+The C<spec_*> methods of L<IO::K8s::Role::SpecBuilder> walk through a field
+of this class into its value, the way the wire JSON reads (k172): on a K3s
+HelmChart, C<< spec_set('values.replicaCount', 3) >> serializes as
+C<values: {"replicaCount": 3}>.
+
 =cut
 
 has value => (
@@ -83,6 +88,12 @@ sub TO_JSON {
     # _copy_one_level is the role's, as in FROM_STRUCT above.
     return _copy_one_level($self->value);
 }
+
+# The node a spec path walks into (IO::K8s::Role::SpecBuilder, k172): the
+# value itself, the live container rather than TO_JSON's copy, so a write
+# through the path lands in the object. Free JSON -- no attribute to check
+# an element against.
+sub _spec_path_node { return ($_[0]->value) }
 
 with 'IO::K8s::Role::Resource';
 

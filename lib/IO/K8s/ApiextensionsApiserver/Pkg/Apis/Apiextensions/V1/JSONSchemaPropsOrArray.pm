@@ -104,6 +104,15 @@ sub TO_JSON {
     return defined $schema ? $schema->TO_JSON : undef;
 }
 
+# The node a spec path walks into (IO::K8s::Role::SpecBuilder, k172): the
+# arm in use -- the schemas array, named so an element written into it is
+# checked against that attribute, or the single schema.
+sub _spec_path_node {
+    my ($self) = @_;
+    my $schemas = $self->schemas;
+    return defined $schemas ? ($schemas, 'schemas') : ($self->schema);
+}
+
 with 'IO::K8s::Role::Resource';
 
 1;

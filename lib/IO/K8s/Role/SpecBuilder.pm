@@ -18,6 +18,13 @@ use Moo::Role;
 # '$ref' reaches _ref). A field an object does not declare lives in its
 # _unknown_fields bag (D1) and is reachable like any other key.
 #
+# A union object -- V1::JSON, JSONSchemaPropsOr{Array,Bool,StringArray} --
+# is not a node of its own: it serializes as the bare value it holds, so a
+# path walks through it into that value (k172), the node its
+# _spec_path_node names. Before, the walk treated it as an ordinary object
+# with no fields and wrote every key into its _unknown_fields bag, which a
+# union's TO_JSON never reads.
+#
 # Before 1.108 every method assumed spec was a hashref: on a modeled spec
 # spec_set replaced the struct with {} and wrote into an orphan (k90).
 # ---------------------------------------------------------------------------
@@ -58,6 +65,12 @@ sub _sb_is_obj { blessed($_[0]) && $_[0]->can('_k8s_attr_info') }
 
 sub _sb_is_index { defined $_[0] && $_[0] =~ /\A-?\d+\z/ }
 
+# A union object (k172): one that names the node a path walks into. Its
+# _spec_path_node returns that node -- a container, an object, a scalar, or
+# undef when the union holds nothing -- and, when the node is a typed
+# array the union keeps in an attribute of its own, that attribute's name.
+sub _sb_is_union { blessed($_[0]) && $_[0]->can('_spec_path_node') }
+
 # JSON key -> (attribute name, registry info) on an object; empty list when
 # the object declares no such field.
 sub _sb_attr {
@@ -86,9 +99,11 @@ sub _sb_index {
 }
 
 # Read one segment. Returns the child, or undef when it is not there. Never
-# creates anything.
+# creates anything. Reading from a union reads from the node it holds; a
+# union reached as the child itself is returned as it is.
 sub _sb_child {
     my ($node, $seg) = @_;
+    ($node) = $node->_spec_path_node if _sb_is_union($node);
     if (_sb_is_obj($node)) {
         my ($attr) = _sb_attr($node, $seg);
         return $node->$attr if defined $attr;
@@ -221,6 +236,60 @@ sub _sb_elem_class {
     return undef;
 }
 
+# A new, empty object of $class for the slot $seg. A union class (k172) is
+# built through its FROM_STRUCT holding the empty container $next asks for
+# -- an array for an index, a hash (the schema arm) for anything else -- so
+# the walk has a node to continue into; a union that cannot hold that
+# (JSONSchemaPropsOrBool has no array arm) croaks here, before anything is
+# stored.
+sub _sb_new_node {
+    my ($class, $next, $seg, $path) = @_;
+    return _sb_guard($path, "cannot create $class for '$seg'", sub {
+        my $loaded = use_module($class);
+        return $loaded->new unless $loaded->can('_spec_path_node');
+        my $fresh = $loaded->FROM_STRUCT(_sb_is_index($next) ? [] : {},
+            IO::K8s::Role::Resource::_default_k8s());
+        my ($node) = $fresh->_spec_path_node;
+        die 'it cannot hold ' . (_sb_is_index($next) ? 'an array' : 'a hash') . "\n"
+            unless ref $node;
+        return $fresh;
+    });
+}
+
+# The node a walk continues into from the union $union, stored under $seg
+# of $parent (k172), and the collection context that node answers to: the
+# union's own attribute when it holds a typed array there (a write into
+# the array is checked against that attribute, as k147 checks a declared
+# collection), undef otherwise -- a V1::JSON value is free JSON. A union
+# holding nothing is first replaced under $seg by a fresh one built for
+# $next ($ctx is $parent's own context, for that store). The node comes
+# back as it is, a scalar included; the caller decides what a scalar means.
+sub _sb_union_node {
+    my ($parent, $seg, $union, $next, $ctx, $path) = @_;
+    my ($node, $attr) = $union->_spec_path_node;
+    unless (defined $node) {
+        $union = _sb_store($parent, $seg, _sb_new_node(ref $union, $next, $seg, $path), $path, $ctx);
+        ($node, $attr) = $union->_spec_path_node;
+    }
+    return ($node, defined $attr ? { owner => $union, attr => $attr, field => $seg, info => {} } : undef);
+}
+
+# The union class a value stored under $seg of $node has to be -- the
+# declared class of an object field, or the element class of the typed
+# collection $ctx describes -- or undef when that is not a union.
+sub _sb_union_slot {
+    my ($node, $seg, $ctx) = @_;
+    my $class;
+    if (_sb_is_obj($node)) {
+        my (undef, $info) = _sb_attr($node, $seg);
+        $class = $info->{class} if $info && $info->{is_object};
+    } else {
+        $class = _sb_elem_class($ctx);
+    }
+    return undef unless $class && eval { use_module($class); 1 } && $class->can('_spec_path_node');
+    return $class;
+}
+
 # What to create in an empty slot so a walk can continue. On an object the
 # registry decides: the declared class for a struct/object field, [] or {}
 # for the container forms, croak for a scalar. Inside an array or hash of
@@ -232,8 +301,7 @@ sub _sb_fresh {
     if (_sb_is_obj($node)) {
         my (undef, $info) = _sb_attr($node, $seg);
         if ($info) {
-            return _sb_guard($path, "cannot create $info->{class} for '$seg'", sub { use_module($info->{class})->new })
-                if $info->{is_object};
+            return _sb_new_node($info->{class}, $next, $seg, $path) if $info->{is_object};
             return [] if grep { $info->{$_} } qw(
                 is_array_of_objects is_array_of_str is_array_of_int
                 is_array_of_bool is_array_of_hash is_array_of_array
@@ -248,8 +316,7 @@ sub _sb_fresh {
             croak "spec path '$path': cannot descend through scalar field '$seg'";
         }
     }
-    return _sb_guard($path, "cannot create $elem_class for '$seg'", sub { use_module($elem_class)->new })
-        if $elem_class;
+    return _sb_new_node($elem_class, $next, $seg, $path) if $elem_class;
     return _sb_is_index($next) ? [] : {};
 }
 
@@ -294,8 +361,8 @@ sub _sb_walk_vivify {
     my @segs = split /\./, $path;
     my $last = pop @segs;
     croak "spec path '$path' is empty" unless defined $last && length $last;
-    my $node = $self->_sb_root(1, $path);
-    my $ctx  = _sb_coll_ctx($self, 'spec');
+    my ($node, $ctx) = _sb_enter($self, 'spec', $self->_sb_root(1, $path),
+        @segs ? $segs[0] : $last, undef, $path);
     for my $i (0 .. $#segs) {
         my $seg  = $segs[$i];
         my $next = $i < $#segs ? $segs[$i + 1] : $last;
@@ -307,12 +374,22 @@ sub _sb_walk_vivify {
             $child = _sb_fresh($node, $seg, $next, $ctx, $path);
             $child = _sb_store($node, $seg, $child, $path, $ctx);
         }
-        # A container we just entered answers to a field only when the
-        # object we came from declares it; an element of a container does not.
-        $ctx  = _sb_coll_ctx($node, $seg);
-        $node = $child;
+        ($node, $ctx) = _sb_enter($node, $seg, $child, $next, $ctx, $path);
     }
     return ($node, $last, $ctx);
+}
+
+# Step from $parent through $seg onto its child $child: the node the walk
+# continues from and the collection context it answers to. A container we
+# just entered answers to a field only when the object we came from
+# declares it; an element of a container does not. A union is stepped
+# through into the node it holds (k172), which must not be a scalar.
+sub _sb_enter {
+    my ($parent, $seg, $child, $next, $ctx, $path) = @_;
+    return ($child, _sb_coll_ctx($parent, $seg)) unless _sb_is_union($child);
+    my ($node, $node_ctx) = _sb_union_node($parent, $seg, $child, $next, $ctx, $path);
+    croak "spec path '$path': cannot descend through scalar field '$seg'" unless ref $node;
+    return ($node, $node_ctx);
 }
 
 =method spec_get
@@ -324,9 +401,12 @@ segment is a hash key, an array index (a purely numeric segment, C<-1> for
 the last element), or a JSON field name on a typed C<spec> node -- an
 inline struct, a referenced class, or an array/hash of either. A terminal
 that is itself typed comes back as that object, not a hashref -- C<spec_get>
-never serializes what it finds. Returns C<undef> if any segment along the
-way is missing, C<spec> itself is unset, or the terminal value is not
-defined. Never vivifies.
+never serializes what it finds. That includes a union field (see
+L</Union fields>): C<spec_get('values')> on a K3s HelmChart returns the
+C<V1::JSON> object, while C<spec_get('values.replicaCount')> reads through it
+into its value. Returns C<undef> if any segment along the way is missing,
+C<spec> itself is unset, or the terminal value is not defined. Never
+vivifies.
 
     my $match = $ir->spec_get('routes.0.match');
 
@@ -387,8 +467,11 @@ Vivifies and returns the arrayref at the dotted path C<$path> -- the same
 intermediate vivification as C<spec_set>, but returning the container
 itself rather than storing a value into it, so the caller can push, splice
 or iterate in place. Croaks if the path already holds a defined,
-non-array value. Vivifies intermediates the same way C<spec_set> does,
-including the required-attribute croak described there.
+non-array value. On a union field (see L</Union fields>) it returns the
+array the union holds, building the union holding an empty array when the
+field is unset or the union holds nothing. Vivifies intermediates the same
+way C<spec_set> does, including the required-attribute croak described
+there.
 
 The returned arrayref is the same one the object holds, not a copy:
 pushing, splicing or otherwise mutating it directly bypasses the
@@ -401,17 +484,28 @@ apply (k147) -- use those when a new element needs checking.
 
 sub spec_array {
     my ($self, $path) = @_;
-    return _sb_array($self->_sb_walk_vivify($path), $path);
+    my ($array) = _sb_array($self->_sb_walk_vivify($path), $path);
+    return $array;
 }
 
 # The array under $last of $parent, stored there first when the slot is
-# empty; spec_array and spec_push share it so a push walks the path once.
+# empty, and the collection context its elements answer to; spec_array and
+# spec_push share it so a push walks the path once. A union under $last
+# hands out the array it holds (k172) -- built holding an empty one when
+# the slot is empty or the union holds nothing.
 sub _sb_array {
     my ($parent, $last, $ctx, $path) = @_;
     my $array = _sb_child($parent, $last);
-    return $array if ref $array eq 'ARRAY';
+    # The array's own field, not its parent's: the values become its elements.
+    my $array_ctx = _sb_coll_ctx($parent, $last);
+    if (!defined $array and my $union = _sb_union_slot($parent, $last, $ctx)) {
+        $array = _sb_store($parent, $last, _sb_new_node($union, 0, $last, $path), $path, $ctx);
+    }
+    ($array, $array_ctx) = _sb_union_node($parent, $last, $array, 0, $ctx, $path)
+        if _sb_is_union($array);
+    return ($array, $array_ctx) if ref $array eq 'ARRAY';
     croak "spec path '$path': '$last' holds a non-array value" if defined $array;
-    return _sb_store($parent, $last, [], $path, $ctx);
+    return (_sb_store($parent, $last, [], $path, $ctx), $array_ctx);
 }
 
 =method spec_hash
@@ -421,9 +515,13 @@ sub _sb_array {
 Vivifies and returns the container at the dotted path C<$path>, so the
 caller can read or write it directly: a plain hashref on an untyped node
 or an opaque map field, or the struct/object itself when the declared
-field is a typed struct or referenced class. Croaks if the path already
-holds a defined scalar. Vivifies intermediates the same way C<spec_set>
-does, including the required-attribute croak described there.
+field is a typed struct or referenced class. On a union field (see
+L</Union fields>) it is the container the union holds, never the union
+object itself: C<< spec_hash('values')->{replicaCount} = 3 >> on a K3s
+HelmChart reaches the wire JSON, and an unset C<values> is built holding an
+empty hash first (k172). Croaks if the path already holds a defined scalar.
+Vivifies intermediates the same way C<spec_set> does, including the
+required-attribute croak described there.
 
 The returned container is the same one the object holds, not a copy:
 writing into it directly does not run the declared field's coercion or
@@ -440,10 +538,14 @@ sub spec_hash {
     my ($self, $path) = @_;
     my ($parent, $last, $ctx) = $self->_sb_walk_vivify($path);
     my $node = _sb_child($parent, $last);
-    return $node if ref $node;
-    croak "spec path '$path': '$last' holds a scalar" if defined $node;
-    my $fresh = _sb_fresh($parent, $last, undef, $ctx, $path);
-    return _sb_store($parent, $last, $fresh, $path, $ctx);
+    croak "spec path '$path': '$last' holds a scalar" if defined $node && !ref $node;
+    $node = _sb_store($parent, $last, _sb_fresh($parent, $last, undef, $ctx, $path), $path, $ctx)
+        unless defined $node;
+    # A union hands out the container it holds, not itself (k172): a key
+    # written into the union object would never reach its TO_JSON.
+    ($node) = _sb_union_node($parent, $last, $node, undef, $ctx, $path) if _sb_is_union($node);
+    croak "spec path '$path': '$last' holds a scalar" unless ref $node;
+    return $node;
 }
 
 =method spec_push
@@ -465,9 +567,7 @@ value is kept as is. Returns C<$self> for chaining.
 sub spec_push {
     my ($self, $path, @values) = @_;
     my ($parent, $last, $ctx) = $self->_sb_walk_vivify($path);
-    my $array = _sb_array($parent, $last, $ctx, $path);
-    # The array's own field, not its parent's: the values become its elements.
-    my $array_ctx = _sb_coll_ctx($parent, $last);
+    my ($array, $array_ctx) = _sb_array($parent, $last, $ctx, $path);
     @values = @{ _sb_coll_check([ @values ], $array_ctx, $path,
         "cannot push onto '$last'") } if $array_ctx;
     push @$array, @values;
@@ -492,8 +592,8 @@ merge are left alone. Returns C<$self> for chaining.
 sub spec_merge {
     my ($self, %data) = @_;
     for my $key (keys %data) {
-        my $root = $self->_sb_root(1, $key);
-        _sb_store($root, $key, $data{$key}, $key, _sb_coll_ctx($self, 'spec'));
+        my ($root, $ctx) = _sb_enter($self, 'spec', $self->_sb_root(1, $key), $key, undef, $key);
+        _sb_store($root, $key, $data{$key}, $key, $ctx);
     }
     return $self;
 }
@@ -529,6 +629,9 @@ sub spec_delete {
         $node = _sb_child($node, $seg);
         return $self unless ref $node;
     }
+    # Deleting from a union deletes from the node it holds (k172).
+    ($node) = $node->_spec_path_node if _sb_is_union($node);
+    return $self unless ref $node;
     if (_sb_is_obj($node)) {
         my ($attr, $info) = _sb_attr($node, $last);
         if (defined $attr && $info->{options} && $info->{options}{nullable}) {
@@ -654,6 +757,35 @@ naming the class, at the caller's line. Composition does not fail for
 those Kinds: this role is composed before the class's own
 C<k8s spec =E<gt> ...> line runs, so a C<requires 'spec'> would reject
 every consumer, including the ones that do declare one.
+
+=head2 Union fields
+
+A field typed as one of the apiextensions union classes -- C<V1::JSON>
+(C<values> of a K3s C<HelmChart>/C<HelmChartConfig>, C<default>,
+C<example> and C<enum> of a schema) or C<JSONSchemaPropsOrArray>,
+C<JSONSchemaPropsOrBool>, C<JSONSchemaPropsOrStringArray> (C<items>,
+C<additionalProperties>, C<additionalItems>, C<dependencies>) -- serializes
+as the bare value it holds, and a spec path walks through it into that
+value the same way (k172):
+
+    $chart->spec_set('values.replicaCount', 3);   # values: {"replicaCount": 3}
+    $chart->spec_get('values.replicaCount');      # 3
+    $chart->spec_hash('values')->{debug} = 1;     # values: {"debug": 1, ...}
+    $schema->spec_set('items.type', 'string');    # items: {"type": "string"}
+
+A C<V1::JSON> value is free JSON: a hash takes keys, an array takes
+indexes (C<-1> included), and a scalar blocks the walk the way a scalar
+does anywhere else. A C<JSONSchemaPropsOr*> union is walked into the arm it
+has in use -- the schema, or its array, whose elements are checked against
+that arm's type (a plain hash is refused where the arm holds schema
+objects) -- and the boolean arm of C<JSONSchemaPropsOrBool> is a scalar.
+A union field that is unset, or a union that holds nothing, is built
+holding what the next segment asks for: a hash (for the C<Or*> unions, the
+schema arm) for a key, an array for an index. C<JSONSchemaPropsOrBool> has
+no array to build and croaks with C<it cannot hold an array>, before
+anything is stored. The union field itself stays an ordinary field:
+L</spec_set> and L</spec_delete> on it replace or clear the union object,
+and L</spec_get> returns it.
 
 =head1 SEE ALSO
 

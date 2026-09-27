@@ -107,6 +107,14 @@ sub TO_JSON {
     return $self->allows ? JSON::MaybeXS::true() : JSON::MaybeXS::false();
 }
 
+# The node a spec path walks into (IO::K8s::Role::SpecBuilder, k172): the
+# schema, or the boolean -- a scalar, which a path cannot descend through.
+sub _spec_path_node {
+    my ($self) = @_;
+    my $schema = $self->schema;
+    return defined $schema ? ($schema) : ($self->allows);
+}
+
 with 'IO::K8s::Role::Resource';
 
 1;

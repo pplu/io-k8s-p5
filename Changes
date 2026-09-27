@@ -121,6 +121,13 @@ Revision history for IO-K8s
     the generated class and IO::K8s::CRD::Emitter renders the parameter,
     so a CRD read in and written out again keeps them.
 
+  - SpecBuilder paths walk through apiextensions union fields into the
+    value they hold: spec_set('values.replicaCount', 3) on a K3s HelmChart
+    now serializes values: {"replicaCount":3} instead of values: null, and
+    spec_get, spec_hash, spec_array, spec_push and spec_delete reach the
+    value as well; the same for a schema's items, additionalProperties,
+    additionalItems, dependencies, default and example.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added
