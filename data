@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-27T20:53:44Z
+claimed_by: followups-3
+class: standard
+completed: 2026-09-27T20:53:38Z
+created: 2026-09-27T19:31:56Z
+id: 169
+priority: low
+started: 2026-09-27T19:53:25Z
+status: done
+tags:
+- inflation
+- k152-followup
+title: V1::JSON FROM_STRUCT speichert den Wert per Referenz
+updated: 2026-09-27T20:53:44Z
+---
+
+Gefunden bei k152 (2026-09-27). IO::K8s::ApiextensionsApiserver::...::V1::JSON->FROM_STRUCT übernimmt einen Container-Wert ohne die eine Kopierebene aus k54; spätere Änderungen an der Quellstruktur schreiben das Objekt um. Seit k152 auch über AutoGen-Klassen erreichbar. Wie k54 eine Ebene kopieren.
+
+Umgesetzt auf fix/followups-3, uncommittet (io-k8s-worker). Eigene Tests grün; Vollsuite lief während der k158-Edits mit zwei fremden Transient-Fehlern (t/74, t/76 einzeln grün).
+
+Commit fa625867
