@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-27T19:51:50Z
+claimed_by: followups-2
+class: standard
+completed: 2026-09-27T19:51:44Z
+created: 2026-09-27T18:35:41Z
+id: 163
+priority: low
+started: 2026-09-27T18:54:38Z
+status: done
+tags:
+- pk8s
+- load
+- k160-followup
+title: 'load(.pk8s): Fehlerzeilen zeigen in den generierten DSL-Code'
+updated: 2026-09-27T19:51:50Z
+---
+
+Gefunden bei k160 (2026-09-27). Ein Fehler in einer .pk8s-Datei meldet z. B. boom at (eval 273) line 1847 statt Datei und Zeile des Manifests. Eine #line-Direktive mit dem Dateinamen vor dem Manifest-Inhalt behebt das. Nebenbei: der Manifest-Eval sieht die Lexicals von _load_file; das eval in eine eigene Sub ohne Lexicals legen.
+
+Umgesetzt auf fix/followups-2, uncommittet (io-k8s-worker). Eigene Tests grün, Vollsuite vor den Edits des Parallel-Workers 122 Dateien 9078 Tests PASS.
+
+Commit 6028e4cc (Name the manifest file and line in .pk8s errors, hide the loader's lexicals)
