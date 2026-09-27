@@ -95,11 +95,14 @@ Revision history for IO-K8s
     "(eval 273) line 1848", and the manifest no longer sees the loader's
     own variables ($file, $m, ...), which now fail under use strict.
 
-  - Errors from add_crd, IO::K8s::CRD->generate (AutoGen's included) and
-    to_crd, and List errors through inflate or IO::K8s::List->FROM_STRUCT,
-    name the calling line instead of one inside the distribution; so does
-    a CRD file that exists but cannot be read, through add_crd and
-    IO::K8s::CRD->load alike.
+  - Errors name the calling line instead of one inside the distribution
+    for add_crd, IO::K8s::CRD->generate (AutoGen's included) and to_crd,
+    FROM_HASH and from_json (the unknown_kinds => 'unstructured' fallback
+    included), spec_set and spec_merge, the JSONSchemaPropsOr* classes,
+    classes AutoGen builds from an openapi_spec, load of a missing .pk8s
+    file, inflate of a document without kind, and List errors through
+    inflate or IO::K8s::List->FROM_STRUCT; so does a CRD file that exists
+    but cannot be read, through add_crd and IO::K8s::CRD->load alike.
 
   - An apiextensions JSON value (a CRD schema's default, example or enum
     entry, a K3s HelmChart's values) is copied one level on the way in and

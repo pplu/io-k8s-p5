@@ -11,6 +11,7 @@ use Scalar::Util qw(blessed);
 # the package as not-methods, so their names stay off every consumer. A `use`
 # below that line composes its exports onto all shipped classes (k118).
 use Moo::Role;
+our @CARP_NOT = ('IO::K8s');  # FROM_HASH/from_json errors name their caller (k175)
 
 has _json_encoder => (
     is      => 'ro',

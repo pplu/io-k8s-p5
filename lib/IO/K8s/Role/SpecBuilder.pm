@@ -9,6 +9,14 @@ use Module::Runtime qw(use_module);
 # below that line composes its exports onto all shipped classes (k118).
 use Moo::Role;
 
+# Carp treats IO::K8s as part of this role (k175), the rule IO::K8s::CRD
+# (k165) and IO::K8s::List (k170) follow: a write that hands a hash to a
+# typed field inflates it through IO::K8s, and a shape croak raised there --
+# or a constructor error, which IO::K8s moves to Carp's answer (k164) --
+# names the line that called spec_set or spec_merge, not the inflation call
+# in this file. A caller in any other package still sees its own line.
+our @CARP_NOT = ('IO::K8s');
+
 # ---------------------------------------------------------------------------
 # A node on a spec path is one of: a plain hashref, a plain arrayref, or an
 # IO::K8s object (anything composing IO::K8s::Role::Resource). Segments are
@@ -734,6 +742,13 @@ index, a scalar blocking further descent (whether hit while walking or
 while storing into it), and C<spec_array>/C<spec_hash> finding a
 non-array or scalar value already at the path. C<spec_merge> bypasses
 the path machinery entirely and shallow-merges into the top level only.
+
+A hash handed to a typed field by C<spec_set> or C<spec_merge> is inflated
+the way C<FROM_HASH> inflates it, and an error that inflation raises -- a
+value of the wrong shape inside the hash, a missing required field -- comes
+without the prefix, as L<IO::K8s/inflate> words it, but like every other
+failure here it names the line that called the C<spec_*> method, not a line
+inside the distribution (k175).
 
 L<IO::K8s::Role::APIObject> composes this role, so every top-level Kind
 has it: the built-in Kubernetes kinds, CRD classes declared via

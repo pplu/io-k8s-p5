@@ -1082,8 +1082,9 @@ sub inflate {
     $self->_refuse_object_shape(undef, $self->_describe_shape($struct))
         unless ref $struct eq 'HASH';
 
+    # croak, not die (k175): the error names the line that called inflate.
     my $kind = $struct->{kind}
-        or die "Cannot inflate: missing 'kind' field in data";
+        or croak "Cannot inflate: missing 'kind' field in data";
 
     # A List-shaped Kind ('List' itself, or any '...List') routes to the
     # generic IO::K8s::List container rather than expand_class(): the
@@ -1867,6 +1868,12 @@ C<apiVersion>/C<kind>/C<metadata> is precisely what it exists to preserve.
 Optional. The OpenAPI v2 specification from a Kubernetes cluster. When provided,
 enables auto-generation of classes for types not found in the built-in classes.
 
+An error from generating such a class -- a C<$ref> no definition answers,
+say, and the remembered failure L<IO::K8s::AutoGen> rethrows when the same
+class is asked for again -- names the line that called L</expand_class>,
+L</new_object>, L</inflate> or whichever entry point asked for the class,
+not a line inside IO::K8s (k175).
+
 =head2 class_namespaces
 
 Optional. ArrayRef of namespace prefixes to search for classes before checking
@@ -1992,7 +1999,8 @@ C<Error loading myapp.pk8s:>. A file name with a double quote, a line break
 or characters outside printable ASCII cannot be written into Perl's
 C<#line> directive; for such a file the line numbers are still right, the
 location reads C<(eval N)> instead of the name, and the prefix still names
-the file.
+the file. A manifest that cannot be opened croaks C<Cannot open myapp.pk8s:
+...> at the line that called C<load> (k175).
 
 The manifest is compiled under C<use strict> and C<use warnings> and sees
 C<var> and one function per Kind, but none of the loader's own variables:
@@ -2180,6 +2188,15 @@ its own code, such as a C<BUILD> that dies, keeps its own location, and a
 direct C<< $class->new(...) >> is not an entry point of IO::K8s and reports
 as it always has.
 
+The same goes for the routes that inflate through IO::K8s on your behalf
+(k175): L<IO::K8s::Role::Resource/FROM_HASH> and C<from_json>, which the
+C<< unknown_kinds => 'unstructured' >> fallback of C<new_object> and
+C<inflate> goes through as well; a hash that C<spec_set> or C<spec_merge>
+of L<IO::K8s::Role::SpecBuilder> writes into a typed field; and a schema
+arm the C<JSONSchemaPropsOr*> union classes inflate. A shape error, a
+missing required field or a value of the wrong type met on those routes
+names the line that called them.
+
 =head2 inflate
 
     my $obj = $k8s->inflate($json_string);
@@ -2204,6 +2221,11 @@ any other Perl value -- an arrayref, C<undef>, an already-inflated object --
 dies naming what it received (k161):
 
     Cannot inflate: expected a hash (a JSON object), got a reference of type ARRAY
+
+A hash without a C<kind> croaks, naming the line that called C<inflate>
+(k175):
+
+    Cannot inflate: missing 'kind' field in data at deploy.pl line 12.
 
 =head2 json_to_object
 

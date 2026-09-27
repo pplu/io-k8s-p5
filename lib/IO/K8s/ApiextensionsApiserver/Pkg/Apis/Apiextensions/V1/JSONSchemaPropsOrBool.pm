@@ -7,6 +7,13 @@ use Types::Standard qw( Bool );
 use Scalar::Util ();
 use JSON::MaybeXS ();
 
+# Carp treats IO::K8s as part of this class (k175), as IO::K8s::List does
+# (k170): a schema arm is inflated through IO::K8s, and a shape croak raised
+# there -- a plain scalar where a schema belongs -- names the line that called
+# FROM_STRUCT, or IO::K8s itself on the way in, not the inflation call below.
+# A caller in any other package still sees its own line.
+our @CARP_NOT = ('IO::K8s');
+
 my $PROPS = 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaProps';
 
 =head1 DESCRIPTION
@@ -24,6 +31,11 @@ C<false> stays C<false> and never collapses into an empty schema object.
     my $ap = $props->additionalProperties;
     if ($ap->is_schema) { ... $ap->schema ... }
     else                { ... $ap->allows ... }
+
+An error inflating the schema arm -- a value of the wrong shape where a
+schema, or a field inside one, belongs -- names the line that called
+L</FROM_STRUCT>, or the entry point of IO::K8s that got there, not a line
+of this class (k175).
 
 =cut
 

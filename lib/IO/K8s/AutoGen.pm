@@ -16,6 +16,7 @@ use IO::K8s::Types qw( IntOrStr Time );
 # The empty list matters: IO::K8s::APIObject's import would make this
 # package a Moo class. Loaded for its subresources check (k158).
 use IO::K8s::APIObject ();
+our @CARP_NOT = ('IO::K8s');  # errors via an openapi_spec instance name its caller (k175)
 
 # Cache of generated classes -- only classes whose generation run completed
 # (see "Generation runs" below). generated_classes() lists exactly these.

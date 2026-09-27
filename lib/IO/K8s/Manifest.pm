@@ -8,6 +8,13 @@ use Moo;
 use Carp qw(croak);
 use Package::Stash;
 
+# Carp treats IO::K8s as part of this module (k175), the way IO::K8s::CRD
+# does (k165): the "Cannot open" IO::K8s->_slurp_utf8 raises for a manifest
+# that cannot be read names the line that called IO::K8s->load, not the
+# read in _load_file below. A caller in any other package -- the manifest
+# calling var(), say -- still sees its own line.
+our @CARP_NOT = ('IO::K8s');
+
 # Runs a manifest's source, returning $@ (k163). Defined here, above every
 # lexical of this file, so the string eval sees none of them: it used to
 # run inside _load_file, where a manifest could read -- and under
