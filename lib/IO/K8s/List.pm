@@ -4,6 +4,7 @@ our $VERSION = '1.109';
 use v5.10;
 use Moo;
 with 'IO::K8s::Role::Resource';
+use Carp ();
 use Module::Runtime ();
 use Types::Standard qw( Str );
 use JSON::MaybeXS ();
@@ -182,6 +183,17 @@ derive one" meaning it already has for an empty list built directly via
 C<new>. It is the only way to inflate a bare C<kind: List> payload, whose
 Kind minus its C<List> suffix is empty and so derives nothing on its own.
 
+C<item_class> must be a class name (k166). A reference -- plain or blessed,
+a JSON boolean included -- or an empty class name, C<''> or a bare C<+>,
+dies naming this class, the argument and what it received, whether the list
+has items or not:
+
+    IO::K8s::List->FROM_STRUCT: item_class must be a class name, got a reference of type HASH
+    IO::K8s::List->FROM_STRUCT: item_class must be a class name, got an empty string
+
+An C<undef> C<item_class> is no override: the item type is derived as if the
+key were absent.
+
 Fails closed (k39/k46): an item Kind that cannot be resolved to a
 class dies with the same "Cannot resolve Kubernetes GVK" error every other
 entry point in this distribution uses, naming the ITEM's kind/apiVersion,
@@ -238,6 +250,17 @@ sub FROM_STRUCT {
     # hand-built list. Same '+' handling as everywhere else (k49).
     my $resolved_item_class;
     if (defined(my $override = $struct->{item_class})) {
+        # A class name and nothing else (k166). A reference used to reach
+        # Module::Runtime ("argument is not a module name") with items, or
+        # the attribute's Maybe[Str] check without; '' or a bare '+' died
+        # "`' is not a module name" with items and was kept silently without.
+        # Carp qualified, not imported: no croak method on a resource class
+        # (k118, t/27_no_import_leak.t).
+        Carp::croak($class.'->FROM_STRUCT: item_class must be a class name, got '
+            .(ref $override    ? $k8s->_describe_shape($override)
+            : $override eq '' ? 'an empty string'
+            :                   "a bare '+'"))
+            if ref $override || $override eq '' || $override eq '+';
         $override =~ s/\A\+//;
         $resolved_item_class = $override;
     }
