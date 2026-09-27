@@ -1074,22 +1074,22 @@ original keys.
     };
 
 A field declaration takes an optional third argument: a hashref of options,
-directly after the type spec (C<k8s name => Type, { ... }>), or as the
+directly after the type spec (C<< k8s name => Type, { ... } >>), or as the
 second element of a two-element arrayref in place of the type spec
-(C<name => [ Type, { ... } ]>) for a field inside an inline struct, which
+(C<< name => [ Type, { ... } ] >>) for a field inside an inline struct, which
 has no third-argument slot of its own. The legacy C<'required'> string
-marker and the C<Type!> suffix (C<k8s x => 'Str!'>) still work and are
-equivalent to C<{ required => 1 }>.
+marker and the C<Type!> suffix (C<< k8s x => 'Str!' >>) still work and are
+equivalent to C<< { required => 1 } >>.
 
 The nine recognised option keys are C<required>, C<default>, C<enum>,
 C<minimum>, C<maximum>, C<pattern>, C<description>, C<nullable> and
 C<preserve_unknown>. All nine are recorded in the attribute registry for
 the CRD schema a C<to_crd> emitter builds from it.
 
-C<required> itself takes two meaningful values. C<required => 1> (like the
+C<required> itself takes two meaningful values. C<< required => 1 >> (like the
 legacy marker and the C<!> suffix) both makes the field a Moo-required
-constructor argument and records C<required => 1> in the registry.
-C<required => 'schema'> records the same registry fact without the Moo
+constructor argument and records C<< required => 1 >> in the registry.
+C<< required => 'schema' >> records the same registry fact without the Moo
 enforcement, leaving the field optional at construction -- this is what
 L<IO::K8s::AutoGen> uses for an OpenAPI C<required> list, since a document
 a real cluster returns can still omit such a field (a server-side default,
@@ -1104,7 +1104,7 @@ API server. They apply to a scalar field, to each element of an array of
 scalars (C<< k8s tags => [Str], { enum => [...] } >>), and to each value of
 a typed value map (C<< k8s weights => { Int => 1 }, { maximum => 100 } >>).
 Declaring one of them on an object, inline-struct or opaque-container field
-(C<{ Str => 1 }>, C<[ {} ]>, C<[ [] ]>, a nested class) is a class-load
+(C<< { Str => 1 } >>, C<[ {} ]>, C<[ [] ]>, a nested class) is a class-load
 error, since there is no scalar value to check. A failing value dies with
 one of:
 
@@ -1150,16 +1150,16 @@ C<nullable> means the key has to exist, and C<null> satisfies it. For every
 field without C<nullable>, C<undef> and C<null> still mean "absent".
 
 Class load fails, naming the class and field, on: an unrecognised option
-key (C<k8s: unknown field option '<key>' for field '<name>' of <class>
-(known: ...)>); any option given an explicit C<undef> value, since that is
-a declaration error rather than "no option" (C<k8s: field option '<key>'
-for ... must not be undef>); a third argument that is neither
+key (C<< k8s: unknown field option '<key>' for field '<name>' of <class>
+(known: ...) >>); any option given an explicit C<undef> value, since that is
+a declaration error rather than "no option" (C<< k8s: field option '<key>'
+for ... must not be undef >>); a third argument that is neither
 C<'required'> nor a hashref; an empty or duplicate C<enum>, or C<enum> on a
 C<Bool> field; C<minimum>/C<maximum> on a non-numeric field, a non-numeric
 bound, or a C<minimum> exceeding C<maximum>; a C<pattern> on a non-string
 field or one that does not compile as a Perl regex; and a C<default> that
-fails the field's own type (C<k8s: 'default' for ... fails the field's own
-type: <message>>), checked once at class-load time rather than discovered
+fails the field's own type (C<< k8s: 'default' for ... fails the field's own
+type: <message> >>), checked once at class-load time rather than discovered
 later when C<to_crd> emits it. An object-bearing field -- a referenced
 class, an inline struct, or an array or map of objects -- is exempt from
 that last check: no plain hash or array default can ever satisfy an
@@ -1173,21 +1173,21 @@ on a declaration that collides with something already in place (k144):
 
 =item * Two different JSON keys that sanitize to the same Perl attribute
 name (C<x-value> and C<x_value> both become C<x_value>), in this class or,
-nearest wins, in an ancestor: C<k8s: field '<name>' of <class> collides
+nearest wins, in an ancestor: C<< k8s: field '<name>' of <class> collides
 with field '<other key>' of <declaring class>: both map to the Perl
-attribute '<attr>'>.
+attribute '<attr>' >>.
 
 =item * A field name that is already a method on the class but not a Moo
 attribute -- a role helper such as L<IO::K8s::Role::APIObject/is_ready> --
 unless the role that provides it has declared the helper as yielding to a
 wire field of the same name, which today only C<conditions> is:
-C<k8s: field '<name>' of <class> collides with the method '<attr>' of
-<class>, which is not an attribute>.
+C<< k8s: field '<name>' of <class> collides with the method '<attr>' of
+<class>, which is not an attribute >>.
 
 =item * A field that would take over an attribute the class defines
-itself outside the C<k8s> DSL (a plain C<has>): C<k8s: field '<name>' of
+itself outside the C<k8s> DSL (a plain C<has>): C<< k8s: field '<name>' of
 <class> would take over the attribute '<attr>' that <class> defines
-outside the k8s DSL>.
+outside the k8s DSL >>.
 
 =item * A C<nullable> field whose predicate or clearer name
 (C<has_E<lt>accessorE<gt>>, C<clear_E<lt>accessorE<gt>>) the class already

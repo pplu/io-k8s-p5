@@ -350,10 +350,10 @@ identically-named C<spec.versions[]> entries -- a shape the apiserver
 rejects -- so that croaks too, naming the repeated version. Each class
 becomes one C<spec.versions[]> entry (schema from L</_schema_for_class>,
 applied per class, and C<subresources> from the class's own declaration
-when it has one, k158): every entry is C<served => true>, and exactly the one
-whose C<name> matches C<storage> gets C<storage => true> (the rest
-C<storage => false>). C<storage> is required and must name one of the given
-classes' own versions, or the call croaks.
+when it has one, k158): every entry is C<< served => true >>, and exactly
+the one whose C<name> matches C<storage> gets C<< storage => true >> (the
+rest C<< storage => false >>). C<storage> is required and must name one of
+the given classes' own versions, or the call croaks.
 
 Versions land in C<spec.versions> in the order C<classes> was given, not
 re-sorted by a Kubernetes-style version precedence -- the caller already
