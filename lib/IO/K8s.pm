@@ -987,9 +987,12 @@ sub _describe_shape {
 
 # The one wording for a value that cannot become an object of $class
 # (k146, k153). $where names the parent class and field of a nested value.
+# $class is undef for a whole document handed to inflate, whose class the
+# missing hash would have named through its kind (k161).
 sub _refuse_object_shape {
     my ($self, $class, $got, $where) = @_;
-    croak 'Cannot inflate '.$class.': expected a hash (a JSON object), got '.$got
+    croak 'Cannot inflate'.(defined $class ? ' '.$class : '')
+        .': expected a hash (a JSON object), got '.$got
         .(defined $where ? ' while inflating '.$where : '');
 }
 
@@ -997,8 +1000,14 @@ sub inflate {
     my ($self, $data) = @_;
     local $IO::K8s::Resource::STRICT = $self->strict;
 
-    # Accept both JSON string and hashref
-    my $struct = ref($data) eq 'HASH' ? $data : $self->json->decode($data);
+    # A hashref is the document, a plain string is JSON text for one. What
+    # the text decodes to has to be a hash as well (k161): inflate('[]')
+    # used to die with Perl's own "Not a HASH reference", and an arrayref,
+    # undef or an object handed over directly came back as a JSON parse
+    # error about a "malformed JSON string" -- none naming what was wrong.
+    my $struct = defined $data && !ref $data ? $self->json->decode($data) : $data;
+    $self->_refuse_object_shape(undef, $self->_describe_shape($struct))
+        unless ref $struct eq 'HASH';
 
     my $kind = $struct->{kind}
         or die "Cannot inflate: missing 'kind' field in data";
@@ -2024,6 +2033,13 @@ and, for objects, the element class (k154):
 Only the container is checked; the contents of a free-form map such as
 C<labels> or C<annotations> stay as unconstrained as before.
 
+A list payload (C<kind: PodList> and the like, inflated into
+L<IO::K8s::List>) follows the same rules: the list itself has to be a hash,
+C<items> an array -- named as C<IO::K8s::List field items> -- and each item
+a hash, named by its index (k161):
+
+    Cannot inflate IO::K8s::Api::Core::V1::Pod: expected a hash (a JSON object), got a plain scalar while inflating IO::K8s::List field items at element 1
+
 All of this applies uniformly across C<new_object>, C<inflate>,
 C<json_to_object>, C<struct_to_object>, L<IO::K8s::Role::Resource/FROM_HASH>
 and the nested coercion of a class's constructor, on every class, and
@@ -2049,13 +2065,21 @@ Independently of that, a defined non-hash value at an object-bearing
 position anywhere in the data also fails closed -- see L</new_object> for
 the exact message.
 
+The data itself has to be a hash: a hashref, or JSON text that decodes to
+an object. JSON text for anything else -- C<[]>, a string, C<null> -- and
+any other Perl value -- an arrayref, C<undef>, an already-inflated object --
+dies naming what it received (k161):
+
+    Cannot inflate: expected a hash (a JSON object), got a reference of type ARRAY
+
 =head2 json_to_object
 
     my $obj = $k8s->json_to_object($json_with_kind);
     my $obj = $k8s->json_to_object('Pod', $json_string);
 
 Convert JSON to an IO::K8s object. With one argument, auto-detects the class
-from C<kind>. With two arguments, uses the specified class.
+from C<kind> exactly as L</inflate> does, and like there the JSON has to
+decode to an object. With two arguments, uses the specified class.
 
 The specified class name goes through L</expand_class> exactly as it would
 for L</new_object>: a bare one-word name is always read as a Kubernetes

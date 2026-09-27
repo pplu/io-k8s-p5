@@ -55,9 +55,11 @@ Revision history for IO-K8s
     object of another class is still converted through its TO_JSON.
 
   - An array or hash field given the wrong container (containers => 'x',
-    labels => []) dies naming the class, the field and the expected and
-    received shape instead of with a bare Perl dereference or
-    type-constraint error.
+    labels => []), a List whose items is no array or holds a non-hash
+    item, and an inflate document that is no hash (inflate('[]')) die
+    naming the class, the field or element and the expected and received
+    shape instead of with a bare Perl dereference, type-constraint or JSON
+    parse error.
 
   - load_yaml reads a file as UTF-8 instead of handing its bytes to
     YAML::PP, which mangled or died on non-ASCII text. A one-line argument

@@ -187,6 +187,18 @@ class dies with the same "Cannot resolve Kubernetes GVK" error every other
 entry point in this distribution uses, naming the ITEM's kind/apiVersion,
 never a silently empty or half-inflated list.
 
+The wrong shape fails closed in the message form of L<IO::K8s/new_object>
+(k161): a C<$struct> that is not a hash dies naming this class, C<items>
+that is not an array dies naming the field, the item class and what it
+received, and an item or C<metadata> that is not a hash dies naming the
+field -- and for an item its index -- it sits at:
+
+    Cannot inflate IO::K8s::List field items: expected an array (a JSON array) of IO::K8s::Api::Core::V1::Pod, got a plain scalar
+    Cannot inflate IO::K8s::Api::Core::V1::Pod: expected a hash (a JSON object), got a plain scalar while inflating IO::K8s::List field items at element 1
+
+A C<$struct> of C<undef>, and C<items> missing or C<undef>, still give an
+empty list.
+
 =cut
 
 my $LIST_META = 'IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ListMeta';
@@ -208,6 +220,15 @@ sub FROM_STRUCT {
     my ($class, $struct, $k8s) = @_;
 
     $k8s //= do { require IO::K8s; IO::K8s->new };
+
+    # The envelope, `items` and each item are refused in the message form
+    # every other inflation uses (k146, k154), through IO::K8s's own
+    # helpers so the wording cannot drift (k161). They used to reach a bare
+    # Perl dereference: "Not a HASH reference" for a struct that is no hash,
+    # "Can't use string as an ARRAY ref" for items => 'x'. undef stays "no
+    # value" -- an empty list, like a missing `items`.
+    $k8s->_refuse_object_shape($class, $k8s->_describe_shape($struct))
+        if defined $struct && ref $struct ne 'HASH';
 
     my $kind        = $struct->{kind};
     my $api_version = $struct->{apiVersion};
@@ -234,18 +255,26 @@ sub FROM_STRUCT {
         # pre-expanded path so it is not re-interpreted by expand_class()
         # (k35), same reasoning IO::K8s::_inflate_struct applies to
         # every nested object it inflates.
-        $metadata = $k8s->_struct_to_object_expanded($LIST_META, $meta_struct);
+        $metadata = $k8s->_struct_to_object_expanded($LIST_META, $meta_struct,
+            $class.' field metadata');
     }
 
+    my $items = $struct->{items} // [];
+    $k8s->_refuse_container_shape($class, 'items', 'ARRAY', $resolved_item_class, $items)
+        unless ref $items eq 'ARRAY';
+
     my @items;
-    for my $item_struct (@{ $struct->{items} // [] }) {
+    for my $i (0 .. $#$items) {
         die "Cannot inflate item in List payload: kind '"
             . (defined $kind ? $kind : '<undef>')
             . "' has no derivable item type and no 'item_class' override was given\n"
             unless defined $resolved_item_class;
         # Already resolved above (via expand_class() or the override) --
-        # the pre-expanded path, for the same k35 reason as metadata.
-        push @items, $k8s->_struct_to_object_expanded($resolved_item_class, $item_struct);
+        # the pre-expanded path, for the same k35 reason as metadata. The
+        # third argument names the element for a shape error, worded like
+        # IO::K8s::_inflate_struct names an element of an object array.
+        push @items, $k8s->_struct_to_object_expanded($resolved_item_class, $items->[$i],
+            $class.' field items at element '.$i);
     }
 
     # Any top-level key besides the ones this envelope itself understands
