@@ -123,6 +123,7 @@ my %HASH_VALUE_TYPES = (
 # recorded in the registry for to_crd; enum, minimum, maximum and pattern
 # are also enforced at construction, the way { Quantity => 1 } validates
 # its values -- a bad value fails here instead of at the API server.
+# nullable also keeps an explicit JSON null on the way in and out (k158).
 # default is deliberately NOT applied client-side: defaulting is the API
 # server's job, and a client default would change the wire output.
 my %FIELD_OPTIONS = map { $_ => 1 } qw(
@@ -523,6 +524,23 @@ sub _declare_field {
         croak "k8s: field option '$key' for $where must not be undef"
             unless defined $opts{$key};
     }
+    # A nullable field keeps an explicit JSON null (k158) and brings two
+    # methods of its own: has_<accessor>, true while the key exists (null
+    # included), and clear_<accessor>, which makes the field absent again.
+    # Both names are part of the declaration preflight: taken by anything
+    # but this very field's own predicate and clearer -- declared before in
+    # this class, or inherited from the field an ancestor declares -- they
+    # are refused like a colliding field name, before anything is built.
+    my @nullable_methods = $opts{nullable} ? _nullable_methods($attr_name) : ();
+    if (@nullable_methods) {
+        my $own = IO::K8s::Role::Resource::_effective_attribute_specs($caller)->{$attr_name} // {};
+        my %own = map { defined $_ ? ($_ => 1) : () } @{$own}{qw( predicate clearer )};
+        for my $method (@nullable_methods) {
+            croak "k8s: $where needs the method '$method' as a nullable field, "
+                . "but $caller already has a method of that name"
+                if $caller->can($method) && !$own{$method};
+        }
+    }
     # required => 1 (or the legacy 'required' marker / '!' suffix) both
     # enforces the field at construction and records required => 1 in the
     # registry. required => 'schema' does the second half only: AutoGen
@@ -684,7 +702,9 @@ sub _declare_field {
             . $inner->get_message($opts{default});
     }
 
-    my $isa = $required ? $inner : Maybe[$inner];
+    # A nullable field takes undef even when required: required means the
+    # key must exist, and null is a value it may exist with (k158).
+    my $isa = $required && !@nullable_methods ? $inner : Maybe[$inner];
 
     $info{required} = 1 if $required_recorded;
     if (%opts) {
@@ -864,8 +884,21 @@ sub _declare_field {
     $has->($attr_name, is => 'rw', isa => $isa, @coerce,
         ($required ? (required => 1) : ()),
         ($attr_name ne $json_key ? (init_arg => $json_key) : ()),
+        (@nullable_methods
+            ? (predicate => $nullable_methods[0], clearer => $nullable_methods[1])
+            : ()),
     );
     return _register_field($caller, $attr_name, \%info);
+}
+
+# The predicate and clearer a nullable field gets (k158), in that order:
+# has_<accessor> and clear_<accessor>, named after the Perl attribute, the
+# same name the accessor itself has. IO::K8s::Role::Resource's TO_JSON and
+# IO::K8s::Role::SpecBuilder's spec_delete call them through this too, so
+# the names are spelled in one place.
+sub _nullable_methods {
+    my ($attr_name) = @_;
+    return ('has_'.$attr_name, 'clear_'.$attr_name);
 }
 
 # An inline struct declared again in the class that declared it (k151). Its
@@ -1084,13 +1117,37 @@ On an optional field the message is prefixed with Type::Tiny's own generic
 "did not pass type constraint" line; the rule text above follows in the
 explanation.
 
-C<default>, C<description>, C<nullable> and C<preserve_unknown> are
-schema-only: they are recorded for C<to_crd> and never change anything at
-construction or serialization. In particular, C<default> is B<not> applied
-client-side -- defaulting is the API server's job, and a client-side
-default would change the wire output, so a field with no value given still
-serializes as absent. C<nullable> likewise does not make C<TO_JSON> emit
-C<null>: an unset field is still omitted from the JSON either way.
+C<default>, C<description> and C<preserve_unknown> are schema-only: they
+are recorded for C<to_crd> and never change anything at construction or
+serialization. In particular, C<default> is B<not> applied client-side --
+defaulting is the API server's job, and a client-side default would change
+the wire output, so a field with no value given still serializes as
+absent.
+
+C<nullable> is recorded for C<to_crd> as well, and since k158 it also
+makes an explicit JSON C<null> a value of its own:
+
+    k8s upstream => { Str => 1 }, { nullable => 1 };
+
+    my $spec = My::Spec->new(upstream => undef);
+    $spec->has_upstream;      # true: the key exists
+    $spec->to_json;           # {"upstream":null}
+    $spec->clear_upstream;    # absent again
+    $spec->to_json;           # {}
+
+The field accepts C<undef> at construction and in its setter -- its type
+is C<Maybe>-wrapped even when it is C<required> -- and every inflation
+route (L<IO::K8s/inflate>, L<IO::K8s/new_object>,
+L<IO::K8s/struct_to_object>, L<IO::K8s/json_to_object>,
+L<IO::K8s::Role::Resource/FROM_HASH>, C<from_json> and the nested coercion
+of a constructor, at any depth) keeps a C<null> for it where every other
+field drops it. C<TO_JSON> writes a nullable field that is present with
+C<undef> as C<null>; an absent one stays omitted. Only a nullable field
+gets the two methods that tell those apart: C<has_E<lt>accessorE<gt>>, true
+while the key exists, C<null> included, and C<clear_E<lt>accessorE<gt>>,
+which makes the field absent again. C<< required => 1 >> together with
+C<nullable> means the key has to exist, and C<null> satisfies it. For every
+field without C<nullable>, C<undef> and C<null> still mean "absent".
 
 Class load fails, naming the class and field, on: an unrecognised option
 key (C<k8s: unknown field option '<key>' for field '<name>' of <class>
@@ -1131,6 +1188,15 @@ C<k8s: field '<name>' of <class> collides with the method '<attr>' of
 itself outside the C<k8s> DSL (a plain C<has>): C<k8s: field '<name>' of
 <class> would take over the attribute '<attr>' that <class> defines
 outside the k8s DSL>.
+
+=item * A C<nullable> field whose predicate or clearer name
+(C<has_E<lt>accessorE<gt>>, C<clear_E<lt>accessorE<gt>>) the class already
+answers to -- a method, or the accessor of another field -- other than as
+this very field's own, declared before or inherited (k158): C<< k8s: field
+'<name>' of <class> needs the method '<method>' as a nullable field, but
+<class> already has a method of that name >>. The other way round, a field
+whose accessor would take a nullable field's predicate or clearer name is
+refused by the method check above.
 
 =item * A field the same class has already declared under the same JSON
 key, declared again with a different type, nested class, option,

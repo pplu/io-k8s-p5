@@ -1685,7 +1685,12 @@ C<x-kubernetes-preserve-unknown-fields> are read as JSON booleans, not
 Perl truthiness, so the wire string C<"false"> is false; a C<default> of
 JSON C<null> -- common on a C<nullable: true> field -- is treated as no
 default at all, not as a default of C<undef>, which the DSL's own
-field-option check would otherwise refuse.
+field-option check would otherwise refuse. A C<nullable: true> property
+behaves as C<nullable> does on a hand-written field (k158): an explicit
+C<null> in a document is kept and written back, and the property gets
+C<has_E<lt>accessorE<gt>> and C<clear_E<lt>accessorE<gt>>. A property whose
+predicate or clearer name the class already answers to fails the generation
+run, like any other declaration collision (see L<IO::K8s::Resource/k8s>).
 
 A malformed schema option is dropped rather than failing the whole class:
 the client-side check is a convenience, the API server validates every

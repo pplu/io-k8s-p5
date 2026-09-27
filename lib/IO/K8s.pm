@@ -1173,7 +1173,16 @@ sub _inflate_struct {
 
     for my $attr (keys %$params) {
         my $value = $params->{$attr};
-        next unless defined $value;
+        unless (defined $value) {
+            # A JSON null is "no value" and dropped -- except for a field
+            # declared nullable, where it is a value of its own that TO_JSON
+            # writes back (k158): the attribute is built with undef, so it
+            # exists and has_<accessor> is true.
+            my $opts = $attr_info->{ $json_to_perl{$attr} // $attr };
+            $opts = $opts->{options} if $opts;
+            $args{$attr} = undef if $opts && $opts->{nullable};
+            next;
+        }
 
         # Pass through opaque fields without type coercion -- but not as the
         # caller's own reference (k54), see the else branch below.
@@ -2072,6 +2081,13 @@ and the nested coercion of a class's constructor, on every class, and
 independently of C<strict> -- C<strict> only governs a constructor key no
 attribute claims, not the shape of a value that is present. C<undef> and
 an omitted field are unaffected and remain allowed.
+
+A JSON C<null> (C<undef>) for a field counts as the field being omitted --
+except for a field declared C<nullable> (see
+L<IO::K8s::Resource/Field options>), where it is kept: the attribute exists
+with C<undef>, its C<has_E<lt>accessorE<gt>> is true, and C<TO_JSON> writes
+the C<null> back (k158). That too holds on every entry point listed above
+and at any depth.
 
 =head2 inflate
 

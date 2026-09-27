@@ -102,6 +102,14 @@ Revision history for IO-K8s
     structure afterwards no longer changes the object -- the rule every
     other array or hash field already follows.
 
+  - A field declared nullable => 1 keeps an explicit JSON null: new, its
+    setter and every inflate path (inflate, new_object, struct_to_object,
+    json_to_object, FROM_HASH, nested coercion) keep it, TO_JSON writes it
+    back as null, and an absent field stays absent. Such a field gets
+    has_<accessor> and clear_<accessor>, and spec_delete removes it.
+    Setting a nullable field to undef therefore sends null; the
+    ExternalSecrets refreshTime now round-trips a server's null.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

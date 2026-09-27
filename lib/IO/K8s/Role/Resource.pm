@@ -287,6 +287,11 @@ keeping whatever JSON type they already had. For classes that compose
 L<IO::K8s::Role::APIObject>, the C<apiVersion>, C<kind> and C<metadata>
 fields are prepended.
 
+A field that holds C<undef> is omitted -- unless it is declared
+C<nullable> and present, which C<has_E<lt>accessorE<gt>> tells: that one is
+written as an explicit JSON C<null> (k158; see
+L<IO::K8s::Resource/Field options>).
+
 This is the entry point L</to_json> builds on, and the inverse of
 L</FROM_HASH>.
 
@@ -310,7 +315,16 @@ sub TO_JSON {
 
     for my $attr (@$attrs) {
         my $value = $self->$attr;
-        next unless defined $value;
+        unless (defined $value) {
+            # A nullable field present with undef is an explicit JSON null
+            # (k158); has_<accessor> tells it from an absent one. Every
+            # other undefined field is omitted, as it always was.
+            my $opts = $info->{$attr} && $info->{$attr}{options};
+            next unless $opts && $opts->{nullable};
+            my ($has) = IO::K8s::Resource::_nullable_methods($attr);
+            $data{ $info->{$attr}{json_key} // $attr } = undef if $self->$has;
+            next;
+        }
 
         my $attr_info = $info->{$attr} // {};
         # Use json_key for output when attr name differs from JSON field name

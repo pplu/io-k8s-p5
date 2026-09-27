@@ -359,7 +359,9 @@ is inflated through the registry the same way C<FROM_HASH> would, and the
 final write goes through the target's ordinary accessor, so a declared
 field's own type constraint validates the value -- the wrong type croaks
 the same way a direct C<< ->attr($value) >> call would. Returns C<$self>
-for chaining.
+for chaining. C<undef> for a C<nullable> field (k158) is a value like any
+other: the field is then present with an explicit C<null>, which
+C<TO_JSON> writes -- L</spec_delete> is what removes it.
 
 Vivifying a typed intermediate constructs the declared class with no
 arguments; a class with required attributes (k101) cannot be built that
@@ -505,6 +507,9 @@ is deleted; for a declared field on a typed node there is nothing to
 remove, so it is cleared to C<undef> through its accessor instead --
 which croaks on a C<required> field, because its type constraint is not
 C<Maybe>-wrapped and rejects C<undef> the same as any other bad value.
+A C<nullable> field is the exception (k158): C<undef> would leave it
+present with an explicit C<null>, so its C<clear_E<lt>accessorE<gt>> removes
+it instead and it is omitted from C<TO_JSON> again.
 For an array parent the indexed element is spliced out. If
 the path does not resolve -- C<spec> is unset, a parent is missing, or the
 terminal is undefined -- the call is a no-op. Returns C<$self> for
@@ -525,8 +530,13 @@ sub spec_delete {
         return $self unless ref $node;
     }
     if (_sb_is_obj($node)) {
-        my ($attr) = _sb_attr($node, $last);
-        if (defined $attr) {
+        my ($attr, $info) = _sb_attr($node, $last);
+        if (defined $attr && $info->{options} && $info->{options}{nullable}) {
+            # Setting undef would leave a nullable field present with null
+            # (k158); its clearer removes the key.
+            my (undef, $clear) = IO::K8s::Resource::_nullable_methods($attr);
+            $node->$clear;
+        } elsif (defined $attr) {
             _sb_guard($path, "cannot clear '$last'", sub { $node->$attr(undef) });
         } else {
             delete $node->_unknown_fields->{$last};
