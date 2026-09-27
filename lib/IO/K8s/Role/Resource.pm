@@ -493,8 +493,11 @@ already an object of the right class) -- an arrayref, a plain string, a
 code or scalar reference -- fails closed the same way inflation does
 everywhere else (k146): it croaks naming the target class, the shape it
 actually received, and, for a nested field, the field itself, rather than
-silently building an empty object. See L<IO::K8s/new_object> for the exact
-message. C<undef> and an omitted field are unaffected and remain allowed.
+silently building an empty object. So does a blessed value whose class has
+no C<TO_JSON> returning a hashref, such as a JSON boolean (k153), and an
+array or hash field holding the wrong container (k154). See
+L<IO::K8s/new_object> for the exact messages. C<undef> and an omitted field
+are unaffected and remain allowed.
 
 =cut
 

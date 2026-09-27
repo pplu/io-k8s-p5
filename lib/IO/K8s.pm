@@ -1177,6 +1177,21 @@ sub _inflate_struct {
         my $perl_name = $json_to_perl{$attr} // $attr;
         my $info = $attr_info->{$perl_name} // {};
 
+        # An array field takes an array and a hash field a hash, whatever
+        # its elements are (k154). The object branches below used to
+        # dereference without looking, so containers => 'x' died with
+        # Perl's own "Can't use string as an ARRAY ref", naming neither the
+        # class nor the field; a scalar container reached the constructor
+        # and got a Type::Tiny message without the class. Only the
+        # container is checked -- the field's own isa already demanded it
+        # (ArrayRef[...], HashRef[...], the bare HashRef of { Str => 1 }),
+        # so nothing is refused that used to pass, and the contents of an
+        # opaque { Str => 1 } map stay as unconstrained as before.
+        if (my $shape = $self->_container_shape($info)) {
+            $self->_refuse_container_shape($class, $attr, $shape, $info->{class}, $value)
+                unless ref $value eq $shape;
+        }
+
         # The registry's {class} is always a final class name: the k8s DSL
         # runs every declared type through IO::K8s::Resource::_expand_class
         # before storing it, and generated inline structs are named in full.
@@ -1240,6 +1255,32 @@ sub _shallow_copy {
     return [ @$value ] if ref $value eq 'ARRAY';
     return { %$value } if ref $value eq 'HASH';
     return $value;
+}
+
+# The container a registry entry's field holds -- 'ARRAY', 'HASH', or
+# nothing for a scalar or single-object field (k154). Read off the flag
+# prefix, the way IO::K8s::AutoGen::_element_compatible does, so a
+# container form the DSL gains later is covered without a list to keep in
+# step with IO::K8s::Resource.
+sub _container_shape {
+    my ($self, $info) = @_;
+    for my $flag (keys %$info) {
+        next unless $info->{$flag};
+        return 'ARRAY' if index($flag, 'is_array_of_') == 0;
+        return 'HASH'  if index($flag, 'is_hash_of_') == 0;
+    }
+    return;
+}
+
+# The same form for an array or hash field holding the wrong container
+# (k154): the class being inflated, the field, the expected container and,
+# for an array or hash of objects, the element class.
+sub _refuse_container_shape {
+    my ($self, $class, $attr, $shape, $of, $value) = @_;
+    croak 'Cannot inflate '.$class.' field '.$attr.': expected '
+        .($shape eq 'ARRAY' ? 'an array (a JSON array)' : 'a hash (a JSON object)')
+        .(defined $of ? ' of '.$of : '')
+        .', got '.$self->_describe_shape($value);
 }
 
 sub object_to_struct {
@@ -1900,11 +1941,23 @@ CRD field typed with a generated selector class of the same shape keeps
 working. Fields the target class does not declare are kept (and die under
 C<strict>) exactly as if its C<TO_JSON> hash had been passed.
 
-This applies uniformly across C<new_object>, C<inflate>, C<json_to_object>,
-C<struct_to_object> and L<IO::K8s::Role::Resource/FROM_HASH> on every
-class, and independently of C<strict> -- C<strict> only governs a
-constructor key no attribute claims, not the shape of a value that is
-present. C<undef> and an omitted field are unaffected and remain allowed.
+An array field -- of objects, such as C<containers>, or of scalars, such
+as C<args> -- takes an arrayref, and a hash field -- of objects, or a map
+such as C<labels> or C<limits> -- takes a hashref. Any other defined value
+dies naming the class being inflated, the field, the expected container
+and, for objects, the element class (k154):
+
+    Cannot inflate IO::K8s::Api::Core::V1::PodSpec field containers: expected an array (a JSON array) of IO::K8s::Api::Core::V1::Container, got a plain scalar
+
+Only the container is checked; the contents of a free-form map such as
+C<labels> or C<annotations> stay as unconstrained as before.
+
+All of this applies uniformly across C<new_object>, C<inflate>,
+C<json_to_object>, C<struct_to_object>, L<IO::K8s::Role::Resource/FROM_HASH>
+and the nested coercion of a class's constructor, on every class, and
+independently of C<strict> -- C<strict> only governs a constructor key no
+attribute claims, not the shape of a value that is present. C<undef> and
+an omitted field are unaffected and remain allowed.
 
 =head2 inflate
 
