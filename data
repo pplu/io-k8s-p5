@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-27T20:53:16Z
+claimed_by: followups-3
+class: standard
+completed: 2026-09-27T20:53:07Z
+created: 2026-09-27T19:22:56Z
+id: 165
+priority: low
+started: 2026-09-27T19:53:52Z
+status: done
+tags:
+- errors
+- crd
+- k162-followup
+title: 'IO::K8s::CRD: Croaks über add_crd nennen eine Zeile in lib/IO/K8s.pm'
+updated: 2026-09-27T20:53:16Z
+---
+
+Gefunden bei k162 (2026-09-27). Croaks aus IO::K8s::CRD->load/generate, aufgerufen über add_crd, melden eine Zeile in lib/IO/K8s.pm statt der des Aufrufers. our @CARP_NOT = ('IO::K8s') in IO::K8s::CRD würde das beheben, auch die Cannot-open-Meldung aus _slurp_utf8 mit CRD.pm-Zeile (Kosten aus k162). Wirkung über load hinaus prüfen.
+
+Umgesetzt auf fix/followups-3, uncommittet (io-k8s-worker). Eigene Tests grün; Vollsuite lief während der k158-Edits mit zwei fremden Transient-Fehlern (t/74, t/76 einzeln grün).
+
+Commit 9d2faf8d
