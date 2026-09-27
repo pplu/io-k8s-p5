@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T22:05:17Z
+claimed_by: followups-4
+class: standard
+completed: 2026-09-27T22:05:11Z
+created: 2026-09-27T20:16:04Z
+id: 170
+priority: low
+started: 2026-09-27T20:55:28Z
+status: done
+tags:
+- errors
+- k165-followup
+title: 'Carp-Grenzen: to_crd, AutoGen unter generate und List über inflate nennen
+  interne Zeilen'
+updated: 2026-09-27T22:05:17Z
+---
+
+Gefunden bei k165 (2026-09-27). to_crd-Fehler zeigen auf lib/IO/K8s/Role/APIObject.pm, AutoGen-Fehler unter generate (auch über add_crd) auf CRD.pm, List-Fehler über inflate auf lib/IO/K8s.pm bzw. List.pm statt auf den Aufrufer. Kandidaten: IO::K8s::Role::APIObject und IO::K8s::AutoGen in @CARP_NOT von IO::K8s::CRD (gegen die Rethrow-Logik von AutoGen testen), our @CARP_NOT = ('IO::K8s') in IO::K8s::List. Zusammen mit k164 betrachten.
+
+2026-09-27 22:05 Commit dd4c35f0
