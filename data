@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T23:06:34Z
+claimed_by: followups-5
+class: standard
+completed: 2026-09-27T23:06:29Z
+created: 2026-09-27T21:47:29Z
+id: 180
+priority: low
+started: 2026-09-27T22:06:20Z
+status: done
+tags:
+- serialization
+- k167-followup
+title: 'Quantity/Time: skalare Felder und Maps serialisieren Perl-Zahlen als JSON-Zahl,
+  [Quantity] als String'
+updated: 2026-09-27T23:06:34Z
+---
+
+Gefunden bei k167 (2026-09-27). limits => { cpu => 1 } geht als 1 raus, [Quantity]-Elemente seit k167 als "1". Beides akzeptiert der API-Server; angleichen (immer String) wäre eine sichtbare Wire-Änderung. Entscheiden und ggf. mit Wire-Regression umsetzen.
+
+Commit 7dc16c85, prove -lr t/ 142 Dateien 9222 Tests PASS.
