@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-27T22:05:02Z
+claimed_by: followups-4
+class: standard
+completed: 2026-09-27T22:04:56Z
+created: 2026-09-27T19:22:50Z
+id: 164
+priority: low
+started: 2026-09-27T20:55:22Z
+status: done
+tags:
+- errors
+- k163-followup
+title: Moo-Konstruktorfehler nennen eine Zeile in lib/IO/K8s.pm statt der des Aufrufers
+updated: 2026-09-27T22:05:02Z
+---
+
+Gefunden bei k163 (2026-09-27). Missing required arguments: selector, template at lib/IO/K8s.pm line 976 - für alle Einstiege (new_object, inflate, struct_to_object ...), in einem .pk8s nennen solche Fehler deshalb nicht die Manifest-Zeile. Moo-Fehler an der Einstiegsstelle abfangen und mit Aufruferzeile neu werfen oder Carp-Vertrauen passend setzen.
+
+2026-09-27 22:05 Commit 952e5583
