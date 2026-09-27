@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T23:06:11Z
+claimed_by: followups-5
+class: standard
+completed: 2026-09-27T23:06:06Z
+created: 2026-09-27T21:47:17Z
+id: 178
+priority: medium
+started: 2026-09-27T22:06:14Z
+status: done
+tags:
+- autogen
+- k167-followup
+title: 'AutoGen: $ref auf Quantity, IntOrString oder Time in items/additionalProperties
+  erzeugt leere Objektklasse'
+updated: 2026-09-27T23:06:11Z
+---
+
+Gefunden bei k167 (2026-09-27), per Probe bestätigt. Ein $ref auf resource.Quantity, intstr.IntOrString oder meta.v1.(Micro)Time in items oder additionalProperties wird zu einer leeren Objektklasse; echte Daten scheitern mit expected a hash ... got a plain scalar. Auf [Quantity]/[IntOrStr]/[Time] bzw. die Map-Formen abbilden wie im skalaren Fall. Dabei die Time-Strenge angleichen: skalar gilt in AutoGen die Str-Regel, im Array die strenge RFC-Regex (die kleines t/z ablehnt, das der API-Server akzeptiert) - eine Regel für beide.
+
+Commit 6dd81af0, prove -lr t/ 142 Dateien 9222 Tests PASS.
