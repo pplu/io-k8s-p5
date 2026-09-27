@@ -989,10 +989,14 @@ sub render_gvk {
         (my $suffix = $key) =~ s/^\Q$u->{kind}\E:://;
         $class_names{"$root\::$suffix"} = $names->{$key};
     }
+    # subresources => 0 (k158): the shipped provider classes declare no
+    # subresources yet, so rendering the upstream ones would turn every
+    # top-level Kind into a DIFFERS. Drop this once they do.
     my $emitter = IO::K8s::CRD::Emitter->new(
-        base    => "IO::K8s::$provider\::" . ucfirst($u->{version}),
-        names   => \%class_names,
-        overlay => $overlay // {},
+        base         => "IO::K8s::$provider\::" . ucfirst($u->{version}),
+        names        => \%class_names,
+        overlay      => $overlay // {},
+        subresources => 0,
     );
     return $emitter->render($root);
 }

@@ -110,6 +110,12 @@ Revision history for IO-K8s
     Setting a nullable field to undef therefore sends null; the
     ExternalSecrets refreshTime now round-trips a server's null.
 
+  - use IO::K8s::APIObject takes a subresources parameter (status, scale)
+    that to_crd and IO::K8s::CRD->new write into spec.versions[]; it is
+    checked at use time. add_crd carries a CRD version's subresources into
+    the generated class and IO::K8s::CRD::Emitter renders the parameter,
+    so a CRD read in and written out again keeps them.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

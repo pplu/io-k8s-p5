@@ -10,6 +10,9 @@ use Module::Runtime qw( use_module );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype refaddr looks_like_number);
 use Types::Standard qw( Bool Int Num Str );
+# The empty list matters: IO::K8s::APIObject's import would make this
+# package a Moo class. Loaded for its subresources check (k158).
+use IO::K8s::APIObject ();
 
 # Cache of generated classes -- only classes whose generation run completed
 # (see "Generation runs" below). generated_classes() lists exactly these.
@@ -124,6 +127,11 @@ sub is_autogen {
 #   kind             => 'StaticWebSite'
 #   resource_plural  => 'staticwebsites'
 #   is_namespaced    => 1
+#   subresources     => { status => {}, scale => {...} } -- a CRD
+#                      version's subresources, installed as the fixed
+#                      identity method `subresources` on a top-level class
+#                      (k158); checked like the IO::K8s::APIObject import
+#                      parameter, before the class is begun.
 #   reuse_core       => 0|1 (default 1) -- type a nested object/items/
 #                      additionalProperties schema as a shipped core class
 #                      instead of a nested class when its shape matches
@@ -289,6 +297,13 @@ sub _generate_class {
     $res_plural    = $opts{resource_plural} if exists $opts{resource_plural};
     $is_namespaced = $opts{is_namespaced}   if exists $opts{is_namespaced};
 
+    # A CRD version's subresources (k158), checked here for the same reason
+    # as the GVK selection above: a malformed section builds nothing and
+    # marks nothing failed, so the repaired manifest works on a retry.
+    my $subresources;
+    $subresources = IO::K8s::APIObject::_checked_subresources($class, $opts{subresources})
+        if exists $opts{subresources};
+
     return if _class_usable($class);
     croak "IO::K8s::AutoGen: $class generated outside a generation run" unless $_run;
     $_run->{$class} = 1;  # Mark begun early to allow recursion; pending until the run commits
@@ -347,6 +362,10 @@ sub _generate_class {
             croak 'resource_plural is fixed for this class and cannot be set' if @_ > 1;
             $res_plural;
         });
+        # The same identity method `use IO::K8s::APIObject subresources =>`
+        # installs, so to_crd writes them back (k112 symmetry, k158).
+        IO::K8s::APIObject::_install_subresources($class, $subresources)
+            if $subresources;
 
         # Apply Role::APIObject for metadata, to_yaml, save, etc.
         require Moo::Role;
@@ -1821,6 +1840,14 @@ generated class installs fixed-value methods for each. These are fixed
 identity, not writable fields: passing an argument croaks rather than
 silently retargeting the object (k67, k70) -- the same contract the
 hand-written CRD template installs via L<IO::K8s::APIObject>.
+
+C<< subresources => { ... } >> (k158), which L<IO::K8s::CRD/generate> passes
+for a CRD version that has any, installs the C<subresources> identity method
+the C<use IO::K8s::APIObject> parameter of that name installs, on a
+top-level class, so its C<to_crd> writes them back. It is checked the same
+way and croaks naming the class and the key; like a failed GVK selection,
+that happens before the class is marked as begun, so it builds and poisons
+nothing.
 
 This function fails closed on input it cannot generate a faithful class
 from, rather than dropping fields or inventing a wrong type. It C<croak>s

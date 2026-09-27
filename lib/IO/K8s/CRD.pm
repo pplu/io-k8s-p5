@@ -150,7 +150,8 @@ sub _flag {
 The served versions of one loaded CRD, in manifest order, each as
 C<< { name, api_version, storage, schema } >> where C<schema> is the
 version's C<openAPIV3Schema> (an empty C<type: object> when the manifest has
-none). Dies when no version is served.
+none), plus C<subresources> as the manifest gives it when the version has
+any (k158). Dies when no version is served.
 
 =cut
 
@@ -171,6 +172,9 @@ sub served_versions {
             # mutating the caller's manifest hashref -- ref() first, so a
             # missing/undef 'schema' is read without creating it.
             schema      => (ref $v->{schema} eq 'HASH' ? $v->{schema}{openAPIV3Schema} : undef) // { type => 'object' },
+            # As given, only when the version has any (k158): generate
+            # hands it to the class, which checks it.
+            (defined $v->{subresources} ? (subresources => $v->{subresources}) : ()),
         };
     }
     croak "IO::K8s::CRD: no served version in the CRD for $crd->{spec}{names}{kind}" unless @out;
@@ -192,7 +196,11 @@ generated nested one. The storage version is the one the manifest marks; when
 none is marked (an invalid manifest, but a common one in hand-written
 fixtures) the last served version is used. Each class carries the CRD's
 C<kind>, C<names.plural> and scope, and every object with C<properties>
-below it is a nested class (see L<IO::K8s::AutoGen>).
+below it is a nested class (see L<IO::K8s::AutoGen>). A version's
+C<subresources> become the class's C<subresources> method (k158; see
+L<IO::K8s::APIObject>), so C<to_crd> writes them back; a malformed
+C<subresources> section croaks the way the C<use IO::K8s::APIObject>
+parameter does, naming the generated class and the key.
 
 Classes are generated under C<$namespace\::_CRD>, never C<$namespace>
 itself. L<IO::K8s::AutoGen> caches by class name, and the class name is
@@ -245,6 +253,7 @@ sub generate {
             kind            => $kind,
             resource_plural => $spec->{names}{plural},
             is_namespaced   => $namespaced,
+            (exists $v->{subresources} ? (subresources => $v->{subresources}) : ()),
             %opts,
         );
         # Track every served version as the fallback so the LAST one wins
@@ -321,7 +330,8 @@ two whose C<api_version> both end C<.../v1>) would otherwise produce two
 identically-named C<spec.versions[]> entries -- a shape the apiserver
 rejects -- so that croaks too, naming the repeated version. Each class
 becomes one C<spec.versions[]> entry (schema from L</_schema_for_class>,
-applied per class): every entry is C<served => true>, and exactly the one
+applied per class, and C<subresources> from the class's own declaration
+when it has one, k158): every entry is C<served => true>, and exactly the one
 whose C<name> matches C<storage> gets C<storage => true> (the rest
 C<storage => false>). C<storage> is required and must name one of the given
 classes' own versions, or the call croaks.
@@ -373,11 +383,15 @@ sub new {
     my $id0 = $ids[0];
     my @versions = map {
         my $i = $_;
+        my $subresources = $classes->[$i]->can('subresources') && $classes->[$i]->subresources;
         {
             name    => $ids[$i]{version},
             served  => JSON::MaybeXS::true,
             storage => ($i == $storage_index) ? JSON::MaybeXS::true : JSON::MaybeXS::false,
             schema  => { openAPIV3Schema => _schema_for_class($classes->[$i]) },
+            # Per version, the way the apiserver takes them: each class's
+            # own declaration (k158), no key for a class without one.
+            ($subresources ? (subresources => $subresources) : ()),
         };
     } 0 .. $#ids;
 

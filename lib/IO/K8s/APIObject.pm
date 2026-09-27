@@ -62,6 +62,41 @@ For Custom Resource Definitions (CRDs), pass C<api_version> and
 optionally C<resource_plural> as import parameters. These are installed
 as class methods before the role is composed, avoiding redefinition warnings.
 
+A CRD class may also declare the subresources its CRD version serves
+(k158), which L<IO::K8s::Role::APIObject/to_crd> writes into
+C<spec.versions[].subresources>:
+
+    package My::StaticWebSite;
+    use IO::K8s::APIObject
+        api_version     => 'homelab.example.com/v1',
+        resource_plural => 'staticwebsites',
+        subresources    => {
+            status => {},
+            scale  => {
+                specReplicasPath   => '.spec.replicas',
+                statusReplicasPath => '.status.replicas',
+                labelSelectorPath  => '.status.selector'
+            }
+        };
+
+C<subresources> becomes a fixed identity class method like C<api_version>:
+it returns a fresh copy of the declaration on every call, and passing an
+argument croaks (C<subresources is fixed for this class and cannot be
+set>). A class without the parameter has no C<subresources> method, and its
+C<to_crd> writes no C<subresources> key. The declaration is checked at
+C<use> time: only C<status> and C<scale> are known; C<status> is an empty
+hashref; C<scale> needs C<specReplicasPath> and C<statusReplicasPath>, takes
+C<labelSelectorPath> as well, and nothing else, each a non-empty string. An
+empty hashref declares no subresource. Anything else croaks naming the
+class and the key, for example
+
+    My::StaticWebSite: unknown subresource 'foo' (known: scale, status)
+    My::StaticWebSite: subresource 'scale' needs 'statusReplicasPath'
+
+A class L<IO::K8s/add_crd> generates from a CRD version with
+C<subresources> gets the same method, and L<IO::K8s::CRD::Emitter> renders
+it as this parameter.
+
 Every class built this way gets L<IO::K8s::Role::SpecBuilder> for
 deep-path spec manipulation (C<spec_get>, C<spec_set>, C<spec_array>,
 C<spec_hash>, C<spec_push>, C<spec_merge>, C<spec_delete>), walking a
@@ -104,6 +139,10 @@ sub import {
             $plural;
         });
     }
+    # exists, not truth: an empty hashref is a declaration (no subresource
+    # served) and undef is a mistake the check below names (k158).
+    _install_subresources($caller, _checked_subresources($caller, $params{subresources}))
+        if exists $params{subresources};
 
     # Apply the APIObject role (provides metadata, labels, conditions,
     # owners -- and, since k103, IO::K8s::Role::SpecBuilder, which that role
@@ -115,6 +154,70 @@ sub import {
     # the role already created the attribute, and the public k8s refuses to
     # register over an attribute it did not create itself (k144).
     IO::K8s::Resource->_k8s_adopt($caller, 'metadata', 'Meta::V1::ObjectMeta');
+}
+
+# The subresources a CRD version may serve (k158), the shape of
+# apiextensions/v1 CustomResourceSubresources: status is an empty object,
+# scale names where the replica counts and the label selector live.
+my %SCALE_KEY = (
+    specReplicasPath   => 'required',
+    statusReplicasPath => 'required',
+    labelSelectorPath  => 'optional',
+);
+
+# A validated, private copy of a class's subresources declaration, or a
+# croak naming $class and the offending key. Shared with IO::K8s::AutoGen,
+# which checks a CRD version's subresources with it before it begins the
+# class, so a malformed manifest builds nothing.
+sub _checked_subresources {
+    my ($class, $subresources) = @_;
+    my $where = $class.':';
+    croak $where.' subresources must be a hashref of status and/or scale, got '
+        .(defined $subresources ? ref $subresources || 'a plain scalar' : 'undef')
+        unless ref $subresources eq 'HASH';
+    for my $key (sort keys %$subresources) {
+        croak $where." unknown subresource '".$key."' (known: scale, status)"
+            unless $key eq 'status' || $key eq 'scale';
+    }
+    my %copy;
+    if (exists $subresources->{status}) {
+        my $status = $subresources->{status};
+        croak $where." subresource 'status' must be an empty hashref"
+            unless ref $status eq 'HASH' && !%$status;
+        $copy{status} = {};
+    }
+    if (exists $subresources->{scale}) {
+        my $scale = $subresources->{scale};
+        croak $where." subresource 'scale' must be a hashref" unless ref $scale eq 'HASH';
+        for my $key (sort keys %$scale) {
+            croak $where." unknown key '".$key."' in subresource 'scale' (known: "
+                .join(', ', sort keys %SCALE_KEY).')'
+                unless $SCALE_KEY{$key};
+        }
+        for my $key (sort grep { $SCALE_KEY{$_} eq 'required' } keys %SCALE_KEY) {
+            croak $where." subresource 'scale' needs '".$key."'" unless exists $scale->{$key};
+        }
+        for my $key (sort keys %$scale) {
+            my $path = $scale->{$key};
+            croak $where." '".$key."' in subresource 'scale' must be a non-empty string"
+                unless defined $path && !ref $path && length $path;
+        }
+        $copy{scale} = { %$scale };
+    }
+    return \%copy;
+}
+
+# Install the checked declaration as the fixed identity method
+# subresources, the way api_version and resource_plural are installed: an
+# argument croaks (k67), and every call hands out a fresh copy, so a
+# caller editing the result cannot change what the class declares.
+sub _install_subresources {
+    my ($class, $subresources) = @_;
+    Package::Stash->new($class)->add_symbol('&subresources', sub {
+        croak 'subresources is fixed for this class and cannot be set' if @_ > 1;
+        return { map { $_ => { %{ $subresources->{$_} } } } keys %$subresources };
+    });
+    return;
 }
 
 1;

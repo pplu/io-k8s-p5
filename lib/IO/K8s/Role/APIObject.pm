@@ -657,7 +657,8 @@ The C<CustomResourceDefinition> this class's own attribute registry
 describes (D9), emitted through L<IO::K8s::CRD/crd_for_class>. It is a
 schema export, not a lossless reverse round-trip through C<add_crd>: see
 L<IO::K8s::CRD/crd_for_class> for the C<Quantity> export and typed-map /
-scalar-array inference limits.
+scalar-array inference limits. A class that declares C<subresources>
+(L<IO::K8s::APIObject>, k158) gets them in its C<spec.versions[]> entry.
 
 =cut
 

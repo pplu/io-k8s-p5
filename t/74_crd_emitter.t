@@ -53,7 +53,9 @@ subtest 'the root file is a house-style APIObject class' => sub {
     my $src = $files->{'TestEmit/V1/Knob.pm'};
     like($src, qr/^package TestEmit::V1::Knob;\n# ABSTRACT: /m, 'package + ABSTRACT');
     like($src, qr/^our \$VERSION = '1\.108';$/m, 'version line');
-    like($src, qr/^use IO::K8s::APIObject\n    api_version     => 'opts\.example\.com\/v1',\n    resource_plural => 'knobs';$/m, 'APIObject import');
+    # The knob's v1 serves the status subresource, which the generated class
+    # carries and the emitter renders as the import parameter (k158).
+    like($src, qr/^use IO::K8s::APIObject\n    api_version     => 'opts\.example\.com\/v1',\n    resource_plural => 'knobs',\n    subresources    => \{ status => \{\} \};$/m, 'APIObject import, subresources included');
     like($src, qr/^with 'IO::K8s::Role::Namespaced';$/m, 'Namespaced');
     like($src, qr/^k8s spec\s+=> '\+TestEmit::V1::KnobSpec', \{ required => 'schema' \};$/m, 'required object field, renamed, recorded not enforced');
     like($src, qr/^k8s status\s+=> '\+TestEmit::V1::KnobStatus';$/m, 'status');

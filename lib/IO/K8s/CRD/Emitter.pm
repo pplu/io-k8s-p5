@@ -10,7 +10,7 @@ use Carp qw( croak );
 use Data::Dumper ();
 use Digest::SHA qw( sha1_hex );
 use re ();
-use Types::Standard qw( Str HashRef );
+use Types::Standard qw( Bool Str HashRef );
 use IO::K8s::AutoGen ();
 use IO::K8s::Resource ();
 use IO::K8s::Role::Resource ();
@@ -96,12 +96,22 @@ overlay renames it.
 
 The C<$VERSION> line to write. Defaults to this distribution's.
 
+=attr subresources
+
+Whether the root Kind's C<subresources> -- what the generated class took
+from its CRD version, see L<IO::K8s::APIObject> -- are rendered as the
+C<subresources> import parameter (k158). Defaults to true, so a rendered
+class declares them and its C<to_crd> writes them back.
+C<maint/crd-drift-check.pl --check> renders with this false while the
+shipped provider classes declare no subresources yet.
+
 =cut
 
-has base    => (is => 'ro', isa => Str, required => 1);
-has names   => (is => 'ro', isa => HashRef, default => sub { {} });
-has overlay => (is => 'ro', isa => HashRef, default => sub { {} });
-has version => (is => 'ro', isa => Str, default => sub { $VERSION });
+has base         => (is => 'ro', isa => Str, required => 1);
+has names        => (is => 'ro', isa => HashRef, default => sub { {} });
+has overlay      => (is => 'ro', isa => HashRef, default => sub { {} });
+has version      => (is => 'ro', isa => Str, default => sub { $VERSION });
+has subresources => (is => 'ro', isa => Bool, default => 1);
 
 # The reverse of IO::K8s::Resource's class-prefix map (full namespace ->
 # short prefix), longest full namespace first so a more specific prefix
@@ -721,6 +731,29 @@ sub _pod_safe {
     return $text;
 }
 
+# The value of the subresources import parameter (k158), as source in the
+# column of the `use IO::K8s::APIObject` parameter it follows. status alone
+# fits on the line; scale, with its three paths, gets one line per key,
+# keys sorted and => aligned like the k8s lines, no trailing commas.
+sub _subresources_source {
+    my ($subresources) = @_;
+    return '{}' unless %$subresources;
+    return '{ status => {} }' unless $subresources->{scale};
+    my $scale = $subresources->{scale};
+    my ($kw) = sort { $b <=> $a } map { length } keys %$scale;
+    my %value = (
+        scale => "{\n"
+            . join(",\n", map { sprintf('            %-*s => %s', $kw, $_, _scalar_literal($scale->{$_})) }
+                sort keys %$scale)
+            . "\n        }"
+    );
+    $value{status} = '{}' if exists $subresources->{status};
+    my ($sw) = sort { $b <=> $a } map { length } keys %value;
+    return "{\n"
+        . join(",\n", map { sprintf('        %-*s => %s', $sw, $_, $value{$_}) } sort keys %value)
+        . "\n    }";
+}
+
 sub _render_class {
     my ($self, $class) = @_;
     my $info  = $class->_k8s_attr_info;
@@ -772,13 +805,18 @@ sub _render_class {
     my $use;
     if ($is_top) {
         my $plural = $class->resource_plural;
-        my @use_lines = (defined $plural && length $plural)
-            ? (
-                'use IO::K8s::APIObject',
-                "    api_version     => '" . $class->api_version . "',",
-                "    resource_plural => '$plural';",
-              )
-            : ("use IO::K8s::APIObject api_version => '" . $class->api_version . "';");
+        my @params = ([ api_version => "'" . $class->api_version . "'" ]);
+        push @params, [ resource_plural => "'$plural'" ] if defined $plural && length $plural;
+        push @params, [ subresources => _subresources_source($class->subresources) ]
+            if $self->subresources && $class->can('subresources');
+        my @use_lines;
+        if (@params == 1) {
+            @use_lines = ("use IO::K8s::APIObject $params[0][0] => $params[0][1];");
+        } else {
+            my ($width) = sort { $b <=> $a } map { length $_->[0] } @params;
+            @use_lines = ('use IO::K8s::APIObject',
+                join(",\n", map { sprintf('    %-*s => %s', $width, @$_) } @params) . ';');
+        }
 
         # overlay: with/extra, for the root Kind only. 'with' defaults to
         # Namespaced when the class composes it and to no roles otherwise
