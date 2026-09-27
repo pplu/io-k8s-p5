@@ -10,6 +10,15 @@ use Types::Standard qw( Str );
 use JSON::MaybeXS ();
 use Scalar::Util ();
 
+# Carp treats IO::K8s as part of this module (k170), the way IO::K8s::CRD
+# does (k165): FROM_STRUCT's own croak reached through IO::K8s->inflate
+# names the line that called inflate, not the FROM_STRUCT call in
+# lib/IO/K8s.pm, and a croak of the IO::K8s shape helpers FROM_STRUCT calls
+# -- and a constructor error for an item, which IO::K8s moves to Carp's
+# answer (k164) -- names the caller of inflate, FROM_STRUCT or from_json,
+# not this file. A caller in any other package still sees its own line.
+our @CARP_NOT = ('IO::K8s');
+
 =head1 SYNOPSIS
 
     use IO::K8s::List;
@@ -210,6 +219,11 @@ field -- and for an item its index -- it sits at:
 
 A C<$struct> of C<undef>, and C<items> missing or C<undef>, still give an
 empty list.
+
+The C<item_class> and shape errors above, and an error an item's
+constructor raises (a missing required field, a value of the wrong type),
+name the line that called L<IO::K8s/inflate>, C<FROM_STRUCT> or
+L</from_json>, not a line inside the distribution (k170).
 
 =cut
 

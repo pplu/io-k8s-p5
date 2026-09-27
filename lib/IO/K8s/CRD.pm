@@ -13,12 +13,21 @@ use IO::K8s ();
 use IO::K8s::AutoGen ();
 use IO::K8s::Resource ();
 
-# Carp treats IO::K8s as part of this module (k165): a croak from load or
-# generate reached through IO::K8s->add_crd names the line that called
-# add_crd, not add_crd's own line in lib/IO/K8s.pm, and the "Cannot open"
-# IO::K8s->_slurp_utf8 raises for load names load's caller, not this file.
+# Carp treats the distribution modules this one works with on a public path
+# as part of it, so an error names the line that called into them:
+#   * IO::K8s (k165): a croak from load or generate reached through
+#     IO::K8s->add_crd names the line that called add_crd, not add_crd's
+#     own line in lib/IO/K8s.pm, and the "Cannot open" IO::K8s->_slurp_utf8
+#     raises for load names load's caller, not this file;
+#   * IO::K8s::AutoGen (k170): a croak from class generation under generate
+#     -- directly or through add_crd, the first failure and the remembered
+#     one AutoGen rethrows for a later request (k149) -- names the caller,
+#     not the generate line here;
+#   * IO::K8s::Role::APIObject (k170): a croak from crd_for_class reached
+#     through $class->to_crd names the line that called to_crd, not the
+#     to_crd line in lib/IO/K8s/Role/APIObject.pm.
 # A caller in any other package still sees its own line.
-our @CARP_NOT = ('IO::K8s');
+our @CARP_NOT = ('IO::K8s', 'IO::K8s::AutoGen', 'IO::K8s::Role::APIObject');
 
 # The typed class crd_for_class() and new() build and return (D9). Kept as
 # a constant rather than spelled out at each call site -- the brief's own
@@ -202,6 +211,12 @@ L<IO::K8s::APIObject>), so C<to_crd> writes them back; a malformed
 C<subresources> section croaks the way the C<use IO::K8s::APIObject>
 parameter does, naming the generated class and the key.
 
+An error from generating a class -- a C<$ref> no definition answers, say,
+and the remembered failure L<IO::K8s::AutoGen> rethrows when the same class
+is asked for again -- names the line that called C<generate>, or
+L<IO::K8s/add_crd> when that is the way in, not a line inside the
+distribution (k170).
+
 Classes are generated under C<$namespace\::_CRD>, never C<$namespace>
 itself. L<IO::K8s::AutoGen> caches by class name, and the class name is
 derived from the namespace plus the group/version/Kind (see
@@ -296,6 +311,10 @@ is exactly C<< IO::K8s::CRD->new(classes => [$class], storage => $version) >>
 where C<$version> is C<$class>'s own version (split out of C<api_version> the
 same way). See L</new> for the object this returns -- a real, fully typed
 C<CustomResourceDefinition>, not a bare hashref.
+
+Reached through C<< $class->to_crd >>, an error -- a C<pattern> that
+cannot be written as ECMA262, say -- names the line that called C<to_crd>,
+not the C<to_crd> line in L<IO::K8s::Role::APIObject> (k170).
 
 =cut
 

@@ -95,10 +95,11 @@ Revision history for IO-K8s
     "(eval 273) line 1848", and the manifest no longer sees the loader's
     own variables ($file, $m, ...), which now fail under use strict.
 
-  - An error add_crd raises while loading or generating a CRD names the
-    line that called add_crd instead of one inside lib/IO/K8s.pm, and a
-    CRD file that exists but cannot be read is reported at the caller's
-    line through add_crd and IO::K8s::CRD->load alike.
+  - Errors from add_crd, IO::K8s::CRD->generate (AutoGen's included) and
+    to_crd, and List errors through inflate or IO::K8s::List->FROM_STRUCT,
+    name the calling line instead of one inside the distribution; so does
+    a CRD file that exists but cannot be read, through add_crd and
+    IO::K8s::CRD->load alike.
 
   - An apiextensions JSON value (a CRD schema's default, example or enum
     entry, a K3s HelmChart's values) is copied one level on the way in and
