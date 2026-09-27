@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T18:52:42Z
+claimed_by: followups
+class: standard
+completed: 2026-09-27T18:52:42Z
+created: 2026-09-27T03:16:49Z
+id: 157
+priority: low
+started: 2026-09-27T18:06:34Z
+status: done
+tags:
+- docs
+title: 'Doku: +Class als Weg, eine aufgelöste Klasse an struct_to_object zu geben'
+updated: 2026-09-27T18:52:42Z
+---
+
+Aus kubernetes-rest k42: struct_to_object und json_to_object lösen den Klassennamen als öffentliche Einstiegspunkte erneut auf; ein einteiliger Name wird dabei bewusst als Kind gelesen (k35). Wer eine schon aufgelöste Klasse übergibt, muss +Class verwenden. Das in der POD von struct_to_object und json_to_object ausdrücklich dokumentieren.
+
+POD in json_to_object und struct_to_object ergänzt (fix/followups, uncommittet), io-k8s-doc-writer.
+
+2026-09-27 18:52 Commit d7ad62b5
