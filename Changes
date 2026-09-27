@@ -123,7 +123,8 @@ Revision history for IO-K8s
     so a CRD read in and written out again keeps them. Any other import
     parameter -- a typo such as subresource or resource_plurals -- dies at
     the use line, naming the class and the known ones, instead of being
-    ignored.
+    ignored; so does an odd number of import arguments, and an api_version
+    or resource_plural that is empty, undef or a reference.
 
   - SpecBuilder paths walk through apiextensions union fields into the
     value they hold: spec_set('values.replicaCount', 3) on a K3s HelmChart

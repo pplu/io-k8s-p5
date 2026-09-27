@@ -69,6 +69,14 @@ C<resource_plurals> -- croaks at the C<use> line before anything is set up
 
     My::StaticWebSite: unknown import parameter 'subresource' for IO::K8s::APIObject (known: api_version, resource_plural, subresources)
 
+The same goes for an odd number of import arguments, and for an
+C<api_version> or C<resource_plural> given as C<undef>, as an empty string
+or as a reference, which used to be skipped as if the parameter were not
+there (k182):
+
+    My::StaticWebSite: odd number of import arguments for IO::K8s::APIObject (1); expected name => value pairs
+    My::StaticWebSite: import parameter 'resource_plural' for IO::K8s::APIObject must be a non-empty string, got an empty string
+
 A CRD class may also declare the subresources its CRD version serves
 (k158), which L<IO::K8s::Role::APIObject/to_crd> writes into
 C<spec.versions[].subresources>:
@@ -123,9 +131,16 @@ my @KNOWN_PARAMS = qw( api_version resource_plural subresources );
 my %KNOWN_PARAM  = map { $_ => 1 } @KNOWN_PARAMS;
 
 sub import {
-    my $class = shift;
-    my %params = @_;
+    my ($class, @args) = @_;
     my $caller = caller;
+
+    # Name => value pairs or nothing: an odd count (a value lost to an edit,
+    # `use IO::K8s::APIObject 'api_version';`) used to leave the lone name
+    # with undef behind Perl's "Odd number of elements" warning (k182).
+    croak $caller.': odd number of import arguments for '.__PACKAGE__
+        .' ('.scalar(@args).'); expected name => value pairs'
+        if @args % 2;
+    my %params = @args;
 
     # A misspelt parameter (subresource, resource_plurals) was ignored and
     # the class built as if it had never been written (k174). Checked
@@ -137,12 +152,27 @@ sub import {
             unless $KNOWN_PARAM{$param};
     }
 
+    # api_version and resource_plural, when given, are the class's identity:
+    # an empty or undef value used to fail the truth tests below and was
+    # skipped without a word, leaving the api_version derived from the
+    # package name or no resource_plural at all (k182). exists, not truth,
+    # as for subresources; checked before anything is set up as well.
+    for my $param (grep { exists $params{$_} } qw( api_version resource_plural )) {
+        my $value = $params{$param};
+        croak $caller.": import parameter '".$param."' for ".__PACKAGE__
+            .' must be a non-empty string, got '
+            .(!defined $value ? 'undef'
+            : ref $value      ? 'a reference of type '.ref($value)
+            :                   'an empty string')
+            unless defined $value && !ref $value && length $value;
+    }
+
     # First, do everything IO::K8s::Resource does
     IO::K8s::Resource->import::into($caller);
 
     # Install CRD overrides *before* applying the role
     # This way the role sees these methods and doesn't install its defaults
-    if (my $api_ver = $params{api_version}) {
+    if (defined(my $api_ver = $params{api_version})) {
         my $stash = Package::Stash->new($caller);
         # A fixed identity method, not a writable field: reject an argument
         # rather than swallow it (k67).
@@ -151,7 +181,7 @@ sub import {
             $api_ver;
         });
     }
-    if (my $plural = $params{resource_plural}) {
+    if (defined(my $plural = $params{resource_plural})) {
         my $stash = Package::Stash->new($caller);
         # A fixed identity method, not a writable field: reject an argument
         # rather than swallow it (k70, same shape as k67).
