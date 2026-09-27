@@ -54,6 +54,11 @@ Revision history for IO-K8s
     received shape instead of with a bare Perl dereference or
     type-constraint error.
 
+  - load_yaml reads a file as UTF-8 instead of handing its bytes to
+    YAML::PP, which mangled or died on non-ASCII text. A one-line argument
+    that is neither an existing file nor YAML text, typically a mistyped
+    path, now dies instead of returning an empty list; so does a directory.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

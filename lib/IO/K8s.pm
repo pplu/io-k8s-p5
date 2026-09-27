@@ -1309,19 +1309,27 @@ sub load_yaml {
 
     require YAML::PP;
 
-    my $content;
-    if ($file_or_string !~ /\n/ && -f $file_or_string) {
-        # It's a file path
-        open my $fh, '<', $file_or_string or die "Cannot open $file_or_string: $!";
-        $content = do { local $/; <$fh> };
-        close $fh;
-    } else {
-        # It's YAML content
-        $content = $file_or_string;
-    }
+    # One argument, two readings (k159). Without a newline it may name a
+    # file: an existing one is read as UTF-8, a directory is refused.
+    # Everything else is YAML text, expected as decoded characters and
+    # parsed as given, never re-encoded.
+    my $one_line = $file_or_string !~ /\n/;
+    croak "load_yaml: '".$file_or_string."' is a directory, not a file or YAML text"
+        if $one_line && -d $file_or_string;
+    my $is_file = $one_line && -f $file_or_string;
+    my $content = $is_file ? $self->_slurp_utf8($file_or_string) : $file_or_string;
 
     # Parse multi-document YAML (Load returns all docs in list context)
     my @docs = YAML::PP::Load($content);
+
+    # A one-line argument that is no file and parses to plain scalars only,
+    # not a single mapping or sequence, is a path with a typo --
+    # 'manifests/app.yaml' is valid YAML for that very string -- and used to
+    # come back as [] without a word. Empty or whitespace-only text, a bare
+    # '---' or a comment parse to nothing defined and still give [].
+    croak "load_yaml: '".$file_or_string."' is neither an existing file nor YAML text"
+        if $one_line && !$is_file
+        && !grep({ ref } @docs) && grep({ defined } @docs);
 
     my $collect_errors = $opts{collect_errors};
     my @objects;
@@ -1350,6 +1358,17 @@ sub load_yaml {
     }
 
     return \@objects;
+}
+
+# A whole file as text, read as UTF-8 -- the encoding Kubernetes manifests
+# are written in, and YAML::PP and a string eval both want characters, not
+# bytes (k159, k160). The same layer IO::K8s::CRD->load reads a file with.
+sub _slurp_utf8 {
+    my ($self, $file) = @_;
+    open my $fh, '<:encoding(UTF-8)', $file or croak 'Cannot open '.$file.': '.$!;
+    my $content = do { local $/; <$fh> };
+    close $fh;
+    return $content;
 }
 
 1;
@@ -1834,6 +1853,19 @@ With CRDs (requires openapi_spec):
 
 Load a YAML manifest file (or YAML string) and return an ArrayRef of IO::K8s
 objects. Supports multi-document YAML (separated by C<--->).
+
+An argument without a newline that names an existing file is read from
+that file, as UTF-8. Anything else is taken as YAML text, which is expected
+as decoded characters (not UTF-8 bytes) and is parsed as given. A one-line
+argument that is no existing file and parses as YAML to plain scalars only
+-- typically a mistyped path -- dies instead of returning an empty list, and
+so does a directory:
+
+    load_yaml: 'manifests/app.yaml' is neither an existing file nor YAML text
+
+Empty or whitespace-only text still returns an empty ArrayRef, and a
+one-line YAML mapping such as C<{kind: Namespace, metadata: {name: x}}> is
+still YAML text.
 
 This method validates declared fields against the Kubernetes types. A declared
 field with the wrong type throws an error. By default, an undeclared field is
