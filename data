@@ -1,0 +1,24 @@
+---
+claimed_at: 2026-09-27T19:50:41Z
+claimed_by: followups-2
+class: standard
+completed: 2026-09-27T19:50:35Z
+created: 2026-09-26T15:30:23Z
+id: 151
+priority: low
+started: 2026-09-27T18:54:08Z
+status: done
+tags:
+- architecture
+- dsl
+- k144-followup
+title: Neudeklaration eines eigenen k8s-Felds mit anderem Typ lässt Registry und Moo
+  auseinanderlaufen
+updated: 2026-09-27T19:50:41Z
+---
+
+Folge aus k144 (2026-09-26). Deklariert eine Klasse dasselbe Feld (gleicher JSON-Key) zweimal in sich selbst, übernimmt die Registry den neuen Eintrag, Moo behält die erste Spec (Moo lehnt has() für einen lokal definierten Accessor ab; +name würde alte Coercion mischen). Instrumentierter Lauf: in lib/ und t/ kommt das außer der metadata-Adoption nicht vor. Zu entscheiden: gleichklassige Neudeklaration mit abweichendem Typ croaken lassen, identische tolerieren. Wire-Output-Regression verpflichtend.
+
+Umgesetzt auf fix/followups-2, uncommittet (io-k8s-worker). prove -lr t/ 125 Dateien 9093 Tests PASS (kombinierter Baum), t/25 und t/26 PASS, Provider-Renders unverändert.
+
+Commit d46550a7 (Refuse a same-class k8s field redeclaration that differs from the first)
