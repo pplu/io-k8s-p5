@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-27T20:53:30Z
+claimed_by: followups-3
+class: standard
+completed: 2026-09-27T20:53:25Z
+created: 2026-09-27T19:23:02Z
+id: 166
+priority: low
+started: 2026-09-27T19:53:19Z
+status: done
+tags:
+- inflation
+- k161-followup
+title: List->FROM_STRUCT prüft item_class nicht
+updated: 2026-09-27T20:53:30Z
+---
+
+Gefunden bei k161 (2026-09-27). Ein item_class-Override, der eine Referenz ist, wird stringifiziert und scheitert dann mit einer Module::Runtime-Meldung. Klare Argumentmeldung.
+
+Umgesetzt auf fix/followups-3, uncommittet (io-k8s-worker). Eigene Tests grün; Vollsuite lief während der k158-Edits mit zwei fremden Transient-Fehlern (t/74, t/76 einzeln grün).
+
+Commit 5873137a
