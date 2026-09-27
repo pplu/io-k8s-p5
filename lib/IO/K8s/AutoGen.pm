@@ -310,63 +310,26 @@ sub _generate_class {
     my $k8s = $class->can('k8s')
         or croak "Failed to set up k8s DSL for $class";
 
-    my $properties = $schema->{properties} // {};
-
-    # A class that gets the GVK class methods below also gets
-    # IO::K8s::Role::APIObject, and with it apiVersion, kind and metadata --
-    # exactly the three properties IO::K8s::Role::Resource::compare_to_schema
-    # already excuses a top-level object for not declaring, and the line
-    # k45 drew for the hand-written template classes. Declaring them a
-    # second time as schema properties is not merely redundant:
+    # A top-level class -- one with a GVK -- gets its identity methods and
+    # IO::K8s::Role::APIObject (and with it IO::K8s::Role::SpecBuilder)
+    # BEFORE any property is declared: the order `use IO::K8s::APIObject`
+    # gives a hand-written class (k150). The other way round, Role::Tiny's
+    # "class wins" let a property whose accessor has the name of a role
+    # method (label, save, is_ready, spec_get, ...) silently replace that
+    # method. Now the k144 declaration preflight in IO::K8s::Resource sees
+    # the role method and refuses the property, naming the class, the
+    # property and the method, which fails the whole generation run (k149).
+    # There is no renaming: the property would have to change its accessor
+    # name, and with it what the class looks like, to get past a clash its
+    # schema cannot know about. conditions keeps its k144 exception -- the
+    # role helper yields to a declared field of that name.
     #
-    #   kind:       add_symbol('&kind') overwrites the generated accessor
-    #               afterwards, so the attribute is write-only-looking and
-    #               $obj->kind('Other') is a silent no-op (k60).
-    #   apiVersion: no such collision, which is worse -- the attribute stays
-    #               writable and TO_JSON emits it over the apiVersion the
-    #               class actually is.
-    #   metadata:   harmless but pure waste -- the role's own `has metadata`
-    #               and the explicit k8s registration further down both land
-    #               after the loop and overwrite whatever it built, having
-    #               generated a throwaway ObjectMeta class on the way. It is
-    #               skipped here so that a schema referencing the standard
-    #               ObjectMeta without carrying its definition (a very common
-    #               way to hand in a single CRD schema) does not trip the
-    #               unresolved-$ref refusal below over a field the role
-    #               supplies anyway.
-    my %role_supplied = (defined $api_ver && defined $kind_val)
-        ? (apiVersion => 1, kind => 1, metadata => 1)
-        : ();
-
-    # D5: reuse a shipped core class for a nested object/items/
-    # additionalProperties schema of exactly its shape, default on.
-    my $reuse_core = exists $opts{reuse_core} ? ($opts{reuse_core} ? 1 : 0) : 1;
-
-    # k120: a set of logical nested-class paths (root-relative,
-    # '::'-joined -- the same key space class_path/the render overlay use)
-    # at which core reuse is suppressed even with reuse_core on, so a
-    # provider's own named type is generated where its shape happens to
-    # match a core class (PrometheusOperator's Argument matches
-    # Core::V1::HTTPHeader). Empty/absent -> reuse behaves exactly as before.
-    my $reuse_core_except = $opts{reuse_core_except} || {};
-
-    # Generate attributes using k8s DSL
-    # Property names with special characters ($ref, x-kubernetes-*) are
-    # automatically sanitized to valid Perl identifiers by _k8s(), with
-    # init_arg mapping so constructors still accept the original JSON keys.
-    my %required = map { $_ => 1 } @{ $schema->{required} // [] };
-    for my $prop (sort keys %$properties) {
-        next if $role_supplied{$prop};
-        my $prop_schema = $properties->{$prop};
-        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class, $reuse_core, $reuse_core_except);
-        next unless defined $type_spec;  # Skip unsupported types
-
-        my $opts = _field_options($prop_schema, $type_spec, $required{$prop});
-        $k8s->($prop, $type_spec, ($opts ? $opts : ()));
-    }
-
-    # Install class methods if we have api_version/kind
-    if (defined $api_ver && defined $kind_val) {
+    # The identity methods still go in before the role, so the role sees
+    # them and does not install its own class-name-derived api_version, kind
+    # and resource_plural -- the same reason IO::K8s::APIObject::import
+    # installs a CRD's before it composes the role.
+    my $is_top = defined $api_ver && defined $kind_val;
+    if ($is_top) {
         my $stash = Package::Stash->new($class);
 
         # These are fixed identity methods, not writable fields. A caller
@@ -400,6 +363,59 @@ sub _generate_class {
             require IO::K8s::Role::Namespaced;
             Moo::Role->apply_roles_to_package($class, 'IO::K8s::Role::Namespaced');
         }
+    }
+
+    my $properties = $schema->{properties} // {};
+
+    # The block above gave a top-level class apiVersion, kind and metadata
+    # -- exactly the three properties IO::K8s::Role::Resource::compare_to_schema
+    # already excuses a top-level object for not declaring, and the line
+    # k45 drew for the hand-written template classes. A schema that lists
+    # them as properties as well is skipped for each of them:
+    #
+    #   kind:       the fixed identity method is already there, so the k144
+    #               preflight would refuse the property as a collision. Back
+    #               when properties came first, the identity method was
+    #               installed over the generated accessor afterwards and
+    #               $obj->kind('Other') was a silent no-op (k60).
+    #   apiVersion: no method of that name, which is worse -- it would become
+    #               a writable attribute and TO_JSON would emit it over the
+    #               apiVersion the class actually is.
+    #   metadata:   the role's own attribute, adopted above; declaring it
+    #               again from the schema could only conflict with that, and
+    #               would generate a throwaway ObjectMeta class on the way. It is
+    #               skipped here so that a schema referencing the standard
+    #               ObjectMeta without carrying its definition (a very common
+    #               way to hand in a single CRD schema) does not trip the
+    #               unresolved-$ref refusal below over a field the role
+    #               supplies anyway.
+    my %role_supplied = $is_top ? (apiVersion => 1, kind => 1, metadata => 1) : ();
+
+    # D5: reuse a shipped core class for a nested object/items/
+    # additionalProperties schema of exactly its shape, default on.
+    my $reuse_core = exists $opts{reuse_core} ? ($opts{reuse_core} ? 1 : 0) : 1;
+
+    # k120: a set of logical nested-class paths (root-relative,
+    # '::'-joined -- the same key space class_path/the render overlay use)
+    # at which core reuse is suppressed even with reuse_core on, so a
+    # provider's own named type is generated where its shape happens to
+    # match a core class (PrometheusOperator's Argument matches
+    # Core::V1::HTTPHeader). Empty/absent -> reuse behaves exactly as before.
+    my $reuse_core_except = $opts{reuse_core_except} || {};
+
+    # Generate attributes using k8s DSL
+    # Property names with special characters ($ref, x-kubernetes-*) are
+    # automatically sanitized to valid Perl identifiers by _k8s(), with
+    # init_arg mapping so constructors still accept the original JSON keys.
+    my %required = map { $_ => 1 } @{ $schema->{required} // [] };
+    for my $prop (sort keys %$properties) {
+        next if $role_supplied{$prop};
+        my $prop_schema = $properties->{$prop};
+        my $type_spec = _schema_to_type_spec($prop_schema, $all_defs, $namespace, $prop, $class, $reuse_core, $reuse_core_except);
+        next unless defined $type_spec;  # Skip unsupported types
+
+        my $opts = _field_options($prop_schema, $type_spec, $required{$prop});
+        $k8s->($prop, $type_spec, ($opts ? $opts : ()));
     }
 
     return $class;
@@ -1746,6 +1762,25 @@ a JSON boolean; the message names the class and field (k55).
 the schema's C<x-kubernetes-group-version-kind> metadata is ambiguous for
 the requested C<api_version>, or names no entry matching it -- the GVK
 selection fails closed rather than pick a version.
+
+=item *
+
+a top-level class -- one with an C<api_version> and a C<kind> -- has a
+property whose accessor would take the name of a method of
+L<IO::K8s::Role::APIObject> (C<label>, C<save>, C<is_ready>, ..., and the
+C<spec_*> methods of L<IO::K8s::Role::SpecBuilder>, which it composes) or of
+the identity methods C<api_version> and C<resource_plural> (k150). The
+identity methods and the role are in place before the first property is
+declared, the order C<use IO::K8s::APIObject> gives a hand-written class,
+so the declaration check of L<IO::K8s::Resource/k8s> refuses the property
+with C<< k8s: field 'label' of <class> collides with the method 'label' of
+<class>, which is not an attribute >>. Before, such a property silently
+replaced the role method on the generated class. The exceptions are that
+check's own: a C<conditions> property takes over the role's condition
+helper, and C<apiVersion>, C<kind> and C<metadata> are not declared from
+the schema at all, since the class already supplies them. A nested class
+composes no role, so these names are ordinary fields there. Nothing is
+renamed.
 
 =back
 
