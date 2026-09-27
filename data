@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-27T22:04:34Z
+claimed_by: followups-4
+class: standard
+completed: 2026-09-27T22:04:28Z
+created: 2026-09-27T20:16:16Z
+id: 172
+priority: medium
+started: 2026-09-27T20:55:10Z
+status: done
+tags:
+- specbuilder
+- k169-followup
+title: SpecBuilder verliert Schreibzugriffe durch ein V1::JSON-Feld
+updated: 2026-09-27T22:04:34Z
+---
+
+Gefunden bei k169 (2026-09-27), vorbestehend. HelmChart: spec_set('values.replicaCount', 3) serialisiert values: null - der Wert landet im _unknown_fields-Beutel des JSON-Objekts, TO_JSON liest ihn nicht. Ebenso gehen Schreibzugriffe auf spec_hash('values') verloren, spec_get('values.a') liefert undef. set_values ist nicht betroffen. SpecBuilder soll durch opake Union-Klassen (V1::JSON) in deren value laufen. Wire-JSON-Regression verpflichtend.
+
+2026-09-27 22:04 Commit b3ef9319
