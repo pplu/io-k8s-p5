@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-27T18:52:00Z
+claimed_by: followups
+class: standard
+completed: 2026-09-27T18:52:00Z
+created: 2026-09-26T15:58:26Z
+id: 154
+priority: low
+started: 2026-09-27T18:06:17Z
+status: done
+tags:
+- inflation
+- k146-followup
+title: Falsche Form an Array-/Hash-Feldern endet in nacktem Perl-Deref-Fehler
+updated: 2026-09-27T18:52:00Z
+---
+
+Folge aus k146 (2026-09-26). containers => "x" oder containers => {} an einem is_array_of_objects-Feld (analog Hash-Felder) scheitert in _inflate_struct mit einem Perl-Dereferenzierungsfehler ohne Klassen-/Feldkontext. Vorbestehend, nicht durch k146 verursacht. Richtung: dieselbe Meldungsform wie k146 (Zielklasse, Feld, erhaltene Form).
+
+Umgesetzt auf fix/followups, uncommittet (io-k8s-worker). prove -lr t/ 118 Dateien 9041 Tests PASS, t/25 und t/26 PASS, dzil build sauber.
+
+2026-09-27 18:51 Commit 0d8c3098
