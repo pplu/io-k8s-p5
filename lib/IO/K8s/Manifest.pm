@@ -8,6 +8,21 @@ use Moo;
 use Carp qw(croak);
 use Package::Stash;
 
+# Runs a manifest's source, returning $@ (k163). Defined here, above every
+# lexical of this file, so the string eval sees none of them: it used to
+# run inside _load_file, where a manifest could read -- and under
+# `use strict` compile against -- $file, $k8s, $vars and the collector $m,
+# and the `our $_collector` alias below. `our $VERSION` above stays in
+# view: it has to come first in every module of the distribution, and a
+# stray $VERSION in a manifest only reaches this package's version string.
+# No `my` on purpose: the invocant is dropped and the source shifted off,
+# so @_ is empty by the time the manifest runs.
+sub _eval_manifest {
+    shift;
+    eval shift;
+    return $@;
+}
+
 # Current collector during evaluation
 our $_collector;
 
@@ -62,17 +77,16 @@ sub _load_file {
         # Build the DSL code with functions for all resource types
         my $dsl_code = _build_dsl_code($k8s);
 
-        # Eval the file content with DSL available
-        my $eval_code = qq{
-            package $pkg;
-            use strict;
-            use warnings;
-            $dsl_code
-            $content
-        };
-
-        eval $eval_code;
-        die "Error loading $file: $@" if $@;
+        # Eval the file content with DSL available, its own line numbers
+        # restarting at 1 under the file's name (k163).
+        my $failure = $class->_eval_manifest(join "\n",
+            'package '.$pkg.';',
+            'use strict;',
+            'use warnings;',
+            $dsl_code,
+            $class->_line_directive($file),
+            $content);
+        die "Error loading $file: $failure" if $failure;
         1;
     };
     my $error = $@;
@@ -80,6 +94,19 @@ sub _load_file {
     die $error unless $ok;
 
     return [ $m->items ];
+}
+
+# The #line directive in front of a manifest's source, so that die, warn
+# and compile errors in it name the file and the manifest's own line
+# instead of "(eval 273) line 1848" behind the generated DSL subs (k163).
+# The directive has no escaping: a name with a double quote or a line
+# break cannot be written into it, and one outside printable ASCII would
+# come out re-encoded, because the evaluated source is a character string.
+# Such a name gets the line numbers alone, under the "(eval N)"
+# pseudo-file; the "Error loading <file>:" prefix still names the file.
+sub _line_directive {
+    my ($class, $file) = @_;
+    return $file =~ /\A[\x20\x21\x23-\x7e]+\z/ ? '#line 1 "'.$file.'"' : '#line 1';
 }
 
 # var() for the manifest evaluated in $pkg (k160): var($name) returns the
@@ -102,6 +129,18 @@ sub _install_var {
     return;
 }
 
+# The package the bodies of the generated Kind functions are compiled in,
+# while the functions themselves are named in the loader package (k163).
+# It trusts IO::K8s for Carp, so an error new_object croaks with for a Kind
+# call -- a field of the wrong shape -- skips the generated function and is
+# reported at the manifest line of the call, not at "(eval 273) line 1674".
+# The functions themselves have to be named in the loader package, where
+# the manifest calls them unqualified, and that package cannot be the one
+# to trust IO::K8s: Carp never stops between two frames of one package, so
+# it would skip the manifest's own frames too and land in this file.
+my $DSL_BODY_PACKAGE = __PACKAGE__.'::_DSL';
+Package::Stash->new($DSL_BODY_PACKAGE)->add_symbol('@CARP_NOT', ['IO::K8s']);
+
 # Build DSL code with resource functions
 sub _build_dsl_code {
     my ($k8s) = @_;
@@ -117,6 +156,7 @@ sub _build_dsl_code {
 
         $code .= qq{
             sub $kind (&@) {
+                package $DSL_BODY_PACKAGE;
                 my \$block = shift;
                 my \$api_version = shift;
                 my \%args = \$block->();

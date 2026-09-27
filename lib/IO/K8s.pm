@@ -1901,6 +1901,21 @@ when loading fails, so reloading manifests in a long-running process does
 not grow it. Subs and closures the manifest hands out in its data keep
 working after that.
 
+Errors name the manifest's file and its own line numbers (k163): a C<die>,
+a warning, a syntax error, a C<var> without value and an error raised for
+a Kind call, such as a field of the wrong shape, all report
+C<at myapp.pk8s line 12>, and a fatal one comes prefixed with
+C<Error loading myapp.pk8s:>. A file name with a double quote, a line break
+or characters outside printable ASCII cannot be written into Perl's
+C<#line> directive; for such a file the line numbers are still right, the
+location reads C<(eval N)> instead of the name, and the prefix still names
+the file.
+
+The manifest is compiled under C<use strict> and C<use warnings> and sees
+C<var> and one function per Kind, but none of the loader's own variables:
+an undeclared C<$file> or C<$m> in it is a compile error, not a quiet
+reach into the loader, and C<@_> is empty at its top level.
+
 With CRDs (requires openapi_spec):
 
     my $k8s = IO::K8s->new(openapi_spec => $spec);
