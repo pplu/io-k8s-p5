@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T23:05:37Z
+claimed_by: followups-5
+class: standard
+completed: 2026-09-27T23:05:32Z
+created: 2026-09-27T21:47:23Z
+id: 179
+priority: medium
+started: 2026-09-27T22:06:31Z
+status: done
+tags:
+- union
+- coercion
+- k172-followup
+title: Objekt-Coercer reicht Nicht-Hashes nicht an FROM_STRUCT der Union-Klassen
+updated: 2026-09-27T23:05:37Z
+---
+
+Gefunden bei k172 (2026-09-27). ->new(values => [1,2]), ->new(values => 5) und JSONSchemaProps->new(enum => ['a']) scheitern am isa, obwohl Inflate dieselben Werte annimmt: der Objekt-Coercer in Resource.pm gibt nur Hashes an FROM_STRUCT weiter. spec_set('values', [1,2]) teilt das. Für Klassen mit FROM_STRUCT (Union-Klassen) jeden Wert an FROM_STRUCT geben.
+
+Commit 65ba1ea9, prove -lr t/ 142 Dateien 9222 Tests PASS.
