@@ -131,6 +131,11 @@ Revision history for IO-K8s
     value as well; the same for a schema's items, additionalProperties,
     additionalItems, dependencies, default and example.
 
+  - A missing required field or a wrongly typed value met while new_object,
+    inflate, struct_to_object, json_to_object, load_yaml or a .pk8s Kind
+    call builds an object names the calling line instead of one inside
+    lib/IO/K8s.pm; a Type::Tiny exception stays an object.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

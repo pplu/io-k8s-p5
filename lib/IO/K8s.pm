@@ -973,7 +973,80 @@ sub _struct_to_object_expanded {
         if defined $params && ref $params ne 'HASH';
 
     my $inflated = $self->_inflate_struct($class, $params);
-    return $class->new(%$inflated);
+    return $self->_construct($class, $inflated);
+}
+
+# Builds an object of $class from its inflated arguments: the one place
+# IO::K8s calls a constructor (k164).
+#
+# An error the constructor raises about those arguments blames the line
+# that called it, which is the one below: Moo croaks "Missing required
+# arguments" from the frame of the class being built, and a Type::Tiny
+# exception takes the first frame outside Type::Tiny. Neither gets past
+# IO::K8s by @CARP_NOT -- the classes being built are not ours to mark,
+# and Type::Tiny does not read @CARP_NOT at all -- so _blame_caller moves
+# such an error to the place a croak from here is reported.
+sub _construct {
+    my ($self, $class, $args) = @_;
+    my $object;
+    return $object if eval { $object = $class->new(%$args); 1 };
+    my $error = $@;
+    die $self->_blame_caller($error);
+}
+
+# $error moved to the place a croak from IO::K8s at this point is reported,
+# when it blames a line of this file (k164) -- inside _construct, only the
+# constructor's own complaint does. Carp decides the place, by the
+# @CARP_NOT declarations of the distribution: the line that called into
+# IO::K8s, the manifest line of a Kind call in a .pk8s (k163), the caller
+# of add_crd or to_crd. A Type::Tiny exception stays the same object with
+# its context moved; a string gets the new location in the form Carp
+# writes it.
+#
+# Everything else is returned as it is: an error blaming another place (a
+# class's own BUILD, a bug elsewhere keeps pointing at itself), a Carp
+# answer that is itself a line of the distribution (a path whose modules do
+# not trust each other yet -- moving the blame there would only trade one
+# internal line for another), and a full backtrace under $Carp::Verbose.
+sub _blame_caller {
+    my ($self, $error) = @_;
+    my $at_construct = qr/ at \Q${\ __FILE__}\E line \d+(?: thread \d+)?\.\n\z/;
+    if (Scalar::Util::blessed($error)) {
+        return $error unless $error->isa('Error::TypeTiny');
+        my $context = $error->context;
+        return $error unless ref $context eq 'HASH'
+            && defined $context->{file} && $context->{file} eq __FILE__;
+        my @at = $self->_caller_location or return $error;
+        @$context{qw( package file line )} = @at;
+        return $error;
+    }
+    return $error if ref $error || !defined $error || $error !~ $at_construct;
+    my (undef, $file, $line) = $self->_caller_location or return $error;
+    $error =~ s/$at_construct/ at $file line $line.\n/;
+    return $error;
+}
+
+# Package, file and line of the place Carp reports a croak from IO::K8s at
+# this point (k164), or nothing when that is a line of the distribution or
+# Carp answers with a full backtrace instead of one line. Carp names the
+# file and line; the package is that of the frame calling from there.
+sub _caller_location {
+    my ($self) = @_;
+    my ($file, $line) = Carp::shortmess('') =~ /\A at (.+) line (\d+)(?: thread \d+)?\.\n\z/
+        or return;
+    return if $self->_is_own_file($file);
+    for (my $level = 1; my @frame = caller $level; $level++) {
+        return ($frame[0], $file, $line) if $frame[1] eq $file && $frame[2] == $line;
+    }
+    return;
+}
+
+# True for a file of this distribution: this one, or a module below the
+# IO/K8s/ directory next to it.
+sub _is_own_file {
+    my ($self, $file) = @_;
+    state $dir = do { (my $d = __FILE__) =~ s/\.pm\z/\//; $d };
+    return $file eq __FILE__ || index($file, $dir) == 0;
 }
 
 # How a refused value is named in an inflation error (k146, k153, k154).
@@ -1036,7 +1109,7 @@ sub inflate {
     }
     $self->load_class($class);
     my $inflated = $self->_inflate_struct($class, $struct);
-    return $class->new(%$inflated);
+    return $self->_construct($class, $inflated);
 }
 
 sub new_object {
@@ -1912,7 +1985,8 @@ working after that.
 
 Errors name the manifest's file and its own line numbers (k163): a C<die>,
 a warning, a syntax error, a C<var> without value and an error raised for
-a Kind call, such as a field of the wrong shape, all report
+a Kind call -- a field of the wrong shape, a missing required field or a
+value of the wrong type (k164) -- all report
 C<at myapp.pk8s line 12>, and a fatal one comes prefixed with
 C<Error loading myapp.pk8s:>. A file name with a double quote, a line break
 or characters outside printable ASCII cannot be written into Perl's
@@ -2088,6 +2162,23 @@ L<IO::K8s::Resource/Field options>), where it is kept: the attribute exists
 with C<undef>, its C<has_E<lt>accessorE<gt>> is true, and C<TO_JSON> writes
 the C<null> back (k158). That too holds on every entry point listed above
 and at any depth.
+
+An error the constructor of a class raises while it is built -- Moo's
+C<Missing required arguments>, or a L<Type::Tiny> exception for a value of
+the wrong type -- names the line that called C<new_object>, C<inflate>,
+C<struct_to_object>, C<json_to_object> or L</load_yaml>, and in a C<.pk8s>
+manifest the line of the Kind call (see L</load>), not a line inside
+IO::K8s (k164). That holds at any depth, for every Kind that resolves to a
+class -- shipped, generated or your own:
+
+    Missing required arguments: selector, template at deploy.pl line 12.
+
+The message is otherwise the constructor's own, and a Type::Tiny exception
+stays the same L<Error::TypeTiny::Assertion> object, its C<context>
+(package, file and line) moved to that caller. An error a class raises from
+its own code, such as a C<BUILD> that dies, keeps its own location, and a
+direct C<< $class->new(...) >> is not an entry point of IO::K8s and reports
+as it always has.
 
 =head2 inflate
 
