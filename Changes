@@ -67,6 +67,10 @@ Revision history for IO-K8s
   - load($file, vars => { ... }) hands values to a .pk8s manifest, which
     reads them with var($name) or var($name, $default).
 
+  - Document that json_to_object and struct_to_object resolve their class
+    name again through expand_class, so a bare one-word name is read as a
+    Kind; an already resolved class goes in as '+Class'.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

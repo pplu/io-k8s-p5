@@ -2057,6 +2057,18 @@ the exact message.
 Convert JSON to an IO::K8s object. With one argument, auto-detects the class
 from C<kind>. With two arguments, uses the specified class.
 
+The specified class name goes through L</expand_class> exactly as it would
+for L</new_object>: a bare one-word name is always read as a Kubernetes
+Kind and looked up in the resource map, never as a package name (k35) --
+C<Gizmo> resolves as the resource map's C<Gizmo> entry, not as a literal
+package called C<Gizmo>. A class name that has already been resolved --
+for example, the return value of a previous L</expand_class> call -- is not
+exempt from this and must be prefixed with C<+> to be used verbatim instead
+of being looked up again:
+
+    my $class = $k8s->expand_class('Gizmo');    # already a full class name
+    $k8s->json_to_object('+'.$class, $json);     # '+' skips re-resolution
+
 When the class argument is a GVK request (domain-qualified, or paired with an
 C<api_version>) that cannot be resolved, this dies with the same fail-closed
 error as L</new_object> -- see there for the exact message and the bare-Kind
@@ -2073,6 +2085,18 @@ the exact message.
 
 Convert a Perl hashref to an IO::K8s object. With one argument, auto-detects
 the class from C<kind>. With two arguments, uses the specified class.
+
+The specified class name goes through L</expand_class> exactly as it would
+for L</new_object>: a bare one-word name is always read as a Kubernetes
+Kind and looked up in the resource map, never as a package name (k35) --
+C<Gizmo> resolves as the resource map's C<Gizmo> entry, not as a literal
+package called C<Gizmo>. A class name that has already been resolved --
+for example, the return value of a previous L</expand_class> call -- is not
+exempt from this and must be prefixed with C<+> to be used verbatim instead
+of being looked up again:
+
+    my $class = $k8s->expand_class('Gizmo');      # already a full class name
+    $k8s->struct_to_object('+'.$class, $hashref);  # '+' skips re-resolution
 
 When the class argument is a GVK request (domain-qualified, or paired with an
 C<api_version>) that cannot be resolved, this dies with the same fail-closed
