@@ -343,11 +343,55 @@ sub _normalize_bool {
 # _default_k8s requires IO::K8s, which loads this file.
 sub _object_coercer {
     my ($class_name) = @_;
+    my $builds = _object_builds($class_name);
     return sub {
-        return $_[0] unless ref $_[0] eq 'HASH';
+        return $_[0] unless $builds->($_[0]);
         return IO::K8s::Role::Resource::_default_k8s()
             ->_struct_to_object_expanded($class_name, $_[0]);
     };
+}
+
+# Whether a value handed to an object-bearing field of $class_name is built
+# into that class by the object coercers, as a predicate the three of them
+# share -- the single field above and, element by element, the array and
+# hash forms in _declare_field.
+#
+# A plain hashref always is. A class with FROM_STRUCT -- the apiextensions
+# union classes, which serialize as the bare value they hold -- takes every
+# defined value (k179): inflation hands it anything, so values => [1, 2]
+# or enum => ['a'] inflated fine while ->new, the setter and spec_set died
+# on the InstanceOf check for the very same values. An object already of
+# the class is left alone, and undef stays "no value". Every other class
+# keeps the k146 rule: anything but a hashref goes on to `isa`, which
+# refuses it.
+#
+# FROM_STRUCT is only known once the class is loaded, and the coercer is
+# installed long before (see _object_coercer). It is asked the first time
+# a value is not a hashref, and the answer is kept; a class that does not
+# load is asked again next time and meanwhile counts as an ordinary class,
+# so such a value still meets the type check it met before.
+sub _object_builds {
+    my ($class_name) = @_;
+    my $from_struct;
+    return sub {
+        my ($value) = @_;
+        return 0 unless defined $value;
+        return 1 if ref $value eq 'HASH';
+        $from_struct //= _takes_any_value($class_name);
+        return 0 unless $from_struct;
+        return blessed($value) && $value->isa($class_name) ? 0 : 1;
+    };
+}
+
+# True when $class_name inflates through FROM_STRUCT (k179), false when it
+# does not, nothing when it cannot be loaded.
+sub _takes_any_value {
+    my ($class_name) = @_;
+    return unless eval {
+        IO::K8s::Role::Resource::_default_k8s()->load_class($class_name);
+        1;
+    };
+    return $class_name->can('FROM_STRUCT') ? 1 : 0;
 }
 
 sub _generate_inline_struct {
@@ -789,13 +833,15 @@ sub _declare_field {
     # now matches the one every other object-bearing field produces.
     #
     # Two things the three object branches here share:
-    #   * `ref $_[0] eq 'HASH'` is false for a blessed hashref, so one test
-    #     covers both "already an object, pass it through" and "not a hash,
-    #     pass it through". That short-circuit is also what keeps
-    #     IO::K8s::_inflate_struct from doing the work twice: it hands
-    #     $class->new fully built objects and every one of them lands here.
-    #   * anything that is neither goes on unchanged and lets `isa` write
-    #     the message -- a coercer never invents a type error of its own.
+    #   * one predicate, _object_builds, decides what is built: a plain
+    #     hashref -- `ref eq 'HASH'` is false for a blessed one -- or, for a
+    #     union class with FROM_STRUCT, any defined value that is not
+    #     already of the class (k179). An object of the class is passed
+    #     through, which is also what keeps IO::K8s::_inflate_struct from
+    #     doing the work twice: it hands $class->new fully built objects and
+    #     every one of them lands here.
+    #   * anything else goes on unchanged and lets `isa` write the message
+    #     -- a coercer never invents a type error of its own.
     elsif ($info{is_object}) {
         @coerce = (coerce => _object_coercer($info{class}));
     }
@@ -803,23 +849,27 @@ sub _declare_field {
     # gets its index appended the same way the [Bool] coercer above does,
     # so the culprit can be found. Scanned first and returned untouched
     # when no element needs building -- the inflate path arrives here with
-    # an array of ready objects and should pay one `ref` per element, not
+    # an array of ready objects and should pay one check per element, not
     # a fresh arrayref.
+    #
+    # An element is built by the rule _object_builds states for the single
+    # field: a hashref, or any defined value for a union class (k179).
     elsif ($info{is_array_of_objects}) {
         my $oc = $info{class};
+        my $builds = _object_builds($oc);
         @coerce = (coerce => sub {
             return $_[0] unless ref $_[0] eq 'ARRAY';
             my $in = $_[0];
             my $needed = 0;
             for my $elem (@$in) {
-                next unless ref $elem eq 'HASH';
+                next unless $builds->($elem);
                 $needed = 1;
                 last;
             }
             return $in unless $needed;
             my @out;
             for my $i (0 .. $#$in) {
-                if (ref $in->[$i] eq 'HASH') {
+                if ($builds->($in->[$i])) {
                     push @out, eval {
                         IO::K8s::Role::Resource::_default_k8s()
                             ->_struct_to_object_expanded($oc, $in->[$i])
@@ -836,24 +886,26 @@ sub _declare_field {
         });
     }
     # Hash of named nested classes: value-wise, with the key named on a
-    # failure. Same scan-first shortcut as the array form; `sort keys` in
-    # the building pass so several bad values still name a deterministic
-    # one, matching the unknown-field walk in IO::K8s::Role::Resource.
+    # failure. Same scan-first shortcut and element rule as the array form;
+    # `sort keys` in the building pass so several bad values still name a
+    # deterministic one, matching the unknown-field walk in
+    # IO::K8s::Role::Resource.
     elsif ($info{is_hash_of_objects}) {
         my $oc = $info{class};
+        my $builds = _object_builds($oc);
         @coerce = (coerce => sub {
             return $_[0] unless ref $_[0] eq 'HASH';
             my $in = $_[0];
             my $needed = 0;
             for my $key (keys %$in) {
-                next unless ref $in->{$key} eq 'HASH';
+                next unless $builds->($in->{$key});
                 $needed = 1;
                 last;
             }
             return $in unless $needed;
             my %out;
             for my $key (sort keys %$in) {
-                if (ref $in->{$key} eq 'HASH') {
+                if ($builds->($in->{$key})) {
                     $out{$key} = eval {
                         IO::K8s::Role::Resource::_default_k8s()
                             ->_struct_to_object_expanded($oc, $in->{$key})
@@ -1047,6 +1099,21 @@ so boolean spellings and the unknown-field policy behave identically on both
 routes. A value that is already an object is passed through untouched, and
 anything that is neither a hashref nor an object is left to the type
 constraint to reject.
+
+The one exception is a class that inflates through C<FROM_STRUCT> -- the
+apiextensions union classes C<V1::JSON> and C<JSONSchemaPropsOr*>, which
+serialize as the bare value they hold. Such a field takes every defined
+value, not only a hashref, exactly as inflation does (k179):
+
+    IO::K8s::K3s::V1::HelmChartSpec->new(values => [ 1, 2 ]);   # values: [1,2]
+    $schema->enum([ 'small', 'large' ]);                         # enum: ["small","large"]
+
+The value goes to the class's C<FROM_STRUCT> through the same call
+inflation makes, in the constructor, the setter and every C<spec_*> write,
+element by element for an array or map of such objects. An object already
+of the class is passed through, C<undef> is still no value, and a value
+the union itself refuses (a plain scalar for the schema arm of C<items>)
+fails with the same inflation error L<IO::K8s/inflate> gives for it.
 
 Short class names are auto-expanded:
 

@@ -76,6 +76,10 @@ sub is_schema {
 Inflation hook called by L<IO::K8s/struct_to_object>. An ArrayRef fills
 C<schemas>, anything else fills C<schema>.
 
+The same hook builds the value a field of this type is given through C<new>,
+its setter or a C<spec_*> write of L<IO::K8s::Role::SpecBuilder>, whatever
+its shape (k179); see L<IO::K8s::Resource/k8s>.
+
 =cut
 
 sub FROM_STRUCT {

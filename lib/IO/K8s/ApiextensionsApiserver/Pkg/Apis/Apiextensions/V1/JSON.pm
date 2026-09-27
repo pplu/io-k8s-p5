@@ -58,6 +58,11 @@ array, after inflation does not reach the object. A container nested inside
 the value is not copied and still shares its contents with the source. A
 plain scalar, C<undef> or a JSON boolean is kept as given.
 
+The same hook builds the value a field of this type is given through C<new>,
+its setter or a C<spec_*> write of L<IO::K8s::Role::SpecBuilder>, whatever
+its shape (k179) -- C<< values => [1, 2] >> on a K3s C<HelmChartSpec> as
+readily as a hash; see L<IO::K8s::Resource/k8s>.
+
 =cut
 
 sub FROM_STRUCT {

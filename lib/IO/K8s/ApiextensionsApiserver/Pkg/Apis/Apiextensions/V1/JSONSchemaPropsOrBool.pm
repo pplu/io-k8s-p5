@@ -77,6 +77,10 @@ built C<JSONSchemaProps>) fills C<schema>; anything else is read as a boolean
 into C<allows>. JSON booleans, C<\1> / C<\0> scalar refs and the plain scalars
 YAML::PP produces are all accepted.
 
+The same hook builds the value a field of this type is given through C<new>,
+its setter or a C<spec_*> write of L<IO::K8s::Role::SpecBuilder>, whatever
+its shape (k179); see L<IO::K8s::Resource/k8s>.
+
 =cut
 
 sub FROM_STRUCT {

@@ -785,7 +785,10 @@ schema arm) for a key, an array for an index. C<JSONSchemaPropsOrBool> has
 no array to build and croaks with C<it cannot hold an array>, before
 anything is stored. The union field itself stays an ordinary field:
 L</spec_set> and L</spec_delete> on it replace or clear the union object,
-and L</spec_get> returns it.
+and L</spec_get> returns it. L</spec_set> takes any value there that
+inflation takes, not only a hash (k179) -- C<< spec_set('values', [1, 2]) >>
+serializes as C<values: [1,2]> -- and so do L</spec_push> and an indexed
+L</spec_set> into an array of union objects such as a schema's C<enum>.
 
 =head1 SEE ALSO
 
