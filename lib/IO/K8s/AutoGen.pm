@@ -427,6 +427,37 @@ my %OPAQUE_TYPES = map { $_ => 1 } qw(
     io.k8s.apimachinery.pkg.runtime.RawExtension
 );
 
+# The apiextensions union types (k152). Upstream's swagger.json describes
+# each of them with a description and nothing else, since none is a JSON
+# object: v1.JSON is any JSON value, JSONSchemaPropsOrArray a schema or an
+# array of schemas, JSONSchemaPropsOrBool a schema or a boolean,
+# JSONSchemaPropsOrStringArray a schema or a string array. Generated from
+# such a definition, a class has no fields and no FROM_STRUCT and cannot
+# hold `default: "foo"`. IO::K8s ships a hand-written class for each of the
+# four, inflated through FROM_STRUCT, and a $ref to one of the names is
+# typed as that class -- by name, whether the spec carries the definition
+# or not, like the apimachinery scalars and %OPAQUE_TYPES above. reuse_core
+# has no say: this is the type itself, not a shape that happens to match.
+#
+# IO::K8s ships no v1beta1 apiextensions classes. The v1beta1 names -- in a
+# spec from a cluster older than 1.22, which removed that API -- are carried
+# by the v1 JSON class instead, which holds any JSON value as it came and
+# writes it back unchanged: opaque, never a field-less class that loses the
+# value.
+my $APIEXT_DEF   = 'io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.';
+my $APIEXT_CLASS = 'IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::';
+my %UNION_TYPES  = map {
+    ( $APIEXT_DEF.'v1.'.$_      => $APIEXT_CLASS.$_,
+      $APIEXT_DEF.'v1beta1.'.$_ => $APIEXT_CLASS.'JSON' )
+} qw( JSON JSONSchemaPropsOrArray JSONSchemaPropsOrBool JSONSchemaPropsOrStringArray );
+
+# The shipped class a union $ref stands for, loaded, or nothing.
+sub _union_class {
+    my ($ref) = @_;
+    my $class = $UNION_TYPES{$ref} or return;
+    return use_module($class);
+}
+
 # A $ref pointing at a definition the caller never supplied.
 #
 # Refusing is the fail-closed choice (k56). The property used to be
@@ -868,8 +899,9 @@ sub _entry_compatible {
 # A $ref is resolved read-only against the definitions _core_class_for was
 # handed, the way _schema_to_type_spec resolves it: the three apimachinery
 # scalars stay the 'string' kind they always were here, %OPAQUE_TYPES is the
-# opaque map, anything else is the object its definition describes. A $ref
-# that does not resolve cannot be shown compatible.
+# opaque map, an apiextensions union name is its shipped class
+# (%UNION_TYPES), anything else is the object its definition describes. A
+# $ref that does not resolve cannot be shown compatible.
 #
 # Nested classes: every schema property must be declared by the class and
 # hold a compatible value (an undeclared one would end in the unknown-field
@@ -905,6 +937,9 @@ sub _field_compatible {
         $ref =~ s{^#/definitions/}{};
         return _entry_compatible($entry, 'string') if _scalar_ref_type($ref);
         return !!$entry->{is_hash_of_str} if $OPAQUE_TYPES{$ref};
+        if (my $union = _union_class($ref)) {
+            return $entry->{is_object} && ($entry->{class} // '') eq $union;
+        }
         my $def = _ref_definition($ref, $ctx) or return 0;
         return $entry->{is_object} && _class_compatible($entry->{class}, $def, $ctx);
     }
@@ -922,6 +957,9 @@ sub _array_compatible {
     # scalars -- the generator's items branch has none either
     if (defined(my $ref = $items->{'$ref'})) {
         $ref =~ s{^#/definitions/}{};
+        if (my $union = _union_class($ref)) {
+            return $entry->{is_array_of_objects} && ($entry->{class} // '') eq $union;
+        }
         my $def = _ref_definition($ref, $ctx) or return 0;
         return $entry->{is_array_of_objects} && _class_compatible($entry->{class}, $def, $ctx);
     }
@@ -946,6 +984,9 @@ sub _object_compatible {
     }
     if (defined(my $ref = $addl->{'$ref'})) {
         $ref =~ s{^#/definitions/}{};
+        if (my $union = _union_class($ref)) {
+            return $entry->{is_hash_of_objects} && ($entry->{class} // '') eq $union;
+        }
         my $def = _ref_definition($ref, $ctx) or return 0;
         return $entry->{is_hash_of_objects} && _class_compatible($entry->{class}, $def, $ctx);
     }
@@ -1204,6 +1245,11 @@ sub _schema_to_type_spec {
             return $scalar;
         }
 
+        # apiextensions union types: the shipped FROM_STRUCT class (k152)
+        if (my $union = _union_class($ref)) {
+            return "+$union";
+        }
+
         # Opaque types should be HashRef, not object references
         if ($OPAQUE_TYPES{$ref}) {
             return { Str => 1 };  # HashRef
@@ -1260,6 +1306,9 @@ sub _schema_to_type_spec {
         my $items = $schema->{items} // {};
         if (my $ref = $items->{'$ref'}) {
             $ref =~ s{^#/definitions/}{};
+            if (my $union = _union_class($ref)) {
+                return ["+$union"];
+            }
             if ($all_defs && $all_defs->{$ref}) {
                 my $ref_class = get_or_generate($ref, $all_defs->{$ref}, $all_defs, $namespace);
                 return ["+$ref_class"];
@@ -1300,6 +1349,9 @@ sub _schema_to_type_spec {
         if (ref $addl eq 'HASH') {
             if (my $ref = $addl->{'$ref'}) {
                 $ref =~ s{^#/definitions/}{};
+                if (my $union = _union_class($ref)) {
+                    return { "+$union" => 1 };
+                }
                 if ($all_defs && $all_defs->{$ref}) {
                     my $ref_class = get_or_generate($ref, $all_defs->{$ref}, $all_defs, $namespace);
                     return { "+$ref_class" => 1 };
@@ -1719,6 +1771,24 @@ already chose, never manufacture a new one -- C<LabelSelectorRequirement>'s
 C<{key,operator,values}> shape stops being reused the moment a schema's own
 C<values> turns out to hold an array of objects rather than scalars; that
 schema gets its own nested class instead.
+
+A C<$ref> to one of the apiextensions union types --
+C<io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON>,
+C<...v1.JSONSchemaPropsOrArray>, C<...v1.JSONSchemaPropsOrBool> and
+C<...v1.JSONSchemaPropsOrStringArray> -- is typed as the class IO::K8s
+ships for it (C<Apiextensions::V1::JSON> and so on), as a property, as an
+array's C<items> or as a map's values (k152). Upstream describes these
+definitions without any properties, because none of them is a JSON object
+(any JSON value; a schema or an array of schemas; a schema or a boolean; a
+schema or a string array); the shipped classes inflate through
+C<FROM_STRUCT> and write the value back exactly as it came, where a class
+generated from the empty definition could not hold C<default: "foo"> at
+all. This holds whatever C<reuse_core> says, and whether or not the spec
+carries the definitions -- the names are resolved like the apimachinery
+C<IntOrString>, C<Quantity> and C<Time>. IO::K8s ships no v1beta1
+apiextensions classes: the same four names under C<v1beta1> are carried
+opaquely by the v1 C<JSON> class, which keeps any value unchanged but does
+not type a schema inside it.
 
 =head1 FUNCTIONS
 

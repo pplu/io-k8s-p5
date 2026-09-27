@@ -74,6 +74,12 @@ Revision history for IO-K8s
     name again through expand_class, so a bare one-word name is read as a
     Kind; an already resolved class goes in as '+Class'.
 
+  - AutoGen types a $ref to the apiextensions JSON, JSONSchemaPropsOrArray,
+    JSONSchemaPropsOrBool and JSONSchemaPropsOrStringArray definitions as
+    the shipped classes, so a value such as default: "foo", an array or a
+    boolean round-trips instead of failing to inflate. The v1beta1 names
+    are carried unchanged by the v1 JSON class.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added
