@@ -280,7 +280,12 @@ array are always emitted as a JSON string, even when the Perl value itself
 is numeric (k145): C<< EnvVar->new(value => 8080) >> serializes C<value> as
 C<"8080">, not a bare C<8080>. The other way round, a C<Num> field and
 each element of a C<[Num]> array are always emitted as a JSON number, so a
-numeric string such as C<'0.25'> goes out unquoted. The opaque
+numeric string such as C<'0.25'> goes out unquoted. Each element of an
+C<[IntOrStr]> array follows the rule of an C<IntOrStr> field: an all-digit
+value goes out as a JSON number, anything else (C<'25%'>, C<'http'>) as the
+string it is. Each element of a C<[Quantity]> or C<[Time]> array goes out as
+a JSON string, the form Kubernetes writes both in -- a C<1> in
+C<validValues> is emitted as C<"1"> (k167). The opaque
 C<< { Str => 1 } >> hash form (labels, annotations, C<fieldsV1>, ...) is
 exempt from that coercion -- its values are copied through unchanged,
 keeping whatever JSON type they already had. For classes that compose
@@ -385,6 +390,24 @@ sub TO_JSON {
             # branch below makes (k54). An element the constructor never
             # saw (spec_push, or a push onto the accessor's arrayref) may be
             # undef or a ref; it goes out exactly as before.
+            $data{$key} = [ map { defined($_) && !ref($_) ? "$_" : $_ } @$value ];
+        } elsif ($attr_info->{is_array_of_int_or_string}) {
+            # The scalar is_int_or_string rule per element (k167): an
+            # all-digit element goes out as a JSON number, anything else as
+            # it is -- so 8080 stays 8080 and '25%' stays '25%'. Until
+            # AutoGen typed int-or-string items as [IntOrStr] no generated
+            # class carried this form, and the generic ARRAY copy below
+            # served the hand-written ones without the rule. undef and ref
+            # elements are left alone, as in is_array_of_str.
+            $data{$key} = [ map {
+                defined($_) && !ref($_) && /\A-?\d+\z/ ? int($_) : $_
+            } @$value ];
+        } elsif ($attr_info->{is_array_of_quantity} || $attr_info->{is_array_of_time}) {
+            # A Quantity and a Time are JSON strings on the wire (k167) --
+            # the form Kubernetes writes both in -- so a numeric Perl
+            # element such as 1 for a Quantity goes out as "1", the same
+            # per-element stringification is_array_of_str applies (k145),
+            # in a new outer array (k54).
             $data{$key} = [ map { defined($_) && !ref($_) ? "$_" : $_ } @$value ];
         } elsif ($attr_info->{is_array_of_bool}) {
             # An undef ELEMENT dies rather than becoming a silent false

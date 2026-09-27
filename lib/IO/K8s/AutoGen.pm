@@ -10,6 +10,9 @@ use Module::Runtime qw( use_module );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype refaddr looks_like_number);
 use Types::Standard qw( Bool Int Num Str );
+# Type::Tiny objects for the [IntOrStr] / [Time] array items (k167); see
+# the array branch of _schema_to_type_spec for why barewords do not do.
+use IO::K8s::Types qw( IntOrStr Time );
 # The empty list matters: IO::K8s::APIObject's import would make this
 # package a Moo class. Loaded for its subresources check (k158).
 use IO::K8s::APIObject ();
@@ -1348,7 +1351,20 @@ sub _schema_to_type_spec {
         # what an array of schema-true JSON booleans needs (k57). Number
         # items get [Num], the array form of the scalar number case (k68):
         # they used to fall through to [ Str ] below, and a [Str] element
-        # goes out as a JSON string since k145 (k155).
+        # goes out as a JSON string since k145 (k155). int-or-string and
+        # date-time items are the same gap for the scalar IntOrStr / Time
+        # cases above (k167), read off the items exactly as those read the
+        # property: the extension first, a format only with `type: string`.
+        # [IntOrStr] keeps an element 8080 a number on the wire; [Time]
+        # validates each element as RFC 3339 -- the DSL's only [Time], the
+        # same constraint a hand-written or emitted [Time] field carries.
+        return [ IntOrStr ]
+            if eval { IO::K8s::Resource::_normalize_bool($items->{'x-kubernetes-int-or-string'}) };
+        if (($items->{type} // '') eq 'string') {
+            my $format = $items->{format} // '';
+            return [ IntOrStr ] if $format eq 'int-or-string';
+            return [ Time ]     if $format eq 'date-time';
+        }
         my $item_type = $items->{type} // 'string';
         return [ Int ]  if $item_type eq 'integer';
         return [ Num ]  if $item_type eq 'number';
@@ -1561,7 +1577,12 @@ sub _field_options {
     # against the schema instead (Important 3 of the k93 review; _k8s's own
     # default check now skips those fields too).
     if (exists $opts{default} && $kind) {
-        my $base = IO::K8s::Resource::_scalar_base_for($kind);
+        # An array's element type is the Type::Tiny object in the spec: for
+        # [Time] that is the RFC 3339 constraint _k8s checks the default
+        # against, not the Str a scalar 'Time' bareword gets (k167).
+        my $base = ref $type_spec eq 'ARRAY' && blessed($type_spec->[0])
+            ? $type_spec->[0]
+            : IO::K8s::Resource::_scalar_base_for($kind);
         my %check_opts = map { $_ => $opts{$_} } grep { exists $opts{$_} } qw(enum minimum maximum pattern);
         my $constrained = IO::K8s::Resource::_constrain($base, $kind, \%check_opts, 'AutoGen default check');
         my $default_ok = ref $type_spec eq 'ARRAY'
@@ -1723,7 +1744,15 @@ own enum or range.
 OpenAPI C<type: number> becomes C<Num>, for a scalar property and for an
 array's C<items> alike (k68, k155), so those values stay JSON numbers on the
 wire rather than turning into strings; C<type: integer> likewise becomes
-C<Int> and C<[Int]>.
+C<Int> and C<[Int]>. C<x-kubernetes-int-or-string: true> (or C<type:
+string> with C<format: int-or-string>) becomes C<IntOrStr> and, on
+C<items>, C<[IntOrStr]>, so an element C<8080> stays a JSON number and
+C<'25%'> a string; C<type: string> with C<format: date-time> becomes
+C<Time> and C<[Time]> (k167). An array element of C<[Time]> is checked as
+an RFC 3339 timestamp, as on a hand-written C<[Time]> field; the scalar
+C<Time> of a generated class accepts any string. A map whose
+C<additionalProperties> is one of these scalar schemas stays the opaque
+hash, which writes its values back unchanged.
 
 An inline C<type: object> schema with its own non-empty C<properties> also
 becomes a typed class now (D10, k94), named after its place in the parent --
