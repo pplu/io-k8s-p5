@@ -9,7 +9,7 @@ use Digest::SHA qw( sha1_hex );
 use Module::Runtime qw( use_module );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype refaddr looks_like_number);
-use Types::Standard qw( Bool Int Str );
+use Types::Standard qw( Bool Int Num Str );
 
 # Cache of generated classes -- only classes whose generation run completed
 # (see "Generation runs" below). generated_classes() lists exactly these.
@@ -1326,9 +1326,13 @@ sub _schema_to_type_spec {
         # 'Str' and 'Int', so ['Bool'] would ask for an array of
         # IO::K8s::Api::Bool objects. [Bool] is the form that reaches the
         # is_array_of_bool branch and its per-element normalization, which is
-        # what an array of schema-true JSON booleans needs (k57).
+        # what an array of schema-true JSON booleans needs (k57). Number
+        # items get [Num], the array form of the scalar number case (k68):
+        # they used to fall through to [ Str ] below, and a [Str] element
+        # goes out as a JSON string since k145 (k155).
         my $item_type = $items->{type} // 'string';
         return [ Int ]  if $item_type eq 'integer';
+        return [ Num ]  if $item_type eq 'number';
         return [ Bool ] if $item_type eq 'boolean';
         # items: object / array with no further structure -> an array of
         # opaque hashes / opaque arrays. Before k66 both fell through to
@@ -1691,6 +1695,11 @@ C<pattern> that does not compile as a Perl regex; a C<minimum>/C<maximum>
 where either bound is not a number or C<minimum> exceeds C<maximum>; and a
 C<default> the field cannot hold -- the wrong type, or a value outside its
 own enum or range.
+
+OpenAPI C<type: number> becomes C<Num>, for a scalar property and for an
+array's C<items> alike (k68, k155), so those values stay JSON numbers on the
+wire rather than turning into strings; C<type: integer> likewise becomes
+C<Int> and C<[Int]>.
 
 An inline C<type: object> schema with its own non-empty C<properties> also
 becomes a typed class now (D10, k94), named after its place in the parent --

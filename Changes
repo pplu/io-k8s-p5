@@ -19,7 +19,9 @@ Revision history for IO-K8s
 
   - Serialize numeric Perl values in Str fields and [Str] elements as JSON
     strings: EnvVar value => 8080 now emits "8080" instead of a bare number
-    the API server rejects. Opaque { Str => 1 } maps are unchanged.
+    the API server rejects. Opaque { Str => 1 } maps are unchanged. AutoGen
+    types an array of type: number as [Num], whose elements always go out
+    as JSON numbers.
 
   - new_object, inflate, struct_to_object, json_to_object and FROM_HASH
     refuse a non-hash value (array, string, code or scalar reference) at an

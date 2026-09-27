@@ -278,11 +278,14 @@ objects recursively via their own C<TO_JSON>, hashes and arrays of objects
 in their canonical shape. A C<Str> field and each element of a C<[Str]>
 array are always emitted as a JSON string, even when the Perl value itself
 is numeric (k145): C<< EnvVar->new(value => 8080) >> serializes C<value> as
-C<"8080">, not a bare C<8080>. The opaque C<< { Str => 1 } >> hash form
-(labels, annotations, C<fieldsV1>, ...) is exempt from that coercion -- its
-values are copied through unchanged, keeping whatever JSON type they
-already had. For classes that compose L<IO::K8s::Role::APIObject>, the
-C<apiVersion>, C<kind> and C<metadata> fields are prepended.
+C<"8080">, not a bare C<8080>. The other way round, a C<Num> field and
+each element of a C<[Num]> array are always emitted as a JSON number, so a
+numeric string such as C<'0.25'> goes out unquoted. The opaque
+C<< { Str => 1 } >> hash form (labels, annotations, C<fieldsV1>, ...) is
+exempt from that coercion -- its values are copied through unchanged,
+keeping whatever JSON type they already had. For classes that compose
+L<IO::K8s::Role::APIObject>, the C<apiVersion>, C<kind> and C<metadata>
+fields are prepended.
 
 This is the entry point L</to_json> builds on, and the inverse of
 L</FROM_HASH>.
@@ -355,6 +358,13 @@ sub TO_JSON {
             } keys %$value };
         } elsif ($attr_info->{is_array_of_int}) {
             $data{$key} = [ map { int($_) } @$value ];
+        } elsif ($attr_info->{is_array_of_num}) {
+            # Each element a JSON number, as for is_num above (k68), so a
+            # numeric string passed to ->new does not go out quoted. Until
+            # AutoGen typed `items: {type: number}` as [Num] (k155) no class
+            # carried this form and the generic ARRAY copy below served it.
+            # An undef or ref element is left alone, as in is_array_of_str.
+            $data{$key} = [ map { defined($_) && !ref($_) ? $_ + 0 : $_ } @$value ];
         } elsif ($attr_info->{is_array_of_str}) {
             # Each element a JSON string, as for is_str above (k145), in a
             # new outer array -- the same one-level copy the generic ARRAY
