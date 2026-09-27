@@ -1294,14 +1294,22 @@ sub object_to_json {
 }
 
 sub load {
-    my ($self, $file) = @_;
+    my ($self, $file, %opts) = @_;
+
+    # vars (k160) is the one option; anything else is a typo that would
+    # otherwise leave every var() in the manifest on its default.
+    my $vars = delete $opts{vars};
+    croak 'load: unknown option '.join(', ', map { "'".$_."'" } sort keys %opts)
+        if %opts;
+    croak 'load: vars must be a hash reference'
+        if defined $vars && ref $vars ne 'HASH';
 
     require IO::K8s::Manifest;
 
     # Set k8s instance for DSL functions
     local $IO::K8s::Manifest::_k8s_instance = $self;
 
-    return IO::K8s::Manifest->_load_file($file, $self);
+    return IO::K8s::Manifest->_load_file($file, $self, $vars);
 }
 
 sub load_yaml {
@@ -1801,6 +1809,7 @@ Returns C<$self> for chaining.
 =head2 load
 
     my $resources = $k8s->load('myapp.pk8s');
+    my $resources = $k8s->load('myapp.pk8s', vars => { name => 'web', replicas => 3 });
 
 Load a C<.pk8s> manifest file and return an ArrayRef of IO::K8s objects.
 
@@ -1840,6 +1849,37 @@ resources:
 
 Inside C<{}> blocks, C<name>, C<namespace>, C<labels>, and C<annotations>
 are automatically moved to C<metadata>.
+
+Values can be handed to a manifest with the C<vars> option. Inside the file,
+C<var($name)> returns the value passed under that name and
+C<var($name, $default)> falls back to C<$default> when none was passed; a
+name with neither dies, naming the file and the name. A value passed as
+C<undef> counts as passed. References pass through as they are. C<var> is
+lower case, so it never collides with a Kind function:
+
+    # myapp.pk8s
+    Deployment {
+        name      => var('name'),
+        namespace => var('namespace', 'default'),
+        spec      => {
+            replicas => var('replicas', 1),
+            ...
+        },
+    };
+
+    my $resources = $k8s->load('myapp.pk8s', vars => { name => 'web', replicas => 3 });
+
+C<vars> must be a hash reference, and it is the only option -- any other
+key dies rather than leaving every C<var> on its default. Without C<vars>,
+C<var($name, $default)> still works and C<var($name)> dies.
+
+The file is read as UTF-8, so a non-ASCII string literal in it gives the
+same characters as the same value in a YAML file read by L</load_yaml>; a
+manifest that says C<use utf8;> itself keeps working. The file is evaluated
+in a package of its own that is removed again once C<load> returns, also
+when loading fails, so reloading manifests in a long-running process does
+not grow it. Subs and closures the manifest hands out in its data keep
+working after that.
 
 With CRDs (requires openapi_spec):
 
