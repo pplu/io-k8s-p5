@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-27T22:04:48Z
+claimed_by: followups-4
+class: standard
+completed: 2026-09-27T22:04:42Z
+created: 2026-09-27T20:36:57Z
+id: 174
+priority: low
+started: 2026-09-27T20:55:16Z
+status: done
+tags:
+- dsl
+- k158-followup
+title: use IO::K8s::APIObject ignoriert unbekannte Importparameter
+updated: 2026-09-27T22:04:48Z
+---
+
+Gefunden bei k158 (2026-09-27). Ein Tippfehler wie subresource => ... oder resource_plurals => ... beim use IO::K8s::APIObject geht still durch. Unbekannte Importparameter mit Klasse und Parameter croaken lassen.
+
+2026-09-27 22:04 Commit e05a4ea6
