@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-09-27T18:52:29Z
+claimed_by: followups
+class: standard
+completed: 2026-09-27T18:52:29Z
+created: 2026-09-27T05:41:39Z
+id: 160
+priority: medium
+started: 2026-09-27T18:06:28Z
+status: done
+tags:
+- pk8s
+- load
+- memory
+title: 'load(.pk8s): jede Ladung hinterlässt ein Package (Speicherwachstum)'
+updated: 2026-09-27T18:52:29Z
+---
+
+IO::K8s->load($file) wertet die .pk8s-Datei in einem frischen Package aus, das danach bestehen bleibt: gemessen ca. 850 KB pro Aufruf. Ein langlaufender Prozess, der Manifeste periodisch neu lädt (Kubernetes::Comb-Manager ruft deploy/status in einer Schleife), wächst unbegrenzt. Kubernetes::Comb::Role::Static cached deshalb pro Instanz. Vorschlag: Package nach dem Laden entfernen (Symbol::delete_package) oder ein festes, wiederverwendetes Package pro Datei. Nebenbei als Feature-Wunsch: Werte (z. B. config, name, namespace) an eine .pk8s-Datei übergeben können.
+
+Umgesetzt auf fix/followups, uncommittet (io-k8s-worker). prove -lr t/ 118 Dateien 9041 Tests PASS, t/25 und t/26 PASS, dzil build sauber.
+
+2026-09-27 18:52 Commit 54cefb25 (amended after initial commit f7714b9a to remove an inaccurate cpanfile claim from the message body; no file content changed)
