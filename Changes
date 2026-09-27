@@ -100,11 +100,12 @@ Revision history for IO-K8s
     CRD file that exists but cannot be read is reported at the caller's
     line through add_crd and IO::K8s::CRD->load alike.
 
-  - Inflating an apiextensions JSON value (a CRD schema's default, example
-    or enum entry, a K3s HelmChart's values) copies a hash or array one
-    level instead of keeping the caller's own, so editing the source
-    structure afterwards no longer changes the object -- the rule every
-    other array or hash field already follows.
+  - An apiextensions JSON value (a CRD schema's default, example or enum
+    entry, a K3s HelmChart's values) is copied one level on the way in and
+    out: inflating copies a hash or array instead of keeping the caller's
+    own, and TO_JSON returns a copy, so editing the source structure or the
+    serialized output no longer changes the object -- the rule every other
+    array or hash field already follows.
 
   - A field declared nullable => 1 keeps an explicit JSON null: new, its
     setter and every inflate path (inflate, new_object, struct_to_object,

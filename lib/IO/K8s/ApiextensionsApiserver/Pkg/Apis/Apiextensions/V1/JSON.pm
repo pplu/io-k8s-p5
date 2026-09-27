@@ -67,13 +67,21 @@ sub FROM_STRUCT {
 
 =method TO_JSON
 
-Returns the wrapped value unchanged.
+Returns the wrapped value, a hash or an array copied one level -- the same
+depth L</FROM_STRUCT> copies on the way in and L<IO::K8s::Role::Resource/TO_JSON>
+copies an untyped container on the way out (k54, k171). A key added to or
+removed from the returned hash, or an element pushed onto the returned
+array, does not reach the object; a container nested inside the value is
+still shared with it. A plain scalar, C<undef> or a JSON boolean is returned
+as it is.
 
 =cut
 
 sub TO_JSON {
     my ($self) = @_;
-    return $self->value;
+    # One level (k171), the output side of FROM_STRUCT's copy (k169);
+    # _copy_one_level is the role's, as in FROM_STRUCT above.
+    return _copy_one_level($self->value);
 }
 
 with 'IO::K8s::Role::Resource';
