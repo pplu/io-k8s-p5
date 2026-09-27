@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-27T22:05:30Z
+claimed_by: followups-4
+class: standard
+completed: 2026-09-27T22:05:25Z
+created: 2026-09-27T19:31:50Z
+id: 168
+priority: low
+started: 2026-09-27T20:55:34Z
+status: done
+tags:
+- docs
+- k151-followup
+title: 'Doku: C<> mit > in der k144-Kollisionsliste von Resource.pm bricht das Rendering'
+updated: 2026-09-27T22:05:30Z
+---
+
+Gefunden bei k151 (2026-09-27). Die Items der Kollisionsliste in lib/IO/K8s/Resource.pm nutzen C<... '<name>' of <class> ...> mit einfachen Klammern; das > beendet C<> vorzeitig. Auf C<< >> umstellen (die neuen k151-Items nutzen das schon).
+
+2026-09-27 22:05 Commit 1fc624f0
