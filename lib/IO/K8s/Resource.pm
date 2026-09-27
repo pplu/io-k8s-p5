@@ -440,6 +440,11 @@ sub _declare_field {
             . "both map to the Perl attribute '$attr_name'"
             if $other_key ne $json_key;
     }
+    # The same JSON key declared a second time in this very class (k151).
+    # Moo keeps the first attribute, so a second declaration is only ever
+    # compared with the first one, below, once its type is interpreted --
+    # identical is a no-op, anything else is refused.
+    my $redeclared = $registered && $declarer eq $caller;
     # A method that is not a Moo attribute -- an IO::K8s::Role::APIObject
     # helper such as get_condition, a Moo keyword -- used to make the old
     # `return if $caller->can($attr_name)` register the field and skip
@@ -464,9 +469,11 @@ sub _declare_field {
     # cases where has() is not called at all:
     #   * adopt -- the explicit path above; the attribute must exist and
     #     take the JSON key as its constructor argument;
-    #   * a field this class already declared through k8s, declared again
-    #     with the same JSON key -- the registry takes the new entry and Moo
-    #     keeps the first spec, unchanged from before k144;
+    #   * a field this class already declared (or adopted), declared again
+    #     with the same JSON key -- compared with the first declaration
+    #     further down, and a no-op when identical (k151). It used to
+    #     overwrite the registry entry while Moo kept the first spec, so
+    #     the two described different fields;
     #   * anything else the class defines itself (a role's attribute, a
     #     plain has) -- refused, since the field would be registered over
     #     an attribute that does not follow its declaration.
@@ -483,7 +490,7 @@ sub _declare_field {
     } elsif ($local) {
         croak "k8s: $where would take over the attribute '$attr_name' that "
             . "$caller defines outside the k8s DSL"
-            unless $registered && $declarer eq $caller;
+            unless $redeclared;
         $install = 0;
     }
 
@@ -648,7 +655,11 @@ sub _declare_field {
         } else {
             # Inline struct: { field => TypeSpec, ... }
             my $inner_class = $caller . '::_' . ucfirst($attr_name);
-            _generate_inline_struct($inner_class, $type_spec);
+            if ($redeclared) {
+                _redeclare_inline_struct($caller, $where, $registered, $inner_class, $type_spec);
+            } else {
+                _generate_inline_struct($inner_class, $type_spec);
+            }
             $info{is_object} = 1;
             $info{is_inline_struct} = 1;
             $info{class} = $inner_class;
@@ -690,8 +701,20 @@ sub _declare_field {
     # Store json_key when it differs from the Perl attribute name
     $info{json_key} = $json_key if $attr_name ne $json_key;
 
-    # Adopted, or redeclared in the class that declared it: see the
-    # preflight above for why there is nothing to install.
+    # Declared in this very class before (k151): nothing is installed or
+    # registered a second time. The registry entry covers type, nested
+    # class, options, recorded required-ness and JSON key; the Moo spec
+    # adds whether required is enforced (1 and 'schema' record the same).
+    # An identical declaration changes nothing, not even the attribute list.
+    if ($redeclared) {
+        _croak_redeclared($where, $caller)
+            unless _same_value(\%info, $registered)
+            && $required == ($spec && $spec->{required} ? 1 : 0);
+        return;
+    }
+
+    # Adopted (a redeclaration has returned above): see the preflight above
+    # for why there is nothing to install.
     return _register_field($caller, $attr_name, \%info) unless $install;
 
     # Call Moo's has — use init_arg to map JSON key to Perl-safe attribute name
@@ -843,6 +866,58 @@ sub _declare_field {
         ($attr_name ne $json_key ? (init_arg => $json_key) : ()),
     );
     return _register_field($caller, $attr_name, \%info);
+}
+
+# An inline struct declared again in the class that declared it (k151). Its
+# inner class exists already, and building it a second time would add a new
+# field to it, keep a dropped one and set the class up twice -- so it is
+# compared instead: the same field names, and every field again an
+# identical declaration in the inner class, which the same rule makes a
+# no-op or refuses. Refused before any field is looked at when the first
+# declaration was not this inline struct or the names differ, so a refusal
+# leaves the inner class as it was.
+sub _redeclare_inline_struct {
+    my ($caller, $where, $registered, $inner_class, $fields) = @_;
+    my $had = $_attr_registry{$inner_class} // {};
+    my @had = sort map { $had->{$_}{json_key} // $_ } keys %$had;
+    _croak_redeclared($where, $caller)
+        unless $registered->{is_inline_struct}
+        && $registered->{class} eq $inner_class
+        && join("\0", @had) eq join("\0", sort keys %$fields);
+    __PACKAGE__->_k8s($inner_class, $_, $fields->{$_}) for sort keys %$fields;
+    return;
+}
+
+sub _croak_redeclared {
+    my ($where, $caller) = @_;
+    croak "k8s: $where is already declared in $caller with a different type, "
+        . 'options or required-ness; declare each field once per class';
+}
+
+# Deep equality of two registry entries (k151): arrays and hashes element
+# by element, everything else by what it stringifies to within the same
+# ref type -- a plain scalar as itself, a Regexp as its pattern with its
+# flags, a JSON boolean default as 0 or 1.
+sub _same_value {
+    my ($x, $y) = @_;
+    return !defined $y unless defined $x;
+    return 0 unless defined $y && ref $x eq ref $y;
+    my $type = reftype($x) // '';
+    if ($type eq 'ARRAY') {
+        return 0 unless @$x == @$y;
+        for my $i (0 .. $#$x) {
+            return 0 unless _same_value($x->[$i], $y->[$i]);
+        }
+        return 1;
+    }
+    if ($type eq 'HASH') {
+        return 0 unless keys %$x == keys %$y;
+        for my $key (keys %$x) {
+            return 0 unless exists $y->{$key} && _same_value($x->{$key}, $y->{$key});
+        }
+        return 1;
+    }
+    return "$x" eq "$y" ? 1 : 0;
 }
 
 # Record a declared field, only once its attribute is in place (k144): a
@@ -1057,6 +1132,18 @@ itself outside the C<k8s> DSL (a plain C<has>): C<k8s: field '<name>' of
 <class> would take over the attribute '<attr>' that <class> defines
 outside the k8s DSL>.
 
+=item * A field the same class has already declared under the same JSON
+key, declared again with a different type, nested class, option,
+C<required> (including C<1> against C<'schema'>) or inline-struct field
+set (k151): C<< k8s: field '<name>' of <class> is already declared in
+<class> with a different type, options or required-ness; declare each
+field once per class >>. Moo keeps the first attribute of a class, so a
+second, different declaration could never take effect; it used to
+overwrite the C<_k8s_attr_info> entry anyway, leaving serialization and
+construction to follow two different declarations of one field. An
+inline struct is compared field by field, and a changed field inside it is
+reported against the generated inner class (C<< <class>::_<Name> >>).
+
 =back
 
 A rejected declaration leaves the class exactly as it was -- nothing is
@@ -1065,12 +1152,11 @@ list. A subclass that redeclares an inherited C<k8s> field under the same
 JSON key replaces it outright, in the subclass only: nearest wins, so the
 new declaration's type, coercion, C<required> and C<init_arg> take over
 there, while the ancestor's own declaration is left completely untouched.
-Redeclaring the same field a second time within the very same class is
-not rejected either, but has no such effect: only the C<_k8s_attr_info>
-registry entry takes the new declaration, while the underlying Moo
-attribute -- and with it the actual type check, coercion and C<required>
-enforcement -- keeps whatever the first declaration in that class set up.
-Declare each field once per class.
+Within the very same class, an identical second declaration of a field
+is tolerated and changes nothing -- not the registry, not the attribute
+list; that includes declaring C<metadata> as C<Meta::V1::ObjectMeta> in a
+class whose C<use IO::K8s::APIObject> already adopted it. Declare each
+field once per class.
 
 The registry (C<_k8s_attr_info>) keeps C<required> as a plain C<1> (absent
 when not required, matching the pre-D3 shape) and every other given option,

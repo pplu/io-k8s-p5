@@ -4,10 +4,12 @@ Revision history for IO-K8s
 
   - A colliding k8s declaration now fails at class load instead of silently
     corrupting the class: two JSON keys that sanitize to one Perl accessor
-    (x-value and x_value, also across inheritance), or a field named like a
-    role method that is not an attribute. A subclass redeclaring an
-    inherited field under the same JSON key now really replaces its type,
-    coercion, required flag and init_arg, not only its registry entry.
+    (x-value and x_value, also across inheritance), a field named like a
+    role method that is not an attribute, or a field its own class already
+    declared with a different type, options or required-ness (an identical
+    repeat is a no-op). A subclass redeclaring an inherited field under the
+    same JSON key now really replaces its type, coercion, required flag and
+    init_arg, not only its registry entry.
 
   - ComponentStatus keeps its top-level conditions: they were dropped on
     inflate and new and serialized as an empty list. The condition helpers
