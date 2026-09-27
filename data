@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-27T22:04:03Z
+claimed_by: followups-4
+class: standard
+completed: 2026-09-27T22:03:57Z
+created: 2026-09-27T19:31:45Z
+id: 167
+priority: low
+started: 2026-09-27T20:54:57Z
+status: done
+tags:
+- autogen
+- serialization
+- k155-followup
+title: 'AutoGen: int-or-string- und date-time-Items werden [Str]'
+updated: 2026-09-27T22:04:03Z
+---
+
+Gefunden bei k155 (2026-09-27). Array-items mit x-kubernetes-int-or-string: true sollten [IntOrStr], mit format: date-time [Time] ergeben; heute [Str], seit k145 geht ein Element 5 als "5" raus. TO_JSON hat außerdem keinen Zweig für is_array_of_int_or_string, _quantity und _time. Kein gebündelter Provider betroffen. Wire-JSON-Regression verpflichtend.
+
+2026-09-27 22:04 Commit a580f258
