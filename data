@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-27T18:51:48Z
+claimed_by: followups
+class: standard
+completed: 2026-09-27T18:51:48Z
+created: 2026-09-26T15:58:25Z
+id: 153
+priority: low
+started: 2026-09-27T18:06:10Z
+status: done
+tags:
+- inflation
+- k146-followup
+title: Geblesste JSON-Booleans an Objektpositionen werden still zu leerem Objekt
+updated: 2026-09-27T18:51:48Z
+---
+
+Folge aus k146 (2026-09-26). Ein geblesster Wert ohne TO_JSON an einer Objektposition, z. B. metadata: true aus dekodiertem JSON (JSON::PP::Boolean), fällt im _inflate_struct-Blessed-Zweig weiter auf {} zurück. k146 hat geblesste Werte bewusst unverändert gelassen. Richtung: geblesste Nicht-IO::K8s-Werte ohne TO_JSON an Objektpositionen wie Nicht-Hash-Werte abweisen; Verhalten für geblesste IO::K8s-Objekte fremder Klasse gesondert entscheiden.
+
+Umgesetzt auf fix/followups, uncommittet (io-k8s-worker). prove -lr t/ 118 Dateien 9041 Tests PASS, t/25 und t/26 PASS, dzil build sauber.
+
+2026-09-27 18:51 Commit aac4a84f
