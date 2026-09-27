@@ -23,8 +23,7 @@ Revision history for IO-K8s
     types an array of type: number as [Num], whose elements always go out
     as JSON numbers, and arrays of int-or-string and date-time items as
     [IntOrStr] and [Time] instead of [Str], so to_crd and the emitter keep
-    them. [IntOrStr] elements serialize like an IntOrStr field, [Quantity]
-    and [Time] elements as JSON strings.
+    them. [IntOrStr] elements serialize like an IntOrStr field.
 
   - new_object, inflate, struct_to_object, json_to_object and FROM_HASH
     refuse a non-hash value (array, string, code or scalar reference) at an
@@ -155,6 +154,11 @@ Revision history for IO-K8s
     already did for a property: [Quantity], { Quantity => 1 } and so on.
     It used to generate an empty class that real values failed to inflate
     into, or refuse a spec that did not ship the definition.
+
+  - Quantity and Time values always serialize as JSON strings, the form
+    Kubernetes writes them in, in scalar fields, maps and arrays alike:
+    limits => { cpu => 1 } now emits "1" instead of a bare 1. The API
+    server accepts both, but the output for numeric Perl values changes.
 
 1.108     2026-09-22 00:53:53Z
 

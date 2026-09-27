@@ -185,10 +185,11 @@ subtest 'GUARD (literal capture): Quantity/Time fields are unaffected by this fi
     my $target_str = IO::K8s::Api::Autoscaling::V2::MetricTarget->new(type => 'Value', value => '100m');
     like($target_str->to_json, qr/"value":"100m"/, 'Quantity given as a string stays a quoted string');
 
+    # k145 left is_quantity alone and this guard pinned the bare number it
+    # still wrote then; k180 made every Quantity a JSON string (t/145).
     my $target_num = IO::K8s::Api::Autoscaling::V2::MetricTarget->new(type => 'Value', value => 100);
-    like($target_num->to_json, qr/"value":100(?:,|\})/,
-        'Quantity given as a bare Perl number currently serializes unquoted -- '
-        . 'k145 does not touch is_quantity, so this stays exactly as it is today');
+    like($target_num->to_json, qr/"value":"100"(?:,|\})/,
+        'Quantity given as a bare Perl number serializes as a quoted string since k180');
 
     my $meta = IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta->new(
         creationTimestamp => '2024-01-01T00:00:00Z',

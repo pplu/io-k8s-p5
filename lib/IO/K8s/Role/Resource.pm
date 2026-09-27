@@ -284,9 +284,12 @@ each element of a C<[Num]> array are always emitted as a JSON number, so a
 numeric string such as C<'0.25'> goes out unquoted. Each element of an
 C<[IntOrStr]> array follows the rule of an C<IntOrStr> field: an all-digit
 value goes out as a JSON number, anything else (C<'25%'>, C<'http'>) as the
-string it is. Each element of a C<[Quantity]> or C<[Time]> array goes out as
-a JSON string, the form Kubernetes writes both in -- a C<1> in
-C<validValues> is emitted as C<"1"> (k167). The opaque
+string it is. A C<Quantity> or C<Time> value always goes out as a JSON
+string, the form Kubernetes writes both in -- a scalar field, each value of
+a C<< { Quantity => 1 } >> or C<< { Time => 1 } >> map and each element of a
+C<[Quantity]> or C<[Time]> array alike: C<< limits => { cpu => 1 } >> is
+emitted as C<{"cpu":"1"}> (k167, k180). The object keeps the value it was
+given. The opaque
 C<< { Str => 1 } >> hash form (labels, annotations, C<fieldsV1>, ...) is
 exempt from that coercion -- its values are copied through unchanged,
 keeping whatever JSON type they already had. For classes that compose
@@ -357,6 +360,12 @@ sub TO_JSON {
             # Str constraint; the guard only keeps one that got into the
             # slot some other way on the old pass-through.
             $data{$key} = ref $value ? $value : "$value";
+        } elsif ($attr_info->{is_quantity} || $attr_info->{is_time}) {
+            # A JSON string, the form Kubernetes writes both in (k180): a
+            # numeric Perl value -- sizeLimit => 1 -- used to go out as a
+            # JSON number, while the same value in a [Quantity] array went
+            # out as "1" (k167). The API server accepts either.
+            $data{$key} = ref $value ? $value : "$value";
         } elsif ($attr_info->{is_object} && blessed($value) && $value->can('TO_JSON')) {
             $data{$key} = $value->TO_JSON;
         } elsif ($attr_info->{is_array_of_objects}) {
@@ -375,6 +384,16 @@ sub TO_JSON {
             $data{$key} = { map {
                 my $v = $value->{$_};
                 $_ => (($v =~ /\A-?\d+\z/) ? int($v) : $v)
+            } keys %$value };
+        } elsif ($attr_info->{is_hash_of_quantity} || $attr_info->{is_hash_of_time}) {
+            # Each value a JSON string, as for the scalar field (k180) --
+            # limits => { cpu => 1 } goes out as {"cpu":"1"} -- in a new
+            # hash (k54). A value the constructor never saw (written through
+            # the accessor's hashref) may be undef or a ref; it goes out as
+            # it is, the way the array branches below leave such elements.
+            $data{$key} = { map {
+                my $v = $value->{$_};
+                $_ => (defined($v) && !ref($v) ? "$v" : $v)
             } keys %$value };
         } elsif ($attr_info->{is_array_of_int}) {
             $data{$key} = [ map { int($_) } @$value ];
