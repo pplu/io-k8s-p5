@@ -44,6 +44,11 @@ Revision history for IO-K8s
 
   - Declare Sub::Util as a direct runtime prerequisite.
 
+  - A blessed value at an object position has to come out of its TO_JSON
+    as a hash: the JSON boolean that "metadata": true decodes to used to
+    build an empty ObjectMeta and now dies naming its class. An IO::K8s
+    object of another class is still converted through its TO_JSON.
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

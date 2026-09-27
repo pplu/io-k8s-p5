@@ -947,18 +947,50 @@ sub _struct_to_object_expanded {
     # Pod with `metadata: {}` while Pod->new(metadata => []) failed its type
     # check (k146). Refused here, after FROM_STRUCT, because the union
     # classes above legitimately take arrays and booleans. Left alone on
-    # purpose: undef (no value, handled like an absent field) and any
-    # blessed object of another class, which _inflate_struct still reads
-    # through its TO_JSON. Independent of strict, which is about undeclared
-    # keys, not shape.
-    if (ref $params ne 'HASH' && defined $params && !Scalar::Util::blessed($params)) {
-        croak 'Cannot inflate '.$class.': expected a hash (a JSON object), got '
-            .(ref $params ? 'a reference of type '.ref($params) : 'a plain scalar')
-            .(defined $where ? ' while inflating '.$where : '');
+    # purpose: undef (no value, handled like an absent field). Independent
+    # of strict, which is about undeclared keys, not shape.
+    #
+    # A blessed value of another class is read through its TO_JSON and has
+    # to come out as a hash like anything else. Without a TO_JSON it is
+    # refused: a JSON boolean at `metadata` -- what "metadata": true
+    # decodes to -- used to fall through to the same `return {}` and build
+    # an empty ObjectMeta (k153). An IO::K8s object of a FOREIGN class stays
+    # accepted on purpose and is converted: AutoGen/CRD classes and core
+    # classes of the same shape get mixed in practice -- a core
+    # LabelSelector handed to a generated selector field -- and its
+    # undeclared fields are kept per D1 (dies under strict), exactly as if
+    # the caller had passed its TO_JSON hash.
+    if (Scalar::Util::blessed($params)) {
+        $self->_refuse_object_shape($class, $self->_describe_shape($params), $where)
+            unless $params->can('TO_JSON');
+        my $data = $params->TO_JSON;
+        $self->_refuse_object_shape($class, $self->_describe_shape($params)
+            .' whose TO_JSON returned '.$self->_describe_shape($data), $where)
+            unless ref $data eq 'HASH';
+        $params = $data;
     }
+    $self->_refuse_object_shape($class, $self->_describe_shape($params), $where)
+        if defined $params && ref $params ne 'HASH';
 
     my $inflated = $self->_inflate_struct($class, $params);
     return $class->new(%$inflated);
+}
+
+# How a refused value is named in an inflation error (k146, k153, k154).
+sub _describe_shape {
+    my ($self, $value) = @_;
+    return !defined $value               ? 'undef'
+         : Scalar::Util::blessed($value) ? 'an object of class '.ref($value)
+         : ref $value                    ? 'a reference of type '.ref($value)
+         :                                 'a plain scalar';
+}
+
+# The one wording for a value that cannot become an object of $class
+# (k146, k153). $where names the parent class and field of a nested value.
+sub _refuse_object_shape {
+    my ($self, $class, $got, $where) = @_;
+    croak 'Cannot inflate '.$class.': expected a hash (a JSON object), got '.$got
+        .(defined $where ? ' while inflating '.$where : '');
 }
 
 sub inflate {
@@ -1108,14 +1140,11 @@ sub _die_resolution_error {
 sub _inflate_struct {
     my ($self, $class, $params) = @_;
 
-    # Blessed objects should be caught by struct_to_object before reaching
-    # here.  If one does slip through (defensive), extract its data rather
-    # than silently returning {} which would create an empty object.
-    if (Scalar::Util::blessed($params)) {
-        return $params->TO_JSON if $params->can('TO_JSON');
-        return {};
-    }
-
+    # Both callers hand over a plain hash or undef: inflate() only ever has
+    # a decoded JSON object here, and _struct_to_object_expanded has already
+    # turned a blessed value into its TO_JSON hash or refused it (k153) and
+    # refused every other shape (k146). undef means "no value" and builds
+    # an object with nothing set.
     return {} unless ref $params eq 'HASH';
 
     # Opaque fields that should be passed through as-is (complex JSON structures)
@@ -1856,6 +1885,20 @@ received, and, for a nested field, the field itself (k146):
 
     Cannot inflate IO::K8s::Api::Core::V1::Pod: expected a hash (a JSON object), got a reference of type ARRAY
     Cannot inflate IO::K8s::Api::Core::V1::PodSpec: expected a hash (a JSON object), got a plain scalar while inflating IO::K8s::Api::Core::V1::Pod field spec
+
+A blessed value of another class is read through its C<TO_JSON>, which
+has to return a hashref; a blessed value without C<TO_JSON> -- such as the
+JSON boolean C<"metadata": true> decodes to -- or with a C<TO_JSON> that
+returns anything else dies the same way, naming the value's class (k153):
+
+    Cannot inflate IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta: expected a hash (a JSON object), got an object of class JSON::PP::Boolean while inflating IO::K8s::Api::Core::V1::Pod field metadata
+
+An IO::K8s object of a I<different> class at an object position is
+therefore converted, not refused: a core
+L<IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::LabelSelector> handed to a
+CRD field typed with a generated selector class of the same shape keeps
+working. Fields the target class does not declare are kept (and die under
+C<strict>) exactly as if its C<TO_JSON> hash had been passed.
 
 This applies uniformly across C<new_object>, C<inflate>, C<json_to_object>,
 C<struct_to_object> and L<IO::K8s::Role::Resource/FROM_HASH> on every
