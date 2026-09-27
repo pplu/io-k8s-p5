@@ -119,7 +119,10 @@ Revision history for IO-K8s
     that to_crd and IO::K8s::CRD->new write into spec.versions[]; it is
     checked at use time. add_crd carries a CRD version's subresources into
     the generated class and IO::K8s::CRD::Emitter renders the parameter,
-    so a CRD read in and written out again keeps them.
+    so a CRD read in and written out again keeps them. Any other import
+    parameter -- a typo such as subresource or resource_plurals -- dies at
+    the use line, naming the class and the known ones, instead of being
+    ignored.
 
   - SpecBuilder paths walk through apiextensions union fields into the
     value they hold: spec_set('values.replicaCount', 3) on a K3s HelmChart

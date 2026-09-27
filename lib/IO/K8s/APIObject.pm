@@ -62,6 +62,13 @@ For Custom Resource Definitions (CRDs), pass C<api_version> and
 optionally C<resource_plural> as import parameters. These are installed
 as class methods before the role is composed, avoiding redefinition warnings.
 
+C<api_version>, C<resource_plural> and C<subresources> (below) are the only
+import parameters. Any other name -- a typo such as C<subresource> or
+C<resource_plurals> -- croaks at the C<use> line before anything is set up
+(k174), naming the class, the parameter and the known ones:
+
+    My::StaticWebSite: unknown import parameter 'subresource' for IO::K8s::APIObject (known: api_version, resource_plural, subresources)
+
 A CRD class may also declare the subresources its CRD version serves
 (k158), which L<IO::K8s::Role::APIObject/to_crd> writes into
 C<spec.versions[].subresources>:
@@ -111,10 +118,24 @@ and C<IO::K8s::APIObject> for top-level resources (Pod, Deployment, Service, etc
 
 =cut
 
+# The import parameters a class may pass (see import below).
+my @KNOWN_PARAMS = qw( api_version resource_plural subresources );
+my %KNOWN_PARAM  = map { $_ => 1 } @KNOWN_PARAMS;
+
 sub import {
     my $class = shift;
     my %params = @_;
     my $caller = caller;
+
+    # A misspelt parameter (subresource, resource_plurals) was ignored and
+    # the class built as if it had never been written (k174). Checked
+    # before anything is set up, so a refused import leaves no half-built
+    # class behind; sort: several unknown keys name a deterministic one.
+    for my $param (sort keys %params) {
+        croak $caller.": unknown import parameter '".$param."' for ".__PACKAGE__
+            .' (known: '.join(', ', @KNOWN_PARAMS).')'
+            unless $KNOWN_PARAM{$param};
+    }
 
     # First, do everything IO::K8s::Resource does
     IO::K8s::Resource->import::into($caller);
