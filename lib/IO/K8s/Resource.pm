@@ -657,11 +657,15 @@ sub _declare_field {
         # attribute, which is exactly what to_crd's _schema_for_class does
         # (found via IO::K8s::Api::Resource::V1::ResourceSlice, whose
         # DeviceCapacity.validValues is [Quantity]; k96 task-2 review).
-        # Purely additive: TO_JSON/_inflate_struct have no branch keyed on
-        # any of these four new flags either, so they fall through to the
-        # same generic ArrayRef copy an unflagged entry already used --
-        # serialization and inflation are unchanged, only the registry gets
-        # more precise.
+        # Purely additive when introduced (k96 task-2): TO_JSON and
+        # _inflate_struct had no branch keyed on any of these four flags, so
+        # they fell through to the same generic ArrayRef copy an unflagged
+        # entry already used. _inflate_struct still does today -- inflation
+        # is unchanged. TO_JSON no longer does: it now reads is_array_of_num
+        # for JSON-number elements (k155), is_array_of_quantity and
+        # is_array_of_time to stringify elements (k180), and
+        # is_array_of_int_or_string for the per-element int-or-string rule
+        # (k167, k181).
         } elsif (_is_type_tiny($elem)) {
             my $kind = $elem->name;
             if ($kind eq 'Str') {

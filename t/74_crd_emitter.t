@@ -358,10 +358,13 @@ subtest 'a path-derived name past 200 chars still renders, with its own fallback
 # int_or_string (added for k96 task-2, read by IO::K8s::CRD's to_crd
 # _type_schema), but this emitter's own _type_source -- the reverse,
 # registry -> DSL-source direction -- still had no branch for any of the
-# four and croaked. Unreachable today via any bundled provider or AutoGen
-# schema path (AutoGen's array-item dispatch never produces one of these
-# four flags from a schema; see the comment above IO::K8s::CRD::_type_schema),
-# so reproduce with a hand-declared class exercising the DSL forms
+# four and croaked. Unreachable today via CRD::Emitter's own schema path
+# for three of the four: AutoGen's array-item dispatch now produces
+# is_array_of_num, is_array_of_int_or_string and is_array_of_time straight
+# from a schema (k155, k167, k181); is_array_of_quantity still is not,
+# since Quantity only round-trips through a $ref a structural CRD schema
+# cannot carry (k178; see the comment above IO::K8s::CRD::_type_schema).
+# Reproduce with a hand-declared class exercising all four DSL forms
 # directly, the same way t/63_k66_array_of_hash.t does for [ {} ] / [ [] ].
 {
     package Test::Karr112::Thing;

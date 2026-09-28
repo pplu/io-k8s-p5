@@ -1679,7 +1679,20 @@ and the caller is left to pluralize the kind name itself
 (C<StaticWebSite> -E<gt> C<staticwebsites>) -- that heuristic does not work
 for all names, which is exactly why declaring it is recommended.
 
+=item C<subresources> (optional)
+
+Declares which subresources (C<status>, C<scale>) the CRD version serves;
+L<IO::K8s::Role::APIObject/to_crd> writes the declaration into
+C<spec.versions[].subresources>. Becomes a fixed identity class method like
+C<api_version>. See L<IO::K8s::APIObject> for the accepted shape and its
+validation.
+
 =back
+
+An unknown import parameter, an odd number of import arguments, or an
+C<api_version>/C<resource_plural> given as C<undef> or an empty string all
+croak at the C<use> line, before anything is set up (k174, k182); see
+L<IO::K8s::APIObject> for the exact messages.
 
 =head2 Namespaced vs cluster-scoped
 

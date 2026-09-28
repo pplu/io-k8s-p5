@@ -302,9 +302,10 @@ C<[Quantity]> export only C<type: string> (or string array items), so the
 Quantity constraint cannot be reconstructed. During the reverse
 L<IO::K8s::AutoGen> inference, typed maps whose values are C<Int>, C<Num>,
 C<Bool>, C<Quantity>, C<Time> or C<IntOrStr> re-import as the opaque
-C<< { Str => 1 } >> form. Scalar arrays C<[Num]>, C<[Quantity]>, C<[Time]>
-and C<[IntOrStr]> re-import as C<[Str]>; C<[Str]>, C<[Int]> and C<[Bool]>
-retain their scalar element type.
+C<< { Str => 1 } >> form. Scalar arrays C<[Str]>, C<[Int]>, C<[Num]>,
+C<[Bool]>, C<[IntOrStr]> and C<[Time]> retain their scalar element type;
+only C<[Quantity]> re-imports as C<[Str]>, since it exports only a plain
+C<type: string> items schema, indistinguishable from C<[Str]>.
 
 The single-version shorthand for L</new>: C<< IO::K8s::CRD::crd_for_class($class) >>
 is exactly C<< IO::K8s::CRD->new(classes => [$class], storage => $version) >>
