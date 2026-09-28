@@ -1,0 +1,25 @@
+---
+claimed_at: 2026-09-28T03:56:48Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T03:56:48Z
+created: 2026-09-27T22:42:10Z
+id: 185
+priority: medium
+started: 2026-09-28T02:45:22Z
+status: done
+tags:
+- autogen
+- reuse
+- k181-followup
+title: 'AutoGen-Reuse: type string passt weiter zu IntOrStr-, Quantity- und Time-Feldern'
+updated: 2026-09-28T03:56:48Z
+---
+
+Gefunden bei k181 (2026-09-28), per Probe bestätigt, Gegenrichtung zu k181. %_TYPE_COMPAT{string} lässt ein type: string-Feld zu IntOrStr-, Quantity- und Time-Feldern passen: {host: string, port: string} wird als TCPSocketAction wiederverwendet und "8080" geht als 8080 raus; {medium, mode, sizeLimit: string} wird als EmptyDirVolumeSource wiederverwendet und sizeLimit: "big" scheitert an der strengen Quantity-Prüfung. Provider-Render vorher/nachher prüfen. Nebenbei: in AutoGen.pm ist der Import Time aus IO::K8s::Types seit k178 ungenutzt.
+
+2026-09-28 02:55 k185 fix applied in AutoGen.pm (string => { is_str => 1 }; int-or-string line unchanged; Time import dropped). Both target cases reproduced red pre-fix and green post-fix; int-or-string guard still matches is_int_or_string+is_quantity. BUT crd-drift-check.pl --check: BEFORE exit 0 clean, AFTER exit 255 fatal: 'CRD::Emitter: target Cilium/V2/PortRule.pm has non-identical generated classes EgressItem::ToPortsItem and IngressItem::ToPortsItem'. ROOT CAUSE = latent error, not over-aggressive fix: Cilium toPorts.ports item is {endPort:integer, port:STRING, protocol:string}, but Cilium/V2/PortRule.pm declares ports => ['Networking::V1::NetworkPolicyPort'] whose port is IntOrStr. That reuse only matched via the over-broad string=>IntOrStr rule this card removes. Live bug today: Cilium port:'80' serializes as 80 (number) via IntOrStr, rejected by the Cilium CRD (port type string). Re-render is out of scope. Reporting to caller before proceeding.
+
+2026-09-28 03:22 RESOLUTION: the card's literal prescription (string => {is_str} only) is TOO BROAD -- it broke 3 legitimate reuses (t/75 subtests 6-7, t/144 test 6 went red): a $ref to resource.Quantity (k178) reusing a Quantity map/array, a $ref to meta.v1.Time reusing a Time field, and a format:date-time string reusing a Time field (metav1.Condition/NamespaceCondition). Root: _scalar_ref_kind routes Quantity/Time $refs to the 'string' kind and _schema_type_kind routes date-time to 'string', so 'string' was doing quadruple duty. Implemented the TRUE mirror of k181 instead: gave quantity, time (date-time + Time/MicroTime $ref) and (unchanged) int-or-string their own kinds; string => {is_str} only. quantity=>{is_quantity,is_str}, time=>{is_time,is_str}. Full suite GREEN (143 files, 9227 tests). Dropped unused Time import. New test t/147_k185_reuse_string.t (red without fix). Files touched: lib/IO/K8s/AutoGen.pm + t/147 only. NOT committed. CILIUM (open, needs your decision): crd-drift-check --check now fatals on Cilium PortRule -- both PortRule.pm AND PortDenyRule.pm reuse Networking::V1::NetworkPolicyPort (port IntOrStr) for Cilium's port:type-string field. Confirmed LIVE bug in shipped lib: Cilium port '80' serializes as number 80, which the Cilium CRD (port string) rejects. The fix correctly stops that reuse, so those two classes need a provider re-render (out of my scope: don't touch provider lib/, don't re-render). Re-render must also solve an emitter dedup: egress/ingress toPorts.ports now render non-identical nested classes -> needs a D6 overlay name for the new PortRule/PortDenyRule ports class. Recommend a follow-up io-k8s card to re-render Cilium, coupled with this commit so --check/release audit stays green.
+
+2026-09-28 03:56 committed c4f44b05: Stop reuse_core matching a plain string field to an IntOrStr, Quantity or Time class (k185)
