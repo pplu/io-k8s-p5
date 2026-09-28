@@ -3,7 +3,8 @@ package IO::K8s::PrometheusOperator::V1::Probe;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'monitoring.coreos.com/v1',
-    resource_plural => 'probes';
+    resource_plural => 'probes',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::PrometheusOperator::V1::ProbeSpec', { required => 'schema' };

@@ -3,7 +3,8 @@ package IO::K8s::ExternalSecrets::V1alpha1::ClusterGenerator;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'generators.external-secrets.io/v1alpha1',
-    resource_plural => 'clustergenerators';
+    resource_plural => 'clustergenerators',
+    subresources    => { status => {} };
 
 k8s spec => '+IO::K8s::ExternalSecrets::V1alpha1::ClusterGeneratorSpec';
 

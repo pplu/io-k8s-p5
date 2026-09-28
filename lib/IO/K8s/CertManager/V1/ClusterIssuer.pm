@@ -3,7 +3,8 @@ package IO::K8s::CertManager::V1::ClusterIssuer;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cert-manager.io/v1',
-    resource_plural => 'clusterissuers';
+    resource_plural => 'clusterissuers',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::CertManaged';
 
 k8s spec   => '+IO::K8s::CertManager::V1::IssuerSpec', { required => 'schema' };

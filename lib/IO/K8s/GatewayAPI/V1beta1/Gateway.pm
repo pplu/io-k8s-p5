@@ -3,7 +3,8 @@ package IO::K8s::GatewayAPI::V1beta1::Gateway;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1beta1',
-    resource_plural => 'gateways';
+    resource_plural => 'gateways',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::GatewayAPI::V1beta1::GatewaySpec', { required => 'schema' };

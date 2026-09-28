@@ -3,7 +3,8 @@ package IO::K8s::VolumeSnapshot::V1::VolumeSnapshotContent;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'snapshot.storage.k8s.io/v1',
-    resource_plural => 'volumesnapshotcontents';
+    resource_plural => 'volumesnapshotcontents',
+    subresources    => { status => {} };
 
 k8s spec   => '+IO::K8s::VolumeSnapshot::V1::VolumeSnapshotContentSpec', { required => 'schema' };
 k8s status => '+IO::K8s::VolumeSnapshot::V1::VolumeSnapshotContentStatus';

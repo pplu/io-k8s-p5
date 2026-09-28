@@ -3,7 +3,8 @@ package IO::K8s::VolumeSnapshot::V1::VolumeGroupSnapshotClass;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'groupsnapshot.storage.k8s.io/v1',
-    resource_plural => 'volumegroupsnapshotclasses';
+    resource_plural => 'volumegroupsnapshotclasses',
+    subresources    => {};
 
 =description
 

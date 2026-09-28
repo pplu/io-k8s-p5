@@ -3,7 +3,8 @@ package IO::K8s::Cilium::V2alpha1::CiliumGatewayClassConfig;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2alpha1',
-    resource_plural => 'ciliumgatewayclassconfigs';
+    resource_plural => 'ciliumgatewayclassconfigs',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::Cilium::V2alpha1::CiliumGatewayClassConfigSpec';

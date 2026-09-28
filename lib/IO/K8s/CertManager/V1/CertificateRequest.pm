@@ -3,7 +3,8 @@ package IO::K8s::CertManager::V1::CertificateRequest;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cert-manager.io/v1',
-    resource_plural => 'certificaterequests';
+    resource_plural => 'certificaterequests',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::CertManager::V1::CertificateRequestSpec';

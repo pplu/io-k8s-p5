@@ -3,7 +3,8 @@ package IO::K8s::GatewayAPI::V1::BackendTLSPolicy;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1',
-    resource_plural => 'backendtlspolicies';
+    resource_plural => 'backendtlspolicies',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::GatewayAPI::V1::BackendTLSPolicySpec', { required => 'schema' };

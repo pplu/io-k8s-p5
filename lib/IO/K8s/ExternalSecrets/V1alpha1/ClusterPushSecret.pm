@@ -3,7 +3,8 @@ package IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecret;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'external-secrets.io/v1alpha1',
-    resource_plural => 'clusterpushsecrets';
+    resource_plural => 'clusterpushsecrets',
+    subresources    => { status => {} };
 
 k8s spec   => '+IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecretSpec';
 k8s status => '+IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecretStatus';

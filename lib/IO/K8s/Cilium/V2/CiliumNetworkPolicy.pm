@@ -3,7 +3,8 @@ package IO::K8s::Cilium::V2::CiliumNetworkPolicy;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
-    resource_plural => 'ciliumnetworkpolicies';
+    resource_plural => 'ciliumnetworkpolicies',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced', 'IO::K8s::Role::NetworkPolicy';
 sub _netpol_format { 'cilium' }
 

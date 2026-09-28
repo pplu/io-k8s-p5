@@ -3,7 +3,8 @@ package IO::K8s::PrometheusOperator::V1::PodMonitor;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'monitoring.coreos.com/v1',
-    resource_plural => 'podmonitors';
+    resource_plural => 'podmonitors',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::PrometheusOperator::V1::PodMonitorSpec', { required => 'schema' };

@@ -3,7 +3,8 @@ package IO::K8s::Cilium::V2alpha1::CiliumLoadBalancerIPPool;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2alpha1',
-    resource_plural => 'ciliumloadbalancerippools';
+    resource_plural => 'ciliumloadbalancerippools',
+    subresources    => { status => {} };
 
 k8s spec   => '+IO::K8s::Cilium::V2alpha1::CiliumLoadBalancerIPPoolSpec', { required => 'schema' };
 k8s status => '+IO::K8s::Cilium::V2alpha1::CiliumLoadBalancerIPPoolStatus';

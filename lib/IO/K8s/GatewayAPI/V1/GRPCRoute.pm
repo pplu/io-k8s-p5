@@ -3,7 +3,8 @@ package IO::K8s::GatewayAPI::V1::GRPCRoute;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1',
-    resource_plural => 'grpcroutes';
+    resource_plural => 'grpcroutes',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced', 'IO::K8s::Role::Routable';
 sub _route_format { 'gateway' }
 

@@ -3,7 +3,8 @@ package IO::K8s::Cilium::V2::CiliumIdentity;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
-    resource_plural => 'ciliumidentities';
+    resource_plural => 'ciliumidentities',
+    subresources    => { status => {} };
 
 k8s 'security-labels' => { Str => 1 }, { required => 'schema' };
 

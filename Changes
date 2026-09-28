@@ -176,6 +176,13 @@ Revision history for IO-K8s
     limits => { cpu => 1 } now emits "1" instead of a bare 1. The API
     server accepts both, but the output for numeric Perl values changes.
 
+  - Bundled provider CRD Kind classes (Cilium, GatewayAPI, AgentSandbox,
+    CertManager, PrometheusOperator, VolumeSnapshot, ExternalSecrets) now
+    declare their upstream subresources, so to_crd writes
+    spec.versions[].subresources -- status, plus scale where upstream defines
+    it (AgentSandbox SandboxWarmPool, PrometheusOperator Alertmanager and
+    Prometheus).
+
 1.108     2026-09-22 00:53:53Z
 
   - Track Kubernetes v1.37.0: 11 new Kinds, 103 supporting types and 48 added

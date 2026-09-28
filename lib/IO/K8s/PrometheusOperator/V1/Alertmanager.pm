@@ -3,7 +3,15 @@ package IO::K8s::PrometheusOperator::V1::Alertmanager;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'monitoring.coreos.com/v1',
-    resource_plural => 'alertmanagers';
+    resource_plural => 'alertmanagers',
+    subresources    => {
+        scale  => {
+            labelSelectorPath  => '.status.selector',
+            specReplicasPath   => '.spec.replicas',
+            statusReplicasPath => '.status.replicas'
+        },
+        status => {}
+    };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::PrometheusOperator::V1::AlertmanagerSpec', { required => 'schema' };

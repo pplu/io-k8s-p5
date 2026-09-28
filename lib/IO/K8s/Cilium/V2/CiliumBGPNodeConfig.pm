@@ -3,7 +3,8 @@ package IO::K8s::Cilium::V2::CiliumBGPNodeConfig;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
-    resource_plural => 'ciliumbgpnodeconfigs';
+    resource_plural => 'ciliumbgpnodeconfigs',
+    subresources    => { status => {} };
 
 k8s spec   => '+IO::K8s::Cilium::V2::CiliumBGPNodeSpec', { required => 'schema' };
 k8s status => '+IO::K8s::Cilium::V2::CiliumBGPNodeStatus';

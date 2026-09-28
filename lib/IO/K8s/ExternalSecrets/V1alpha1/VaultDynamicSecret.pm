@@ -3,7 +3,8 @@ package IO::K8s::ExternalSecrets::V1alpha1::VaultDynamicSecret;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'generators.external-secrets.io/v1alpha1',
-    resource_plural => 'vaultdynamicsecrets';
+    resource_plural => 'vaultdynamicsecrets',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec => '+IO::K8s::ExternalSecrets::V1alpha1::VaultDynamicSecretSpec';

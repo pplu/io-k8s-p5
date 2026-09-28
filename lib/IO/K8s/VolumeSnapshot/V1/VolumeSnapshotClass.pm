@@ -3,7 +3,8 @@ package IO::K8s::VolumeSnapshot::V1::VolumeSnapshotClass;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'snapshot.storage.k8s.io/v1',
-    resource_plural => 'volumesnapshotclasses';
+    resource_plural => 'volumesnapshotclasses',
+    subresources    => {};
 
 k8s deletionPolicy => Str, { required => 'schema', enum => [qw(Delete Retain)] };
 k8s driver         => Str, { required => 'schema' };

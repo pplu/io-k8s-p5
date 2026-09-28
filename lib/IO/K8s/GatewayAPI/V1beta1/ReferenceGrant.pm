@@ -3,7 +3,8 @@ package IO::K8s::GatewayAPI::V1beta1::ReferenceGrant;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'gateway.networking.k8s.io/v1beta1',
-    resource_plural => 'referencegrants';
+    resource_plural => 'referencegrants',
+    subresources    => {};
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec => '+IO::K8s::GatewayAPI::V1beta1::ReferenceGrantSpec', { required => 'schema' };

@@ -3,7 +3,8 @@ package IO::K8s::ExternalSecrets::V1alpha1::PushSecret;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'external-secrets.io/v1alpha1',
-    resource_plural => 'pushsecrets';
+    resource_plural => 'pushsecrets',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::ExternalSecrets::V1alpha1::PushSecretSpec';

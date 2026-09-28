@@ -3,7 +3,8 @@ package IO::K8s::Cilium::V2::CiliumEndpoint;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'cilium.io/v2',
-    resource_plural => 'ciliumendpoints';
+    resource_plural => 'ciliumendpoints',
+    subresources    => {};
 with 'IO::K8s::Role::Namespaced';
 
 k8s status => '+IO::K8s::Cilium::V2::EndpointStatus';

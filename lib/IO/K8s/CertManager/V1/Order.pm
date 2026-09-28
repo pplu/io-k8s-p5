@@ -3,7 +3,8 @@ package IO::K8s::CertManager::V1::Order;
 our $VERSION = '1.109';
 use IO::K8s::APIObject
     api_version     => 'acme.cert-manager.io/v1',
-    resource_plural => 'orders';
+    resource_plural => 'orders',
+    subresources    => { status => {} };
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec   => '+IO::K8s::CertManager::V1::OrderSpec', { required => 'schema' };
