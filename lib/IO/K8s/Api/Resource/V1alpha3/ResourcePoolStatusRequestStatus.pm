@@ -28,7 +28,7 @@ k8s pools => ['Resource::V1alpha3::PoolStatus'];
 
 =attr pools
 
-Pools contains the first C<spec.limit> matching pools, sorted by driver then pool name. If C<len(pools) < poolCount>, the list was truncated. When omitted, no pools matched the request filters.
+Pools contains the first C<spec.limit> matching pools, sorted by driver then pool name. If C<< len(pools) < poolCount >>, the list was truncated. When omitted, no pools matched the request filters.
 
 =cut
 

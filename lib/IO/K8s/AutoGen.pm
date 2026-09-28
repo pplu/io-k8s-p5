@@ -1790,13 +1790,13 @@ to avoid collisions:
 Each OpenAPI property also carries its field options (D3 of the CRD
 design) into the generated class, through the same C<k8s> option hash a
 hand-written class would use (see L<IO::K8s::Resource/k8s>): the schema's
-C<required> list becomes the field's C<required => 'schema'> option, so a
+C<required> list becomes the field's C<< required => 'schema' >> option, so a
 generated class records which fields the schema demands -- available to
 C<to_crd> and to L<IO::K8s::Resource/_k8s_attr_info> -- without enforcing
 them at construction. An OpenAPI-required field can still be absent from a
 real cluster document (a server-side default, a status object not yet
 populated), and rejecting it at C<inflate> would reject valid data; use
-C<required => 1> for a field that must always be enforced (see
+C<< required => 1 >> for a field that must always be enforced (see
 L<IO::K8s::Resource/k8s>). C<enum>, C<minimum>, C<maximum>, C<pattern>,
 C<default>, C<description>, C<nullable> and
 C<x-kubernetes-preserve-unknown-fields> are carried the same way, so a
@@ -1812,7 +1812,7 @@ default at all, not as a default of C<undef>, which the DSL's own
 field-option check would otherwise refuse. A C<nullable: true> property
 behaves as C<nullable> does on a hand-written field (k158): an explicit
 C<null> in a document is kept and written back, and the property gets
-C<has_E<lt>accessorE<gt>> and C<clear_E<lt>accessorE<gt>>. A property whose
+C<< has_<accessor> >> and C<< clear_<accessor> >>. A property whose
 predicate or clearer name the class already answers to fails the generation
 run, like any other declaration collision (see L<IO::K8s::Resource/k8s>).
 
@@ -1924,7 +1924,7 @@ C<additionalProperties> values, and any nested object field are checked the
 same way, recursively. A C<$ref> met along the way is resolved read-only
 against the same definitions the schema's own C<$ref>s resolve against; one
 that does not resolve counts as not held, never as a pass. An opaque
-C<{ Str => 1 }> field on the candidate matches only a schema fragment that
+C<< { Str => 1 } >> field on the candidate matches only a schema fragment that
 would itself become an opaque hash -- no C<properties>, no structured
 C<additionalProperties> -- with one exception: a bare C<{type: object}>
 field matches a candidate field typed as C<ObjectMeta>, since that is how

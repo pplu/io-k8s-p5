@@ -106,7 +106,7 @@ sub add_ip_san {
     $cert->renew_before(hours => $n);
 
 Sets C<spec.renewBefore> from either C<days> or C<hours>. The value is
-formatted as a Go duration string C<"<n>h0m0s"> -- the wire format
+formatted as a Go duration string C<< "<n>h0m0s" >> -- the wire format
 cert-manager accepts. Pass exactly one of the two keys; if both are given
 C<days> wins. Returns C<$self> for chaining.
 
