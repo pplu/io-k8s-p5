@@ -665,7 +665,7 @@ sub _has_properties {
 #      reuse a class that declares the same-named field as an array, for
 #      instance. This is checked before anything else, since a name match
 #      alone says nothing about the wire shape. It is coarse for arrays and
-#      maps (any array, any map); step 6 settles what they hold.
+#      maps (any array, any map); step 4 settles what they hold.
 #
 #   3. Every remaining candidate must not OVER-CONSTRAIN the schema (k136,
 #      see _overrequires): a candidate that marks some shared key
@@ -681,9 +681,28 @@ sub _has_properties {
 #      candidate leaves the reused class merely looser than the schema
 #      promises, never lossy.
 #
-#   4. Exactly one candidate survives both filters -> reuse it.
+#   4. Every remaining candidate must hold the schema all the way down
+#      (k148, see _field_compatible): an array's elements, a map's values
+#      and every nested object's fields, recursively. A candidate that does
+#      not -- an array of objects against a class whose same-named field is
+#      an array of strings, which is what LabelSelectorRequirement was reused
+#      for before -- is dropped here. k148 first ran this as a gate on the
+#      class steps 5/6 had already picked, so it could only WITHDRAW a reuse;
+#      k156 moved it ahead of the tie-break, where dropping the
+#      recursively-incompatible candidates can leave a single survivor and so
+#      DECIDE a reuse that a name/type match alone left ambiguous: a
+#      {metadata,spec} matches every *TemplateSpec by name and type, but only
+#      PodTemplateSpec's spec holds a PodSpec and only
+#      PersistentVolumeClaimTemplate's a PVC spec, so the mismatched
+#      candidates fall away and the one that fits is reused (AgentSandbox's
+#      podTemplate and volumeClaimTemplates, PrometheusOperator's ephemeral
+#      volumeClaimTemplate). Wire-identical candidates share their verdict
+#      here (same flags, same classes per key), so they survive or fall
+#      together and step 6 still sees the same wire-identical set.
 #
-#   5. Several do -- reused only when they are wire-identical: the same
+#   5. Exactly one candidate survives every filter -> reuse it.
+#
+#   6. Several do -- reused only when they are wire-identical: the same
 #      type flags (NOT required-ness -- a field being optional on one
 #      shipped class and mandatory on another doesn't change what value it
 #      holds) and the same referenced class per key, where a key has one.
@@ -698,16 +717,10 @@ sub _has_properties {
 #      LabelSelectorRequirement, by a wide margin the most common shape a
 #      provider CRD's inline schema turns out to match (138 LabelSelector
 #      copies, 162 of this bare triple, per the step-4 drift measurement).
-#      A shape shared by candidates that are NOT wire-identical (an
-#      optional field naming a different type, a different value type
-#      under the same key) stays a nested class rather than guess.
-#
-#   6. The class steps 4/5 picked must hold the schema all the way down
-#      (k148, see _field_compatible): an array's elements, a map's values
-#      and every nested object's fields, recursively. Otherwise nothing is
-#      reused -- an array of objects can't reuse a class whose same-named
-#      field is an array of strings, which is what LabelSelectorRequirement
-#      was reused for before.
+#      A shape still matched by several NON-wire-identical candidates after
+#      the step-4 filter (an optional field naming a different type, a
+#      different value type under the same key that both nonetheless hold the
+#      schema) stays a nested class rather than guess.
 #
 # A class's own `metadata` is part of its shape only for an embedded type
 # (PodTemplateSpec: {metadata,spec}, a real schema-visible field) -- never
@@ -1248,24 +1261,33 @@ sub _core_class_for {
             if @shared_vocab_before
             && !grep { _core_rank($_) < scalar @CORE_PREFERENCE } @candidates;
     }
-    # Several type- and required-compatible candidates: reuse the preferred
-    # one only if they are wire-identical (already preference-sorted by
-    # core_class_for_shape, and filtering above preserves that order).
-    my $chosen = @candidates == 1                     ? $candidates[0]
-               : _wire_identical(\@keys, @candidates) ? $candidates[0]
-               :                                        undef;
-    return undef unless defined $chosen;
+    # Recursive-compatibility filter (k148 check, k156 placement): every
+    # remaining candidate must hold what the schema describes all the way
+    # down -- array elements, map values, nested objects (see
+    # _field_compatible / _class_compatible) -- or it is dropped here, ahead
+    # of the tie-break below. k148 first ran this as a gate on the
+    # already-picked class (it could only WITHDRAW a reuse); k156 moves it
+    # ahead of the tie-break so it can also DECIDE one: a shape several
+    # candidates match by name and type alone (a {metadata,spec} that fits
+    # every *TemplateSpec) narrows to the single candidate whose deep shape
+    # holds the schema (only PodTemplateSpec's spec holds a PodSpec, only
+    # PersistentVolumeClaimTemplate's a PVC spec), and that one is reused
+    # where before the non-wire-identical tie-break refused them all.
+    # Wire-identical candidates share their verdict here (same flags, same
+    # classes per key), so they survive or fall together and the tie-break
+    # below still sees the same wire-identical set.
+    @candidates = grep {
+        _class_compatible($_, $schema, { defs => $all_defs, active => {} })
+    } @candidates;
+    return undef unless @candidates;
 
-    # k148: the class picked above must hold what the schema describes all
-    # the way down -- array elements, map values, nested objects (see
-    # _field_compatible) -- or nothing is reused. A gate on the pick rather
-    # than a sharper filter ahead of the tie-break, on purpose: this can
-    # only ever withdraw a reuse, never turn a shape that was ambiguous
-    # before into a new one, so every reuse that was already sound stays
-    # exactly as it was. Wire-identical candidates share their verdict here
-    # (same flags, same classes per key), so checking the preferred one is
-    # checking them all.
-    return _class_compatible($chosen, $schema, { defs => $all_defs, active => {} }) ? $chosen : undef;
+    # Several type-, required- and recursively-compatible candidates: reuse
+    # the preferred one only if they are wire-identical (already
+    # preference-sorted by core_class_for_shape, and every filter above
+    # preserves that order). A single survivor is reused outright.
+    return @candidates == 1                     ? $candidates[0]
+         : _wire_identical(\@keys, @candidates) ? $candidates[0]
+         :                                        undef;
 }
 
 # The scalar type a $ref to one of the special apimachinery types stands for

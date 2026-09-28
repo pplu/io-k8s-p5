@@ -6,7 +6,7 @@ use IO::K8s::Resource;
 k8s additionalPodMetadata => '+IO::K8s::AgentSandbox::V1beta1::PodMetadata';
 k8s env                   => ['+IO::K8s::AgentSandbox::V1beta1::EnvVar'];
 k8s lifecycle             => '+IO::K8s::AgentSandbox::V1beta1::Lifecycle';
-k8s volumeClaimTemplates  => ['+IO::K8s::AgentSandbox::V1beta1::PersistentVolumeClaimTemplate'];
+k8s volumeClaimTemplates  => ['Core::V1::PersistentVolumeClaimTemplate'];
 k8s warmPoolRef           => '+IO::K8s::AgentSandbox::V1beta1::SandboxWarmPoolRef', { required => 'schema' };
 
 =attr additionalPodMetadata

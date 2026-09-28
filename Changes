@@ -2,6 +2,15 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - AgentSandbox and PrometheusOperator now reuse the shipped core classes
+    for their embedded pod and volume-claim templates: Sandbox and
+    SandboxTemplate podTemplate is Core::V1::PodTemplateSpec, and every
+    volumeClaimTemplates entry (plus Prometheus/PrometheusAgent's ephemeral
+    volumeClaimTemplate) is Core::V1::PersistentVolumeClaimTemplate. The
+    reuse heuristic now filters candidates by recursive shape compatibility
+    before its tie-break, which resolves these previously-ambiguous
+    {metadata,spec} shapes to the single matching core class.
+
   - A colliding k8s declaration now fails at class load instead of silently
     corrupting the class: two JSON keys that sanitize to one Perl accessor
     (x-value and x_value, also across inheritance), a field -- or an AutoGen

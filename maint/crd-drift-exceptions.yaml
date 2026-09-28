@@ -169,6 +169,48 @@ ignore_unrendered:
   - provider: AgentSandbox
     path: IO/K8s/AgentSandbox/V1alpha1/SandboxWarmPool.pm
     reason: "k88: v1alpha1 removed upstream at agent-sandbox v1.0.0 (no api/v1alpha1 manifest left to render from); class kept for clusters still on v0.5.x"
+  # k156: the recursive _field_compatible filter now runs AHEAD of the D5 reuse
+  # tie-break (see IO::K8s::AutoGen::_core_class_for), so these once-ambiguous
+  # {metadata,spec} shapes now reuse a core class: Sandbox's and SandboxTemplate's
+  # podTemplate reuse Core::V1::PodTemplateSpec, and all three Kinds'
+  # volumeClaimTemplates reuse Core::V1::PersistentVolumeClaimTemplate. The
+  # emitter therefore no longer renders the per-provider nested subtree those
+  # fields used to own (PodTemplate/PodSpec and its single-key sub-structs,
+  # PersistentVolumeClaimTemplate + EmbeddedObjectMetadata, LocalObjectReference).
+  # The classes are KEPT shipped, not deleted -- a removal is a breaking
+  # public-API change that would need IO::K8s::Deprecated redirect stubs, a
+  # coordination call left as a follow-up; kept, they stay directly usable and
+  # cost nothing but this suppression.
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/EmbeddedObjectMetadata.pm
+    reason: "k156: was the metadata of the now-reused PodTemplate/PersistentVolumeClaimTemplate; unreferenced after the reuse. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/LocalObjectReference.pm
+    reason: "k156: was PodSpec.imagePullSecrets item; unreferenced after podTemplate reuses Core::V1::PodTemplateSpec. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/PersistentVolumeClaimTemplate.pm
+    reason: "k156: volumeClaimTemplates now reuse Core::V1::PersistentVolumeClaimTemplate; this per-provider copy is unreferenced. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/PodOS.pm
+    reason: "k156: was PodSpec.os; unreferenced after podTemplate reuses Core::V1::PodTemplateSpec. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/PodReadinessGate.pm
+    reason: "k156: was PodSpec.readinessGates item; unreferenced after podTemplate reuses Core::V1::PodTemplateSpec. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/PodSchedulingGate.pm
+    reason: "k156: was PodSpec.schedulingGates item; unreferenced after podTemplate reuses Core::V1::PodTemplateSpec. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/PodSchedulingGroup.pm
+    reason: "k156: was PodSpec.schedulingGroup; unreferenced after podTemplate reuses Core::V1::PodTemplateSpec. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/PodSpec.pm
+    reason: "k156: was PodTemplate.spec; unreferenced after podTemplate reuses Core::V1::PodTemplateSpec (whose spec is the superset Core::V1::PodSpec). Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: AgentSandbox
+    path: IO/K8s/AgentSandbox/V1beta1/PodTemplate.pm
+    reason: "k156: podTemplate now reuses Core::V1::PodTemplateSpec; this per-provider copy is unreferenced. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
+  - provider: PrometheusOperator
+    path: IO/K8s/PrometheusOperator/V1/PersistentVolumeClaimTemplate.pm
+    reason: "k156: storage.ephemeral.volumeClaimTemplate (Prometheus + PrometheusAgent, via the shared EphemeralVolumeSource) now reuses Core::V1::PersistentVolumeClaimTemplate; this per-provider copy is unreferenced. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
     reason: "k120/k133: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; k133 chose Weg 1 -- keep the named empty struct as a superset and accept the two residual reference-site divergences via accept_structural_divergence below."
