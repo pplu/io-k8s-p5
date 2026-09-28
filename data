@@ -1,0 +1,27 @@
+---
+claimed_at: 2026-09-28T04:37:42Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T04:37:36Z
+created: 2026-09-27T20:36:51Z
+id: 173
+priority: low
+started: 2026-09-28T04:00:00Z
+status: done
+tags:
+- crd
+- providers
+- k158-followup
+title: Provider-Klassen deklarieren subresources
+updated: 2026-09-28T04:37:42Z
+---
+
+Folge aus k158 (2026-09-27). Die gebündelten Provider-CRD-Klassen deklarieren ihre subresources noch nicht; to_crd gibt sie deshalb nicht aus. Mit gerenderten subresources zeigt maint/crd-drift-check.pl 89 DIFFERS (Cilium 23, GatewayAPI 14, AgentSandbox 3, CertManager 6, PrometheusOperator 7, VolumeSnapshot 12, ExternalSecrets 24, Traefik 0). Klassen um den Importparameter ergänzen, danach subresources => 0 in maint/crd-drift-check.pl entfernen und den Check wieder byte-identisch bekommen.
+
+2026-09-28 03:59 Starte k173: entferne subresources=>0-Unterdrueckung in crd-drift-check.pl render_gvk, ergaenze subresources-Importparameter in betroffenen Top-Level-Provider-Kind-Klassen byte-identisch zum Emitter-Render, verifiziere --check EXIT 0 / 0 differ und prove -lr t/.
+
+2026-09-28 04:22 k173 Fortschritt: crd-drift-check.pl render_gvk: subresources=>0 entfernt (Emitter-Default 1 greift), Kommentar aktualisiert. 90 Top-Level-Kind-Klassen (nur use-Block, byte-identisch zum Render) subresources ergaenzt: Cilium 23, GatewayAPI 14, AgentSandbox 3, CertManager 6, PrometheusOperator 7, VolumeSnapshot 12, ExternalSecrets 25, Traefik 0. 89 im differ-Bucket (=Erwartung), +1 UUID (accepted spec-Divergenz). --check alle Provider: EXIT 0, 0 differ; cosmetic/accepted restauriert (VolSnap 33, ExtSec 8+2acc, PromOp 5).
+
+2026-09-28 04:25 Fertig. crd-drift-check.pl render_gvk: subresources=>0 entfernt + Kommentar aktualisiert (Emitter-Default 1). 90 Top-Level-Provider-Kind-Klassen um subresources-Importparameter ergaenzt, byte-identisch zum Emitter-Render (nur der use IO::K8s::APIObject-Block angefasst, POD/k8s/accepted-Divergenzen unberuehrt). Verifiziert: crd-drift-check.pl --check alle 8 Provider EXIT 0, 0 differ, keine FATAL/non-identical; cosmetic/accepted restauriert. prove -lr t/: Files=144, Tests=9234, Result PASS, Exit 0 (keine Testanpassung noetig; t/79,96,91,129,137,51,74,25,26 gruen). Baum commit-ready, NICHT committet. skilletor-Churn unter .claude/ nicht angefasst.
+
+2026-09-28 04:37 committed f63b1ecb: Declare upstream subresources on provider CRD Kind classes so to_crd emits them (k173)
