@@ -1,0 +1,30 @@
+---
+claimed_at: 2026-09-28T05:32:57Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T05:32:50Z
+created: 2026-09-26T16:26:10Z
+id: 156
+priority: low
+started: 2026-09-27T19:53:13Z
+status: done
+tags:
+- autogen
+- crd
+- k148-followup
+title: 'reuse_core: rekursive Kompatibilität als Filter vor dem Tie-Break (7 neue
+  Reuses)'
+updated: 2026-09-28T05:32:57Z
+---
+
+Optionaler Folgeschritt zu k148 (2026-09-26). k148 setzt die rekursive Container-/Element-/Map-Prüfung als nachgelagertes Tor ein (kann Reuse nur entziehen; alle 882 Reuse-Entscheidungen der Provider unverändert). Als Filter vor dem Tie-Break würde sie 7 bisher mehrdeutige Fälle eindeutig machen und fachlich richtige neue Reuses erzeugen: AgentSandbox podTemplate → PodTemplateSpec (x2), volumeClaimTemplates → PersistentVolumeClaimTemplate (x3); PrometheusOperator storage.ephemeral.volumeClaimTemplate → PersistentVolumeClaimTemplate (x2). Erfordert Re-Render beider Provider, ggf. no_reuse_core-Overlays für eigene Typen (k120); AgentSandbox rendert sonst zwei GVKs auf eine gemeinsame PodSpec.pm (exit 255).
+
+2026-09-28 04:44 Started k156. Read _core_class_for + _field_compatible in lib/IO/K8s/AutoGen.pm. Current order: shape->type filter->required filter(k136/k139)->tie-break(single/wire-identical)->recursive gate(k148). Plan: move recursive check as FILTER before tie-break. Cache present for 8 providers (no K3s). Establishing baseline first.
+
+2026-09-28 04:59 BAIL-gate PASSED: after moving the recursive _class_compatible check to a filter before the tie-break, --check shows ONLY AgentSandbox (3 DIFFERS) + PrometheusOperator (1 DIFFERS) drift = exactly the 7 expected reuses (AgentSandbox podTemplate->Core::V1::PodTemplateSpec x2, volumeClaimTemplates->Core::V1::PersistentVolumeClaimTemplate x3; PrometheusOperator ephemeral volumeClaimTemplate->Core::V1::PersistentVolumeClaimTemplate x2 GVKs collapse to 1 shared EphemeralVolumeSource.pm). Other 6 providers byte-identical to baseline (0 differ, EXIT 0). No EXIT 255 (feared PodSpec-dedup crash did NOT occur; render is clean). _scan_core_shapes only walks Api/Apimachinery, so keeping provider orphans does NOT re-add ambiguity. t/75 + t/111 still PASS. DECISION: reuse orphans 9 AgentSandbox + 1 PrometheusOperator nested classes; per repo practice (ignore_unrendered precedent + memory 'keep as superset, not remove+tombstone') KEEP them via ignore_unrendered rather than delete (deletion = breaking public-API removal needing IO::K8s::Deprecated stubs = coordination, outside worker lane). Proceeding: edit 4 lib spec files, add 10 ignore_unrendered, update overlays+comments, update t/28 isa_ok to core types, add regression test. Follow-up to surface: whether to later delete the 10 orphans via Deprecated protocol.
+
+2026-09-28 05:20 DONE (SUCCESS). Algorithm: in IO::K8s::AutoGen::_core_class_for the recursive _class_compatible check moved from a post-tie-break GATE (k148, could only withdraw a reuse) to a FILTER over candidates AHEAD of the single/wire-identical tie-break; wire-identical candidates share their recursive verdict so the tie-break still sees the same set. Comment block steps renumbered (recursive=step4, single=5, wire-identical=6) + step-2 cross-ref fixed. FINAL --check all 8 providers EXIT 0 / 0 differ: Cilium 202m, GatewayAPI 143m, AgentSandbox 19m/13nr(4 v1alpha1+9 k156), Traefik 86m, CertManager 81m, PrometheusOperator 133m/5cosm/1nr, VolumeSnapshot 10m/33cosm, ExternalSecrets 281m/8cosm/2acc -- 6 unaffected providers byte-identical to baseline. prove -lr t/: Files=145, Tests=9239, Result PASS, EXIT 0 (t/85 core-shape-index unchanged; t/26+t/25 both serialization dirs green). Changed: AutoGen.pm (algo+comments); 4 lib spec files (SandboxSpec/SandboxTemplateSpec/SandboxClaimSpec podTemplate->Core::V1::PodTemplateSpec + volumeClaimTemplates->Core::V1::PersistentVolumeClaimTemplate; EphemeralVolumeSource volumeClaimTemplate->Core::V1::PersistentVolumeClaimTemplate); crd-drift-exceptions.yaml (+10 ignore_unrendered for the orphaned nested classes, kept-not-deleted); AgentSandbox.yaml + PrometheusOperator.yaml overlays (stale comment fixed, dead names entries pruned); t/28 isa_ok updated to core types (round-trip still byte-identical); t/75 comments/messages made accurate; NEW t/149_k156_reuse_core_recursive_filter.t (2 new reuses + 2 guards). NO commit (release-manager). FOLLOW-UP to surface: the 10 orphaned classes are dead-after-reuse; a later cleanup could DELETE them via the IO::K8s::Deprecated protocol (breaking removal = coordination, not done here).
+
+2026-09-28 05:20 SUCCESS. k156 landed commit-ready (NOT committed). Recursive reuse check moved to a filter before the tie-break in AutoGen::_core_class_for; 7 new correct reuses across AgentSandbox + PrometheusOperator, 6 other providers byte-identical to baseline. --check all 8 providers EXIT 0/0 differ; prove -lr t/ = 145 files/9239 tests PASS. Orphaned nested classes kept (ignore_unrendered), not deleted -- removal deferred as a coordination follow-up (IO::K8s::Deprecated). See card notes for full detail, changed-files list, and the proposed Changes bullet + commit subject in the worker report.
+
+committed 1d23bcb745442d116e77007fe369530cacdccc22: Reuse core Pod/PVC template classes by filtering reuse candidates on recursive shape before the tie-break (k156)
