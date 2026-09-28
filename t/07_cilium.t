@@ -457,8 +457,8 @@ subtest 'full depth round-trip: CiliumNetworkPolicy / CiliumClusterwideNetworkPo
     isa_ok($cnp->spec->ingress->[0]->authentication, 'IO::K8s::Cilium::V2::Authentication');
     isa_ok($cnp->spec->ingress->[0]->toPorts->[0], 'IO::K8s::Cilium::V2::PortRule');
     isa_ok($cnp->spec->ingress->[0]->toPorts->[0]->ports->[0],
-        'IO::K8s::Api::Networking::V1::NetworkPolicyPort',
-        'PortRule.ports reused core NetworkPolicyPort (reuse_core)');
+        'IO::K8s::Cilium::V2::PortProtocol',
+        'PortRule.ports uses dedicated Str-port PortProtocol, not IntOrStr NetworkPolicyPort (k187)');
     isa_ok($cnp->spec->ingress->[0]->toPorts->[0]->rules, 'IO::K8s::Cilium::V2::L7Rules');
     isa_ok($cnp->spec->ingress->[0]->toPorts->[0]->rules->http->[0], 'IO::K8s::Cilium::V2::PortRuleHTTP');
     isa_ok($cnp->spec->egress->[0], 'IO::K8s::Cilium::V2::EgressRule');

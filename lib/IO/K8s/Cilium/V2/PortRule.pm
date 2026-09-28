@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s listener       => '+IO::K8s::Cilium::V2::Listener';
 k8s originatingTLS => '+IO::K8s::Cilium::V2::TLSContext';
-k8s ports          => ['Networking::V1::NetworkPolicyPort'];
+k8s ports          => ['+IO::K8s::Cilium::V2::PortProtocol'];
 k8s rules          => '+IO::K8s::Cilium::V2::L7Rules';
 k8s serverNames    => [Str], { pattern => qr/^([-a-zA-Z0-9_*]+[.]?)+$/ };
 k8s terminatingTLS => '+IO::K8s::Cilium::V2::TLSContext';

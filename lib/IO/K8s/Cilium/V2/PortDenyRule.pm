@@ -3,7 +3,7 @@ package IO::K8s::Cilium::V2::PortDenyRule;
 our $VERSION = '1.109';
 use IO::K8s::Resource;
 
-k8s ports => ['Networking::V1::NetworkPolicyPort'];
+k8s ports => ['+IO::K8s::Cilium::V2::PortProtocol'];
 
 =attr ports
 

@@ -60,6 +60,12 @@ Revision history for IO-K8s
     string still reuses a Time field and a $ref to resource.Quantity a
     Quantity field.
 
+  - Cilium's CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy
+    toPorts.ports is now a dedicated PortProtocol class whose port is a
+    string, not the reused Networking::V1::NetworkPolicyPort whose IntOrStr
+    port sent a Cilium port "80" out as the number 80 that the Cilium CRD
+    rejects.
+
   - Declare Sub::Util as a direct runtime prerequisite.
 
   - A blessed value at an object position has to come out of its TO_JSON
