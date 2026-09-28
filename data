@@ -1,0 +1,21 @@
+---
+claimed_at: 2026-09-28T03:57:05Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T03:57:05Z
+created: 2026-09-28T03:26:51Z
+id: 187
+priority: medium
+started: 2026-09-28T03:27:05Z
+status: done
+tags:
+- crd
+- cilium
+- k185-followup
+title: 'Cilium PortRule/PortDenyRule: port ist type:string, nicht NetworkPolicyPort/IntOrStr'
+updated: 2026-09-28T03:57:05Z
+---
+
+Von k185 (2026-09-28) aufgedeckter latenter Serialisierungs-Bug. Cilium toPorts.ports-Item ist {endPort: integer, port: string, protocol: string} - port ist plain type:string. Die ausgelieferten lib/IO/K8s/Cilium/V2/PortRule.pm (Z.8) und PortDenyRule.pm (Z.6) deklarieren aber ports => ["Networking::V1::NetworkPolicyPort"], dessen port IntOrStr ist. Diese Wiederverwendung matchte nur ueber die in k185 entfernte zu-breite string->is_int_or_string-Regel. Folge heute: ein Cilium port => "80" serialisiert als Zahl 80, die das Cilium-CRD (port: string) ablehnt. Nach dem k185-Fix rendert AutoGen das ports-Item nicht mehr als NetworkPolicyPort -> egress/ingress toPorts.ports rendern nicht-identische verschachtelte Klassen, der Emitter-Dedup stirbt (crd-drift-check fatal auf Cilium). Fix: Cilium PortRule/PortDenyRule re-rendern mit eigenem Str-port-ports-Nested-Class plus D6-Overlay-Name, damit die zwei Pfade deduplizieren; crd-drift-check wieder byte-identisch. MUSS mit k185 zusammen landen (sonst regressiert der Check von clean auf fatal). Bail-Klausel: falls Re-Render exit 255 bleibt oder Overlay unaufloesbar, k185 UND diese Karte zurueck in Backlog.
+
+2026-09-28 03:57 committed 43dbdeda: Type Cilium PortRule/PortDenyRule ports as a Str-port class, not NetworkPolicyPort (k187)
