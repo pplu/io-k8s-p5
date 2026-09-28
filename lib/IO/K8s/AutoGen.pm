@@ -10,9 +10,10 @@ use Module::Runtime qw( use_module );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype refaddr looks_like_number);
 use Types::Standard qw( Bool Int Num Str );
-# Type::Tiny objects for the [IntOrStr] / [Time] array items (k167); see
-# the array branch of _schema_to_type_spec for why barewords do not do.
-use IO::K8s::Types qw( IntOrStr Time );
+# Type::Tiny object for the [IntOrStr] array items (k167); see the array
+# branch of _schema_to_type_spec for why a bareword does not do. [Time]
+# items go through $GENERATED_TIME instead (k178), so Time is not imported.
+use IO::K8s::Types qw( IntOrStr );
 # The empty list matters: IO::K8s::APIObject's import would make this
 # package a Moo class. Loaded for its subresources check (k158).
 use IO::K8s::APIObject ();
@@ -830,28 +831,43 @@ sub core_class_for_shape {
 }
 
 # The JSON-schema "kind" a property's type dispatches on for reuse-safety
-# purposes -- string / int-or-string / integer / number / boolean / array /
-# object. Mirrors _schema_to_type_spec's own dispatch (including its
-# x-kubernetes-int-or-string and `format: int-or-string` checks and its Str
-# fallback for anything unmodeled) without generating anything, since
-# _core_class_for needs this for a schema fragment it may end up NOT typing
-# as an object at all.
+# purposes -- string / int-or-string / time / quantity / integer / number /
+# boolean / array / object. Mirrors _schema_to_type_spec's own dispatch
+# (including its x-kubernetes-int-or-string, `format: int-or-string` and
+# `format: date-time` checks and its Str fallback for anything unmodeled)
+# without generating anything, since _core_class_for needs this for a schema
+# fragment it may end up NOT typing as an object at all.
 #
-# int-or-string is a kind of its own (k181), not 'string': it used to be
-# read as one, which made a Str field -- or [Str] one level down -- a match,
-# and since k145 a Str goes out as a JSON string, so a reused class turned
-# the schema's 8080 into "8080". It matches an IntOrStr field, and a
-# Quantity one: controller-gen renders a resource.Quantity as
-# x-kubernetes-int-or-string with the quantity pattern (the emitter reads
-# that back as Quantity, k125), and a CRD embedding a pod template or a
-# ResourceList would otherwise stop reusing every core class that holds a
-# Quantity. A Time -- no int-or-string value passes its check -- it never
-# matches.
+# The string family splits into four kinds (k181, k185), not one, because a
+# reused class imposes its own wire type on the field and the wrong one
+# corrupts the value:
+#   * int-or-string (k181) -- x-kubernetes-int-or-string, or `type: string`
+#     with `format: int-or-string`, or a $ref to intstr.IntOrString
+#     (_scalar_ref_kind). Matches an IntOrStr field and a Quantity one:
+#     controller-gen renders a resource.Quantity as x-kubernetes-int-or-string
+#     with the quantity pattern (the emitter reads that back as Quantity,
+#     k125), so a CRD embedding a pod template or a ResourceList still reuses
+#     the core class that holds it.
+#   * time -- `format: date-time`, or a $ref to meta.v1.(Micro)Time
+#     (_scalar_ref_kind). Matches a Time field: the value IS an RFC 3339
+#     timestamp, which is exactly what a Time field holds and emits.
+#   * quantity -- a $ref to resource.Quantity (_scalar_ref_kind). Matches a
+#     Quantity field: the value IS a quantity.
+#   * string -- a plain `type: string` (no format, no scalar $ref), '', and
+#     anything unmodeled. Matches a Str field only (k185). It must NOT reuse
+#     an IntOrStr, Quantity or Time class: an IntOrStr turns the schema's
+#     "8080" into the number 8080 (a Str goes out quoted since k145), a strict
+#     Quantity rejects a "big", a strict Time rejects any non-RFC 3339 string.
+#     Reading a plain string as any of those was the k185 bug -- the mirror of
+#     the k181 one that read int-or-string as 'string'.
+# time and quantity also match a Str field: a timestamp or quantity string is
+# a lossless fit for one, the same direction the reuse check accepts elsewhere.
 sub _schema_type_kind {
     my ($schema) = @_;
     return 'int-or-string' if eval { IO::K8s::Resource::_normalize_bool($schema->{'x-kubernetes-int-or-string'}) };
     my $type = $schema->{type} // '';
     return 'int-or-string' if $type eq 'string' && ($schema->{format} // '') eq 'int-or-string';
+    return 'time'    if $type eq 'string' && ($schema->{format} // '') eq 'date-time';
     return 'integer' if $type eq 'integer';
     return 'number'  if $type eq 'number';
     return 'boolean' if $type eq 'boolean';
@@ -860,14 +876,18 @@ sub _schema_type_kind {
     return 'string';  # 'string', '', and anything unmodeled alike (k42's own Str fallback)
 }
 
-# Registry type flags compatible with each schema kind (rule 2 above).
+# Registry type flags compatible with each schema kind (rule 2 above). The
+# string family (string / int-or-string / time / quantity) and why each is a
+# kind of its own is explained on _schema_type_kind above.
 # 'array'/'object' match by prefix/membership rather than an exhaustive
 # list -- see _flag_compatible. That coarse array/object match is only the
 # pre-selection the tie-break works on; what the array holds and what the
 # map's values are is decided by _field_compatible below (k148), which asks
 # _flag_compatible about scalar kinds only.
 my %_TYPE_COMPAT = (
-    string          => { map { $_ => 1 } qw( is_str is_int_or_string is_quantity is_time ) },
+    string          => { is_str => 1 },
+    quantity        => { map { $_ => 1 } qw( is_quantity is_str ) },
+    time            => { map { $_ => 1 } qw( is_time is_str ) },
     'int-or-string' => { map { $_ => 1 } qw( is_int_or_string is_quantity ) },
     integer         => { map { $_ => 1 } qw( is_int is_int_or_string ) },
     number          => { map { $_ => 1 } qw( is_num ) },
@@ -935,9 +955,9 @@ sub _entry_compatible {
 #
 # A $ref is resolved read-only against the definitions _core_class_for was
 # handed, the way _schema_to_type_spec resolves it: the apimachinery scalars
-# are values -- IntOrString the int-or-string kind (k181), Quantity and Time
-# the 'string' kind they always were here -- as a property, as items and as
-# map values alike (k178, see _scalar_ref_kind), %OPAQUE_TYPES is the
+# are values -- IntOrString the int-or-string kind (k181), Quantity the
+# quantity kind and Time the time kind (k185) -- as a property, as items and
+# as map values alike (k178, see _scalar_ref_kind), %OPAQUE_TYPES is the
 # opaque map, an apiextensions union name is its shipped class
 # (%UNION_TYPES), anything else is the object its definition describes. A
 # $ref that does not resolve cannot be shown compatible.
@@ -1262,12 +1282,15 @@ sub _scalar_ref_type {
 }
 
 # The reuse-check kind (see _schema_type_kind) of such a $ref, or undef:
-# IntOrString is the int-or-string kind (k181), Quantity and Time stay the
-# string kind they always were here.
+# IntOrString is the int-or-string kind (k181), Quantity the quantity kind
+# and Time the time kind (k185) -- each distinct from a plain string, which a
+# scalar $ref never is.
 sub _scalar_ref_kind {
     my ($ref) = @_;
     my $scalar = _scalar_ref_type($ref) or return undef;
-    return $scalar eq 'IntOrStr' ? 'int-or-string' : 'string';
+    return 'int-or-string' if $scalar eq 'IntOrStr';
+    return 'quantity'      if $scalar eq 'Quantity';
+    return 'time';  # Time / MicroTime
 }
 
 # The element types of a generated class's scalar arrays (k178). The scalar

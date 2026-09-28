@@ -50,6 +50,16 @@ Revision history for IO-K8s
     and nested fields are now compared recursively; reuse decisions for the
     bundled providers are unchanged.
 
+  - AutoGen's reuse_core no longer types a plain type: string field as a
+    shipped core class whose matching field is an IntOrStr, Quantity or Time
+    -- the mirror of the int-or-string fix above. {host, port: string} no
+    longer reuses TCPSocketAction, whose IntOrStr port sent "8080" out as
+    8080, and {medium, mode, sizeLimit: string} no longer reuses
+    EmptyDirVolumeSource, whose strict Quantity rejected sizeLimit "big"; such
+    a field is typed Str and keeps its string value. A format: date-time
+    string still reuses a Time field and a $ref to resource.Quantity a
+    Quantity field.
+
   - Declare Sub::Util as a direct runtime prerequisite.
 
   - A blessed value at an object position has to come out of its TO_JSON
