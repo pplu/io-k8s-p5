@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-28T06:26:16Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T06:26:16Z
+created: 2026-09-28T02:43:37Z
+id: 186
+priority: low
+started: 2026-09-28T05:35:06Z
+status: done
+tags:
+- docs
+- k176-followup
+title: 'Doku: verbleibende =E<gt>-C<>-Formen und Sync-Lint für die C<>-Falle'
+updated: 2026-09-28T06:26:16Z
+---
+
+Folge aus k176/k168 (2026-09-28). (1) CertManaged.pm Zeilen 45, 132, 200 nutzen noch die valide escapte Form C<... =E<gt> ...> (rendert korrekt als =>, KEINE kaputte Falle) und wurden in k176 bewusst nach Hausregel #2 nicht angefasst. Optional auf die einheitliche C<< >>-Form normalisieren (Konsistenz mit AutoGen/Resource/CRD nach k168/k176). Weitere Dateien mit escaptem E<gt>/E<lt> existieren (Cilium.pm, IO/K8s.pm, Routable.pm, Loadbalanced.pm, MiddlewareBuilder.pm, NetworkPolicy.pm, HelmManaged.pm, Types/Net.pm, diverse Api/Resource-Klassen) - alle valide, nur Stilfrage. (2) Empfehlung: mechanischer Lint/grep-Schritt im Upstream-Spec-Sync-Workflow, der jedes einfache C<...> (nicht C<< >>) meldet, dessen Inhalt /[<>]/ matcht - Null-False-Negative-Check gegen genau diese Falle, da die upstream-derived API-Klassen-Beschreibungen (z.B. Resource v1/v1alpha3 mit <domain>, <=, >=) beim Hand-Wrappen erneut die Falle einführen können.
+
+Committed as a5b86ba5: Normalize remaining =E<gt> and raw-> POD codes to C<< >> across 21 lib files and add pod-angle-lint (k186). 44 insertions/44 deletions in lib/ POD plus new maint/pod-angle-lint.pl (325 lines). Verified: prove -lr t/ PASS (9239 tests, Files=145), perl maint/pod-angle-lint.pl clean (1934 files scanned). No Changes entry (POD/tooling, consistent with k176/k177).
