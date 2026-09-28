@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-28T02:32:57Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T02:32:57Z
+created: 2026-09-27T21:47:12Z
+id: 177
+priority: low
+started: 2026-09-28T02:18:49Z
+status: done
+tags:
+- docs
+- k167-followup
+title: 'Doku: veraltete Kommentare und POD zu Array-Flags, subresources und k174'
+updated: 2026-09-28T02:32:57Z
+---
+
+Gefunden bei k167/k174 (2026-09-27). (1) lib/IO/K8s/Resource.pm um Zeile 614: Kommentar behauptet, TO_JSON/_inflate_struct hätten keinen Zweig für die vier Array-Flags - seit k155/k167 falsch. (2) lib/IO/K8s/CRD.pm um 304-307: Re-Import-Liste der Array-Typen veraltet (jetzt behalten [Str], [Int], [Num], [Bool], [IntOrStr], [Time] ihren Typ; [Quantity] wird [Str]). (3) t/74_crd_emitter.t um 357-362: Testkommentar veraltet. (4) lib/IO/K8s.pm: die Liste der Importparameter von use IO::K8s::APIObject nennt weder subresources (k158) noch den croak aus k174.
+
+Vier stale Docs/Kommentare korrigiert (Resource.pm TO_JSON-Array-Flags, CRD.pm Array-Re-Import [Quantity]->[Str], t/74 k112-Kommentar, IO/K8s.pm Import-Params subresources+Croak). Map-Satz in CRD.pm bewusst unveraendert (verifiziert korrekt). Volle Suite prove -lr t/: Files=142, Tests=9222, PASS. Commit 30620915.
