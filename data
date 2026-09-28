@@ -1,0 +1,19 @@
+---
+claimed_at: 2026-09-28T02:13:21Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T02:13:21Z
+created: 2026-09-27T22:36:11Z
+id: 184
+priority: low
+started: 2026-09-28T02:04:56Z
+status: done
+tags:
+- hygiene
+title: APIObject.pm, Resource.pm, Types.pm ohne use strict/use warnings
+updated: 2026-09-28T02:13:21Z
+---
+
+Gefunden bei k182 (2026-09-28). Die drei Module haben weder use strict noch use warnings; Warnungen daraus erscheinen nur unter -w. Hausregel prüfen (Import-Mechanik der DSL beachten) und ergänzen, mit voller Suite.
+
+Ergänzt use strict; use warnings; in APIObject.pm, Resource.pm, Types.pm (Hausstil nach our VERSION/use v5.10). Keine Encapsulation nötig: Resource.pm hatte alle vier Symbolref-Stellen bereits in lexikalische 'no strict refs'-Bloecke gefasst; APIObject.pm/Types.pm haben keine rohen Symbolrefs. Keine neuen Warnungen. Volle Suite prove -lr t/: Files=142, Tests=9222, PASS. Commit 674827db.
