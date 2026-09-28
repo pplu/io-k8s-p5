@@ -709,10 +709,12 @@ declares for that field (an inline struct or referenced class, an
 array/hash container), with a hashref handed to a typed slot inflated the
 same way C<FROM_HASH> does. C<spec_get> and C<spec_delete> never vivify.
 
-Every failure raised while walking or vivifying begins with the spec
-path and carries no internal file or line (k101) -- C<spec path 'PATH':>
-in front of the reason, or, for a path that is itself empty, C<spec path
-'PATH' is empty> on its own. A Moo/Type::Tiny failure hit while vivifying
+Every failure the walk's own checks raise, or that vivifying or writing
+a declared field raises, begins with the spec path and carries no
+internal file or line (k101) -- C<spec path 'PATH':> in front of the
+reason, or, for a path that is itself empty, C<spec path 'PATH' is empty>
+on its own -- except inflating a hash into a typed field, which carries
+no such prefix (see below). A Moo/Type::Tiny failure hit while vivifying
 or writing a declared field is re-raised with that prefix, such as:
 
     spec path 'PATH': cannot set 'SEG': ORIGINAL MESSAGE
