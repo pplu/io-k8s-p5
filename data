@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-28T02:42:59Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T02:42:59Z
+created: 2026-09-27T21:33:58Z
+id: 176
+priority: low
+started: 2026-09-28T02:36:16Z
+status: done
+tags:
+- docs
+- k168-followup
+title: 'Doku: C<> mit > auch in AutoGen, CertManaged und zwei API-Klassen'
+updated: 2026-09-28T02:42:59Z
+---
+
+Gefunden bei k168 (2026-09-27). Dieselbe POD-Falle (> in C<>) steht noch in lib/IO/K8s/AutoGen.pm (Zeilen um 1704, 1710, 1818), Role/CertManaged.pm (um 109), Api/Resource/V1/CapacityRequirements.pm (10) und Api/Resource/V1alpha3/ResourcePoolStatusRequestStatus.pm (31, aus Upstream-Beschreibungen). Auf C<< >> umstellen; für die API-Klassen prüfen, ob die Beschreibungen aus Upstream übernommen werden und das Muster beim nächsten Sync wiederkommt.
+
+7 C<>-mit->-Fallen auf C<< >> umgestellt (AutoGen 4x inkl. Schwester { Str => 1 }, CertManaged 1x, CapacityRequirements 1x, ResourcePoolStatusRequestStatus 1x). CertManaged 45/132/200 nutzen die valide escapte =E<gt>-Form (keine Falle) und bleiben bewusst -> Folge-Karte. API-Klassen upstream-derived, Sync-Wiederkehr moeglich. Volle Suite prove -lr t/: Files=142, Tests=9222, PASS. Commit b21c0fee.
