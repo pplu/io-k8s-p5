@@ -64,7 +64,7 @@ sub basic_auth {
 
 Configures the Traefik stripPrefix middleware to remove each prefix in
 C<@prefixes> from incoming request paths. The prefixes are written as a
-single C<< { prefixes =E<gt> [...] } >> block, replacing any prior
+single C<< { prefixes => [...] } >> block, replacing any prior
 stripPrefix block. Pass an empty list to emit an empty
 C<stripPrefix.prefixes> array. Returns C<$self> for chaining.
 
@@ -84,7 +84,7 @@ sub strip_prefix {
 
 Configures the Traefik redirectScheme middleware to issue a permanent 301
 redirect from the current listener to C<https>. The wire block is
-C<< { scheme =E<gt> 'https', permanent =E<gt> 1 } >>. Returns C<$self> for
+C<< { scheme => 'https', permanent => 1 } >>. Returns C<$self> for
 chaining.
 
 =cut

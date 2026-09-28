@@ -18,7 +18,7 @@ requires qw( spec_set );
 Configures the Traefik inFlightConn middleware, which caps how many
 simultaneous TCP connections the middleware lets through -- once C<$amount>
 connections are open the next one is closed rather than queued. Writes the
-C<< spec.inFlightConn = { amount =E<gt> $amount } >> block, replacing any
+C<< spec.inFlightConn = { amount => $amount } >> block, replacing any
 prior one. Passing no amount writes an empty C<< {} >> rather than a
 populated block. Returns C<$self> for chaining.
 
@@ -41,7 +41,7 @@ sub in_flight_conn {
 Configures the Traefik ipAllowList middleware to accept connections only
 from the given client IPs, each written either as a plain address or in
 CIDR notation. The ranges are written as a single
-C<< { sourceRange =E<gt> [...] } >> block, replacing any prior ipAllowList
+C<< { sourceRange => [...] } >> block, replacing any prior ipAllowList
 block. Pass an empty list to emit an empty C<ipAllowList.sourceRange>
 array. Returns C<$self> for chaining.
 

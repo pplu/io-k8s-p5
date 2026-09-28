@@ -16,8 +16,8 @@ requires qw( spec_array spec_get spec_push spec_set );
     $obj->set_weighted($name, $weight);
 
 Upserts a weighted backend into C<spec.weighted.services>. If a backend with
-C<name =E<gt> $name> already exists its weight is replaced; otherwise the
-C<< { name =E<gt> $name, weight =E<gt> $weight } >> entry is appended. The
+C<< name => $name >> already exists its weight is replaced; otherwise the
+C<< { name => $name, weight => $weight } >> entry is appended. The
 shape matches Istio's DestinationRule C<trafficPolicy> weighted subset
 semantics -- useful when a CRD consumer wants the same UX across several
 traffic-management kinds. Returns C<$self> for chaining.

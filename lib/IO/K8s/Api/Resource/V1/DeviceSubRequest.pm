@@ -73,7 +73,7 @@ k8s name => Str, 'required';
 
 =attr name
 
-Name can be used to reference this subrequest in the list of constraints or the list of configurations for the claim. References must use the format C<<main request>/<subrequest>>. Must be a DNS label.
+Name can be used to reference this subrequest in the list of constraints or the list of configurations for the claim. References must use the format C<< <main request>/<subrequest> >>. Must be a DNS label.
 
 =cut
 

@@ -78,7 +78,7 @@ sub select_pods {
 
 Adds an ingress rule allowing traffic from pods matching the given labels.
 C<$labels> is a hashref (the C<matchLabels> payload); C<ports> is an
-optional arrayref of C<< { port =E<gt> $n, protocol =E<gt> 'TCP' } >>
+optional arrayref of C<< { port => $n, protocol => 'TCP' } >>
 entries. Core K8s writes C<spec.ingress[].from[].podSelector>; Cilium
 writes C<spec.ingress[].fromEndpoints[].matchLabels>. Returns C<$self> for
 chaining.
@@ -109,8 +109,8 @@ sub allow_ingress_from_pods {
 
 Adds an ingress rule allowing traffic from the given CIDR ranges. Each CIDR
 is validated as having a C</> and being parseable by L<Net::IP>; croaks
-otherwise. C<ports> is an optional arrayref of C<< { port =E<gt> $n,
-protocol =E<gt> 'TCP' } >> entries. Core K8s writes
+otherwise. C<ports> is an optional arrayref of C<< { port => $n,
+protocol => 'TCP' } >> entries. Core K8s writes
 C<spec.ingress[].from[].ipBlock.cidr>; Cilium writes
 C<spec.ingress[].fromCIDR>. Returns C<$self> for chaining.
 
@@ -139,7 +139,7 @@ sub allow_ingress_from_cidrs {
 
 Adds an ingress rule allowing traffic from any pod in the named namespace.
 Internally selects on the well-known
-C<kubernetes.io/metadata.name =E<gt> $namespace> label (or its Cilium
+C<< kubernetes.io/metadata.name => $namespace >> label (or its Cilium
 equivalent C<k8s:io.kubernetes.pod.namespace>). C<ports> is optional.
 Returns C<$self> for chaining.
 

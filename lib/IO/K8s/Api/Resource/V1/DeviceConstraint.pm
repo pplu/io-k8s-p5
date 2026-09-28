@@ -29,7 +29,7 @@ k8s requests => [Str];
 
 =attr requests
 
-Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim. References to subrequests must include the name of the main request and may include the subrequest using the format C<<main request>/<subrequest>>. If just the main request is given, the constraint applies to all subrequests.
+Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim. References to subrequests must include the name of the main request and may include the subrequest using the format C<< <main request>/<subrequest> >>. If just the main request is given, the constraint applies to all subrequests.
 
 =cut
 

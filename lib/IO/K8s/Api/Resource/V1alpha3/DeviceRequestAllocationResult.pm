@@ -25,7 +25,7 @@ k8s pool => Str, 'required';
 
 =attr pool
 
-This name together with the driver name and the device name field identify which device was allocated (C<E<lt>driver nameE<gt>/E<lt>pool nameE<gt>/E<lt>device nameE<gt>>).
+This name together with the driver name and the device name field identify which device was allocated (C<< <driver name>/<pool name>/<device name> >>).
 
 Must not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.
 

@@ -68,7 +68,7 @@ names (D6) come in. Checked before L</overlay>'s own C<names> map.
 
 =attr overlay
 
-The per-Kind slice of a provider's C<maint/crd-render/E<lt>ProviderE<gt>.yaml>
+The per-Kind slice of a provider's C<< maint/crd-render/<Provider>.yaml >>
 (the render-side counterpart of L</names>): a hashref with C<with> (arrayref
 of role class names composed on one C<with> line), C<extra> (arrayref of
 verbatim source lines rendered right after the C<with> line) and C<names>

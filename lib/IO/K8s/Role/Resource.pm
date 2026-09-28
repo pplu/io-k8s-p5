@@ -254,7 +254,7 @@ attribute walk never sees as a field of its own.
 
 An instance created through L<IO::K8s> with C<< strict => 1 >> turns this
 into a fatal error instead: any key that would otherwise land in the bag
-dies as C<Unknown field 'E<lt>nameE<gt>' for E<lt>classE<gt>>, again at every
+dies as C<< Unknown field '<name>' for <class> >>, again at every
 nesting level, for the duration of that call.
 
 Since k99, L<IO::K8s::List> -- the generic envelope a list Kind (C<PodList>,
@@ -297,7 +297,7 @@ L<IO::K8s::Role::APIObject>, the C<apiVersion>, C<kind> and C<metadata>
 fields are prepended.
 
 A field that holds C<undef> is omitted -- unless it is declared
-C<nullable> and present, which C<has_E<lt>accessorE<gt>> tells: that one is
+C<nullable> and present, which C<< has_<accessor> >> tells: that one is
 written as an explicit JSON C<null> (k158; see
 L<IO::K8s::Resource/Field options>).
 

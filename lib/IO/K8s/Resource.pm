@@ -1216,8 +1216,8 @@ L<IO::K8s::Role::Resource/FROM_HASH>, C<from_json> and the nested coercion
 of a constructor, at any depth) keeps a C<null> for it where every other
 field drops it. C<TO_JSON> writes a nullable field that is present with
 C<undef> as C<null>; an absent one stays omitted. Only a nullable field
-gets the two methods that tell those apart: C<has_E<lt>accessorE<gt>>, true
-while the key exists, C<null> included, and C<clear_E<lt>accessorE<gt>>,
+gets the two methods that tell those apart: C<< has_<accessor> >>, true
+while the key exists, C<null> included, and C<< clear_<accessor> >>,
 which makes the field absent again. C<< required => 1 >> together with
 C<nullable> means the key has to exist, and C<null> satisfies it. For every
 field without C<nullable>, C<undef> and C<null> still mean "absent".
@@ -1263,7 +1263,7 @@ itself outside the C<k8s> DSL (a plain C<has>): C<< k8s: field '<name>' of
 outside the k8s DSL >>.
 
 =item * A C<nullable> field whose predicate or clearer name
-(C<has_E<lt>accessorE<gt>>, C<clear_E<lt>accessorE<gt>>) the class already
+(C<< has_<accessor> >>, C<< clear_<accessor> >>) the class already
 answers to -- a method, or the accessor of another field -- other than as
 this very field's own, declared before or inherited (k158): C<< k8s: field
 '<name>' of <class> needs the method '<method>' as a nullable field, but

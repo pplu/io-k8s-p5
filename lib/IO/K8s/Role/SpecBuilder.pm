@@ -616,7 +616,7 @@ remove, so it is cleared to C<undef> through its accessor instead --
 which croaks on a C<required> field, because its type constraint is not
 C<Maybe>-wrapped and rejects C<undef> the same as any other bad value.
 A C<nullable> field is the exception (k158): C<undef> would leave it
-present with an explicit C<null>, so its C<clear_E<lt>accessorE<gt>> removes
+present with an explicit C<null>, so its C<< clear_<accessor> >> removes
 it instead and it is omitted from C<TO_JSON> again.
 For an array parent the indexed element is spliced out. If
 the path does not resolve -- C<spec> is unset, a parent is missing, or the
@@ -754,7 +754,7 @@ inside the distribution (k175).
 
 L<IO::K8s::Role::APIObject> composes this role, so every top-level Kind
 has it: the built-in Kubernetes kinds, CRD classes declared via
-C<use IO::K8s::APIObject api_version =E<gt> ..., ...>, and the classes
+C<< use IO::K8s::APIObject api_version => ..., ... >>, and the classes
 L<IO::K8s::AutoGen> builds at runtime, which compose
 L<IO::K8s::Role::APIObject> directly. Before 1.108 only CRD classes got
 it, and composing one of the builder roles
@@ -772,7 +772,7 @@ every one of them croaks
 
 naming the class, at the caller's line. Composition does not fail for
 those Kinds: this role is composed before the class's own
-C<k8s spec =E<gt> ...> line runs, so a C<requires 'spec'> would reject
+C<< k8s spec => ... >> line runs, so a C<requires 'spec'> would reject
 every consumer, including the ones that do declare one.
 
 =head2 Union fields

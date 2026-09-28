@@ -132,7 +132,7 @@ schema to model further).
 
 C<cilium.io/v2alpha1> is modeled to full depth the same way -- 12 Kinds
 (the five v2alpha1-only Kinds plus the seven BGP/CIDR/LoadBalancerIPPool
-back-compat tracks, which share the very C<kinds.E<lt>KindE<gt>> overlay
+back-compat tracks, which share the very C<< kinds.<Kind> >> overlay
 entry the C<cilium.io/v2> render of the same Kind uses -- the version
 directory alone disambiguates, so a Go type is never accidentally shared
 I<across> C<v2>/C<v2alpha1>), under C<IO::K8s::Cilium::V2alpha1::*>.

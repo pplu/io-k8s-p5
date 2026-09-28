@@ -61,7 +61,7 @@ k8s pool => Str, 'required';
 
 =attr pool
 
-This name together with the driver name and the device name field identify which device was allocated (C<E<lt>driver nameE<gt>/E<lt>pool nameE<gt>/E<lt>device nameE<gt>>).
+This name together with the driver name and the device name field identify which device was allocated (C<< <driver name>/<pool name>/<device name> >>).
 
 Must not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.
 
@@ -71,7 +71,7 @@ k8s request => Str, 'required';
 
 =attr request
 
-Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format C<<main request>/<subrequest>>.
+Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format C<< <main request>/<subrequest> >>.
 
 Multiple devices may have been allocated per request.
 

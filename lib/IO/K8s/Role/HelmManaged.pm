@@ -123,8 +123,8 @@ C<spec_*> methods, so the methods work whether the underlying C<spec>
 attribute is a plain hash or a typed object.
 
 Use this role on a custom CRD class with
-C<api_version =E<gt> 'helm.cattle.io/v1'> or
-C<api_version =E<gt> 'k3s.cattle.io/v1'>, or compose it on the bundled
+C<< api_version => 'helm.cattle.io/v1' >> or
+C<< api_version => 'k3s.cattle.io/v1' >>, or compose it on the bundled
 L<IO::K8s::K3s::V1::HelmChart> / L<IO::K8s::K3s::V1::HelmChartConfig>
 classes to add the helpers at runtime.
 

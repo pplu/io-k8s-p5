@@ -1833,7 +1833,7 @@ Optional. Boolean, default C<0>. Governs what happens when a constructor key
 matches no declared attribute, at any nesting level. With the default C<0> the
 field is kept and re-emitted by C<TO_JSON> (see
 L<IO::K8s::Role::Resource/UNKNOWN FIELDS>); with C<1> it dies instead, with
-C<Unknown field 'E<lt>nameE<gt>' for E<lt>classE<gt>>.
+C<< Unknown field '<name>' for <class> >>.
 
     my $k8s = IO::K8s->new(strict => 1);
     $k8s->new_object('Pod', { spec => { bogusField => 1 } });
@@ -1901,8 +1901,8 @@ own copy, so modifications via C<add()> do not affect other instances.
 
 =head2 json
 
-A L<JSON::MaybeXS> encoder/decoder configured with C<utf8 =E<gt> 1> and
-C<canonical =E<gt> 1>. Used by L</object_to_json>, L</json_to_object> and
+A L<JSON::MaybeXS> encoder/decoder configured with C<< utf8 => 1 >> and
+C<< canonical => 1 >>. Used by L</object_to_json>, L</json_to_object> and
 L</inflate> for their default encoding/decoding. Override at construction
 when the caller needs a different encoder (for example, to disable
 C<canonical> for tighter output, or to swap in a different backend):
@@ -2180,7 +2180,7 @@ an omitted field are unaffected and remain allowed.
 A JSON C<null> (C<undef>) for a field counts as the field being omitted --
 except for a field declared C<nullable> (see
 L<IO::K8s::Resource/Field options>), where it is kept: the attribute exists
-with C<undef>, its C<has_E<lt>accessorE<gt>> is true, and C<TO_JSON> writes
+with C<undef>, its C<< has_<accessor> >> is true, and C<TO_JSON> writes
 the C<null> back (k158). That too holds on every entry point listed above
 and at any depth.
 

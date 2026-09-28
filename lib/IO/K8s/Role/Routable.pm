@@ -75,11 +75,11 @@ C<hostnames> list.
 
 =item * C<'traefik'> -- Traefik IngressRoute. Adds a new C<routes> entry
 whose C<match> string combines each hostname with C<Host(`...`)>, e.g.
-C<< match =E<gt> 'Host(`example.com`), Host(`api.example.com`)' >>.
+C<< match => 'Host(`example.com`), Host(`api.example.com`)' >>.
 
 =item * C<'ingress'> -- core Kubernetes Ingress. Appends an
 L<IO::K8s::Api::Networking::V1::IngressRule> per hostname with
-C<host =E<gt> $hostname>.
+C<< host => $hostname >>.
 
 =back
 
@@ -288,7 +288,7 @@ sub add_path_match {
 
 Adds a header-based match to the most recently added routing rule.
 Gateway API appends to the last match's C<headers> array as
-C<< { name =E<gt> $header, value =E<gt> $value } >>; Traefik extends the
+C<< { name => $header, value => $value } >>; Traefik extends the
 route's C<match> string with C<< && Header(`<name>`, `<value>`) >>.
 Core Ingress does not support header matching natively and the call is a
 no-op in that mode. Returns C<$self> for chaining.
