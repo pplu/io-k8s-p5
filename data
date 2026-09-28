@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-09-28T02:04:05Z
+claimed_by: orchestrator
+class: standard
+completed: 2026-09-28T02:04:05Z
+created: 2026-09-27T22:36:06Z
+id: 183
+priority: low
+started: 2026-09-28T01:57:38Z
+status: done
+tags:
+- specbuilder
+- errors
+title: 'SpecBuilder: Inflate-Fehler typisierter Felder ohne spec path-Präfix'
+updated: 2026-09-28T02:04:05Z
+---
+
+Gefunden bei k175 (2026-09-28), vorbestehend. _sb_inflate läuft außerhalb von _sb_guard; Fehler beim Inflaten eines Hashs für ein typisiertes Feld kommen ohne das Präfix spec path '...':, das die k101-POD verspricht. Entweder in den Guard ziehen oder die POD korrigieren.
+
+2026-09-28 02:04 Committed as 43a90b64: qualified the SpecBuilder DESCRIPTION prefix promise with the k175 typed-field inflate exception. POD only, no code/behavior change; t/143 pins the behavior.
