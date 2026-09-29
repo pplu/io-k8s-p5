@@ -498,17 +498,23 @@ sub to_json {
     my $yaml_string = $pod->TO_YAML;
 
 Returns a YAML string for the object, built via L<YAML::PP> on top of
-L</TO_JSON>. Uses the JSON schema with JSON booleans (so C<true>/C<false>
-survive the round-trip the way they would to the API server). Symmetric
-to L</TO_JSON> -- the YAML is just another wire format over the same
-canonical struct.
+L</TO_JSON>. Real booleans and numbers go out bare. A string is quoted
+whenever a JSON, YAML 1.2 core or YAML 1.1 reader would take its bare form
+for a boolean, null or number (C<True>, C<yes>, C<on>, C<~>, C<012>,
+C<0x1F>, C<+1>, ...), so kubectl and the API server read it back as a
+string. Symmetric to L</TO_JSON> -- the YAML is just another wire format
+over the same canonical struct.
 
 =cut
 
 sub TO_YAML {
     my $self = shift;
     require YAML::PP;
-    my $yp = YAML::PP->new(schema => [qw/JSON/], boolean => 'JSON::PP');
+    # Dumping with all three schemas quotes the union of what each would
+    # resolve to a non-string; kubectl reads YAML 1.1 (go-yaml v2), so the
+    # JSON schema alone left True, yes, on, ~, 012 bare (k188). Typed
+    # values emit the same under all three: they share JSON's representers.
+    my $yp = YAML::PP->new(schema => [qw/JSON Core YAML1_1/], boolean => 'JSON::PP');
     return $yp->dump_string($self->TO_JSON);
 }
 

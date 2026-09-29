@@ -668,11 +668,10 @@ sub to_crd {
     return IO::K8s::CRD::crd_for_class(ref($self) || $self);
 }
 
+# One YAML emitter for every object: IO::K8s::Role::Resource's TO_YAML (k188).
 sub to_yaml {
     my ($self) = @_;
-    require YAML::PP;
-    my $yp = YAML::PP->new(schema => [qw/JSON/], boolean => 'JSON::PP');
-    return $yp->dump_string($self->TO_JSON);
+    return $self->TO_YAML;
 }
 
 =method to_yaml

@@ -2,6 +2,17 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - to_yaml, TO_YAML and save now quote every string that a JSON, YAML 1.2
+    core or YAML 1.1 reader would take for a boolean, null or number (True,
+    False, yes, No, on, ~, Null, 012, 0x1F, +1, 1_000, .inf, ...). Before,
+    only strings JSON would misread were quoted, so kubectl and the API
+    server, which resolve YAML 1.1, read such label, annotation and env
+    values and condition statuses as booleans, nulls or numbers, and a
+    generated CRD's enum [True, False, Unknown] arrived as
+    [true, false, "Unknown"]. Real booleans and numbers are still emitted
+    bare, and the output is unchanged for every other value. Every object's
+    to_yaml now goes through the one TO_YAML emitter.
+
   - AgentSandbox and PrometheusOperator now reuse the shipped core classes
     for their embedded pod and volume-claim templates: Sandbox and
     SandboxTemplate podTemplate is Core::V1::PodTemplateSpec, and every
