@@ -1,0 +1,71 @@
+---
+claimed_at: 2026-09-29T18:41:27Z
+claimed_by: io-k8s-p5
+class: standard
+completed: 2026-09-29T18:41:27Z
+created: 2026-09-29T17:11:11Z
+id: 188
+priority: high
+started: 2026-09-29T18:23:55Z
+status: done
+tags:
+- bug
+- yaml
+- serialization
+title: to_yaml leaves YAML 1.1 words (True, False, yes, No, on, ~, 0x1F, +1) unquoted,
+  so kubectl reads string values as booleans, nulls and numbers
+updated: 2026-09-29T18:41:27Z
+---
+
+Found while reviewing Kubernetes::Comb for its first release (2026-09-29). Reproduces on the released 1.108 and on the current tree.
+
+## What happens
+
+TO_YAML / to_yaml (lib/IO/K8s/Role/Resource.pm, lib/IO/K8s/Role/APIObject.pm) dump with YAML::PP->new(schema => [qw/JSON/], boolean => "JSON::PP"). The JSON schema only quotes strings that JSON itself would read as something else: true, false, null and JSON numbers. Every other word that a YAML 1.1 or YAML 1.2 core parser resolves to a non-string goes out bare.
+
+YAML::PP 0.41 dumping the same list of Perl strings per schema:
+
+    JSON     True False yes No on OFF y N ~ Null 0x1F 0o14 012 1_000 190:20:30 .inf .NaN "1e3" +1 "true" "null" "123"
+    Core     "True" "False" yes No on OFF y N "~" "Null" "0x1F" "0o14" "012" 1_000 190:20:30 ".inf" ".NaN" "1e3" "+1" ...
+    YAML1_1  "True" "False" "yes" "No" "on" "OFF" "y" "N" "~" "Null" "0x1F" 0o14 "012" "1_000" "190:20:30" ".inf" ".NaN" 1e3 "+1" ...
+
+A YAML 1.1 parser (PyYAML safe_load, checked) reads the bare forms as: True/False/yes/No/on/OFF -> boolean, ~ and Null -> null, 0x1F -> 31, 012 -> 10, 1_000 -> 1000, 190:20:30 -> 685230, .inf/.NaN -> float, +1 -> 1. kubectl and the API server parse YAML through sigs.k8s.io/yaml on go-yaml v2, which follows the YAML 1.1 resolution for these words; that part is from knowledge of the library, not checked against a cluster here.
+
+## Why it matters
+
+The documented use of to_yaml is "suitable for kubectl apply -f". Concrete damage:
+
+1. Kubernetes::Comb::CRD::CombCondition declares status with enum => [qw( True False Unknown )] -- the standard Kubernetes condition values. to_crd->to_yaml emits
+
+       enum:
+       - True
+       - False
+       - Unknown
+
+   which a YAML 1.1 reader takes as [true, false, "Unknown"]. A CRD installed that way rejects every status whose condition is "True" or "False". Any CRD class with a condition enum is affected, not only the Comb one. The JSON path (TO_JSON, Kubernetes::REST->ensure_crd) is correct: "enum":["True","False","Unknown"].
+2. A condition object itself dumps as "status: True".
+3. Plain string fields: a label value "yes", an env value "on", spec.class "No", an annotation "012" all change type on the way into the cluster and are then rejected (labels and env values must be strings) or silently altered.
+
+Round trips inside Perl hide it: YAML::XS and YAML::PP with the default schema read True and yes back as strings.
+
+## Repro
+
+    perl -MIO::K8s::Api::Core::V1::ConfigMap -e "print IO::K8s::Api::Core::V1::ConfigMap->new(metadata => { name => q(x), labels => { a => q(yes), b => q(True), c => q(012) } })->to_yaml"
+
+    perl -MKubernetes::Comb::CRD::Comb -e "print Kubernetes::Comb::CRD::Comb->to_crd->to_yaml" | grep -A3 enum:
+
+## Expected
+
+A string value is emitted so that every YAML reader Kubernetes tooling uses gets a string back: quoted whenever the JSON, Core or YAML 1.1 schema would resolve the bare form to a boolean, null or number. No single YAML::PP schema covers it (YAML1_1 leaves 1e3 and 0o14 bare, Core leaves yes/No/on bare, JSON leaves nearly all), so the emitter needs the union. Real booleans and numbers (JSON::PP booleans, Int/Num fields) stay bare. A regression test should parse the output with a YAML 1.1 resolution and compare types, not only round-trip through YAML::PP.
+
+## Consumers waiting on this
+
+Kubernetes::Comb: examples/sync.pl and examples/async.pl document "print Kubernetes::Comb::CRD::Comb->to_crd->to_yaml | kubectl apply -f -" as the way to install the CRD. Its first release should depend on the IO::K8s release that carries this fix.
+
+2026-09-29 headless run (Kubernetes::Comb orchestrator): working test-first. Dump sites in lib/: only Role/Resource.pm TO_YAML and Role/APIObject.pm to_yaml (save and to_crd->to_yaml go through them; CRD::Emitter renders Perl, no YAML dump). Probe: YAML::PP 0.41 schema => [qw/JSON Core YAML1_1/] quotes the union of all three resolvers.
+
+2026-09-29 18:36 Fixed (worker, uncommitted): Role::Resource TO_YAML now dumps with YAML::PP schema [JSON Core YAML1_1], boolean JSON::PP; Role::APIObject to_yaml delegates to TO_YAML, so one emitter construction. Re-verified: only those two dump_string sites in lib/, no other to_yaml/TO_YAML overrides. Equivalence: the three schemas share JSON's represent_int/float/undef/bool, only the quoting set grows; probe over full suite (36 dump calls), 40 YAML docs loaded by t/25,26,05,to_yaml,24,128,145, and synthetic ints/floats/inf/bools/undef/empty/multiline/UTF-8: byte-identical output except the k188 words. t/150 green incl. PyYAML subtest; prove -lr t/: Files=146 Tests=9246 PASS. Card not moved per orchestrator.
+
+Fix: Role::Resource TO_YAML dumps with YAML::PP schema => [qw/JSON Core YAML1_1/] (union of the three resolvers); Role::APIObject to_yaml delegates to TO_YAML, so save and to_crd->to_yaml share it. Regression t/150_k188_yaml_string_quoting.t (YAML1_1/Core/JSON reload types + optional PyYAML) was red 6/7 before, green after. Existing dumps byte-identical (worker probe); no existing test claim replaced. prove -lr t/ unit mode: Files=146 Tests=9246 PASS. Not checked against a real kubectl/cluster.
+
+2026-09-29 18:41 Committed as 1d604156
