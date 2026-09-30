@@ -1,0 +1,14 @@
+---
+class: standard
+created: 2026-09-30T16:20:33Z
+id: 193
+priority: low
+status: backlog
+tags:
+- dsl
+- cosmetic
+title: 'Cosmetic: remaining { X => 1 } maps to HashRef[X]'
+updated: 2026-09-30T16:20:33Z
+---
+
+Out of scope for k191 per spec (/home/getty/dev/perl-developer/docs/superpowers/specs/2026-09-30-io-k8s-typed-maps-design.md, 'Nicht im Scope'): switch the remaining { X => 1 } declarations in the tree to HashRef[X], target 1.110. Also removes the lenient { Str => 1 } from real string maps (HashRef[Str] is strict), which lets maint/crd-drift-check.pl drop its HashRef[X] == { X => 1 } normalization in _structural_signature.
