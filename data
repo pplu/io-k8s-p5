@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-09-30T05:37:00Z
+claimed_by: io-k8s-release-manager
+class: standard
+completed: 2026-09-30T05:36:54Z
+created: 2026-09-30T05:15:11Z
+id: 190
+priority: low
+started: 2026-09-30T05:24:55Z
+status: done
+tags:
+- docs
+- pod
+title: Remove internal karr ids from shipped POD
+updated: 2026-09-30T05:37:00Z
+---
+
+Pre-release audit 1.109: 104 POD lines in 16 lib files cite internal board ids such as (k35), (k175) -- unreadable for CPAN readers (house rule: reference only the tracker the repo publishes). Heaviest: IO/K8s.pm 19, AutoGen.pm 19, Role/SpecBuilder.pm 12, Role/Resource.pm 9, List.pm 8. Code comments may keep them. Owner: io-k8s-doc-writer. Not a release blocker (1.108 already shipped such references).
+
+io-k8s-doc-writer: removed karr ids from POD in 16 lib files (112+/113-). 'Since k99' -> 'Since 1.108', 'since k158' -> 'since 1.109', 'Before that' (k116) -> 'Before 1.108'; '(kNN; see' -> '(see'. Code comments untouched. Changes {{$NEXT}} had no karr ids. Left in place: design-decision id D10 in AutoGen/CRD/Emitter POD (out of scope, not a karr id). Verified: POD karr-id scan 0, podchecker OK on 16 built files, pod-angle-lint clean, prove -lr t/ PASS (146 files, 9246 tests, unit mode, no skips), dzil build clean.
+
+Committed as 2d1d84e2 (Remove internal karr ids from shipped POD (k190)). No Changes entry: POD-only cleanup, no user-visible behavior change.
