@@ -59,13 +59,14 @@ use IO::K8s;
 }
 
 {
-    # A genuinely opaque spec ({ Str => 1 }, per IO::K8s::APIObject's own
-    # CRD synopsis and TestSB::OpaqueThing in t/68_specbuilder_objects.t):
-    # there is no field type to enforce here, so element writes are
-    # expected to keep behaving exactly as before the fix.
+    # A genuinely opaque spec: there is no field type to enforce here, so
+    # element writes are expected to keep behaving exactly as before the fix.
+    # k191: declared Opaque now. It was `{ Str => 1 }`, which used to be the
+    # opaque map and is a string map since k191; the GUARD below (values keep
+    # their JSON types) is about the opaque map, so only the spelling moved.
     package T147::Opaque;
     use IO::K8s::APIObject api_version => 'test.example.com/v1';
-    k8s spec => { Str => 1 };
+    k8s spec => Opaque;
 }
 
 my $k8s = IO::K8s->new;
@@ -264,10 +265,10 @@ subtest 'GUARD: a spec_array reference stays connected after a successful spec_p
     is(scalar(@$ref), 1, 'and the reference taken beforehand now shows the new element');
 };
 
-# Claim: an opaque spec ({ Str => 1 }) has no field type to enforce, so its
+# Claim: an opaque spec (Opaque) has no field type to enforce, so its
 # element writes must keep behaving exactly as before the fix -- arbitrary
 # values pass through untouched and keep their JSON types on the wire.
-subtest 'GUARD: opaque spec ({ Str => 1 }) element writes are unaffected' => sub {
+subtest 'GUARD: opaque spec (Opaque) element writes are unaffected' => sub {
     my $obj = T147::Opaque->new(metadata => { name => 'o' }, spec => { rules => [] });
     $obj->spec_push('rules', 'x', 3, { a => 1 });
     is_deeply($obj->spec->{rules}, [ 'x', 3, { a => 1 } ],

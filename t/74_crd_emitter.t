@@ -72,7 +72,9 @@ subtest 'field lines render every type form and the options' => sub {
     like($src, qr/^k8s limit\s+=> '\+TestEmit::V1::RateLimit';$/m, 'nested object via the name map');
     like($src, qr/^k8s routes\s+=> \['\+TestEmit::V1::KnobSpecRoutesItem'\];$/m, 'array of objects');
     like($src, qr/^k8s size\s+=> IntOrStr;$/m, 'int-or-string');
-    like($src, qr/^k8s extra\s+=> \{ Str => 1 \}, \{ preserve_unknown => 1 \};$/m, 'opaque map with a schema-only option');
+    # k191: the opaque map renders as Opaque; { Str => 1 } is the string map
+    # since then. Same claim, the opaque map's spelling changed.
+    like($src, qr/^k8s extra\s+=> Opaque, \{ preserve_unknown => 1 \};$/m, 'opaque map with a schema-only option');
     like($src, qr/^=attr mode\n\nOperating mode\.\n/m, 'description becomes the =attr text');
     like($src, qr/^=attr replicas\n\nNo description in the upstream schema\.\n/m, 'fallback text');
     unlike($src, qr/description =>/, 'description is not repeated as an option');

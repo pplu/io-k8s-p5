@@ -16,7 +16,7 @@ k8s metadataConfig       => '+IO::K8s::PrometheusOperator::V1::MetadataConfig';
 k8s name                 => Str;
 k8s noProxy              => Str;
 k8s oauth2               => '+IO::K8s::PrometheusOperator::V1::OAuth2';
-k8s proxyConnectHeader   => { Str => 1 };
+k8s proxyConnectHeader   => Opaque;
 k8s proxyFromEnvironment => Bool;
 k8s proxyUrl             => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s queueConfig          => '+IO::K8s::PrometheusOperator::V1::QueueConfig';

@@ -181,7 +181,7 @@ If the OS field is set to windows, following fields must be unset: - spec.hostPI
 
 =cut
 
-k8s overhead => { Str => 1 };
+k8s overhead => HashRef[Quantity];
 
 =attr overhead
 

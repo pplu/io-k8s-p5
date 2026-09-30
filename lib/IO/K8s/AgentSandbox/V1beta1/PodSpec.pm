@@ -23,7 +23,7 @@ k8s initContainers                => ['Core::V1::Container'];
 k8s nodeName                      => Str;
 k8s nodeSelector                  => { Str => 1 };
 k8s os                            => '+IO::K8s::AgentSandbox::V1beta1::PodOS';
-k8s overhead                      => { Str => 1 };
+k8s overhead                      => HashRef[Quantity];
 k8s preemptionPolicy              => Str;
 k8s priority                      => Int;
 k8s priorityClassName             => Str;

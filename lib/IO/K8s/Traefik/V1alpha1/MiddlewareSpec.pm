@@ -20,7 +20,7 @@ k8s inFlightReq       => '+IO::K8s::Traefik::V1alpha1::InFlightReq';
 k8s ipAllowList       => '+IO::K8s::Traefik::V1alpha1::IPAllowList';
 k8s ipWhiteList       => '+IO::K8s::Traefik::V1alpha1::IPWhiteList';
 k8s passTLSClientCert => '+IO::K8s::Traefik::V1alpha1::PassTLSClientCert';
-k8s plugin            => { Str => 1 };
+k8s plugin            => Opaque;
 k8s rateLimit         => '+IO::K8s::Traefik::V1alpha1::RateLimit';
 k8s redirectRegex     => '+IO::K8s::Traefik::V1alpha1::RedirectRegex';
 k8s redirectScheme    => '+IO::K8s::Traefik::V1alpha1::RedirectScheme';

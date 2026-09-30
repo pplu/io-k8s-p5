@@ -289,10 +289,15 @@ string, the form Kubernetes writes both in -- a scalar field, each value of
 a C<< { Quantity => 1 } >> or C<< { Time => 1 } >> map and each element of a
 C<[Quantity]> or C<[Time]> array alike: C<< limits => { cpu => 1 } >> is
 emitted as C<{"cpu":"1"}>. The object keeps the value it was
-given. The opaque
-C<< { Str => 1 } >> hash form (labels, annotations, C<fieldsV1>, ...) is
-exempt from that coercion -- its values are copied through unchanged,
-keeping whatever JSON type they already had. For classes that compose
+given. Each value of a string map -- C<< { Str => 1 } >> or
+C<HashRef[Str]>: labels, annotations, ConfigMap C<data>, ... -- goes out as
+a JSON string too, so C<< labels => { v => 5 } >> is C<{"v":"5"}>. A
+reference value in a C<< { Str => 1 } >> map is copied through unchanged
+and warns once per class and field, in the C<deprecated> category: declare
+such a field C<Opaque> or C<HashRef[...]>. The free map, C<Opaque> or a
+bare C<HashRef> (C<fieldsV1>, a C<RawExtension>, ...), is exempt from all
+of this -- its values are copied through unchanged, keeping whatever JSON
+type they already had. For classes that compose
 L<IO::K8s::Role::APIObject>, the C<apiVersion>, C<kind> and C<metadata>
 fields are prepended.
 
@@ -395,6 +400,29 @@ sub TO_JSON {
                 my $v = $value->{$_};
                 $_ => (defined($v) && !ref($v) ? "$v" : $v)
             } keys %$value };
+        } elsif ($attr_info->{is_hash_of_str}) {
+            # The string map (k191): every scalar value a JSON string, the
+            # rule a [Str] element follows (k145) -- labels => { v => 5 }
+            # used to go out as {"v":5} and the API server answered 400 --
+            # in a new hash (k54), the object keeping what it was given.
+            # undef and a reference go out as they are. A reference can only
+            # sit in the lenient { Str => 1 } form (HashRef[Str] refuses one
+            # at construction, but a write through the accessor's hashref
+            # can still put one there), and there it is the opaque-map use
+            # that form served until k191, so it is reported, once per class
+            # and field (_warn_lenient_ref).
+            my %out;
+            for my $k (keys %$value) {
+                my $v = $value->{$k};
+                if (ref $v) {
+                    _warn_lenient_ref(ref($self) || $self, $key, $k)
+                        if $attr_info->{is_hash_of_str_lenient};
+                    $out{$k} = $v;
+                } else {
+                    $out{$k} = defined $v ? "$v" : $v;
+                }
+            }
+            $data{$key} = \%out;
         } elsif ($attr_info->{is_array_of_int}) {
             $data{$key} = [ map { int($_) } @$value ];
         } elsif ($attr_info->{is_array_of_num}) {
@@ -476,6 +504,26 @@ sub TO_JSON {
         }
     }
     return \%data;
+}
+
+# The deprecation warning of the lenient string map (k191): a { Str => 1 }
+# field holding a reference is an opaque map declared the pre-k191 way. Once
+# per class and field for the life of the process, in the 'deprecated'
+# category of the code that serialized it, so `no warnings 'deprecated'`
+# there silences it and $SIG{__WARN__} sees it. Counted only when actually
+# emitted: a serialization with the category switched off does not use up
+# the one warning a later one should get.
+my %_lenient_ref_warned;
+
+sub _warn_lenient_ref {
+    my ($class, $field, $map_key) = @_;
+    return if $_lenient_ref_warned{$class}{$field};
+    return unless warnings::enabled('deprecated');
+    $_lenient_ref_warned{$class}{$field} = 1;
+    warnings::warn('deprecated', "IO::K8s: field '$field' of $class is declared "
+        . "{ Str => 1 }, a map of strings, but holds a reference (at key "
+        . "'$map_key'); it is passed through unchanged. If the field is not a "
+        . 'map of strings, declare it as Opaque or HashRef[...]');
 }
 
 =method to_json
@@ -695,6 +743,7 @@ sub _describe_local_type {
     return 'array<object>'  if $info->{is_array_of_objects};
     return 'hash<string>'   if $info->{is_hash_of_str};
     return 'hash<object>'   if $info->{is_hash_of_objects};
+    return 'object'         if $info->{is_hash_opaque};
     return 'object'         if $info->{is_object};
     return 'unknown';
 }

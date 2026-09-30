@@ -7,8 +7,8 @@ use IO::K8s::APIObject
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec => {
-    podTemplate           => { Str => 1 },
-    volumeClaimTemplates  => { Str => 1 },
+    podTemplate           => Opaque,
+    volumeClaimTemplates  => ['Core::V1::PersistentVolumeClaimTemplate'],
     shutdownTime          => Time,
     shutdownPolicy        => Str,
     replicas              => Int,
@@ -17,7 +17,7 @@ k8s spec => {
 k8s status => {
     serviceFQDN => Str,
     service     => Str,
-    conditions  => { Str => 1 },
+    conditions  => ['Meta::V1::Condition'],
     replicas    => Int,
     selector    => Str,
     podIPs      => [Str],

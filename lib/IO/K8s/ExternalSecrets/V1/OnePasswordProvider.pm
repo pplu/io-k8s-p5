@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s auth        => '+IO::K8s::ExternalSecrets::V1::OnePasswordAuth', { required => 'schema' };
 k8s connectHost => Str, { required => 'schema' };
-k8s vaults      => { Str => 1 }, { required => 'schema' };
+k8s vaults      => HashRef[Int], { required => 'schema' };
 
 =attr auth
 

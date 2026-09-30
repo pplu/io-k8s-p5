@@ -11,6 +11,7 @@ use Package::Stash;
 use Types::Standard qw( ArrayRef Bool HashRef InstanceOf Int Maybe Num Str );
 use IO::K8s::Types qw( IntOrStr Quantity Time );
 use IO::K8s::Role::Resource ();
+use namespace::clean ();
 use Scalar::Util qw( blessed reftype looks_like_number );
 use Carp qw( croak );
 use Sub::Util qw( subname );
@@ -103,12 +104,19 @@ sub _scalar_base_for {
     return $STR_ISA_MAP{$kind} // Str;
 }
 
-# Value types for the hash-of-scalar-type DSL form { TypeName => 1 } (k63).
-# 'Str' is deliberately NOT here: it keeps its historical bare-HashRef meaning,
-# the genuinely opaque string map that labels, annotations and fieldsV1 need.
-# Everything here constrains each VALUE against the scalar type, so a map
-# upstream declares as map[X]Quantity finally rejects cpu => 'banana' at
-# construction instead of at the API server.
+# Value types for the hash-of-scalar-type DSL form { TypeName => 1 } (k63),
+# and for HashRef[TypeName], which means the same (k191). Everything here
+# constrains each VALUE against the scalar type, so a map upstream declares
+# as map[X]Quantity finally rejects cpu => 'banana' at construction instead
+# of at the API server.
+#
+# 'Str' is NOT here: since k191 it is the string map (is_hash_of_str, every
+# scalar value a JSON string on the wire), and its two spellings validate
+# differently. HashRef[Str] is strict, a reference value is refused.
+# { Str => 1 } keeps the bare HashRef it always had and is marked
+# is_hash_of_str_lenient: it was the opaque map until k191, so a reference
+# value still passes and TO_JSON warns about it once per class and field.
+# The free map is Opaque (or a bare HashRef), flag is_hash_opaque.
 my %HASH_VALUE_TYPES = (
     Int      => { isa => Int,      flag => 'is_hash_of_int' },
     Num      => { isa => Num,      flag => 'is_hash_of_num' },
@@ -212,6 +220,22 @@ sub import {
     my $class = shift;
     my $caller = caller;
     $class->_setup_class($caller);
+    $class->_import_map_types($caller);
+}
+
+# HashRef and Opaque for map declarations (k191): `k8s data => HashRef[Str]`,
+# `k8s raw => Opaque`. Only here, where a class is compiled from source --
+# _setup_class also serves inline structs and IO::K8s::AutoGen, which build
+# their fields at runtime and never name a type in code. Both names are
+# swept from the package again once the scope that said `use` has finished
+# compiling (namespace::clean, the explicit-list form): the declarations
+# compiled against them keep working, but neither becomes a method of every
+# shipped class, which is what k118 took HashRef off (t/27_no_import_leak.t).
+sub _import_map_types {
+    my ($class, $target) = @_;
+    Types::Standard->import::into($target, qw( HashRef ));
+    IO::K8s::Types->import::into($target, qw( Opaque ));
+    namespace::clean->import(-cleanee => $target, qw( HashRef Opaque ));
 }
 
 sub _setup_class {
@@ -394,6 +418,39 @@ sub _takes_any_value {
         1;
     };
     return $class_name->can('FROM_STRUCT') ? 1 : 0;
+}
+
+# A map whose values have a type (k191): HashRef[X], and the { X => 1 } form
+# that means the same for every X but Str. Sets the registry flag in $info
+# and returns the field's type. X is a Type::Tiny value type: a scalar kind
+# by its name -- Str (the strict string map), Int, Num, Bool, IntOrStr,
+# Quantity, Time -- or InstanceOf[Class], the map of objects. The value
+# constraint is X itself, so HashRef[Time] checks what { Time => 1 } checks
+# and a lenient Str-based Time (IO::K8s::AutoGen's) stays lenient.
+sub _typed_map {
+    my ($info, $value_type, $opts, $where) = @_;
+    my $kind = $value_type->name;
+    if ($kind eq 'Str') {
+        $info->{is_hash_of_str} = 1;
+        return HashRef[ _constrain($value_type, 'Str', $opts, $where) ];
+    }
+    if (my $vt = $HASH_VALUE_TYPES{$kind}) {
+        $info->{ $vt->{flag} } = 1;
+        return HashRef[ _constrain($value_type, $kind, $opts, $where) ];
+    }
+    return _object_map($info, $value_type->class, $opts, $where)
+        if $value_type->isa('Type::Tiny::Class');
+    croak "k8s: cannot interpret the value type of $where: HashRef["
+        . $value_type->display_name . '] (a scalar type, or InstanceOf[Class])';
+}
+
+# The map of objects: { Class => 1 } and HashRef[InstanceOf[Class]].
+sub _object_map {
+    my ($info, $full_class, $opts, $where) = @_;
+    $info->{is_hash_of_objects} = 1;
+    $info->{class} = $full_class;
+    _reject_value_options($opts, $where);
+    return HashRef[InstanceOf[$full_class]];
 }
 
 sub _generate_inline_struct {
@@ -612,13 +669,24 @@ sub _declare_field {
     my %info;
     my $inner;
 
-    # Handle Type::Tiny objects directly (Str, Int, Bool, IntOrStr, Quantity, Time)
+    # Handle Type::Tiny objects directly (Str, Int, Bool, IntOrStr, Quantity,
+    # Time) -- and, since k191, the map types: Opaque or a bare HashRef is
+    # the free map, HashRef[X] a map whose values are X.
     if (_is_type_tiny($type_spec)) {
         my $kind  = $type_spec->name;
         my $flags = $TYPE_FLAGS{$kind};
         if ($flags) {
             %info  = %$flags;
             $inner = _constrain($type_spec, $kind, \%opts, $where);
+        } elsif ($kind eq 'Opaque' || $kind eq 'HashRef') {
+            # Values untyped and copied through as they are; there is no
+            # scalar to put a value option on.
+            $info{is_hash_opaque} = 1;
+            _reject_value_options(\%opts, $where);
+            $inner = HashRef;
+        } elsif ($type_spec->is_parameterized
+            && $type_spec->parameterized_from->name eq 'HashRef') {
+            $inner = _typed_map(\%info, $type_spec->type_parameter, \%opts, $where);
         }
     } elsif (!ref $type_spec) {
         if (my $flags = $TYPE_FLAGS{$type_spec}) {
@@ -703,22 +771,22 @@ sub _declare_field {
             # Hash-of-X pattern: { TypeName => 1 }
             my $vkind = $keys[0];
             if ($vkind eq 'Str') {
+                # The string map, lenient (k191): TO_JSON puts every scalar
+                # value out as a JSON string, but the check stays the bare
+                # HashRef it was while { Str => 1 } meant the opaque map, so
+                # a declaration still relying on that keeps loading and
+                # serializing -- its reference values pass through, with a
+                # one-time warning. HashRef[Str] is the strict spelling.
                 $info{is_hash_of_str} = 1;
-                # Use plain HashRef without inner constraint - K8s has nested hashes
-                # in fields like fieldsV1, annotations, labels which can have any structure
+                $info{is_hash_of_str_lenient} = 1;
                 _reject_value_options(\%opts, $where);
                 $inner = HashRef;
             } elsif (my $vt = $HASH_VALUE_TYPES{$vkind}) {
                 # { Quantity => 1 } and friends: a typed value map. Each value
                 # is validated against the scalar type (k63).
-                $info{$vt->{flag}} = 1;
-                $inner = HashRef[ _constrain($vt->{isa}, $vkind, \%opts, $where) ];
+                $inner = _typed_map(\%info, $vt->{isa}, \%opts, $where);
             } else {
-                my $full_class = _expand_class($vkind);
-                $info{is_hash_of_objects} = 1;
-                $info{class} = $full_class;
-                _reject_value_options(\%opts, $where);
-                $inner = HashRef[InstanceOf[$full_class]];
+                $inner = _object_map(\%info, _expand_class($vkind), \%opts, $where);
             }
         } else {
             # Inline struct: { field => TypeSpec, ... }
@@ -927,6 +995,26 @@ sub _declare_field {
             return \%out;
         });
     }
+    # Map of Bool (k191): a JSON boolean value -- what a decoded document
+    # carries -- becomes the 0/1 the value check accepts, through the same
+    # normalization the Bool field uses. Only reference values are touched:
+    # a plain scalar goes to `isa` as it is, so 'maybe' is still refused
+    # rather than read as true. A map whose values are all plain scalars is
+    # returned untouched.
+    elsif ($info{is_hash_of_bool}) {
+        @coerce = (coerce => sub {
+            return $_[0] unless ref $_[0] eq 'HASH';
+            my $in = $_[0];
+            return $in unless grep { ref } values %$in;
+            my %out;
+            for my $key (keys %$in) {
+                my $v = $in->{$key};
+                my $n = ref $v ? eval { _normalize_bool($v) } : undef;
+                $out{$key} = defined $n ? $n : $v;
+            }
+            return \%out;
+        });
+    }
     # A yielding role helper composed into this package goes first, so the
     # accessor can take its name -- after every check above, so a rejected
     # declaration never gets this far.
@@ -1065,8 +1153,11 @@ Just C<use IO::K8s::Resource;> - no need for C<use Moo> or C<extends>.
     k8s suspend => 'Bool';
     k8s spec => 'Core::V1::PodSpec';           # Short class name
     k8s containers => ['Core::V1::Container']; # Array of objects
-    k8s labels => { Str => 1 };                # Opaque hash of strings
+    k8s labels => { Str => 1 };                # String map (lenient legacy spelling)
+    k8s data => HashRef[Str];                  # String map, strict
+    k8s raw => Opaque;                         # Free map, values untyped (also bare HashRef)
     k8s limits => { Quantity => 1 };           # Typed value map (also Int/Num/Bool/Time/IntOrStr)
+    k8s ports => HashRef[Int];                 # The same, as HashRef[X]
     k8s rows => [ {} ];                         # Array of opaque hashes
     k8s matrix => [ [] ];                       # Array of opaque arrays
     k8s spec => {                              # Inline struct
@@ -1075,12 +1166,26 @@ Just C<use IO::K8s::Resource;> - no need for C<use Moo> or C<extends>.
         template => { Str => 1 },
     };
 
-The C<< { Str => 1 } >> form is a deliberately B<opaque> hash: any value is
-accepted, for genuinely free-form maps such as labels, annotations and
-C<fieldsV1>. C<< { Quantity => 1 } >> (and C<Int>, C<Num>, C<Bool>, C<Time>,
+C<< { Str => 1 } >> and C<HashRef[Str]> declare a B<string map> -- labels,
+annotations, ConfigMap C<data>, a C<map[string]string> upstream: C<TO_JSON>
+puts every scalar value out as a JSON string, so C<< labels => { v => 5 } >>
+goes out as C<{"v":"5"}>. C<HashRef[Str]> refuses a reference value at
+construction. C<< { Str => 1 } >> keeps accepting any value, since it was
+the opaque map before 1.109: a reference value passes through unchanged and
+warns once per class and field (category C<deprecated>). C<Opaque>, or a
+bare C<HashRef>, is the B<free map> for genuinely free-form values such as
+C<fieldsV1> or a C<RawExtension>: any value, copied through as it is.
+C<Opaque> takes no parameters -- C<Opaque[...]> dies at declaration.
+Declare a free field as C<Opaque>: C<< { Str => 1 } >> was the opaque map up
+to 1.108, but is a string map now, so C<to_crd> emits C<additionalProperties:
+string> for it instead of C<x-kubernetes-preserve-unknown-fields>, and a
+reference value warns.
+C<< { Quantity => 1 } >> (and C<Int>, C<Num>, C<Bool>, C<Time>,
 C<IntOrStr>) instead validates every value against that scalar type, so a
 map upstream declares as C<map[X]Quantity> rejects a bad value at
-construction rather than at the API server.
+construction rather than at the API server; C<HashRef[Quantity]> and the
+other C<HashRef[X]>, including C<HashRef[InstanceOf['Some::Class']]> for a
+map of objects, are the same declarations spelled the other way.
 
 Inline structs auto-generate an inner class (e.g. C<MyClass::_Spec>) with
 the declared fields. Hashrefs are auto-coerced to the inner class on
@@ -1176,9 +1281,10 @@ Type::Tiny constraints at construction, the same way C<< { Quantity => 1 }
 API server. They apply to a scalar field, to each element of an array of
 scalars (C<< k8s tags => [Str], { enum => [...] } >>), and to each value of
 a typed value map (C<< k8s weights => { Int => 1 }, { maximum => 100 } >>).
-Declaring one of them on an object, inline-struct or opaque-container field
-(C<< { Str => 1 } >>, C<[ {} ]>, C<[ [] ]>, a nested class) is a class-load
-error, since there is no scalar value to check. A failing value dies with
+Declaring one of them on an object, inline-struct or container field
+(C<Opaque>, a bare C<HashRef>, C<< { Str => 1 } >>, C<[ {} ]>, C<[ [] ]>, a nested class) is a
+class-load error, since there is no scalar value to check. C<HashRef[Str]>
+takes them, per value. A failing value dies with
 one of:
 
     Value "x" is not one of: a, b

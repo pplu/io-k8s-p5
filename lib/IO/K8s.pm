@@ -1276,9 +1276,10 @@ sub _inflate_struct {
         # class nor the field; a scalar container reached the constructor
         # and got a Type::Tiny message without the class. Only the
         # container is checked -- the field's own isa already demanded it
-        # (ArrayRef[...], HashRef[...], the bare HashRef of { Str => 1 }),
-        # so nothing is refused that used to pass, and the contents of an
-        # opaque { Str => 1 } map stay as unconstrained as before.
+        # (ArrayRef[...], HashRef[...], the bare HashRef of Opaque and of
+        # the lenient { Str => 1 }), so nothing is refused that used to
+        # pass, and the contents of an opaque map stay as unconstrained as
+        # before.
         if (my $shape = $self->_container_shape($info)) {
             $self->_refuse_container_shape($class, $attr, $shape, $info->{class}, $value)
                 unless ref $value eq $shape;
@@ -1353,13 +1354,14 @@ sub _shallow_copy {
 # nothing for a scalar or single-object field (k154). Read off the flag
 # prefix, the way IO::K8s::AutoGen::_element_compatible does, so a
 # container form the DSL gains later is covered without a list to keep in
-# step with IO::K8s::Resource.
+# step with IO::K8s::Resource. The free map (Opaque / HashRef, k191) is the
+# one hash form without an is_hash_of_ prefix.
 sub _container_shape {
     my ($self, $info) = @_;
     for my $flag (keys %$info) {
         next unless $info->{$flag};
         return 'ARRAY' if index($flag, 'is_array_of_') == 0;
-        return 'HASH'  if index($flag, 'is_hash_of_') == 0;
+        return 'HASH'  if index($flag, 'is_hash_of_') == 0 || $flag eq 'is_hash_opaque';
     }
     return;
 }
@@ -1590,7 +1592,9 @@ The C<k8s> DSL supports these type specifications:
   k8s ready    => 'Bool';                  # boolean attribute
   k8s spec     => 'Core::V1::PodSpec';     # nested IO::K8s object
   k8s ports    => ['Core::V1::ServicePort']; # array of objects
-  k8s labels   => { Str => 1 };            # hash of strings
+  k8s labels   => { Str => 1 };            # map of strings
+  k8s data     => HashRef[Str];            # map of strings (strict)
+  k8s raw      => Opaque;                  # free map, values untyped
   k8s items    => ['+Full::Class::Name'];  # array with full class (+ prefix)
 
 =head2 IO::K8s::APIObject (top-level resources)
@@ -1638,8 +1642,8 @@ like Pod, Deployment, and Service.
       resource_plural => 'staticwebsites';
   with 'IO::K8s::Role::Namespaced';
 
-  k8s spec   => { Str => 1 };
-  k8s status => { Str => 1 };
+  k8s spec   => Opaque;
+  k8s status => Opaque;
   1;
 
 That's it - 6 lines of actual code. This class now supports:
@@ -1764,13 +1768,14 @@ per served version and goes further than the OpenAPI-spec path above: every
 inline C<type: object> schema below the top level, which is how a CRD
 schema is written everywhere below its Kind, becomes its own nested class
 named after its place in the parent (C<< <Kind>::<Prop> >>, with an
-C<Item> / C<Value> suffix for array items and map values) instead of an
-opaque hash of strings, so field options and the unknown-field bag apply at
+C<Item> / C<Value> suffix for array items and map values) instead of a
+free C<Opaque> map, so field options and the unknown-field bag apply at
 every level. Hash-style access on such a field still works -- a Moo object
 is a blessed hash keyed by attribute name -- so code that reads
 C<< $obj->{spec}{mode} >> does not need to change either way. Only a
-property-less object and an C<additionalProperties>-only map (nothing
-underneath to attach options to) stay opaque. L<IO::K8s::CRD::Emitter>
+property-less object (or one with C<x-kubernetes-preserve-unknown-fields>)
+stays C<Opaque>, and an C<additionalProperties>-only map becomes a
+C<HashRef[X]> (nothing underneath to attach options to). L<IO::K8s::CRD::Emitter>
 renders the same classes as checked-in source.
 
 =head2 Explicit generation with IO::K8s::AutoGen

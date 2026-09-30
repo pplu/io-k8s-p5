@@ -2,6 +2,41 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - Behaviour change: { Str => 1 } is now a map of strings. Every scalar
+    value goes out as a JSON string in TO_JSON, to_json and to_yaml, so a
+    label, annotation, ConfigMap data value or any other map[string]string
+    value built from a numeric Perl value (labels => { v => $n + 0 }) no
+    longer reaches the API server as a JSON number and gets a 400 back. A
+    reference value in a { Str => 1 } map is still passed through, but
+    warns once per class and field in the 'deprecated' category: declare a
+    free-form map as Opaque (or a bare HashRef), which copies its values
+    through unchanged. to_crd exports a string map as additionalProperties:
+    {type: string} and an Opaque map as x-kubernetes-preserve-unknown-fields.
+    Opaque takes no parameters.
+
+  - New map forms HashRef[Str] (strict: a reference value is refused at
+    construction), HashRef[Int], HashRef[Num], HashRef[Bool],
+    HashRef[IntOrStr], HashRef[Quantity], HashRef[Time] and
+    HashRef[InstanceOf[Class]], equivalent to the { X => 1 } sugar, which
+    stays. { Bool => 1 } and HashRef[Bool] now accept the JSON booleans a
+    cluster sends back. AutoGen types an additionalProperties map as
+    HashRef[X] and a schemaless or preserve-unknown object as Opaque.
+
+  - 77 shipped fields whose upstream schema is not a map of strings are now
+    declared by what they hold: RawExtension, FieldsV1 and
+    map[string][]string fields (ControllerRevision data, WatchEvent object,
+    ManagedFieldsEntry fieldsV1, OpaqueDeviceConfiguration parameters,
+    UserInfo extra, PrometheusOperator proxyConnectHeader and params, ...)
+    are Opaque; resource lists (PodSpec overhead, allocatedResources,
+    consumedCapacity, ...) are HashRef[Quantity] and reject a value that is
+    not a quantity at construction; PodDisruptionBudgetStatus disruptedPods
+    is HashRef[Time]; ExternalSecrets OnePasswordProvider vaults and Traefik
+    ErrorPage statusRewrites are HashRef[Int]; Resource V1
+    DeviceCounterConsumption counters is a map of Counter objects.
+    AgentSandbox v1alpha1 volumeClaimTemplates, conditions and env are
+    arrays, as upstream declares them, instead of maps that refused every
+    real value.
+
   - to_yaml, TO_YAML and save now quote every string that a JSON, YAML 1.2
     core or YAML 1.1 reader would take for a boolean, null or number (True,
     False, yes, No, on, ~, Null, 012, 0x1F, +1, 1_000, .inf, ...). Before,

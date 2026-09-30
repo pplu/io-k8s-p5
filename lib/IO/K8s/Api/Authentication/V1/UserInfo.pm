@@ -3,7 +3,7 @@ package IO::K8s::Api::Authentication::V1::UserInfo;
 our $VERSION = '1.109';
 use IO::K8s::Resource;
 
-k8s extra => { Str => 1 };
+k8s extra => Opaque;
 
 =attr extra
 

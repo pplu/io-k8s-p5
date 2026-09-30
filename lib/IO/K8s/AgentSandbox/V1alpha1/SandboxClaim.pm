@@ -15,7 +15,7 @@ k8s spec => {
         annotations => { Str => 1 },
         labels      => { Str => 1 },
     },
-    env => { Str => 1 },
+    env => ['+IO::K8s::AgentSandbox::V1beta1::EnvVar'],
     lifecycle => {
         shutdownTime            => Time,
         shutdownPolicy          => Str,
@@ -23,7 +23,7 @@ k8s spec => {
     },
 };
 k8s status => {
-    conditions => { Str => 1 },
+    conditions => ['Meta::V1::Condition'],
     sandbox    => {
         name   => Str,
         podIPs => [Str],

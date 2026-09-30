@@ -4,7 +4,7 @@ our $VERSION = '1.109';
 use IO::K8s::Resource;
 
 k8s duration  => Str;
-k8s extra     => { Str => 1 };
+k8s extra     => Opaque;
 k8s groups    => [Str];
 k8s isCA      => Bool;
 k8s issuerRef => '+IO::K8s::CertManager::V1::IssuerReference', { required => 'schema' };

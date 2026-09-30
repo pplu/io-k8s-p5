@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s conditions            => ['+IO::K8s::ExternalSecrets::V1alpha1::PushSecretStatusCondition'];
 k8s refreshTime           => Time, { nullable => 1 };
-k8s syncedPushSecrets     => { Str => 1 };
+k8s syncedPushSecrets     => Opaque;
 k8s syncedResourceVersion => Str;
 
 =attr conditions

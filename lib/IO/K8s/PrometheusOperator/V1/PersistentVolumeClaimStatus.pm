@@ -5,8 +5,8 @@ use IO::K8s::Resource;
 
 k8s accessModes                      => [Str];
 k8s allocatedResourceStatuses        => { Str => 1 };
-k8s allocatedResources               => { Str => 1 };
-k8s capacity                         => { Str => 1 };
+k8s allocatedResources               => HashRef[Quantity];
+k8s capacity                         => HashRef[Quantity];
 k8s conditions                       => ['Core::V1::PersistentVolumeClaimCondition'];
 k8s currentVolumeAttributesClassName => Str;
 k8s modifyVolumeStatus               => 'Core::V1::ModifyVolumeStatus';

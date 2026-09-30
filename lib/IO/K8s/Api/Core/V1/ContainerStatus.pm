@@ -3,7 +3,7 @@ package IO::K8s::Api::Core::V1::ContainerStatus;
 our $VERSION = '1.109';
 use IO::K8s::Resource;
 
-k8s allocatedResources => { Str => 1 };
+k8s allocatedResources => HashRef[Quantity];
 
 =attr allocatedResources
 

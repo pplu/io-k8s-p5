@@ -394,7 +394,13 @@ sub _type_source {
     return ('[Time]')     if $info->{is_array_of_time};
     return ('[ {} ]')     if $info->{is_array_of_hash};
     return ('[ [] ]')     if $info->{is_array_of_array};
-    return ('{ Str => 1 }')      if $info->{is_hash_of_str};
+    # The string map in the spelling that reads back as itself (k191): the
+    # lenient legacy form only where the registry says lenient, a strict
+    # one -- AutoGen's additionalProperties {type: string} -- as
+    # HashRef[Str]. The free map is Opaque.
+    return ('{ Str => 1 }')      if $info->{is_hash_of_str} && $info->{is_hash_of_str_lenient};
+    return ('HashRef[Str]')      if $info->{is_hash_of_str};
+    return ('Opaque')            if $info->{is_hash_opaque};
     return ('{ Int => 1 }')      if $info->{is_hash_of_int};
     return ('{ Num => 1 }')      if $info->{is_hash_of_num};
     return ('{ Bool => 1 }')     if $info->{is_hash_of_bool};

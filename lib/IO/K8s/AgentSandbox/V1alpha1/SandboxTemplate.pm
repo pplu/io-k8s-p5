@@ -7,8 +7,8 @@ use IO::K8s::APIObject
 with 'IO::K8s::Role::Namespaced';
 
 k8s spec => {
-    podTemplate                => { Str => 1 },
-    networkPolicy               => { Str => 1 },
+    podTemplate                => Opaque,
+    networkPolicy               => Opaque,
     networkPolicyManagement     => Str,
     envVarsInjectionPolicy      => Str,
     service                     => Bool,

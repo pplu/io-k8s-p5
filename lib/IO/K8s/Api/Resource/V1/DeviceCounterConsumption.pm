@@ -27,7 +27,7 @@ CounterSet is the name of the set from which the counters defined will be consum
 
 =cut
 
-k8s counters => { Str => 1 }, 'required';
+k8s counters => { 'Resource::V1::Counter' => 1 }, 'required';
 
 =attr counters
 

@@ -27,7 +27,7 @@ BindingFailureConditions contains a copy of the BindingFailureConditions from th
 
 =cut
 
-k8s consumedCapacity => { Str => 1 };
+k8s consumedCapacity => HashRef[Quantity];
 
 =attr consumedCapacity
 

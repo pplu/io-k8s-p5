@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s noProxy              => Str;
 k8s path                 => Str, { default => '/probe' };
-k8s proxyConnectHeader   => { Str => 1 };
+k8s proxyConnectHeader   => Opaque;
 k8s proxyFromEnvironment => Bool;
 k8s proxyUrl             => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s scheme               => Str, { enum => [qw(http https HTTP HTTPS)] };

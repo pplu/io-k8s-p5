@@ -129,11 +129,17 @@ subtest 'a [Time] default the elements cannot hold is dropped, not fatal' => sub
 
 subtest 'maps of int-or-string / date-time values have no such gap' => sub {
     my $info = $class->_k8s_attr_info;
-    ok($info->{portMap}{is_hash_of_str}, 'int-or-string additionalProperties: the opaque { Str => 1 } map');
-    ok($info->{stampMap}{is_hash_of_str}, 'date-time additionalProperties: the opaque { Str => 1 } map');
+    # k191 replaces the first two claims: these maps are no longer the
+    # opaque { Str => 1 } (which became the string map) but typed maps,
+    # HashRef[IntOrStr] and HashRef[Time]. The wire claim below is kept --
+    # an int-or-string value 8080 stays a number, now by the typed map's
+    # per-value rule instead of an untouched copy.
+    ok($info->{portMap}{is_hash_of_int_or_string}, 'int-or-string additionalProperties: HashRef[IntOrStr]');
+    ok($info->{stampMap}{is_hash_of_time}, 'date-time additionalProperties: HashRef[Time]');
+    ok(!$info->{$_}{is_hash_of_str}, "$_ is not a string map") for qw( portMap stampMap );
     my $obj = $class->new(portMap => { a => 8080, b => 'http' }, stampMap => { at => '2026-09-27T12:00:00Z' });
     is($obj->to_json, '{"portMap":{"a":8080,"b":"http"},"stampMap":{"at":"2026-09-27T12:00:00Z"}}',
-        'map values are copied through unchanged: a number is not stringified');
+        'map values keep their wire type: an int-or-string number is not stringified');
 };
 
 # The TO_JSON branches themselves, on hand-declared classes (DSL forms the

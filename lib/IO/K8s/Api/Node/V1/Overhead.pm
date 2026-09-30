@@ -3,7 +3,7 @@ package IO::K8s::Api::Node::V1::Overhead;
 our $VERSION = '1.109';
 use IO::K8s::Resource;
 
-k8s podFixed => { Str => 1 };
+k8s podFixed => HashRef[Quantity];
 
 =attr podFixed
 

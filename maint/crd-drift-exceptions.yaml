@@ -213,7 +213,7 @@ ignore_unrendered:
     reason: "k156: storage.ephemeral.volumeClaimTemplate (Prometheus + PrometheusAgent, via the shared EphemeralVolumeSource) now reuses Core::V1::PersistentVolumeClaimTemplate; this per-provider copy is unreferenced. Kept shipped rather than removed (removal would need IO::K8s::Deprecated stubs -- deferred)"
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUIDSpec.pm
-    reason: "k120/k133: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as { Str => 1 } and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; k133 chose Weg 1 -- keep the named empty struct as a superset and accept the two residual reference-site divergences via accept_structural_divergence below."
+    reason: "k120/k133: upstream models uuids .spec as a property-less {type: object}; AutoGen keeps a property-less object opaque (k55) so the render types UUID.spec as Opaque ({ Str => 1 } before k191) and emits no UUIDSpec, while lib ships a named empty struct. A typed-empty vs opaque-hash wrapper choice, not a field difference; k133 chose Weg 1 -- keep the named empty struct as a superset and accept the two residual reference-site divergences via accept_structural_divergence below."
   # CertManager (k135/k139) / PrometheusOperator (k137): the provider-owned
   # condition classes. lib gives each provider its own Issuer/Certificate/
   # CertificateRequest/monitoringv1.Condition class, required exactly as its own
@@ -295,7 +295,7 @@ ignore_unrendered:
 # ExternalSecrets (k132): 8 generators.external-secrets.io/v1alpha1 (+ one v1)
 # classes differing only in ABSTRACT/POD. NOT listed here, deliberately:
 # V1alpha1/UUID.pm and V1alpha1/ClusterGeneratorGenerator.pm, whose `spec`/
-# `uuidSpec` the emitter types as { Str => 1 } while lib ships the named empty
+# `uuidSpec` the emitter types as Opaque ({ Str => 1 } before k191) while lib ships the named empty
 # struct UUIDSpec (see ignore_unrendered's UUIDSpec.pm entry). Those are
 # genuine k8s-declaration differences, not cosmetic; the guard would refuse
 # them anyway. k133 settled the k120 follow-up (Weg 1): they are kept as a
@@ -460,7 +460,8 @@ ignore_cosmetic_differs:
 # UUIDSpec choice. generators.external-secrets.io/v1alpha1 models uuids .spec
 # (and ClusterGenerator's uuid generator, uuidSpec) as a property-less
 # {type: object}; AutoGen keeps a property-less object opaque (k55), so the
-# emitter types both reference sites as { Str => 1 } and emits no UUIDSpec,
+# emitter types both reference sites as Opaque ({ Str => 1 } before k191)
+# and emits no UUIDSpec,
 # while lib deliberately keeps the named empty struct UUIDSpec as a superset.
 # k133 chose Weg 1 -- keep lib as-is and accept these two residual
 # reference-site divergences here, rather than drop the class (Deprecated) or
@@ -468,10 +469,10 @@ ignore_cosmetic_differs:
 accept_structural_divergence:
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/UUID.pm
-    reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types spec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque { Str => 1 }"
+    reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types spec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque map (Opaque; { Str => 1 } before k191)"
   - provider: ExternalSecrets
     path: IO/K8s/ExternalSecrets/V1alpha1/ClusterGeneratorGenerator.pm
-    reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types uuidSpec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque { Str => 1 }"
+    reason: "k133 Weg 1 / k55 / k120: typed-empty UUIDSpec deliberately kept as a superset -- lib types uuidSpec as +IO::K8s::ExternalSecrets::V1alpha1::UUIDSpec, the emitter renders the opaque map (Opaque; { Str => 1 } before k191)"
   # CertManager (k135/k139) / PrometheusOperator (k137): the provider-owned
   # condition classes and the status classes that reference them. k136 stopped
   # reuse_core (D5) rendering Meta::V1::Condition here (it over-requires vs

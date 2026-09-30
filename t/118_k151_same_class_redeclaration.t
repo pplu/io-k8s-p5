@@ -35,6 +35,7 @@ use IO::K8s::APIObject ();
 use IO::K8s::AutoGen;
 use IO::K8s::Resource ();
 use Types::Standard qw( Int Str );
+use IO::K8s::Types qw( Opaque );
 
 sub registry_for {
     my ($class) = @_;
@@ -105,7 +106,9 @@ subtest 'an identical second declaration changes nothing' => sub {
         [ pattern => [ 'Str', { pattern => qr/\A[a-z]+\z/ } ] ],
         [ req     => [ 'Str', 'required' ] ],
         [ object  => [ 'Core::V1::PodSpec' ] ],
-        [ opaque  => [ { Str => 1 } ] ],
+        # k191: { Str => 1 } is the string map; the opaque map is Opaque.
+        [ strmap  => [ { Str => 1 } ] ],
+        [ opaque  => [ Opaque ] ],
         [ dashed  => [ 'Str' ], 'x-dashed' ],
     ) {
         my ($label, $decl, $field) = @$case;

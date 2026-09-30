@@ -19,7 +19,7 @@ FieldsType is the discriminator for the different fields format and version. The
 
 =cut
 
-k8s fieldsV1 => { Str => 1 };
+k8s fieldsV1 => Opaque;
 
 =attr fieldsV1
 

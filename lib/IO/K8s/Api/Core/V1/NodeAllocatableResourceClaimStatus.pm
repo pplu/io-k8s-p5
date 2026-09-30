@@ -35,7 +35,7 @@ ResourceClaimName is the name of the ResourceClaim that was generated for the Po
 
 =cut
 
-k8s resources => { Str => 1 };
+k8s resources => HashRef[Quantity];
 
 =attr resources
 

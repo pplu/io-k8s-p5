@@ -13,7 +13,7 @@ Must not contain more than 8 entries.
 
 =cut
 
-k8s data => { Str => 1 };
+k8s data => Opaque;
 
 =attr data
 

@@ -51,7 +51,12 @@ my $k8s = IO::K8s->new;
     use IO::K8s::APIObject
         api_version     => 'k145.example.com/v1',
         resource_plural => 'opaquespecs';
-    k8s spec => { Str => 1 };
+    # k191: this fixture used to be `{ Str => 1 }`, which was the opaque map.
+    # Since k191 { Str => 1 } is a real string map (numbers become JSON
+    # strings), so the fixture moved to Opaque to keep the claim below alive:
+    # the opaque map is left untouched. Only the declaration changed, not
+    # what the GUARD asserts.
+    k8s spec => Opaque;
 }
 
 # ============================================================================
@@ -154,11 +159,10 @@ subtest 'GUARD: Num field stays an unquoted JSON number' => sub {
     like($o->to_json, qr/"value":3\.5(?:,|\})/, 'Num field is unquoted');
 };
 
-# Claim: an opaque hash field ({ Str => 1 }) is deliberately untyped -- its
-# nested numbers and booleans must survive unchanged, never be stringified,
-# because { Str => 1 } means "map of string keys to anything", not "map of
-# strings" (declared above, Test::K145::OpaqueSpec).
-subtest 'GUARD: opaque hash field ({ Str => 1 }) leaves nested numbers/bools alone' => sub {
+# Claim: an opaque hash field (Opaque; before k191 spelled { Str => 1 }) is
+# deliberately untyped -- its nested numbers and booleans must survive
+# unchanged, never be stringified (declared above, Test::K145::OpaqueSpec).
+subtest 'GUARD: opaque hash field (Opaque) leaves nested numbers/bools alone' => sub {
     my $o = Test::K145::OpaqueSpec->new(
         metadata => { name => 'x' },
         spec     => { replicas => 3, enabled => JSON::MaybeXS::true, nested => { n => 1 } },

@@ -11,7 +11,7 @@ Conditions contains the latest observation of the device's state. If the device 
 
 =cut
 
-k8s data => { Str => 1 };
+k8s data => Opaque;
 
 =attr data
 

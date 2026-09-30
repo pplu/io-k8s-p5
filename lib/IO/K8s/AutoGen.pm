@@ -9,11 +9,12 @@ use Digest::SHA qw( sha1_hex );
 use Module::Runtime qw( use_module );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype refaddr looks_like_number);
-use Types::Standard qw( Bool Int Num Str );
+use Types::Standard qw( Bool HashRef Int Num Str );
 # Type::Tiny object for the [IntOrStr] array items (k167); see the array
 # branch of _schema_to_type_spec for why a bareword does not do. [Time]
 # items go through $GENERATED_TIME instead (k178), so Time is not imported.
-use IO::K8s::Types qw( IntOrStr );
+# Opaque is the free map a schemaless object becomes (k191).
+use IO::K8s::Types qw( IntOrStr Opaque );
 # The empty list matters: IO::K8s::APIObject's import would make this
 # package a Moo class. Loaded for its subresources check (k158).
 use IO::K8s::APIObject ();
@@ -445,7 +446,8 @@ sub _generate_class {
     return $class;
 }
 
-# Opaque type definitions that should be HashRef, not object references
+# Opaque type definitions that should be the free map (Opaque), not object
+# references
 my %OPAQUE_TYPES = map { $_ => 1 } qw(
     io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
     io.k8s.apimachinery.pkg.runtime.RawExtension
@@ -889,6 +891,30 @@ sub _schema_type_kind {
     return 'string';  # 'string', '', and anything unmodeled alike (k42's own Str fallback)
 }
 
+# The value type of a map whose additionalProperties is a scalar schema
+# (k191) -- the DSL kind name Str, Int, Num, Bool, IntOrStr or Time -- or
+# undef when the generator types the map as the free Opaque instead: an
+# object or array value, or a value schema that names no type at all.
+# Unlike _schema_type_kind, a missing type is not read as a string here: a
+# string map stringifies every value on the wire, and `{}` promises no
+# strings. Shared by _schema_to_type_spec and the reuse check
+# (_object_compatible), so both read a map the same way.
+sub _map_value_kind {
+    my ($addl) = @_;
+    return 'IntOrStr' if eval { IO::K8s::Resource::_normalize_bool($addl->{'x-kubernetes-int-or-string'}) };
+    my $type = $addl->{type} // '';
+    if ($type eq 'string') {
+        my $format = $addl->{format} // '';
+        return 'IntOrStr' if $format eq 'int-or-string';
+        return 'Time'     if $format eq 'date-time';
+        return 'Str';
+    }
+    return 'Int'  if $type eq 'integer';
+    return 'Num'  if $type eq 'number';
+    return 'Bool' if $type eq 'boolean';
+    return undef;
+}
+
 # Registry type flags compatible with each schema kind (rule 2 above). The
 # string family (string / int-or-string / time / quantity) and why each is a
 # kind of its own is explained on _schema_type_kind above.
@@ -910,7 +936,8 @@ my %_TYPE_COMPAT = (
 sub _flag_compatible {
     my ($kind, $flag) = @_;
     return 1 if $kind eq 'array'  && $flag =~ /^is_array_of_/;
-    return 1 if $kind eq 'object' && ($flag eq 'is_object' || $flag eq 'is_inline_struct' || $flag =~ /^is_hash_of_/);
+    return 1 if $kind eq 'object' && ($flag eq 'is_object' || $flag eq 'is_inline_struct'
+        || $flag eq 'is_hash_opaque' || $flag =~ /^is_hash_of_/);
     return $_TYPE_COMPAT{$kind} ? !!$_TYPE_COMPAT{$kind}{$flag} : 0;
 }
 
@@ -950,21 +977,26 @@ sub _entry_compatible {
 #   object + map    -> additionalProperties with properties needs
 #                      is_hash_of_objects whose class matches it; a scalar
 #                      value kind a typed scalar map (is_hash_of_quantity,
-#                      ...) by the scalar rules
+#                      ...) by the scalar rules -- the string map
+#                      (is_hash_of_str, labels, annotations) among them, a
+#                      `type: string` value needing is_hash_of_str (k191)
 #   opaque object   -> see below
 #
-# The opaque map, { Str => 1 } / is_hash_of_str (arbitrary JSON, labels,
-# fieldsV1), is its own case and is not read as a string map: it matches
-# exactly the schema fragments the generator itself types as { Str => 1 } --
-# an object with neither properties nor a structured additionalProperties
-# (a scalar or unstructured additionalProperties, a boolean one, or none;
-# a $ref to %OPAQUE_TYPES). Reusing it there changes nothing about the
-# field. It does not match a map of structured objects, a structured
-# object, an array or a scalar, however permissive a plain HashRef is: that
-# would reuse a class that loses the schema's typing, and a match that
-# cannot be shown is not one. Nor does an opaque schema match a typed map
-# or a structured class -- the schema allows values those reject -- with
-# the one exception of ObjectMeta ($OBJECT_META below).
+# The opaque map, Opaque / is_hash_opaque (arbitrary JSON, fieldsV1,
+# RawExtension), is its own case: it matches exactly the schema fragments
+# the generator itself types as Opaque -- an object with neither properties
+# nor a scalar-valued additionalProperties (an object, array or typeless
+# value schema, a boolean one, or none; a $ref to %OPAQUE_TYPES; see
+# _map_value_kind). Reusing it there changes nothing about the field. It
+# does not match a map of structured objects, a string or typed map, a
+# structured object, an array or a scalar, however permissive a plain
+# HashRef is: that would reuse a class that loses the schema's typing, and
+# a match that cannot be shown is not one. Nor does an opaque schema match
+# a string map, a typed map or a structured class -- the schema allows
+# values those reject or would rewrite (a string map puts a number out as
+# a string) -- with the one exception of ObjectMeta ($OBJECT_META below).
+# Until k191 the opaque map was spelled { Str => 1 }, and is_hash_of_str
+# was matched here in its place.
 #
 # A $ref is resolved read-only against the definitions _core_class_for was
 # handed, the way _schema_to_type_spec resolves it: the apimachinery scalars
@@ -1010,7 +1042,7 @@ sub _field_compatible {
         if (my $kind = _scalar_ref_kind($ref)) {
             return _entry_compatible($entry, $kind);
         }
-        return !!$entry->{is_hash_of_str} if $OPAQUE_TYPES{$ref};
+        return !!$entry->{is_hash_opaque} if $OPAQUE_TYPES{$ref};
         if (my $union = _union_class($ref)) {
             return $entry->{is_object} && ($entry->{class} // '') eq $union;
         }
@@ -1057,13 +1089,12 @@ sub _object_compatible {
     # a boolean additionalProperties, or none: the opaque map -- or an
     # embedded ObjectMeta (see $OBJECT_META)
     unless (ref $addl eq 'HASH') {
-        return 1 if $entry->{is_hash_of_str};
+        return 1 if $entry->{is_hash_opaque};
         return $entry->{is_object} && ($entry->{class} // '') eq $OBJECT_META;
     }
     if (defined(my $ref = $addl->{'$ref'})) {
         $ref =~ s{^#/definitions/}{};
-        # the typed map the generator makes of an apimachinery scalar (k178);
-        # not the opaque one, which _element_compatible never counts
+        # the typed map the generator makes of an apimachinery scalar (k178)
         if (my $kind = _scalar_ref_kind($ref)) {
             return _element_compatible($entry, 'is_hash_of_', $kind);
         }
@@ -1075,22 +1106,20 @@ sub _object_compatible {
     }
     return $entry->{is_hash_of_objects} && _class_compatible($entry->{class}, $addl, $ctx)
         if _has_properties($addl);
-    # anything else the generator types as the opaque map, whatever the
-    # value schema says
-    return 1 if $entry->{is_hash_of_str};
-    my $kind = _schema_type_kind($addl);
-    return 0 if $kind eq 'array' || $kind eq 'object';
-    return _element_compatible($entry, 'is_hash_of_', $kind);
+    # a scalar value schema is the string or typed map the generator makes
+    # of it, by the scalar rules; anything else it types as the opaque map
+    return !!$entry->{is_hash_opaque} unless _map_value_kind($addl);
+    return _element_compatible($entry, 'is_hash_of_', _schema_type_kind($addl));
 }
 
 # Does $entry carry a scalar-element container flag ($prefix plus a scalar
 # name: is_array_of_int, is_hash_of_quantity, ...) whose scalar is
-# compatible with $kind under the scalar rules? is_hash_of_str is the
-# opaque map, not a string-valued one, and never counts here.
+# compatible with $kind under the scalar rules? Since k191 is_hash_of_str
+# is the string map and counts like is_array_of_str; the opaque map has a
+# flag of its own (is_hash_opaque) that never matches a prefix here.
 sub _element_compatible {
     my ($entry, $prefix, $kind) = @_;
     for my $flag (grep { $entry->{$_} } keys %$entry) {
-        next if $flag eq 'is_hash_of_str';
         next unless $flag =~ /^\Q$prefix\E(.+)\z/;
         return 1 if _flag_compatible($kind, 'is_' . $1);
     }
@@ -1337,6 +1366,18 @@ my %GENERATED_ITEM_TYPE = (
     Time     => $GENERATED_TIME,
 );
 
+# The value types of a generated scalar map, HashRef[X] (k191), by the kind
+# _map_value_kind reads off additionalProperties. Time is the lenient
+# $GENERATED_TIME for the reason the array element above is.
+my %GENERATED_MAP_VALUE_TYPE = (
+    Str      => Str,
+    Int      => Int,
+    Num      => Num,
+    Bool     => Bool,
+    IntOrStr => IntOrStr,
+    Time     => $GENERATED_TIME,
+);
+
 # Convert OpenAPI schema to k8s() type spec
 #
 # $field_name and $class are diagnostic context only: everything this
@@ -1377,9 +1418,9 @@ sub _schema_to_type_spec {
             return "+$union";
         }
 
-        # Opaque types should be HashRef, not object references
+        # Opaque types should be the free map, not object references
         if ($OPAQUE_TYPES{$ref}) {
-            return { Str => 1 };  # HashRef
+            return Opaque;
         }
 
         # Generate referenced class if needed
@@ -1524,21 +1565,27 @@ sub _schema_to_type_spec {
             if (_has_properties($addl)) {
                 return { '+' . _nested_class($class, $field_name, 'Value', $addl, $all_defs, $namespace, $reuse_core, $reuse_core_except) => 1 };
             }
-            return { Str => 1 };  # Hash of strings
+            # A scalar value schema is the string map HashRef[Str] or the
+            # typed map of its kind; anything else -- object or array
+            # values, a value schema without a type -- the free map (k191).
+            # Before k191 every one of them became the then-opaque
+            # { Str => 1 }.
+            my $value_kind = _map_value_kind($addl);
+            return $value_kind ? HashRef[ $GENERATED_MAP_VALUE_TYPE{$value_kind} ] : Opaque;
         }
         # additionalProperties is allowed to be a JSON boolean instead of a
         # schema -- true: any extra property, false: none. A JSON::PP::Boolean
         # is a blessed scalar ref, so the $ref lookup above used to die "Not a
         # HASH reference" naming neither class nor field (k55). Neither
         # boolean says anything about the value types, so the field stays the
-        # same opaque hash a schemaless object gets.
+        # same free map (Opaque) a schemaless object gets.
         if (defined $addl) {
             my $reftype = reftype($addl);
             croak "additionalProperties of $where is a " . $reftype
                 . " reference; expected a schema object or a boolean"
                 if defined $reftype && $reftype ne 'SCALAR';
         }
-        return { Str => 1 };  # Generic object -> hash of strings
+        return Opaque;  # Generic object -> the free map (k191)
     }
 
     # Unknown type
@@ -1575,12 +1622,32 @@ sub _scalar_kind {
     }
     if (ref $type_spec eq 'HASH') {
         my ($k) = keys %$type_spec;
-        # { Str => 1 } is the deliberately opaque map; typed maps carry
-        # their value kind.
+        # { Str => 1 } is the lenient string map, which takes no value
+        # option (IO::K8s::Resource); typed maps carry their value kind.
         return undef if $k eq 'Str';
         return $SCALAR_KIND{$k} ? $k : undef;
     }
+    # HashRef[X] (k191): the value type's kind, Str included -- the strict
+    # string map takes value options; Opaque none.
+    if (my $value_type = _map_value_type($type_spec)) {
+        return $SCALAR_KIND{ $value_type->name } ? $value_type->name : undef;
+    }
     return undef;
+}
+
+# The value type of a HashRef[X] type spec, or undef for anything else.
+sub _map_value_type {
+    my ($type_spec) = @_;
+    return undef unless blessed($type_spec) && $type_spec->isa('Type::Tiny')
+        && $type_spec->is_parameterized
+        && $type_spec->parameterized_from->name eq 'HashRef';
+    return $type_spec->type_parameter;
+}
+
+# A typed map of either spelling: { X => 1 } or HashRef[X].
+sub _is_map_spec {
+    my ($type_spec) = @_;
+    return ref $type_spec eq 'HASH' || _map_value_type($type_spec) ? 1 : 0;
 }
 
 # Field options for one property (D3). Schema-only facts (description,
@@ -1649,7 +1716,24 @@ sub _field_options {
     # the same "malformed default is dropped" rule every other option here
     # follows (carried over from the step-2 final re-review).
     if ($kind && $kind eq 'Bool' && exists $opts{default}) {
-        if (ref $type_spec eq 'ARRAY') {
+        if (_is_map_spec($type_spec)) {
+            # A map of Bool (k191): the default is a hash, normalized value
+            # by value and dropped when a value cannot mean true/false, as
+            # the array case below does per element.
+            my %normalized;
+            if (ref $opts{default} eq 'HASH') {
+                for my $key (keys %{ $opts{default} }) {
+                    my $n = eval { IO::K8s::Resource::_normalize_bool($opts{default}{$key}) };
+                    last if $@;
+                    $normalized{$key} = $n;
+                }
+            }
+            if (ref $opts{default} eq 'HASH' && keys %normalized == keys %{ $opts{default} }) {
+                $opts{default} = \%normalized;
+            } else {
+                delete $opts{default};
+            }
+        } elsif (ref $type_spec eq 'ARRAY') {
             my @normalized;
             if (ref $opts{default} eq 'ARRAY') {
                 for my $elem (@{ $opts{default} }) {
@@ -1671,7 +1755,7 @@ sub _field_options {
         # A typed map (k178) constrains each value, as an array each
         # element: its constraints sit on additionalProperties.
         my $src = ($prop_schema->{type} // '') eq 'array' ? ($prop_schema->{items} // {})
-                : ref $type_spec eq 'HASH'                ? $prop_schema->{additionalProperties}
+                : _is_map_spec($type_spec)                ? $prop_schema->{additionalProperties}
                 :                                           $prop_schema;
         if (ref $src->{enum} eq 'ARRAY' && @{ $src->{enum} } && !grep { !defined } @{ $src->{enum} }) {
             my %seen;
@@ -1708,13 +1792,14 @@ sub _field_options {
         # the strict Quantity and Time among them (k178). A default that is
         # a hash, for a map, is checked value by value.
         my $base = ref $type_spec eq 'ARRAY' && blessed($type_spec->[0]) ? $type_spec->[0]
+                 : _map_value_type($type_spec)                          ? _map_value_type($type_spec)
                  : ref $type_spec eq 'HASH'                             ? IO::K8s::Types->get_type($kind)
                  :                                                        IO::K8s::Resource::_scalar_base_for($kind);
         my %check_opts = map { $_ => $opts{$_} } grep { exists $opts{$_} } qw(enum minimum maximum pattern);
         my $constrained = IO::K8s::Resource::_constrain($base, $kind, \%check_opts, 'AutoGen default check');
         my $default_ok = ref $type_spec eq 'ARRAY'
             ? (ref $opts{default} eq 'ARRAY' && !grep { !$constrained->check($_) } @{ $opts{default} })
-            : ref $type_spec eq 'HASH'
+            : _is_map_spec($type_spec)
             ? (ref $opts{default} eq 'HASH' && !grep { !$constrained->check($_) } values %{ $opts{default} })
             : $constrained->check($opts{default});
         delete $opts{default} unless $default_ok;
@@ -1878,16 +1963,18 @@ string> with C<format: int-or-string>) becomes C<IntOrStr> and, on
 C<items>, C<[IntOrStr]>, so an element C<8080> stays a JSON number and
 C<'25%'> a string; C<type: string> with C<format: date-time> becomes
 C<Time> and C<[Time]>. A map whose C<additionalProperties> is one
-of these scalar schemas stays the opaque hash, which writes its values back
-unchanged.
+of these scalar schemas becomes a typed map: C<type: string> gives
+C<HashRef[Str]>, and C<integer>, C<number>, C<boolean>, int-or-string and
+C<date-time> give C<HashRef[Int]>, C<HashRef[Num]>, C<HashRef[Bool]>,
+C<HashRef[IntOrStr]> and C<HashRef[Time]>.
 
 A C<$ref> to one of the apimachinery scalar definitions --
 C<resource.Quantity>, C<intstr.IntOrString>, C<meta.v1.Time> and
 C<meta.v1.MicroTime> -- is typed as that scalar wherever it sits: a
 property becomes C<Quantity>, C<IntOrStr> or C<Time>, an array's C<items>
 C<[Quantity]>, C<[IntOrStr]> or C<[Time]>, and a map's
-C<additionalProperties> C<< { Quantity => 1 } >>, C<< { IntOrStr => 1 } >>
-or C<< { Time => 1 } >>, whether or not the spec carries the definition.
+C<additionalProperties> C<HashRef[Quantity]>, C<HashRef[IntOrStr]>
+or C<HashRef[Time]>, whether or not the spec carries the definition.
 Before, the C<items> and C<additionalProperties> forms were generated from
 the definition, a bare C<type: string>, as an empty class that no quantity
 or timestamp could inflate into.
@@ -1899,7 +1986,7 @@ C<z> the strict check of a hand-written C<Time> field refuses, so a
 generated class never fails to inflate what the API server returned. The
 API server validates the format regardless. A hand-written or emitted
 class keeps the strict checks, and so does the typed map above -- the DSL
-has only the one C<< { Quantity => 1 } >> and C<< { Time => 1 } >> -- which
+has only the one C<HashRef[Quantity]> and C<HashRef[Time]> -- which
 only a swagger C<$ref> reaches, whose values the API server writes in
 canonical form.
 
@@ -1907,10 +1994,10 @@ An inline C<type: object> schema with its own non-empty C<properties> also
 becomes a typed class now (D10), named after its place in the parent --
 C<< <Parent>::<Prop> >>, with an C<Item> / C<Value> suffix for array items
 and map values shaped the same way -- so its properties get field options
-exactly like a class built from a C<$ref>. Only a property-less C<type:
-object> and an C<additionalProperties>-only map (no C<properties> of their
-own) stay the existing opaque hash of strings, with nothing underneath to
-attach options to. Scalar properties carry their options at every level
+exactly like a class built from a C<$ref>. A property-less C<type:
+object> (or one with C<x-kubernetes-preserve-unknown-fields>) becomes
+C<Opaque>, and an C<additionalProperties>-only map (no C<properties> of
+their own) a C<HashRef[X]>, with nothing underneath to attach options to. Scalar properties carry their options at every level
 regardless.
 
 A path-derived nested class name that would run past Perl's 251-character
@@ -1968,9 +2055,9 @@ key at the top level -- an array field's C<items>, a map's
 C<additionalProperties> values, and any nested object field are checked the
 same way, recursively. A C<$ref> met along the way is resolved read-only
 against the same definitions the schema's own C<$ref>s resolve against; one
-that does not resolve counts as not held, never as a pass. An opaque
-C<< { Str => 1 } >> field on the candidate matches only a schema fragment that
-would itself become an opaque hash -- no C<properties>, no structured
+that does not resolve counts as not held, never as a pass. An
+C<Opaque> field on the candidate matches only a schema fragment that
+would itself become an C<Opaque> map -- no C<properties>, no scalar or structured
 C<additionalProperties> -- with one exception: a bare C<{type: object}>
 field matches a candidate field typed as C<ObjectMeta>, since that is how
 C<controller-gen> renders an embedded C<metav1.ObjectMeta> below a CRD's

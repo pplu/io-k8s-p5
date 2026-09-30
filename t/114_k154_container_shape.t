@@ -42,6 +42,7 @@ my $COUNTERSET = 'IO::K8s::Api::Resource::V1::CounterSet';
         docs   => [ {} ],
         flags  => [Bool],
         counts => { Int => 1 },
+        blob   => Opaque,   # k191: the opaque map
     };
 }
 
@@ -172,13 +173,16 @@ subtest '{ Str => 1 }: labels => [...] dies naming ObjectMeta' => sub {
         qr/ObjectMeta field labels/, qr/hash/i, qr/ARRAY/);
 };
 
-# Claim: the generic forms [ {} ], [Bool] and { Int => 1 } get the same.
+# Claim: the generic forms [ {} ], [Bool] and { Int => 1 } get the same --
+# and, since k191, the opaque map Opaque, which has no is_hash_of_ flag and
+# is counted as a hash container by name (IO::K8s::_container_shape).
 subtest 'generic container forms of a DSL class' => sub {
     my $k8s = IO::K8s->new;
     for my $case (
         [ docs   => 'x', qr/field docs\b.*array/i ],
         [ flags  => {},  qr/field flags\b.*array/i ],
         [ counts => [],  qr/field counts\b.*hash/i ],
+        [ blob   => [],  qr/field blob\b.*hash/i ],
     ) {
         my ($field, $value, $re) = @$case;
         dies_naming("$field wrong shape",
@@ -219,13 +223,18 @@ subtest 'GUARD: right shapes still build' => sub {
         'wire form');
 };
 
-# Claim: the contents of an opaque { Str => 1 } field stay unconstrained.
-subtest 'GUARD: opaque { Str => 1 } contents stay untouched' => sub {
-    my $pod = IO::K8s->new->new_object('Pod',
-        metadata => { name => 'p', labels => { a => { b => 1 } }, annotations => { x => [ 1 ] } });
-    is_deeply($pod->TO_JSON->{metadata},
-        { name => 'p', labels => { a => { b => 1 } }, annotations => { x => [ 1 ] } },
-        'nested structures inside labels/annotations pass through as before');
+# Claim: the contents of an opaque map stay unconstrained. Before k191 this
+# was asserted on labels/annotations, declared { Str => 1 }, which was the
+# opaque map then. k191 made { Str => 1 } the string map (numbers go out as
+# JSON strings; a nested structure still passes, with a deprecation warning
+# -- t/151_k191_typed_maps.t), so the claim moved to an Opaque field, the
+# opaque map's own spelling. The claim itself is unchanged.
+subtest 'GUARD: opaque map (Opaque) contents stay untouched' => sub {
+    my $bag = IO::K8s->new->new_object('+T154::Bag',
+        metadata => { name => 'b' }, spec => { blob => { a => { b => 1 }, x => [ 1 ] } });
+    is_deeply($bag->TO_JSON->{spec},
+        { blob => { a => { b => 1 }, x => [ 1 ] } },
+        'nested structures inside an Opaque field pass through as before');
 };
 
 # Claim: the direct constructor keeps failing at Moo's own type constraint --

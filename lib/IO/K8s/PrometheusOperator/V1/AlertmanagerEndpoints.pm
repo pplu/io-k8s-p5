@@ -14,7 +14,7 @@ k8s namespace            => Str;
 k8s noProxy              => Str;
 k8s pathPrefix           => Str;
 k8s port                 => IntOrStr, { required => 'schema' };
-k8s proxyConnectHeader   => { Str => 1 };
+k8s proxyConnectHeader   => Opaque;
 k8s proxyFromEnvironment => Bool;
 k8s proxyUrl             => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s relabelings          => ['+IO::K8s::PrometheusOperator::V1::RelabelConfig'];

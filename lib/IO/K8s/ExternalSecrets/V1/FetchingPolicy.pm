@@ -3,7 +3,7 @@ package IO::K8s::ExternalSecrets::V1::FetchingPolicy;
 our $VERSION = '1.109';
 use IO::K8s::Resource;
 
-k8s byID   => { Str => 1 };
+k8s byID   => Opaque;
 k8s byName => '+IO::K8s::ExternalSecrets::V1::ByName';
 
 =attr byID

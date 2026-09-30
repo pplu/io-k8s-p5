@@ -9,7 +9,7 @@ k8s bearerToken          => Str;
 k8s bearerTokenFile      => Str;
 k8s host                 => Str, { required => 'schema' };
 k8s noProxy              => Str;
-k8s proxyConnectHeader   => { Str => 1 };
+k8s proxyConnectHeader   => Opaque;
 k8s proxyFromEnvironment => Bool;
 k8s proxyUrl             => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s tlsConfig            => '+IO::K8s::PrometheusOperator::V1::TLSConfig';

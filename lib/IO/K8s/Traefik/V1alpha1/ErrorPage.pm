@@ -7,7 +7,7 @@ k8s errorRequestHeaders => [Str];
 k8s query               => Str;
 k8s service             => '+IO::K8s::Traefik::V1alpha1::Service';
 k8s status              => [Str], { pattern => qr/^([1-5][0-9]{2}[,-]?)+$/ };
-k8s statusRewrites      => { Str => 1 };
+k8s statusRewrites      => HashRef[Int];
 
 =attr errorRequestHeaders
 

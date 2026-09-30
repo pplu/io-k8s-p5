@@ -300,9 +300,11 @@ The schema is generated from the registry, but it is not a lossless
 DSL-to-schema-to-DSL round-trip through C<add_crd>. C<Quantity> and
 C<[Quantity]> export only C<type: string> (or string array items), so the
 Quantity constraint cannot be reconstructed. During the reverse
-L<IO::K8s::AutoGen> inference, typed maps whose values are C<Int>, C<Num>,
-C<Bool>, C<Quantity>, C<Time> or C<IntOrStr> re-import as the opaque
-C<< { Str => 1 } >> form. Scalar arrays C<[Str]>, C<[Int]>, C<[Num]>,
+L<IO::K8s::AutoGen> inference, a string map -- C<< { Str => 1 } >> or
+C<HashRef[Str]> -- re-imports as the strict C<HashRef[Str]>, and so does a
+C<< { Quantity => 1 } >> map, whose values export as plain strings; typed
+maps of C<Int>, C<Num>, C<Bool>, C<Time> or C<IntOrStr> keep their value
+type, and C<Opaque> stays C<Opaque>. Scalar arrays C<[Str]>, C<[Int]>, C<[Num]>,
 C<[Bool]>, C<[IntOrStr]> and C<[Time]> retain their scalar element type;
 only C<[Quantity]> re-imports as C<[Str]>, since it exports only a plain
 C<type: string> items schema, indistinguishable from C<[Str]>.
@@ -485,8 +487,8 @@ CURRENT path (the second, internal C<$seen> argument -- never pass it from
 outside): a class that references itself, directly or through a reused
 core class, becomes an opaque
 C<< { type => 'object', 'x-kubernetes-preserve-unknown-fields' => true } >>
-stub at the repeat instead of recursing forever, the same stub the opaque
-C<< { Str => 1 } >> map gets. This is deliberately PATH-scoped, not global:
+stub at the repeat instead of recursing forever, the same stub the free
+C<Opaque> map gets. This is deliberately PATH-scoped, not global:
 a class that legitimately appears more than once as unrelated siblings
 (C<LabelSelector>, reused all over a real CRD schema per D5) must not be
 flattened to that stub on its second, unrelated appearance.
@@ -558,14 +560,12 @@ sub _property_schema {
 # emit here that would read back as Quantity. A Quantity field therefore
 # round-trips through add_crd as a plain Str -- documented in the task-2
 # report, not worked around here. is_hash_of_quantity shares the same gap
-# for the same reason (AutoGen's additionalProperties dispatch collapses
-# every typed map -- int/num/bool/quantity/time/int-or-string alike -- to
-# the opaque { Str => 1 } shape rather than a typed additionalProperties
-# schema, so none of is_hash_of_{int,num,bool,quantity,time,int_or_string}
-# has a schema shape that reads back as itself; only the standalone scalar
-# is_time is lossless via `format: date-time`, which AutoGen's own dispatch
-# explicitly reads back into Time). is_array_of_quantity has the identical
-# gap to the scalar is_quantity, one level down.
+# for the same reason: its additionalProperties is a plain `type: string`,
+# which AutoGen reads back as the string map HashRef[Str]. The other typed
+# maps -- int/num/bool/time/int-or-string -- read back as themselves since
+# k191, when AutoGen's additionalProperties dispatch stopped collapsing
+# every one of them to the old opaque { Str => 1 }. is_array_of_quantity
+# has the identical gap to the scalar is_quantity, one level down.
 sub _type_schema {
     my ($entry, $seen) = @_;
 
@@ -606,11 +606,11 @@ sub _type_schema {
 
     return { type => 'object', additionalProperties => _schema_for_class($entry->{class}, $seen) }
         if $entry->{is_hash_of_objects};
-    # is_hash_of_str is the opaque { Str => 1 } marker itself (see
-    # Resource.pm: "the genuinely opaque string map that labels,
-    # annotations and fieldsV1 need") -- never a typed additionalProperties
-    # schema, unlike every other is_hash_of_* flag below.
-    return _opaque_object() if $entry->{is_hash_of_str};
+    # The string map (k191) -- HashRef[Str] and { Str => 1 } alike, a
+    # map[string]string upstream -- and the free map, Opaque / HashRef,
+    # which is what { Str => 1 } used to stand for here.
+    return { type => 'object', additionalProperties => { type => 'string' } } if $entry->{is_hash_of_str};
+    return _opaque_object() if $entry->{is_hash_opaque};
     return { type => 'object', additionalProperties => { type => 'integer' } } if $entry->{is_hash_of_int};
     return { type => 'object', additionalProperties => { type => 'number' } }  if $entry->{is_hash_of_num};
     return { type => 'object', additionalProperties => { type => 'boolean' } } if $entry->{is_hash_of_bool};

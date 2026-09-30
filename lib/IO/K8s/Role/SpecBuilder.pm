@@ -319,7 +319,7 @@ sub _sb_fresh {
             return {} if grep { $info->{$_} } qw(
                 is_hash_of_str is_hash_of_objects is_hash_of_int is_hash_of_num
                 is_hash_of_bool is_hash_of_quantity is_hash_of_time
-                is_hash_of_int_or_string
+                is_hash_of_int_or_string is_hash_opaque
             );
             croak "spec path '$path': cannot descend through scalar field '$seg'";
         }
@@ -735,7 +735,7 @@ C<to_json> serializes it. A multi-value C<spec_push> checks and coerces
 every new value together before appending any of them, so one bad value
 among several leaves the array unchanged. This applies only to a
 collection reached through a declared field; an element inside the
-C<_unknown_fields> bag or an opaque C<< { Str => 1 } >> spec value keeps
+C<_unknown_fields> bag or an C<Opaque> spec value keeps
 the free JSON rules of a plain hash or array instead, unchecked.
 
 The walk's own checks use the same C<spec path 'PATH':> prefix for the

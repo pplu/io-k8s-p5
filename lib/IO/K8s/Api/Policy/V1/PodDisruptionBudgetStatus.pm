@@ -27,7 +27,7 @@ minimum desired number of healthy pods
 
 =cut
 
-k8s disruptedPods => { Str => 1 };
+k8s disruptedPods => HashRef[Time];
 
 =attr disruptedPods
 

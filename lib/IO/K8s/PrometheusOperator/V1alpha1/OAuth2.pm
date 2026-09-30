@@ -7,7 +7,7 @@ k8s clientId             => '+IO::K8s::PrometheusOperator::V1alpha1::SecretOrCon
 k8s clientSecret         => 'Core::V1::ConfigMapKeySelector', { required => 'schema' };
 k8s endpointParams       => { Str => 1 };
 k8s noProxy              => Str;
-k8s proxyConnectHeader   => { Str => 1 };
+k8s proxyConnectHeader   => Opaque;
 k8s proxyFromEnvironment => Bool;
 k8s proxyUrl             => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s scopes               => [Str];

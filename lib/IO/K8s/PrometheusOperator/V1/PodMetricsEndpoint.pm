@@ -15,11 +15,11 @@ k8s interval                 => Str, { pattern => qr/^(0|(([0-9]+)y)?(([0-9]+)w)
 k8s metricRelabelings        => ['+IO::K8s::PrometheusOperator::V1::RelabelConfig'];
 k8s noProxy                  => Str;
 k8s oauth2                   => '+IO::K8s::PrometheusOperator::V1::OAuth2';
-k8s params                   => { Str => 1 };
+k8s params                   => Opaque;
 k8s path                     => Str;
 k8s port                     => Str;
 k8s portNumber               => Int, { minimum => 1, maximum => 65535 };
-k8s proxyConnectHeader       => { Str => 1 };
+k8s proxyConnectHeader       => Opaque;
 k8s proxyFromEnvironment     => Bool;
 k8s proxyUrl                 => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s relabelings              => ['+IO::K8s::PrometheusOperator::V1::RelabelConfig'];

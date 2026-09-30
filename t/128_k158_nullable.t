@@ -40,7 +40,7 @@ use IO::K8s::ExternalSecrets;
   use IO::K8s::Resource;
 
   k8s class    => Str, { required => 1 };
-  k8s upstream => { Str => 1 }, { nullable => 1, preserve_unknown => 1 };
+  k8s upstream => Opaque, { nullable => 1, preserve_unknown => 1 };  # k191: the opaque map is Opaque
   k8s target   => '+Test158::Upstream', { nullable => 1 };
   k8s note     => Str, { nullable => 1 };
   k8s tags     => [Str], { nullable => 1 };

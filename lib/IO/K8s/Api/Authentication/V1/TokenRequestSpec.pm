@@ -3,7 +3,7 @@ package IO::K8s::Api::Authentication::V1::TokenRequestSpec;
 our $VERSION = '1.109';
 use IO::K8s::Resource;
 
-k8s attestations => { Str => 1 };
+k8s attestations => Opaque;
 
 =attr attestations
 

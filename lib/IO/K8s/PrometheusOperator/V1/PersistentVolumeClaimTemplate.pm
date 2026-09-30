@@ -3,7 +3,7 @@ package IO::K8s::PrometheusOperator::V1::PersistentVolumeClaimTemplate;
 our $VERSION = '1.109';
 use IO::K8s::Resource;
 
-k8s metadata => { Str => 1 };
+k8s metadata => Opaque;
 k8s spec     => 'Core::V1::PersistentVolumeClaimSpec', { required => 'schema' };
 
 =attr metadata

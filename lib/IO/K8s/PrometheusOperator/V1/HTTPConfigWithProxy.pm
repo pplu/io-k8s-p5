@@ -10,7 +10,7 @@ k8s enableHttp2          => Bool;
 k8s followRedirects      => Bool;
 k8s noProxy              => Str;
 k8s oauth2               => '+IO::K8s::PrometheusOperator::V1::OAuth2';
-k8s proxyConnectHeader   => { Str => 1 };
+k8s proxyConnectHeader   => Opaque;
 k8s proxyFromEnvironment => Bool;
 k8s proxyUrl             => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s tlsConfig            => '+IO::K8s::PrometheusOperator::V1::SafeTLSConfig';

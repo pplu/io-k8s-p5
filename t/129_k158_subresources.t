@@ -33,7 +33,7 @@ use IO::K8s::CRD::Emitter;
     resource_plural => 'plains';
   with 'IO::K8s::Role::Namespaced';
 
-  k8s spec => { Str => 1 };
+  k8s spec => Opaque;
 
   1;
 }
@@ -46,8 +46,8 @@ use IO::K8s::CRD::Emitter;
     subresources    => { status => {} };
   with 'IO::K8s::Role::Namespaced';
 
-  k8s spec   => { Str => 1 };
-  k8s status => { Str => 1 };
+  k8s spec   => Opaque;
+  k8s status => Opaque;
 
   1;
 }
@@ -84,7 +84,7 @@ my %SCALE = (
     api_version     => 'k158multi.example.com/v1beta1',
     resource_plural => 'widgets';
 
-  k8s spec => { Str => 1 };
+  k8s spec => Opaque;
 
   1;
 }
@@ -96,7 +96,7 @@ my %SCALE = (
     resource_plural => 'widgets',
     subresources    => { status => {} };
 
-  k8s spec => { Str => 1 };
+  k8s spec => Opaque;
 
   1;
 }

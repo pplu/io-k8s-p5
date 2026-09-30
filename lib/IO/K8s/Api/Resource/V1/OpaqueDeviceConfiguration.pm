@@ -15,7 +15,7 @@ Must be a DNS subdomain and should end with a DNS domain owned by the vendor of 
 
 =cut
 
-k8s parameters => { Str => 1 }, 'required';
+k8s parameters => Opaque, 'required';
 
 =attr parameters
 

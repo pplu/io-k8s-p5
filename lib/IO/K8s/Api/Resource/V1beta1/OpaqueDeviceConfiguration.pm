@@ -11,7 +11,7 @@ Driver is used to determine which kubelet plugin needs to be passed these config
 
 =cut
 
-k8s parameters => { Str => 1 }, 'required';
+k8s parameters => Opaque, 'required';
 
 =attr parameters
 
