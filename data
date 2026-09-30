@@ -1,0 +1,13 @@
+---
+class: standard
+created: 2026-09-30T16:20:33Z
+id: 195
+priority: low
+status: backlog
+tags:
+- crd
+title: 'to_crd: value options of [X] and typed maps land on the container schema'
+updated: 2026-09-30T16:20:33Z
+---
+
+Pre-existing, found during k191: CRD.pm _apply_options writes enum/pattern/minimum/maximum of an [X] array and of a typed map (now also HashRef[Str]) onto the container schema instead of items / additionalProperties. The emitted CRD then constrains the array/object itself, not its values.
