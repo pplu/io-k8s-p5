@@ -25,7 +25,7 @@ of attributes.
     $props->TO_JSON->{default} # 'nginx' — bare, not { value => 'nginx' }
 
 The C<spec_*> methods of L<IO::K8s::Role::SpecBuilder> walk through a field
-of this class into its value, the way the wire JSON reads (k172): on a K3s
+of this class into its value, the way the wire JSON reads: on a K3s
 HelmChart, C<< spec_set('values.replicaCount', 3) >> serializes as
 C<values: {"replicaCount": 3}>.
 
@@ -52,7 +52,7 @@ sub _build__json_encoder {
 
 Inflation hook called by L<IO::K8s/struct_to_object>. Wraps C<$struct>
 unchanged, except that a hash or an array is copied one level -- the rule
-inflation applies to every array or hash of scalars (k54, k169). A key added
+inflation applies to every array or hash of scalars. A key added
 to or removed from the source hash, or an element pushed onto the source
 array, after inflation does not reach the object. A container nested inside
 the value is not copied and still shares its contents with the source. A
@@ -60,7 +60,7 @@ plain scalar, C<undef> or a JSON boolean is kept as given.
 
 The same hook builds the value a field of this type is given through C<new>,
 its setter or a C<spec_*> write of L<IO::K8s::Role::SpecBuilder>, whatever
-its shape (k179) -- C<< values => [1, 2] >> on a K3s C<HelmChartSpec> as
+its shape -- C<< values => [1, 2] >> on a K3s C<HelmChartSpec> as
 readily as a hash; see L<IO::K8s::Resource/k8s>.
 
 =cut
@@ -79,7 +79,7 @@ sub FROM_STRUCT {
 
 Returns the wrapped value, a hash or an array copied one level -- the same
 depth L</FROM_STRUCT> copies on the way in and L<IO::K8s::Role::Resource/TO_JSON>
-copies an untyped container on the way out (k54, k171). A key added to or
+copies an untyped container on the way out. A key added to or
 removed from the returned hash, or an element pushed onto the returned
 array, does not reach the object; a container nested inside the value is
 still shared with it. A plain scalar, C<undef> or a JSON boolean is returned

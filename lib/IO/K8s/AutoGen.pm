@@ -1855,7 +1855,7 @@ Perl truthiness, so the wire string C<"false"> is false; a C<default> of
 JSON C<null> -- common on a C<nullable: true> field -- is treated as no
 default at all, not as a default of C<undef>, which the DSL's own
 field-option check would otherwise refuse. A C<nullable: true> property
-behaves as C<nullable> does on a hand-written field (k158): an explicit
+behaves as C<nullable> does on a hand-written field: an explicit
 C<null> in a document is kept and written back, and the property gets
 C<< has_<accessor> >> and C<< clear_<accessor> >>. A property whose
 predicate or clearer name the class already answers to fails the generation
@@ -1871,19 +1871,19 @@ C<default> the field cannot hold -- the wrong type, or a value outside its
 own enum or range.
 
 OpenAPI C<type: number> becomes C<Num>, for a scalar property and for an
-array's C<items> alike (k68, k155), so those values stay JSON numbers on the
+array's C<items> alike, so those values stay JSON numbers on the
 wire rather than turning into strings; C<type: integer> likewise becomes
 C<Int> and C<[Int]>. C<x-kubernetes-int-or-string: true> (or C<type:
 string> with C<format: int-or-string>) becomes C<IntOrStr> and, on
 C<items>, C<[IntOrStr]>, so an element C<8080> stays a JSON number and
 C<'25%'> a string; C<type: string> with C<format: date-time> becomes
-C<Time> and C<[Time]> (k167). A map whose C<additionalProperties> is one
+C<Time> and C<[Time]>. A map whose C<additionalProperties> is one
 of these scalar schemas stays the opaque hash, which writes its values back
 unchanged.
 
 A C<$ref> to one of the apimachinery scalar definitions --
 C<resource.Quantity>, C<intstr.IntOrString>, C<meta.v1.Time> and
-C<meta.v1.MicroTime> -- is typed as that scalar wherever it sits (k178): a
+C<meta.v1.MicroTime> -- is typed as that scalar wherever it sits: a
 property becomes C<Quantity>, C<IntOrStr> or C<Time>, an array's C<items>
 C<[Quantity]>, C<[IntOrStr]> or C<[Time]>, and a map's
 C<additionalProperties> C<< { Quantity => 1 } >>, C<< { IntOrStr => 1 } >>
@@ -1893,7 +1893,7 @@ the definition, a bare C<type: string>, as an empty class that no quantity
 or timestamp could inflate into.
 
 The C<Time> and C<Quantity> of a generated class accept any string, as a
-scalar field and as an array element alike (k178): a custom resource's
+scalar field and as an array element alike: a custom resource's
 C<date-time> is stored as written, and RFC 3339 allows a lowercase C<t> and
 C<z> the strict check of a hand-written C<Time> field refuses, so a
 generated class never fails to inflate what the API server returned. The
@@ -1904,7 +1904,7 @@ only a swagger C<$ref> reaches, whose values the API server writes in
 canonical form.
 
 An inline C<type: object> schema with its own non-empty C<properties> also
-becomes a typed class now (D10, k94), named after its place in the parent --
+becomes a typed class now (D10), named after its place in the parent --
 C<< <Parent>::<Prop> >>, with an C<Item> / C<Value> suffix for array items
 and map values shaped the same way -- so its properties get field options
 exactly like a class built from a C<$ref>. Only a property-less C<type:
@@ -1962,7 +1962,7 @@ matching C<PodTemplateSpec>, C<JobTemplateSpec>,
 C<ResourceClaimTemplateSpec> and others, each with C<spec> typed
 differently -- stays a nested class rather than guess which one is meant.
 
-Surviving all of that is still not enough (k148): the chosen class must also
+Surviving all of that is still not enough: the chosen class must also
 hold what the schema describes all the way down, not merely match it key by
 key at the top level -- an array field's C<items>, a map's
 C<additionalProperties> values, and any nested object field are checked the
@@ -1988,7 +1988,7 @@ C<io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON>,
 C<...v1.JSONSchemaPropsOrArray>, C<...v1.JSONSchemaPropsOrBool> and
 C<...v1.JSONSchemaPropsOrStringArray> -- is typed as the class IO::K8s
 ships for it (C<Apiextensions::V1::JSON> and so on), as a property, as an
-array's C<items> or as a map's values (k152). Upstream describes these
+array's C<items> or as a map's values. Upstream describes these
 definitions without any properties, because none of them is a JSON object
 (any JSON value; a schema or an array of schemas; a schema or a boolean; a
 schema or a string array); the shipped classes inflate through
@@ -2016,10 +2016,10 @@ D5's core-class reuse; see above.
 When C<api_version> (or C<kind> / C<resource_plural>) is supplied, the
 generated class installs fixed-value methods for each. These are fixed
 identity, not writable fields: passing an argument croaks rather than
-silently retargeting the object (k67, k70) -- the same contract the
+silently retargeting the object -- the same contract the
 hand-written CRD template installs via L<IO::K8s::APIObject>.
 
-C<< subresources => { ... } >> (k158), which L<IO::K8s::CRD/generate> passes
+C<< subresources => { ... } >>, which L<IO::K8s::CRD/generate> passes
 for a CRD version that has any, installs the C<subresources> identity method
 the C<use IO::K8s::APIObject> parameter of that name installs, on a
 top-level class, so its C<to_crd> writes them back. It is checked the same
@@ -2041,12 +2041,12 @@ the apimachinery scalars and the apiextensions union types, which are
 resolved by name (see L</DESCRIPTION>). A partial
 spec that references definitions it does not ship used to generate the
 class anyway, minus those fields -- losing their data on every round-trip.
-It now dies naming the C<$ref> and where it appeared (k56).
+It now dies naming the C<$ref> and where it appeared.
 
 =item *
 
 C<additionalProperties> is a reference that is neither a schema object nor
-a JSON boolean; the message names the class and field (k55).
+a JSON boolean; the message names the class and field.
 
 =item *
 
@@ -2060,7 +2060,7 @@ a top-level class -- one with an C<api_version> and a C<kind> -- has a
 property whose accessor would take the name of a method of
 L<IO::K8s::Role::APIObject> (C<label>, C<save>, C<is_ready>, ..., and the
 C<spec_*> methods of L<IO::K8s::Role::SpecBuilder>, which it composes) or of
-the identity methods C<api_version> and C<resource_plural> (k150). The
+the identity methods C<api_version> and C<resource_plural>. The
 identity methods and the role are in place before the first property is
 declared, the order C<use IO::K8s::APIObject> gives a hand-written class,
 so the declaration check of L<IO::K8s::Resource/k8s> refuses the property
@@ -2075,8 +2075,8 @@ renamed.
 
 =back
 
-A failure anywhere in this process is a failure of the whole generation run
-(k149), not just of the one class being built: the root class, every
+A failure anywhere in this process is a failure of the whole generation run,
+not just of the one class being built: the root class, every
 C<$ref>'d definition generated on the way, and every nested class -- the
 "run" -- succeed or fail together. The one exception is the GVK-selection
 failure above (the third bullet): it happens before the class is marked as
@@ -2103,7 +2103,7 @@ instance.
 One partial-spec shape still generates successfully by design: a top-level
 CRD schema whose C<metadata> C<$ref>s the standard C<ObjectMeta> without
 shipping its definition. C<metadata> is supplied by the role and is skipped
-before its C<$ref> is looked at (k60), so this common single-schema
+before its C<$ref> is looked at, so this common single-schema
 hand-in does not trip the unresolved-C<$ref> refusal. A side effect of that
 skip: when C<$all_defs> does carry C<ObjectMeta> and nothing else
 references it, it no longer appears in L</generated_classes()>.
@@ -2132,7 +2132,7 @@ A class that failed to generate (see
 L</get_or_generate($def_name, $schema, $all_defs, $namespace)>) is not reset
 by this call -- its failure record is kept on purpose, so a later request
 for it still re-raises the run's original error instead of handing back the
-half-built package the failed run left behind (k149). The only way to retry
+half-built package the failed run left behind. The only way to retry
 that class is to generate it into a fresh C<IO::K8s> instance's namespace.
 
 =head2 generated_classes()
@@ -2140,7 +2140,7 @@ that class is to generate it into a fresh C<IO::K8s> instance's namespace.
 List the class names whose generation run completed successfully. A class
 begun by a run that later failed is never listed here, even though its
 package may still exist in memory and even though it can never be generated
-again in this namespace (k149; see
+again in this namespace (see
 L</get_or_generate($def_name, $schema, $all_defs, $namespace)>).
 
 =head2 class_description($class)
@@ -2186,7 +2186,7 @@ C<is_str>/C<is_int_or_string>/C<is_quantity>/C<is_time>; int-or-string --
 C<x-kubernetes-int-or-string>, or C<type: string> with C<format:
 int-or-string> -- matches C<is_int_or_string> or C<is_quantity> (the form
 C<controller-gen> gives a C<resource.Quantity>), never a C<Str> field that
-would write C<8080> back as C<"8080"> nor a C<Time> (k181); C<integer>
+would write C<8080> back as C<"8080"> nor a C<Time>; C<integer>
 matches C<is_int> or C<is_int_or_string>; C<number> matches C<is_num>;
 C<boolean> matches C<is_bool>; C<array> matches any C<is_array_of_*>;
 C<object>, whether the schema property has C<properties> of its own or is
@@ -2195,7 +2195,7 @@ and -- when several type-compatible candidates remain -- requires them to
 be wire-identical before picking the preferred one. Picking a class this way
 is still not the final word: it must also hold the schema all the way down
 -- array items, map values, nested object fields, checked recursively -- or
-nothing is reused after all (k148; see above for the full rule, including
+nothing is reused after all (see above for the full rule, including
 the C<$ref>, opaque-map and C<ObjectMeta> special cases).
 
 The index itself is precomputed and shipped as

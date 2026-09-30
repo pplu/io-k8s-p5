@@ -84,7 +84,7 @@ Accepted only as a fully-qualified class name, exactly like every other
 class-name-taking parameter in this distribution: a leading C<+> is
 stripped before use ("this is already a full class name"), and a short or
 partially-qualified name is not guessed at -- L</kind> and L</api_version>
-simply have nothing to derive from it (k49).
+simply have nothing to derive from it.
 
 =cut
 
@@ -170,7 +170,7 @@ Returns the Kubernetes kind (e.g., "PodList"), derived from items or item_class.
 For an C<item_class> the Kind is its last C<::> segment, or the whole name for
 a single-segment class such as a CRD registered as C<+Widget> -- but only when
 L</api_version> can also resolve for the same item_class; otherwise C<undef>,
-never a Kind with no apiVersion to go with it (k49).
+never a Kind with no apiVersion to go with it.
 
 =cut
 
@@ -192,7 +192,7 @@ derive one" meaning it already has for an empty list built directly via
 C<new>. It is the only way to inflate a bare C<kind: List> payload, whose
 Kind minus its C<List> suffix is empty and so derives nothing on its own.
 
-C<item_class> must be a class name (k166). A reference -- plain or blessed,
+C<item_class> must be a class name. A reference -- plain or blessed,
 a JSON boolean included -- or an empty class name, C<''> or a bare C<+>,
 dies naming this class, the argument and what it received, whether the list
 has items or not:
@@ -203,13 +203,13 @@ has items or not:
 An C<undef> C<item_class> is no override: the item type is derived as if the
 key were absent.
 
-Fails closed (k39/k46): an item Kind that cannot be resolved to a
+Fails closed: an item Kind that cannot be resolved to a
 class dies with the same "Cannot resolve Kubernetes GVK" error every other
 entry point in this distribution uses, naming the ITEM's kind/apiVersion,
 never a silently empty or half-inflated list.
 
-The wrong shape fails closed in the message form of L<IO::K8s/new_object>
-(k161): a C<$struct> that is not a hash dies naming this class, C<items>
+The wrong shape fails closed in the message form of L<IO::K8s/new_object>:
+a C<$struct> that is not a hash dies naming this class, C<items>
 that is not an array dies naming the field, the item class and what it
 received, and an item or C<metadata> that is not a hash dies naming the
 field -- and for an item its index -- it sits at:
@@ -223,7 +223,7 @@ empty list.
 The C<item_class> and shape errors above, and an error an item's
 constructor raises (a missing required field, a value of the wrong type),
 name the line that called L<IO::K8s/inflate>, C<FROM_STRUCT> or
-L</from_json>, not a line inside the distribution (k170).
+L</from_json>, not a line inside the distribution.
 
 =cut
 
@@ -393,8 +393,8 @@ sub to_json {
     my $json_bytes = $list->to_json;
 
 Serializes the List to a canonical JSON document as a B<UTF-8 encoded byte
-string> -- the same convention every L<IO::K8s::Role::Resource> class uses
-(k53), and the input L</from_json> reads back (k64).
+string> -- the same convention every L<IO::K8s::Role::Resource> class uses,
+and the input L</from_json> reads back.
 
 =cut
 
@@ -411,7 +411,7 @@ second argument when the item types must resolve through that instance's
 providers or C<class_namespaces>; without one a shared default instance is
 used, as FROM_STRUCT does.
 
-List composes L<IO::K8s::Role::Resource> (since k99) so its top-level
+List composes L<IO::K8s::Role::Resource> (since 1.108) so its top-level
 envelope gets the same C<_unknown_fields> bag and C<strict> handling as
 every other resource, but it is a container, not an API object with its
 own GVK, so C<to_json>/C<from_json>/C<TO_JSON>/C<FROM_STRUCT> stay

@@ -480,7 +480,7 @@ derived from the first ancestor in a known namespace.
     $deployment->api_version;  # "apps/v1"
 
 Derived identity, not a writable field: passing an argument croaks
-rather than silently rebinding (k67). CRD classes installed via
+rather than silently rebinding. CRD classes installed via
 L<IO::K8s::APIObject/api_version> install a fixed-value method with the
 same contract -- see there for the precise error message.
 
@@ -553,7 +553,7 @@ registered as C<+Widget>.
     $deployment->kind;  # "Deployment"
 
 Derived identity, not a writable field: passing an argument croaks
-rather than silently rebinding (k67). Auto-generated CRD classes
+rather than silently rebinding. Auto-generated CRD classes
 install a fixed-value method with the same contract -- see
 L<IO::K8s::AutoGen> for the precise error message.
 
@@ -628,7 +628,7 @@ CRD classes declare their own, which always wins over the built-in table:
         resource_plural => 'staticwebsites';
 
 Derived identity, not a writable field: passing an argument croaks
-rather than silently rebinding (k70). CRD classes installed via
+rather than silently rebinding. CRD classes installed via
 L<IO::K8s::APIObject/resource_plural> install a fixed-value method with
 the same contract -- see there for the precise error message.
 
@@ -658,7 +658,7 @@ describes (D9), emitted through L<IO::K8s::CRD/crd_for_class>. It is a
 schema export, not a lossless reverse round-trip through C<add_crd>: see
 L<IO::K8s::CRD/crd_for_class> for the C<Quantity> export and typed-map /
 scalar-array inference limits. A class that declares C<subresources>
-(L<IO::K8s::APIObject>, k158) gets them in its C<spec.versions[]> entry.
+(L<IO::K8s::APIObject>) gets them in its C<spec.versions[]> entry.
 
 =cut
 
@@ -945,8 +945,8 @@ sub _condition_field {
 Returns all status conditions as an arrayref, read from
 C<< $obj->status->conditions >>. A class that declares its own top-level
 C<conditions> field via the C<k8s> DSL -- rather than nesting it under
-C<status> -- replaces this helper with that field's own accessor instead
-(k144): L<IO::K8s::Api::Core::V1::ComponentStatus> is the one shipped Kind
+C<status> -- replaces this helper with that field's own accessor instead:
+L<IO::K8s::Api::Core::V1::ComponentStatus> is the one shipped Kind
 that does, since upstream carries its conditions at the top level.
 
 =cut

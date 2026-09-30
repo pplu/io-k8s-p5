@@ -1691,7 +1691,7 @@ validation.
 
 An unknown import parameter, an odd number of import arguments, or an
 C<api_version>/C<resource_plural> given as C<undef> or an empty string all
-croak at the C<use> line, before anything is set up (k174, k182); see
+croak at the C<use> line, before anything is set up; see
 L<IO::K8s::APIObject> for the exact messages.
 
 =head2 Namespaced vs cluster-scoped
@@ -1844,7 +1844,7 @@ L</struct_to_object>; L</load> and L</load_yaml> inherit it because both
 build on C<inflate>/C<new_object>. It applies for the duration of that one
 call, including every nested object it constructs along the way.
 
-Since k99, L<IO::K8s::List>, the envelope a list Kind inflates to, also
+Since 1.108, L<IO::K8s::List>, the envelope a list Kind inflates to, also
 composes L<IO::K8s::Role::Resource>: its own top-level keys are preserved
 and checked under C<strict> exactly like any other resource's, alongside
 the objects inside C<items>, each through its own class.
@@ -1885,7 +1885,7 @@ An error from generating such a class -- a C<$ref> no definition answers,
 say, and the remembered failure L<IO::K8s::AutoGen> rethrows when the same
 class is asked for again -- names the line that called L</expand_class>,
 L</new_object>, L</inflate> or whichever entry point asked for the class,
-not a line inside IO::K8s (k175).
+not a line inside IO::K8s.
 
 =head2 class_namespaces
 
@@ -2003,17 +2003,17 @@ when loading fails, so reloading manifests in a long-running process does
 not grow it. Subs and closures the manifest hands out in its data keep
 working after that.
 
-Errors name the manifest's file and its own line numbers (k163): a C<die>,
+Errors name the manifest's file and its own line numbers: a C<die>,
 a warning, a syntax error, a C<var> without value and an error raised for
 a Kind call -- a field of the wrong shape, a missing required field or a
-value of the wrong type (k164) -- all report
+value of the wrong type -- all report
 C<at myapp.pk8s line 12>, and a fatal one comes prefixed with
 C<Error loading myapp.pk8s:>. A file name with a double quote, a line break
 or characters outside printable ASCII cannot be written into Perl's
 C<#line> directive; for such a file the line numbers are still right, the
 location reads C<(eval N)> instead of the name, and the prefix still names
 the file. A manifest that cannot be opened croaks C<Cannot open myapp.pk8s:
-...> at the line that called C<load> (k175).
+...> at the line that called C<load>.
 
 The manifest is compiled under C<use strict> and C<use warnings> and sees
 C<var> and one function per Kind, but none of the loader's own variables:
@@ -2106,7 +2106,7 @@ L</inflate>: it is treated as the exact GVK the caller wants, and the
 short name resolves against it instead of whichever version the class
 defaults to. When a positional C<api_version> is also given and the two
 disagree -- including one being defined and the other undef -- this
-croaks rather than picking one (k62):
+croaks rather than picking one:
 
     new_object: conflicting apiVersion for kind 'NetworkPolicy' --
     params hash says 'cilium.io/v2', positional argument says 'networking.k8s.io/v1'
@@ -2133,7 +2133,7 @@ the params, or (via L</struct_to_object> and L</json_to_object>) the
 top-level value itself -- must be a hashref, or an already-inflated object
 of the right class; anything else (an arrayref, a plain string, a code or
 scalar reference) dies naming the target class, the shape actually
-received, and, for a nested field, the field itself (k146):
+received, and, for a nested field, the field itself:
 
     Cannot inflate IO::K8s::Api::Core::V1::Pod: expected a hash (a JSON object), got a reference of type ARRAY
     Cannot inflate IO::K8s::Api::Core::V1::PodSpec: expected a hash (a JSON object), got a plain scalar while inflating IO::K8s::Api::Core::V1::Pod field spec
@@ -2141,7 +2141,7 @@ received, and, for a nested field, the field itself (k146):
 A blessed value of another class is read through its C<TO_JSON>, which
 has to return a hashref; a blessed value without C<TO_JSON> -- such as the
 JSON boolean C<"metadata": true> decodes to -- or with a C<TO_JSON> that
-returns anything else dies the same way, naming the value's class (k153):
+returns anything else dies the same way, naming the value's class:
 
     Cannot inflate IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta: expected a hash (a JSON object), got an object of class JSON::PP::Boolean while inflating IO::K8s::Api::Core::V1::Pod field metadata
 
@@ -2156,7 +2156,7 @@ An array field -- of objects, such as C<containers>, or of scalars, such
 as C<args> -- takes an arrayref, and a hash field -- of objects, or a map
 such as C<labels> or C<limits> -- takes a hashref. Any other defined value
 dies naming the class being inflated, the field, the expected container
-and, for objects, the element class (k154):
+and, for objects, the element class:
 
     Cannot inflate IO::K8s::Api::Core::V1::PodSpec field containers: expected an array (a JSON array) of IO::K8s::Api::Core::V1::Container, got a plain scalar
 
@@ -2166,7 +2166,7 @@ C<labels> or C<annotations> stay as unconstrained as before.
 A list payload (C<kind: PodList> and the like, inflated into
 L<IO::K8s::List>) follows the same rules: the list itself has to be a hash,
 C<items> an array -- named as C<IO::K8s::List field items> -- and each item
-a hash, named by its index (k161):
+a hash, named by its index:
 
     Cannot inflate IO::K8s::Api::Core::V1::Pod: expected a hash (a JSON object), got a plain scalar while inflating IO::K8s::List field items at element 1
 
@@ -2181,7 +2181,7 @@ A JSON C<null> (C<undef>) for a field counts as the field being omitted --
 except for a field declared C<nullable> (see
 L<IO::K8s::Resource/Field options>), where it is kept: the attribute exists
 with C<undef>, its C<< has_<accessor> >> is true, and C<TO_JSON> writes
-the C<null> back (k158). That too holds on every entry point listed above
+the C<null> back. That too holds on every entry point listed above
 and at any depth.
 
 An error the constructor of a class raises while it is built -- Moo's
@@ -2189,7 +2189,7 @@ C<Missing required arguments>, or a L<Type::Tiny> exception for a value of
 the wrong type -- names the line that called C<new_object>, C<inflate>,
 C<struct_to_object>, C<json_to_object> or L</load_yaml>, and in a C<.pk8s>
 manifest the line of the Kind call (see L</load>), not a line inside
-IO::K8s (k164). That holds at any depth, for every Kind that resolves to a
+IO::K8s. That holds at any depth, for every Kind that resolves to a
 class -- shipped, generated or your own:
 
     Missing required arguments: selector, template at deploy.pl line 12.
@@ -2201,8 +2201,8 @@ its own code, such as a C<BUILD> that dies, keeps its own location, and a
 direct C<< $class->new(...) >> is not an entry point of IO::K8s and reports
 as it always has.
 
-The same goes for the routes that inflate through IO::K8s on your behalf
-(k175): L<IO::K8s::Role::Resource/FROM_HASH> and C<from_json>, which the
+The same goes for the routes that inflate through IO::K8s on your behalf:
+L<IO::K8s::Role::Resource/FROM_HASH> and C<from_json>, which the
 C<< unknown_kinds => 'unstructured' >> fallback of C<new_object> and
 C<inflate> goes through as well; a hash that C<spec_set> or C<spec_merge>
 of L<IO::K8s::Role::SpecBuilder> writes into a typed field; and a schema
@@ -2231,12 +2231,11 @@ the exact message.
 The data itself has to be a hash: a hashref, or JSON text that decodes to
 an object. JSON text for anything else -- C<[]>, a string, C<null> -- and
 any other Perl value -- an arrayref, C<undef>, an already-inflated object --
-dies naming what it received (k161):
+dies naming what it received:
 
     Cannot inflate: expected a hash (a JSON object), got a reference of type ARRAY
 
-A hash without a C<kind> croaks, naming the line that called C<inflate>
-(k175):
+A hash without a C<kind> croaks, naming the line that called C<inflate>:
 
     Cannot inflate: missing 'kind' field in data at deploy.pl line 12.
 
@@ -2251,7 +2250,7 @@ decode to an object. With two arguments, uses the specified class.
 
 The specified class name goes through L</expand_class> exactly as it would
 for L</new_object>: a bare one-word name is always read as a Kubernetes
-Kind and looked up in the resource map, never as a package name (k35) --
+Kind and looked up in the resource map, never as a package name --
 C<Gizmo> resolves as the resource map's C<Gizmo> entry, not as a literal
 package called C<Gizmo>. A class name that has already been resolved --
 for example, the return value of a previous L</expand_class> call -- is not
@@ -2280,7 +2279,7 @@ the class from C<kind>. With two arguments, uses the specified class.
 
 The specified class name goes through L</expand_class> exactly as it would
 for L</new_object>: a bare one-word name is always read as a Kubernetes
-Kind and looked up in the resource map, never as a package name (k35) --
+Kind and looked up in the resource map, never as a package name --
 C<Gizmo> resolves as the resource map's C<Gizmo> entry, not as a literal
 package called C<Gizmo>. A class name that has already been resolved --
 for example, the return value of a previous L</expand_class> call -- is not
@@ -2340,7 +2339,7 @@ qualified C<api_version/Kind> form is checked first against the resource
 map, then a short-name key whose mapped class itself reports the
 requested C<api_version>, then the C<openapi_spec> for an auto-generated
 class. Anything else fails closed rather than substituting a different
-version (k17).
+version.
 
 A bare unqualified name is B<not> a GVK request: it falls through to
 C<IO::K8s::>E<lt>KindE<gt> and then to auto-generation, and a name that

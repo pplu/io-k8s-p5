@@ -34,7 +34,7 @@ collapses into a single schema.
 An error inflating the schema arm -- a value of the wrong shape where a
 schema, or a field inside one, belongs -- names the line that called
 L</FROM_STRUCT>, or the entry point of IO::K8s that got there, not a line
-of this class (k175).
+of this class.
 
 =cut
 
@@ -90,7 +90,7 @@ C<schemas>, anything else fills C<schema>.
 
 The same hook builds the value a field of this type is given through C<new>,
 its setter or a C<spec_*> write of L<IO::K8s::Role::SpecBuilder>, whatever
-its shape (k179); see L<IO::K8s::Resource/k8s>.
+its shape; see L<IO::K8s::Resource/k8s>.
 
 =cut
 

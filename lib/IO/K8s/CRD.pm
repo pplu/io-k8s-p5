@@ -81,7 +81,7 @@ file, or an arrayref of any of those. Dies on a document that is not a
 C<CustomResourceDefinition> or lacks C<spec.group>, C<spec.names.kind> or
 C<spec.versions>.
 
-A string is read by the same rule as L<IO::K8s/load_yaml> (k162): without
+A string is read by the same rule as L<IO::K8s/load_yaml>: without
 a newline and naming an existing file, it is read from that file, as UTF-8;
 anything else is YAML or JSON text in decoded characters. A one-line string
 that is no existing file and parses to plain scalars only -- typically a
@@ -160,7 +160,7 @@ The served versions of one loaded CRD, in manifest order, each as
 C<< { name, api_version, storage, schema } >> where C<schema> is the
 version's C<openAPIV3Schema> (an empty C<type: object> when the manifest has
 none), plus C<subresources> as the manifest gives it when the version has
-any (k158). Dies when no version is served.
+any. Dies when no version is served.
 
 =cut
 
@@ -206,7 +206,7 @@ none is marked (an invalid manifest, but a common one in hand-written
 fixtures) the last served version is used. Each class carries the CRD's
 C<kind>, C<names.plural> and scope, and every object with C<properties>
 below it is a nested class (see L<IO::K8s::AutoGen>). A version's
-C<subresources> become the class's C<subresources> method (k158; see
+C<subresources> become the class's C<subresources> method (see
 L<IO::K8s::APIObject>), so C<to_crd> writes them back; a malformed
 C<subresources> section croaks the way the C<use IO::K8s::APIObject>
 parameter does, naming the generated class and the key.
@@ -215,7 +215,7 @@ An error from generating a class -- a C<$ref> no definition answers, say,
 and the remembered failure L<IO::K8s::AutoGen> rethrows when the same class
 is asked for again -- names the line that called C<generate>, or
 L<IO::K8s/add_crd> when that is the way in, not a line inside the
-distribution (k170).
+distribution.
 
 Classes are generated under C<$namespace\::_CRD>, never C<$namespace>
 itself. L<IO::K8s::AutoGen> caches by class name, and the class name is
@@ -315,7 +315,7 @@ C<CustomResourceDefinition>, not a bare hashref.
 
 Reached through C<< $class->to_crd >>, an error -- a C<pattern> that
 cannot be written as ECMA262, say -- names the line that called C<to_crd>,
-not the C<to_crd> line in L<IO::K8s::Role::APIObject> (k170).
+not the C<to_crd> line in L<IO::K8s::Role::APIObject>.
 
 =cut
 
@@ -351,7 +351,7 @@ identically-named C<spec.versions[]> entries -- a shape the apiserver
 rejects -- so that croaks too, naming the repeated version. Each class
 becomes one C<spec.versions[]> entry (schema from L</_schema_for_class>,
 applied per class, and C<subresources> from the class's own declaration
-when it has one, k158): every entry is C<< served => true >>, and exactly
+when it has one): every entry is C<< served => true >>, and exactly
 the one whose C<name> matches C<storage> gets C<< storage => true >> (the
 rest C<< storage => false >>). C<storage> is required and must name one of
 the given classes' own versions, or the call croaks.

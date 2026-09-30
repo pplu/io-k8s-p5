@@ -257,7 +257,7 @@ into a fatal error instead: any key that would otherwise land in the bag
 dies as C<< Unknown field '<name>' for <class> >>, again at every
 nesting level, for the duration of that call.
 
-Since k99, L<IO::K8s::List> -- the generic envelope a list Kind (C<PodList>,
+Since 1.108, L<IO::K8s::List> -- the generic envelope a list Kind (C<PodList>,
 a bare C<kind: List>, ...) inflates to -- composes this role too, so its
 own top-level keys besides C<items>/C<metadata>/C<item_class> are preserved
 and checked exactly like any other resource's, under C<strict> or
@@ -278,7 +278,7 @@ right JSON type: integers unquoted, booleans as C<true>/C<false>, nested
 objects recursively via their own C<TO_JSON>, hashes and arrays of objects
 in their canonical shape. A C<Str> field and each element of a C<[Str]>
 array are always emitted as a JSON string, even when the Perl value itself
-is numeric (k145): C<< EnvVar->new(value => 8080) >> serializes C<value> as
+is numeric: C<< EnvVar->new(value => 8080) >> serializes C<value> as
 C<"8080">, not a bare C<8080>. The other way round, a C<Num> field and
 each element of a C<[Num]> array are always emitted as a JSON number, so a
 numeric string such as C<'0.25'> goes out unquoted. Each element of an
@@ -288,7 +288,7 @@ string it is. A C<Quantity> or C<Time> value always goes out as a JSON
 string, the form Kubernetes writes both in -- a scalar field, each value of
 a C<< { Quantity => 1 } >> or C<< { Time => 1 } >> map and each element of a
 C<[Quantity]> or C<[Time]> array alike: C<< limits => { cpu => 1 } >> is
-emitted as C<{"cpu":"1"}> (k167, k180). The object keeps the value it was
+emitted as C<{"cpu":"1"}>. The object keeps the value it was
 given. The opaque
 C<< { Str => 1 } >> hash form (labels, annotations, C<fieldsV1>, ...) is
 exempt from that coercion -- its values are copied through unchanged,
@@ -298,7 +298,7 @@ fields are prepended.
 
 A field that holds C<undef> is omitted -- unless it is declared
 C<nullable> and present, which C<< has_<accessor> >> tells: that one is
-written as an explicit JSON C<null> (k158; see
+written as an explicit JSON C<null> (see
 L<IO::K8s::Resource/Field options>).
 
 This is the entry point L</to_json> builds on, and the inverse of
@@ -558,17 +558,17 @@ sub _default_k8s {
 Builds an object of this class from a plain hashref of JSON field names,
 inflating nested objects, arrays of objects and hashes of objects through the
 attribute registry -- the same inflation L<IO::K8s/inflate> performs, so a
-struct from L</TO_JSON> round-trips back (k59). Before 1.108 this was a
+struct from L</TO_JSON> round-trips back. Before 1.108 this was a
 bare C<< $class->new(%$hash) >> and any nested field had to be pre-built.
 
 A defined value at an object-bearing position that is not a hashref (or
 already an object of the right class) -- an arrayref, a plain string, a
 code or scalar reference -- fails closed the same way inflation does
-everywhere else (k146): it croaks naming the target class, the shape it
+everywhere else: it croaks naming the target class, the shape it
 actually received, and, for a nested field, the field itself, rather than
 silently building an empty object. So does a blessed value whose class has
-no C<TO_JSON> returning a hashref, such as a JSON boolean (k153), and an
-array or hash field holding the wrong container (k154). See
+no C<TO_JSON> returning a hashref, such as a JSON boolean, and an
+array or hash field holding the wrong container. See
 L<IO::K8s/new_object> for the exact messages. C<undef> and an omitted field
 are unaffected and remain allowed.
 
@@ -586,8 +586,8 @@ sub FROM_HASH {
 Builds an object of this class from a JSON document, symmetric to
 L</to_json>. The argument is a B<UTF-8 encoded byte string> -- exactly what
 C<to_json> produces; a decoded character string is not accepted and fails
-loudly in the JSON decoder rather than silently round-tripping to mojibake
-(k53). Decode-tolerance was rejected on purpose: it would leave
+loudly in the JSON decoder rather than silently round-tripping to mojibake.
+Decode-tolerance was rejected on purpose: it would leave
 C<from_json> more permissive than C<< $k8s->json_to_object >>, which has
 always been byte-oriented.
 

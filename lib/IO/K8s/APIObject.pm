@@ -55,7 +55,7 @@ Kinds; C<undef> when there is no plural, e.g. a subresource)
 
 C<api_version()> and C<resource_plural()> are fixed identity methods, not
 writable fields: when a CRD declares its own via the import parameters
-below, passing an argument croaks rather than silently rebinding (k67, k70).
+below, passing an argument croaks rather than silently rebinding.
 The methods derive their value from the class name in the built-in case, so
 the same guard applies -- see L<IO::K8s::Role::APIObject> for the exact
 messages.
@@ -66,21 +66,21 @@ as class methods before the role is composed, avoiding redefinition warnings.
 
 C<api_version>, C<resource_plural> and C<subresources> (below) are the only
 import parameters. Any other name -- a typo such as C<subresource> or
-C<resource_plurals> -- croaks at the C<use> line before anything is set up
-(k174), naming the class, the parameter and the known ones:
+C<resource_plurals> -- croaks at the C<use> line before anything is set up,
+naming the class, the parameter and the known ones:
 
     My::StaticWebSite: unknown import parameter 'subresource' for IO::K8s::APIObject (known: api_version, resource_plural, subresources)
 
 The same goes for an odd number of import arguments, and for an
 C<api_version> or C<resource_plural> given as C<undef>, as an empty string
 or as a reference, which used to be skipped as if the parameter were not
-there (k182):
+there:
 
     My::StaticWebSite: odd number of import arguments for IO::K8s::APIObject (1); expected name => value pairs
     My::StaticWebSite: import parameter 'resource_plural' for IO::K8s::APIObject must be a non-empty string, got an empty string
 
-A CRD class may also declare the subresources its CRD version serves
-(k158), which L<IO::K8s::Role::APIObject/to_crd> writes into
+A CRD class may also declare the subresources its CRD version serves,
+which L<IO::K8s::Role::APIObject/to_crd> writes into
 C<spec.versions[].subresources>:
 
     package My::StaticWebSite;
@@ -118,7 +118,7 @@ Every class built this way gets L<IO::K8s::Role::SpecBuilder> for
 deep-path spec manipulation (C<spec_get>, C<spec_set>, C<spec_array>,
 C<spec_hash>, C<spec_push>, C<spec_merge>, C<spec_delete>), walking a
 typed C<spec> through its own declared fields as readily as a plain hash
-one -- built-in Kinds as well as CRDs, since 1.108 (k103). A Kind that
+one -- built-in Kinds as well as CRDs, since 1.108. A Kind that
 carries no C<spec> field at all (C<ConfigMap>, C<Secret>, the RBAC kinds,
 ...) has the methods too, and every one of them croaks naming the class
 rather than failing on a missing accessor.

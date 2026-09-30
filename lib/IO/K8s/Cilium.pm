@@ -244,7 +244,7 @@ reinitialization.
 
 Reachable only via their domain-qualified C<resource_map> key (never a bare short
 name), for clusters that have not yet upgraded past the Cilium release where each was
-superseded or removed (k78, k83):
+superseded or removed:
 
 =over 4
 

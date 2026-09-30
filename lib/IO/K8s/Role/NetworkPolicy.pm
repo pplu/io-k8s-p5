@@ -247,7 +247,7 @@ C<kube-system> B<and> carry the label, not either:
 Cilium writes the same two facts as one C<toEndpoints> match in its own
 label vocabulary (C<k8s:io.kubernetes.pod.namespace>, C<k8s:k8s-app>).
 
-B<Changed in 1.108> (k117): the core branch used to emit the ports without
+B<Changed in 1.108>: the core branch used to emit the ports without
 any C<to> peer, which allows port 53 to B<every> destination -- a policy
 looser than this documentation described, and one that silently opened
 egress on port 53 to anything a pod could reach. Manifests regenerated

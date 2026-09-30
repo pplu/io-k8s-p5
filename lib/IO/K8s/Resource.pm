@@ -1086,7 +1086,7 @@ Inline structs auto-generate an inner class (e.g. C<MyClass::_Spec>) with
 the declared fields. Hashrefs are auto-coerced to the inner class on
 construction, through the very same coercion a named nested class gets --
 so a plain container inside the hashref is copied one level rather than
-stored by reference (k116). Before that, C<< ->new >> was the one route
+stored by reference. Before 1.108, C<< ->new >> was the one route
 into an inline-struct field that aliased the caller's structure while
 C<inflate>, C<struct_to_object> and C<FROM_HASH> already copied it; the
 four now agree.
@@ -1109,7 +1109,7 @@ constraint to reject.
 The one exception is a class that inflates through C<FROM_STRUCT> -- the
 apiextensions union classes C<V1::JSON> and C<JSONSchemaPropsOr*>, which
 serialize as the bare value they hold. Such a field takes every defined
-value, not only a hashref, exactly as inflation does (k179):
+value, not only a hashref, exactly as inflation does:
 
     IO::K8s::K3s::V1::HelmChartSpec->new(values => [ 1, 2 ]);   # values: [1,2]
     $schema->enum([ 'small', 'large' ]);                         # enum: ["small","large"]
@@ -1197,7 +1197,7 @@ defaulting is the API server's job, and a client-side default would change
 the wire output, so a field with no value given still serializes as
 absent.
 
-C<nullable> is recorded for C<to_crd> as well, and since k158 it also
+C<nullable> is recorded for C<to_crd> as well, and since 1.109 it also
 makes an explicit JSON C<null> a value of its own:
 
     k8s upstream => { Str => 1 }, { nullable => 1 };
@@ -1240,7 +1240,7 @@ C<InstanceOf> constraint, so there is nothing useful to check, and the
 default is recorded as given.
 
 Class load also fails, before any field option above is even considered,
-on a declaration that collides with something already in place (k144):
+on a declaration that collides with something already in place:
 
 =over 4
 
@@ -1265,7 +1265,7 @@ outside the k8s DSL >>.
 =item * A C<nullable> field whose predicate or clearer name
 (C<< has_<accessor> >>, C<< clear_<accessor> >>) the class already
 answers to -- a method, or the accessor of another field -- other than as
-this very field's own, declared before or inherited (k158): C<< k8s: field
+this very field's own, declared before or inherited: C<< k8s: field
 '<name>' of <class> needs the method '<method>' as a nullable field, but
 <class> already has a method of that name >>. The other way round, a field
 whose accessor would take a nullable field's predicate or clearer name is
@@ -1274,7 +1274,7 @@ refused by the method check above.
 =item * A field the same class has already declared under the same JSON
 key, declared again with a different type, nested class, option,
 C<required> (including C<1> against C<'schema'>) or inline-struct field
-set (k151): C<< k8s: field '<name>' of <class> is already declared in
+set: C<< k8s: field '<name>' of <class> is already declared in
 <class> with a different type, options or required-ness; declare each
 field once per class >>. Moo keeps the first attribute of a class, so a
 second, different declaration could never take effect; it used to

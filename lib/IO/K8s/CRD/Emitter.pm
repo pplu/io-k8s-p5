@@ -80,7 +80,7 @@ root class composes that role and C<[]> otherwise, when not given. This
 attribute holds one Kind's overlay, not the whole provider file -- slicing
 C<< $provider_overlay->{kinds}{$kind} >> out of the YAML is the caller's job.
 
-An C<names> value carrying C<::> (k120) is an B<absolute> target -- a
+An C<names> value carrying C<::> is an B<absolute> target -- a
 fully-qualified package this render references but does not itself write a
 file for: a cross-version type another version directory of the same
 provider already ships (C<IO::K8s::ExternalSecrets::V1::AWSAuth> named under a
@@ -100,7 +100,7 @@ The C<$VERSION> line to write. Defaults to this distribution's.
 
 Whether the root Kind's C<subresources> -- what the generated class took
 from its CRD version, see L<IO::K8s::APIObject> -- are rendered as the
-C<subresources> import parameter (k158). Defaults to true, so a rendered
+C<subresources> import parameter. Defaults to true, so a rendered
 class declares them and its C<to_crd> writes them back.
 C<maint/crd-drift-check.pl --check> renders with this false while the
 shipped provider classes declare no subresources yet.
@@ -138,7 +138,7 @@ L</overlay>'s C<names> when listed there by logical path, otherwise
 L</base> plus the class's path segments below its Kind joined together
 (the Kind itself for the root).
 
-An overlay C<names> value that carries C<::> (k120) is used verbatim as an
+An overlay C<names> value that carries C<::> is used verbatim as an
 absolute package (a leading C<+> is stripped) rather than joined below
 L</base> -- the cross-version / core external targets described under
 L</overlay>. Such a class satisfies C<_is_external_ref>: L</render> neither

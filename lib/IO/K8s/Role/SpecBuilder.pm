@@ -447,12 +447,12 @@ is inflated through the registry the same way C<FROM_HASH> would, and the
 final write goes through the target's ordinary accessor, so a declared
 field's own type constraint validates the value -- the wrong type croaks
 the same way a direct C<< ->attr($value) >> call would. Returns C<$self>
-for chaining. C<undef> for a C<nullable> field (k158) is a value like any
+for chaining. C<undef> for a C<nullable> field is a value like any
 other: the field is then present with an explicit C<null>, which
 C<TO_JSON> writes -- L</spec_delete> is what removes it.
 
 Vivifying a typed intermediate constructs the declared class with no
-arguments; a class with required attributes (k101) cannot be built that
+arguments; a class with required attributes cannot be built that
 way, and the call croaks naming the spec path instead -- build that object
 yourself and hand it to C<spec_set> as the value.
 
@@ -484,7 +484,7 @@ there.
 The returned arrayref is the same one the object holds, not a copy:
 pushing, splicing or otherwise mutating it directly bypasses the
 declared field's coercion and type check that C<spec_push>/C<spec_set>
-apply (k147) -- use those when a new element needs checking.
+apply -- use those when a new element needs checking.
 
     push @{ $ir->spec_array('entryPoints') }, 'websecure';
 
@@ -527,13 +527,13 @@ field is a typed struct or referenced class. On a union field (see
 L</Union fields>) it is the container the union holds, never the union
 object itself: C<< spec_hash('values')->{replicaCount} = 3 >> on a K3s
 HelmChart reaches the wire JSON, and an unset C<values> is built holding an
-empty hash first (k172). Croaks if the path already holds a defined scalar.
+empty hash first. Croaks if the path already holds a defined scalar.
 Vivifies intermediates the same way C<spec_set> does, including the
 required-attribute croak described there.
 
 The returned container is the same one the object holds, not a copy:
 writing into it directly does not run the declared field's coercion or
-type check the way C<spec_set> does (k147) -- on a plain hash or an
+type check the way C<spec_set> does -- on a plain hash or an
 opaque spec value that is nothing new, but on a typed value map (C<<
 { Quantity => 1 } >>) a value written this way skips the per-key
 validation C<spec_set> would apply.
@@ -615,7 +615,7 @@ is deleted; for a declared field on a typed node there is nothing to
 remove, so it is cleared to C<undef> through its accessor instead --
 which croaks on a C<required> field, because its type constraint is not
 C<Maybe>-wrapped and rejects C<undef> the same as any other bad value.
-A C<nullable> field is the exception (k158): C<undef> would leave it
+A C<nullable> field is the exception: C<undef> would leave it
 present with an explicit C<null>, so its C<< clear_<accessor> >> removes
 it instead and it is omitted from C<TO_JSON> again.
 For an array parent the indexed element is spliced out. If
@@ -711,7 +711,7 @@ same way C<FROM_HASH> does. C<spec_get> and C<spec_delete> never vivify.
 
 Every failure the walk's own checks raise, or that vivifying or writing
 a declared field raises, begins with the spec path and carries no
-internal file or line (k101) -- C<spec path 'PATH':> in front of the
+internal file or line -- C<spec path 'PATH':> in front of the
 reason, or, for a path that is itself empty, C<spec path 'PATH' is empty>
 on its own -- except inflating a hash into a typed field, which carries
 no such prefix (see below). A Moo/Type::Tiny failure hit while vivifying
@@ -723,7 +723,7 @@ or writing a declared field is re-raised with that prefix, such as:
     spec path 'PATH': cannot set 'SEG' in 'FIELD': ORIGINAL MESSAGE
     spec path 'PATH': cannot push onto 'FIELD': ORIGINAL MESSAGE
 
-The last two are element writes into a typed collection (k147):
+The last two are element writes into a typed collection:
 C<spec_push>, an indexed C<spec_set>, a map key written through
 C<spec_set>, and C<spec_merge> all run the value through the same
 coercion and type check the collection's declared field applies to a
@@ -750,7 +750,7 @@ the way C<FROM_HASH> inflates it, and an error that inflation raises -- a
 value of the wrong shape inside the hash, a missing required field -- comes
 without the prefix, as L<IO::K8s/inflate> words it, but like every other
 failure here it names the line that called the C<spec_*> method, not a line
-inside the distribution (k175).
+inside the distribution.
 
 L<IO::K8s::Role::APIObject> composes this role, so every top-level Kind
 has it: the built-in Kubernetes kinds, CRD classes declared via
@@ -761,7 +761,7 @@ it, and composing one of the builder roles
 (L<IO::K8s::Role::CertManaged>, L<IO::K8s::Role::Routable>, ...) onto a
 class without it failed at the first C<spec_*> call rather than at
 composition time; those roles now C<require> the C<spec_*> methods they
-use, which is only correct because every APIObject has them (k103).
+use, which is only correct because every APIObject has them.
 
 A Kind that declares no C<spec> field at all -- 32 of the shipped ones,
 carrying C<data>/C<rules>/C<subjects> instead: C<ConfigMap>, C<Secret>,
@@ -783,7 +783,7 @@ C<example> and C<enum> of a schema) or C<JSONSchemaPropsOrArray>,
 C<JSONSchemaPropsOrBool>, C<JSONSchemaPropsOrStringArray> (C<items>,
 C<additionalProperties>, C<additionalItems>, C<dependencies>) -- serializes
 as the bare value it holds, and a spec path walks through it into that
-value the same way (k172):
+value the same way:
 
     $chart->spec_set('values.replicaCount', 3);   # values: {"replicaCount": 3}
     $chart->spec_get('values.replicaCount');      # 3
@@ -803,7 +803,7 @@ no array to build and croaks with C<it cannot hold an array>, before
 anything is stored. The union field itself stays an ordinary field:
 L</spec_set> and L</spec_delete> on it replace or clear the union object,
 and L</spec_get> returns it. L</spec_set> takes any value there that
-inflation takes, not only a hash (k179) -- C<< spec_set('values', [1, 2]) >>
+inflation takes, not only a hash -- C<< spec_set('values', [1, 2]) >>
 serializes as C<values: [1,2]> -- and so do L</spec_push> and an indexed
 L</spec_set> into an array of union objects such as a schema's C<enum>.
 
