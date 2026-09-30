@@ -1,0 +1,14 @@
+---
+class: standard
+created: 2026-09-30T15:28:18Z
+id: 192
+priority: low
+status: backlog
+tags:
+- maint
+- drift
+title: 'crd-schema-audit: dead is_hash walk into object maps'
+updated: 2026-09-30T15:28:18Z
+---
+
+Found during k191 classification (2026-09-30): maint/crd-schema-audit.pl:319 reads $info->{is_hash}, a registry flag that is never set (the real flags are is_hash_of_objects / is_hash_of_* / is_hash_opaque). The walk into object-map values is therefore dead code today. Fix: key the descent on is_hash_of_objects. Not part of k191.
