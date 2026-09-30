@@ -134,6 +134,13 @@ sub defkey_to_perl_class {
 subtest 'every core is_hash_of_str field is additionalProperties {type: string} upstream' => sub {
     # v1.37.0 first; classes it no longer knows (kept as a superset for older
     # clusters) fall back to v1.36.3. A class in neither is reported, not skipped.
+    # spec/ is not shipped in the built dist: without v1.37.0 there is nothing
+    # to check, without v1.36.3 only the fallback classes cannot be checked.
+    my @have = grep { $ROOT->child('spec', $_)->is_file } qw( v1.37.0.json v1.36.3.json );
+    plan skip_all => 'spec/v1.37.0.json not available (spec/ is not shipped in the dist)'
+        unless grep { $_ eq 'v1.37.0.json' } @have;
+    my $have_fallback = grep { $_ eq 'v1.36.3.json' } @have;
+
     my @specs = map {
         my $d = JSON::MaybeXS->new->decode($ROOT->child('spec', $_)->slurp_raw)->{definitions};
         ok($d, "$_ has definitions");
@@ -143,11 +150,11 @@ subtest 'every core is_hash_of_str field is additionalProperties {type: string} 
             $for_class{$class} = $key;
         }
         { name => $_, defs => $d, for_class => \%for_class };
-    } qw( v1.37.0.json v1.36.3.json );
+    } @have;
 
     my $CORE = qr/^IO::K8s::(?:Api|Apimachinery|ApiextensionsApiserver|KubeAggregator)::/;
     my $registry = \%IO::K8s::Resource::_attr_registry;
-    my ($checked, $mapped_classes, $fallback, @wrong, @unmatched, @no_upstream) = (0, 0, 0);
+    my ($checked, $mapped_classes, $fallback, @wrong, @unmatched, @no_upstream, @fallback_skipped) = (0, 0, 0);
 
     # Deliberately skipped: kept as a superset for older clusters, but neither
     # v1.37.0 nor v1.36.3 carries the definition, so there is nothing to check
@@ -158,7 +165,10 @@ subtest 'every core is_hash_of_str field is additionalProperties {type: string} 
         my @fields = grep { $registry->{$class}{$_}{is_hash_of_str} } sort keys %{ $registry->{$class} };
         my ($spec) = grep { $_->{for_class}{$class} } @specs;
         unless ($spec) {
-            push @no_upstream, grep { !$SKIPPED{$_} } map { "$class.$_" } @fields;
+            # Without the v1.36.3 fallback these cannot be told apart from a
+            # real gap, so they are reported as skipped instead.
+            my @gone = grep { !$SKIPPED{$_} } map { "$class.$_" } @fields;
+            if ($have_fallback) { push @no_upstream, @gone } else { push @fallback_skipped, @gone }
             next;
         }
         $mapped_classes++;
@@ -179,6 +189,8 @@ subtest 'every core is_hash_of_str field is additionalProperties {type: string} 
         }
     }
 
+    diag 'v1.36.3.json missing, skipped ' . scalar(@fallback_skipped) . ' fields of classes v1.37.0 no longer knows'
+        if @fallback_skipped;
     cmp_ok($mapped_classes, '>', 300, "mapped $mapped_classes core classes to upstream definitions");
     # Lower bound only proves the loop is not vacuous (at time of writing 25
     # core fields carry is_hash_of_str); it is deliberately loose so that
