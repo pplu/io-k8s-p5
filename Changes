@@ -130,8 +130,11 @@ Revision history for IO-K8s
     "(eval 273) line 1848", and the manifest no longer sees the loader's
     own variables ($file, $m, ...), which now fail under use strict.
 
-  - Errors name the calling line instead of one inside the distribution
-    for add_crd, IO::K8s::CRD->generate (AutoGen's included) and to_crd,
+  - Errors name the calling line instead of one inside the distribution:
+    a missing required field or a wrongly typed value met while new_object,
+    inflate, struct_to_object, json_to_object, load_yaml or a .pk8s Kind
+    call builds an object (a Type::Tiny exception stays an object), and
+    errors from add_crd, IO::K8s::CRD->generate (AutoGen's included) and to_crd,
     FROM_HASH and from_json (the unknown_kinds => 'unstructured' fallback
     included), spec_set and spec_merge, the JSONSchemaPropsOr* classes,
     classes AutoGen builds from an openapi_spec, load of a missing .pk8s
@@ -171,13 +174,11 @@ Revision history for IO-K8s
     value as well; the same for a schema's items, additionalProperties,
     additionalItems, dependencies, default and example.
 
-  - A missing required field or a wrongly typed value met while new_object,
-    inflate, struct_to_object, json_to_object, load_yaml or a .pk8s Kind
-    call builds an object names the calling line instead of one inside
-    lib/IO/K8s.pm; a Type::Tiny exception stays an object.
-
-  - Fix the POD of IO::K8s::Resource's field options and IO::K8s::CRD->new,
-    where a > inside a C<> code cut it short and garbled the text.
+  - Fix POD where a > inside a C<> code cut it short and garbled the text:
+    IO::K8s, IO::K8s::Resource's field options, IO::K8s::CRD->new,
+    IO::K8s::AutoGen, IO::K8s::CRD::Emitter, IO::K8s::Cilium,
+    IO::K8s::Types::Net, the IO::K8s::Role::* builder roles and several
+    Resource API classes.
 
   - A field typed as an apiextensions union class takes on new, its setter
     and spec_set/spec_push every value inflate takes, not only a hash:
