@@ -1,0 +1,13 @@
+---
+class: standard
+created: 2026-09-30T16:20:33Z
+id: 194
+priority: low
+status: backlog
+tags:
+- dsl
+title: Own DSL form for map[string][]string
+updated: 2026-09-30T16:20:33Z
+---
+
+k191 declared map[string][]string fields (UserInfo/SubjectAccessReviewSpec/CSR/CertManager extra, TokenRequestSpec attestations, PrometheusOperator params, ExternalSecrets getParameters) as Opaque, because there is no typed form for them (spec: 'eigene Form spaeter'). Also map[string][]SecretKeySelector (PrometheusOperator proxyConnectHeader, 28x). Design a form such as HashRef[ArrayRef[Str]], then reclassify.
