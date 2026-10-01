@@ -1,0 +1,31 @@
+---
+claimed_at: 2026-10-01T05:34:13Z
+claimed_by: io-k8s-p5
+class: standard
+created: 2026-10-01T05:18:44Z
+id: 196
+priority: high
+status: review
+tags:
+- regression
+title: 'Regression 1.109: OpenAPI type: number fields serialize as JSON strings'
+updated: 2026-10-01T05:34:13Z
+---
+
+In 1.109 werden Felder, die in der Kubernetes-OpenAPI `type: number` (format double) sind, als JSON-String serialisiert. Live: Gateway-API-CRDs v1.6.1 anlegen -> API-Server 400 `json: cannot unmarshal string into Go struct field JSONSchemaProps...minimum of type float64`.
+
+Repro:
+  perl -Ilib -MIO::K8s -E 'my $k=IO::K8s->new; my $o=$k->struct_to_object("IO::K8s::ApiextensionsApiserver::Pkg::Apis::Apiextensions::V1::JSONSchemaProps",{type=>"integer",minimum=>1,maximum=>65535}); say $k->object_to_json($o)'
+1.109: {"maximum":"65535","minimum":"1",...}; 1.108: {"maximum":65535,"minimum":1,...}.
+
+Felder sind als Str deklariert (JSONSchemaProps minimum/maximum/multipleOf); neu in 1.109 ist harte String-Serialisierung von Str.
+
+Fix: OpenAPI type: number -> Num mit numerischer Serialisierung, im Generator/AutoGen und in den generierten Klassen; alle type: number-Felder in spec/v1.36.3.json, spec/v1.37.0.json und spec/crd prüfen. Roter Test zuerst (auch Perl-Strings "1", "0.5" aus YAML; Roundtrip to_crd/object_to_json/to_yaml). Kein Version-Bump, kein Release.
+
+2026-10-01 05:22 Ursache: JSONSchemaProps.{minimum,maximum,multipleOf} sind seit jeher Str, upstream type: number (double). 76825c49 (k145, in 1.109, nicht 1.108) serialisiert Str hart als JSON-String -> Bug sichtbar. Audit Core-Klassen vs spec/v1.37.0+v1.36.3: nur diese 3 Felder sind falsch typisiert (kein weiteres Str/Int/Num/Bool-Mismatch). spec/crd (Cilium, CertManager, GatewayAPI, Traefik, PrometheusOperator, ExternalSecrets, AgentSandbox, VolumeSnapshot): kein einziges type: number. AutoGen (number->Num, [Num], {Num=>1}) und CRD::Emitter (is_num->Num) mappen bereits korrekt. Roter Test t/153_k196_number_wire_type.t: 8/8 Subtests rot.
+
+2026-10-01 05:24 Fix: JSONSchemaProps minimum/maximum/multipleOf Str -> Num (TO_JSON is_num numifiziert, auch "0.5"). Role::Resource::_describe_local_type kennt jetzt number/array<number>/hash<number> (compare_to_schema meldete Num als unknown). t/153 grün (8 Subtests, inkl. statischem Guard: 1484 Core-Skalarfelder gegen spec/v1.37.0+v1.36.3 -- Str/Int/Num/Bool müssen zum Upstream-Typ passen, fängt künftige Str-für-number-Fehltypisierung). Gezielte Tests 108/120/48/21/31/119/127/135/141/150/152 grün. Generator: AutoGen + CRD::Emitter mappen number bereits auf Num; Core-Klassen haben keinen Generator im Repo, daher der statische Guard.
+
+2026-10-01 05:34 Volle Suite: erster Lauf rot nur in t/42 (Synthesizer hatte keinen Num-Zweig, 'synthetic-minimum' von Num abgelehnt) -> t/42 um is_num-Synthese (als numerischer String) + Unquoted-Check ergänzt. Zweiter Lauf prove -lr t: Files=149, Tests=9272, PASS. Commit 0a339625 (lokal, nicht gepusht). dzil build -> IO-K8s-1.110.tar.gz im Repo-Root.
+
+2026-10-01 05:34 Done: JSONSchemaProps minimum/maximum/multipleOf Str->Num (Ursache: k145/76825c49 in 1.109 macht Str hart zum JSON-String). compare_to_schema kennt number. t/153 neu (Repro, Strings, load_yaml/to_crd/to_yaml-Roundtrip, Gateway API v1.6.1, statischer Core-Typ-Guard), t/42 Num-Synthese. prove -lr t PASS (149 Dateien/9272 Tests). Commit 0a339625, Tarball IO-K8s-1.110.tar.gz. Kein Bump/Release/Push.
