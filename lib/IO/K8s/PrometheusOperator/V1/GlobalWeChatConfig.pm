@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::GlobalWeChatConfig;
 # ABSTRACT: wechat defines the default WeChat Config
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s apiCorpID => Str;

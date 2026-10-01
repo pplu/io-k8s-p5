@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::ProbeSpec;
 # ABSTRACT: spec defines the specification of desired Ingress selection for target discovery by Prometheus.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s authorization                  => '+IO::K8s::PrometheusOperator::V1::SafeAuthorization';

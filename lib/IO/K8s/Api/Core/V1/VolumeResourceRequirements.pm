@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::VolumeResourceRequirements;
 # ABSTRACT: VolumeResourceRequirements describes the storage resource requirements for a volume.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s limits => { Quantity => 1 };

@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::Listener;
 # ABSTRACT: listener specifies the name of a custom Envoy listener to which this traffic should be redirected to.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s envoyConfig => '+IO::K8s::Cilium::V2::EnvoyConfig', { required => 'schema' };

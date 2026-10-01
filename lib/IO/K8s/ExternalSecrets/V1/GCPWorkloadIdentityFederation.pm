@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::GCPWorkloadIdentityFederation;
 # ABSTRACT: GCPWorkloadIdentityFederation holds the configurations required for generating federated access tokens.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s audience               => Str;

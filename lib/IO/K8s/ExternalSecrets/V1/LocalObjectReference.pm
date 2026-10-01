@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::LocalObjectReference;
 # ABSTRACT: Binding represents a servicebinding.io Provisioned Service reference to the secret
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s name => Str, { default => '' };

@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::Tag;
 # ABSTRACT: Tag is a key-value pair that can be attached to an AWS resource.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s key   => Str, { required => 'schema' };

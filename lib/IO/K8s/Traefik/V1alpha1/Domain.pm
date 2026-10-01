@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::Domain;
 # ABSTRACT: Domain is the domain definition for the DefaultCertificate.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s main => Str;

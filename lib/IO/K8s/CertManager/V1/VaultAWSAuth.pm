@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::VaultAWSAuth;
 # ABSTRACT: AWS authenticates with Vault using AWS IAM authentication.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s iamRoleArn        => Str;

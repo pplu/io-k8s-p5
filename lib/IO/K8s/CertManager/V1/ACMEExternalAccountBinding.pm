@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMEExternalAccountBinding;
 # ABSTRACT: ExternalAccountBinding is a reference to a CA external account of the ACME server.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s keyAlgorithm => Str, { enum => [qw(HS256 HS384 HS512)] };

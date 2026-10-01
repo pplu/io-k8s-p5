@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::GCPWorkloadIdentity;
 # ABSTRACT: Specify a service account with Workload Identity
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s clusterLocation   => Str;

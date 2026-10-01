@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::Rules;
 # ABSTRACT: rules defines the configuration of the Prometheus rules' engine.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s alert => '+IO::K8s::PrometheusOperator::V1::RulesAlert';

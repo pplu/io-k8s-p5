@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::AlertmanagerConfiguration;
 # ABSTRACT: alertmanagerConfiguration defines the configuration of Alertmanager.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s global    => '+IO::K8s::PrometheusOperator::V1::AlertmanagerGlobalConfig';

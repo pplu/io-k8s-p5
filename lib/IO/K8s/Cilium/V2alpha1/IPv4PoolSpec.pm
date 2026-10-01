@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::IPv4PoolSpec;
 # ABSTRACT: IPv4 specifies the IPv4 CIDRs and mask sizes of the pool
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s cidrs    => [Str], { required => 'schema' };

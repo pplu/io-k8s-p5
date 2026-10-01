@@ -12,7 +12,7 @@ use IO::K8s::Resource ();
 use IO::K8s::Unstructured ();
 use namespace::clean;
 
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 
 # Track which classes we've auto-generated
 my %_autogen_cache;

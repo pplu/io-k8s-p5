@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::SecretStoreRetrySettings;
 # ABSTRACT: Used to configure HTTP retries on failures.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s maxRetries    => Int;

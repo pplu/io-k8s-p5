@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ConjurProvider;
 # ABSTRACT: Conjur configures this store to sync secrets using conjur provider
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s auth       => '+IO::K8s::ExternalSecrets::V1::ConjurAuth', { required => 'schema' };

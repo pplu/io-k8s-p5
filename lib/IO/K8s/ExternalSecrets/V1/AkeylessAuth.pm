@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::AkeylessAuth;
 # ABSTRACT: Auth configures how the operator authenticates with Akeyless.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s kubernetesAuth    => '+IO::K8s::ExternalSecrets::V1::AkeylessKubernetesAuth';

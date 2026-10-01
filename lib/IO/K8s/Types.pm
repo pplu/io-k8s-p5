@@ -1,6 +1,6 @@
 package IO::K8s::Types;
 # ABSTRACT: Type::Tiny type library for Kubernetes resources
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use strict;
 use warnings;
 use Type::Library -base, -declare => qw( IntOrStr Quantity Time Opaque );

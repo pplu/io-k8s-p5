@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::ContainerExtendedResourceRequest;
 # ABSTRACT: ContainerExtendedResourceRequest has the mapping of container name, extended resource name to the device request name.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s containerName => Str, 'required';

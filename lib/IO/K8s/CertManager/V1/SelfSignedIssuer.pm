@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::SelfSignedIssuer;
 # ABSTRACT: SelfSigned configures this issuer to 'self sign' certificates using the private key used to create the CertificateRequest object.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s crlDistributionPoints => [Str];

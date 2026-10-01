@@ -1,6 +1,6 @@
 package IO::K8s::Api::Lifecycle::V1alpha1::EvictionStatus;
 # ABSTRACT: EvictionStatus represents the last observed status of the eviction request.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s conditions => ['Meta::V1::Condition'];

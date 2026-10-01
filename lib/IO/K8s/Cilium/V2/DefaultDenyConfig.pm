@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::DefaultDenyConfig;
 # ABSTRACT: EnableDefaultDeny determines whether this policy configures the subject endpoint(s) to have a default deny mode.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s egress  => Bool;

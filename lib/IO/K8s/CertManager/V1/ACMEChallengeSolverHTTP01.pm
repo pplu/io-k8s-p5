@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMEChallengeSolverHTTP01;
 # ABSTRACT: Configures cert-manager to attempt to complete authorizations by performing the HTTP01 challenge flow.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s gatewayHTTPRoute => '+IO::K8s::CertManager::V1::ACMEChallengeSolverHTTP01GatewayHTTPRoute';

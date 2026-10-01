@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::QuayAccessToken;
 # ABSTRACT: QuayAccessToken generates Quay oauth token for pulling/pushing images
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::APIObject
     api_version     => 'generators.external-secrets.io/v1alpha1',
     resource_plural => 'quayaccesstokens',

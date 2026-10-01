@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::FileKeySelector;
 # ABSTRACT: FileKeySelector selects a key of the env file.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s key => Str, 'required';

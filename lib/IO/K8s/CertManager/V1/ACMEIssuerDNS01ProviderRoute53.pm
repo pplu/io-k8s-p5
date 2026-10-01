@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMEIssuerDNS01ProviderRoute53;
 # ABSTRACT: Use the AWS Route53 API to manage DNS01 challenge records.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s accessKeyID              => Str;

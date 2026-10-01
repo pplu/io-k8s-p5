@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1beta1::HTTPRequestMirrorFilter;
 # ABSTRACT: RequestMirror defines a schema for a filter that mirrors requests.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s backendRef => '+IO::K8s::GatewayAPI::V1beta1::BackendObjectReference', { required => 'schema' };

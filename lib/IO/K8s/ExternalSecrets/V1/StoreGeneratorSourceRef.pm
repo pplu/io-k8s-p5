@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::StoreGeneratorSourceRef;
 # ABSTRACT: SourceRef points to a store or generator which contains secret values ready to use.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s generatorRef => 'Autoscaling::V1::CrossVersionObjectReference';

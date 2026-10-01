@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::EndpointIdentifiers;
 # ABSTRACT: ExternalIdentifiers is a set of identifiers to identify the endpoint apart from the pod name.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s 'cni-attachment-id'  => Str;

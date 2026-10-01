@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::RouteParentStatus;
 # ABSTRACT: RouteParentStatus describes the status of a route with respect to an associated Parent.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s conditions     => ['Meta::V1::Condition'], { required => 'schema' };

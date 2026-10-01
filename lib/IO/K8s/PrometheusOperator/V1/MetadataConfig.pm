@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::MetadataConfig;
 # ABSTRACT: metadataConfig defines how to send a series metadata to the remote storage.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s maxSamplesPerSend => Int, { minimum => -1 };

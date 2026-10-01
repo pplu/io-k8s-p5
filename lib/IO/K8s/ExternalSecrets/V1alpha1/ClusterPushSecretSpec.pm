@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::ClusterPushSecretSpec;
 # ABSTRACT: ClusterPushSecretSpec defines the configuration for a ClusterPushSecret resource.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s namespaceSelectors => ['Meta::V1::LabelSelector'];

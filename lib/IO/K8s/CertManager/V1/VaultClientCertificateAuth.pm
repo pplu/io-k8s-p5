@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::VaultClientCertificateAuth;
 # ABSTRACT: ClientCertificate authenticates with Vault by presenting a client certificate during the request's TLS handshake.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s mountPath  => Str;

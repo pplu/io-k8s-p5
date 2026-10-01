@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::MirrorService;
 # ABSTRACT: MirrorService holds the mirror configuration.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s healthCheck        => '+IO::K8s::Traefik::V1alpha1::ServerHealthCheck';

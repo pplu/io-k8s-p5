@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ChallengeStatus;
 # ABSTRACT: ChallengeStatus
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s presented   => Bool;

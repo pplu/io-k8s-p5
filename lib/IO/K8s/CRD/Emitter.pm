@@ -1,6 +1,6 @@
 package IO::K8s::CRD::Emitter;
 # ABSTRACT: Render generated IO::K8s classes as house-style Perl source
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use v5.10;
 use Moo;
 use Carp qw( croak );

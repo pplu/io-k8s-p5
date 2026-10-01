@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::FakeProviderData;
 # ABSTRACT: FakeProviderData defines a key-value pair with optional version for the fake provider.
-our $VERSION = '1.109';
+our $VERSION = '1.110';
 use IO::K8s::Resource;
 
 k8s key     => Str, { required => 'schema' };
