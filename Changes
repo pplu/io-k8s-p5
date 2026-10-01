@@ -1,6 +1,6 @@
 Revision history for IO-K8s
 
-{{$NEXT}}
+1.110     2026-10-01 15:57:19Z
 
   - Fix a 1.109 regression: JSONSchemaProps minimum, maximum and multipleOf
     (OpenAPI type: number) are now Num and go out as JSON numbers. They were
