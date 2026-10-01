@@ -1,6 +1,6 @@
 Revision history for IO-K8s
 
-{{$NEXT}}
+1.109     2026-10-01 02:33:28Z
 
   - Behaviour change: { Str => 1 } is now a map of strings. Every scalar
     value goes out as a JSON string in TO_JSON, to_json and to_yaml, so a
