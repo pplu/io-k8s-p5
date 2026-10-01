@@ -57,7 +57,7 @@ k8s maxLength => Int;
 
 k8s maxProperties => Int;
 
-k8s maximum => Str;
+k8s maximum => Num;
 
 k8s minItems => Int;
 
@@ -65,9 +65,9 @@ k8s minLength => Int;
 
 k8s minProperties => Int;
 
-k8s minimum => Str;
+k8s minimum => Num;
 
-k8s multipleOf => Str;
+k8s multipleOf => Num;
 
 k8s not => 'Apiextensions::V1::JSONSchemaProps';
 
