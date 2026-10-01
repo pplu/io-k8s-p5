@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::HostPort;
 # ABSTRACT: HostPort represents a "host:port" network address.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s host => Str, { required => 'schema' };

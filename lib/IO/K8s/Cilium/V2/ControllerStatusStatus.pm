@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::ControllerStatusStatus;
 # ABSTRACT: Status is the status of the controller
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s 'consecutive-failure-count' => Int;

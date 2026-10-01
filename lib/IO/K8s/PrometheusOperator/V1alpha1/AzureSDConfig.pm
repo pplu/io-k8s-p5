@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::AzureSDConfig;
 # ABSTRACT: AzureSDConfig allow retrieving scrape targets from Azure VMs.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s authenticationMethod => Str, { enum => [qw(OAuth ManagedIdentity SDK WorkloadIdentity)] };

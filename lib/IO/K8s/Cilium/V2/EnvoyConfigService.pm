@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::EnvoyConfigService;
 # ABSTRACT: EnvoyConfigService
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s name      => Str, { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::Rule;
 # ABSTRACT: Rule is a policy rule which must be applied to all endpoints which match the labels contained in the endpointSelector Each rule is split into an ingress section which contains all rules applicable at ingress, and an egress section applicable at egress.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s description       => Str;

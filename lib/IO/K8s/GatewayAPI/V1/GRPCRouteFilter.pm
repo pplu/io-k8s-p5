@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::GRPCRouteFilter;
 # ABSTRACT: GRPCRouteFilter defines processing steps that must be completed during the request or response lifecycle.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s extensionRef           => '+IO::K8s::GatewayAPI::V1::LocalObjectReference';

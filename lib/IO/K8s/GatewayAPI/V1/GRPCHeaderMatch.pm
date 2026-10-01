@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::GRPCHeaderMatch;
 # ABSTRACT: GRPCHeaderMatch describes how to select a gRPC route by matching gRPC request headers.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s name  => Str, { required => 'schema', pattern => '^[A-Za-z0-9!#$%&\'*+\\-.^_\\x60|~]+$' };

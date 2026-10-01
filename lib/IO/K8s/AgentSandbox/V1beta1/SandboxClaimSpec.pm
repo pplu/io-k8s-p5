@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1beta1::SandboxClaimSpec;
 # ABSTRACT: SandboxClaimSpec
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s additionalPodMetadata => '+IO::K8s::AgentSandbox::V1beta1::PodMetadata';

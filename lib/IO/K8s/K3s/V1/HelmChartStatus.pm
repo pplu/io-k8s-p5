@@ -1,6 +1,6 @@
 package IO::K8s::K3s::V1::HelmChartStatus;
 # ABSTRACT: HelmChartStatus represents the resulting state from processing HelmChart events
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s conditions => ['+IO::K8s::K3s::V1::HelmChartCondition'];

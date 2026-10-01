@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::StorageOSPersistentVolumeSource;
 # ABSTRACT: Represents a StorageOS persistent volume resource.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s fsType => Str;

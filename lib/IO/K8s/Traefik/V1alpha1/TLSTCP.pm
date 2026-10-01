@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::TLSTCP;
 # ABSTRACT: TLS defines the TLS configuration on a layer 4 / TCP Route.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s certResolver => Str;

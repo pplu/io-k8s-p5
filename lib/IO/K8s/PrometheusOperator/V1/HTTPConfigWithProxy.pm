@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::HTTPConfigWithProxy;
 # ABSTRACT: httpConfig defines the default HTTP configuration.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s authorization        => '+IO::K8s::PrometheusOperator::V1::SafeAuthorization';

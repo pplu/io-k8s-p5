@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1beta1::HTTPHeaderMatch;
 # ABSTRACT: HTTPHeaderMatch describes how to select a HTTP route by matching HTTP request headers.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s name  => Str, { required => 'schema', pattern => '^[A-Za-z0-9!#$%&\'*+\\-.^_\\x60|~]+$' };

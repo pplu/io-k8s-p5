@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::GCRAccessTokenSpec;
 # ABSTRACT: GCRAccessTokenSpec defines the desired state to generate a Google Container Registry access token.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s auth      => '+IO::K8s::ExternalSecrets::V1alpha1::GCRAuth', { required => 'schema' };

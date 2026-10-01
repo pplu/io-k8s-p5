@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::ServiceMonitorSpec;
 # ABSTRACT: spec defines the specification of desired Service selection for target discovery by Prometheus.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s attachMetadata                 => '+IO::K8s::PrometheusOperator::V1::AttachMetadata';

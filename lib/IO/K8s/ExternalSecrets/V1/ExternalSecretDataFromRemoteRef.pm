@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ExternalSecretDataFromRemoteRef;
 # ABSTRACT: ExternalSecretDataFromRemoteRef defines the connection between the Kubernetes Secret keys and the Provider data when using DataFrom to fetch multiple values from a Provider.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s extract   => '+IO::K8s::ExternalSecrets::V1::ExternalSecretDataRemoteRef';

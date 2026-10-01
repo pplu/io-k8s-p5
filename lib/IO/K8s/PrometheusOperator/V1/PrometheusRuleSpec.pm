@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::PrometheusRuleSpec;
 # ABSTRACT: spec defines the specification of desired alerting rule definitions for Prometheus.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s groups => ['+IO::K8s::PrometheusOperator::V1::RuleGroup'];

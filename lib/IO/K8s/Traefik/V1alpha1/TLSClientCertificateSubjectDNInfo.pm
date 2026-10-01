@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::TLSClientCertificateSubjectDNInfo;
 # ABSTRACT: Subject defines the client certificate subject details to add to the X-Forwarded-Tls-Client-Cert-Info header.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s commonName         => Bool;

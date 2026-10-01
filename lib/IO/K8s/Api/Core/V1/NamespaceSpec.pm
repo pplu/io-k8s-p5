@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::NamespaceSpec;
 # ABSTRACT: NamespaceSpec describes the attributes on a Namespace.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s finalizers => [Str];

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::WebTLSConfig;
 # ABSTRACT: tlsConfig defines the TLS parameters for HTTPS.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s cert                     => '+IO::K8s::PrometheusOperator::V1::SecretOrConfigMap';

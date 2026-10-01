@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::SecretStoreRef;
 # ABSTRACT: SecretStoreRef defines which SecretStore to fetch the ExternalSecret data.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s kind => Str, { enum => [qw(SecretStore ClusterSecretStore)] };

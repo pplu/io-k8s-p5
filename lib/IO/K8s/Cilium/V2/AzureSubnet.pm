@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::AzureSubnet;
 # ABSTRACT: Subnet is the subnet the interface is attached to.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s cidr => Str;

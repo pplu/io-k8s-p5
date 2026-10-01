@@ -1,6 +1,6 @@
 package IO::K8s::Role::MiddlewareTCPBuilder;
 # ABSTRACT: Role for building Traefik TCP middleware configuration
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use Moo::Role;
 
 # The fluent setters below build the spec through IO::K8s::Role::SpecBuilder

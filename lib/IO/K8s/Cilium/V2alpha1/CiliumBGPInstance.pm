@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumBGPInstance;
 # ABSTRACT: CiliumBGPInstance
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s localASN  => Int, { minimum => 1, maximum => 4294967295 };

@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ExternalSecretTemplateMetadata;
 # ABSTRACT: ExternalSecretTemplateMetadata defines metadata fields for the Secret blueprint.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s annotations => { Str => 1 };

@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ChefAuthSecretRef;
 # ABSTRACT: ChefAuthSecretRef holds secret references for chef server login credentials.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s privateKeySecretRef => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector', { required => 'schema' };

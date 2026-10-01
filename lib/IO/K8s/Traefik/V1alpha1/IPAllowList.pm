@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::IPAllowList;
 # ABSTRACT: IPAllowList holds the IP allowlist middleware configuration.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s ipStrategy       => '+IO::K8s::Traefik::V1alpha1::IPStrategy';

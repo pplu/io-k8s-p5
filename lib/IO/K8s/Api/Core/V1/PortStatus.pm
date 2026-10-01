@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::PortStatus;
 # ABSTRACT: 
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s error => Str;

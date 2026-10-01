@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::ProbeTargets;
 # ABSTRACT: targets defines a set of static or dynamically discovered targets to probe.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s ingress      => '+IO::K8s::PrometheusOperator::V1::ProbeTargetIngress';

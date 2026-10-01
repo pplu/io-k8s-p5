@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::UDPRouteStatus;
 # ABSTRACT: Status defines the current state of UDPRoute.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s parents => ['+IO::K8s::GatewayAPI::V1::RouteParentStatus'], { required => 'schema' };

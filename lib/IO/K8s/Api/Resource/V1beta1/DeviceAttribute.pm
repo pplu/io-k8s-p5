@@ -1,6 +1,6 @@
 package IO::K8s::Api::Resource::V1beta1::DeviceAttribute;
 # ABSTRACT: DeviceAttribute must have exactly one field set.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s bool => Bool;

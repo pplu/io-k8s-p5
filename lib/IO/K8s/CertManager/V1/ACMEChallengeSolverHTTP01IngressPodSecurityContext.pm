@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::ACMEChallengeSolverHTTP01IngressPodSecurityContext;
 # ABSTRACT: If specified, the pod's security context
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s fsGroup             => Int;

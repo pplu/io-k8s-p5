@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::TLSStoreSpec;
 # ABSTRACT: TLSStoreSpec defines the desired state of a TLSStore.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s certificates         => ['+IO::K8s::Traefik::V1alpha1::Certificate'];

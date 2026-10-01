@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::FortanixProviderSecretRef;
 # ABSTRACT: APIKey is the API token to access SDKMS Applications.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s secretRef => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector';

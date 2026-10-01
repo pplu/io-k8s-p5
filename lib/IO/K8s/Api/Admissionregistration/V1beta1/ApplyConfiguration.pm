@@ -1,6 +1,6 @@
 package IO::K8s::Api::Admissionregistration::V1beta1::ApplyConfiguration;
 # ABSTRACT: ApplyConfiguration defines the desired configuration values of an object.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s expression => Str, 'required';

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::QuerySpec;
 # ABSTRACT: query defines the configuration of the Prometheus query service.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s lookbackDelta  => Str;

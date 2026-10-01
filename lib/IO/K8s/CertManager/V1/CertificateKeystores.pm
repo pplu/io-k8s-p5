@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::CertificateKeystores;
 # ABSTRACT: Additional keystore output formats to be stored in the Certificate's Secret.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s jks    => '+IO::K8s::CertManager::V1::JKSKeystore';

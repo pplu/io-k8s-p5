@@ -1,6 +1,6 @@
 package IO::K8s::Role::HelmManaged;
 # ABSTRACT: Role for K3s Helm chart management
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use Moo::Role;
 
 # The fluent setters below build the spec through IO::K8s::Role::SpecBuilder

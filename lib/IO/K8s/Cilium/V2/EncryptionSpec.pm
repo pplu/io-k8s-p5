@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::EncryptionSpec;
 # ABSTRACT: Encryption is the encryption configuration of the node.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s key => Int;

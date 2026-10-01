@@ -1,6 +1,6 @@
 package IO::K8s::Api::Storage::V1::StorageHealth;
 # ABSTRACT: StorageHealth contains storage backend health reported by a CSI driver on a node.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s healthConditions => ['Storage::V1::StorageHealthCondition'];

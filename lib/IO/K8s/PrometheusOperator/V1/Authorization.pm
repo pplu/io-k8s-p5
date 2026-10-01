@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::Authorization;
 # ABSTRACT: authorization section for the ScrapeClass.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s credentials     => 'Core::V1::ConfigMapKeySelector';

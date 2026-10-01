@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::NgrokProviderSecretRef;
 # ABSTRACT: APIKey is the API Key used to authenticate with ngrok.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s secretRef => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector';

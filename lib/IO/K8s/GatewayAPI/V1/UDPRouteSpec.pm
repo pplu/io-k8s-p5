@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1::UDPRouteSpec;
 # ABSTRACT: Spec defines the desired state of UDPRoute.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s parentRefs => ['+IO::K8s::GatewayAPI::V1::ParentReference'];

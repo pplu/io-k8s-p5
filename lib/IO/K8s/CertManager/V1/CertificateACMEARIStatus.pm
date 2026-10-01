@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::CertificateACMEARIStatus;
 # ABSTRACT: ARI stores the ACME Renewal Information that is fetched from the ACME server in accordance with RFC 9773.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s explanationURL  => Str;

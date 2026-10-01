@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::WindowsSecurityContextOptions;
 # ABSTRACT: WindowsSecurityContextOptions contain Windows-specific options and credentials.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s gmsaCredentialSpec => Str;

@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::BeyondtrustWorkloadCredentialsAuth;
 # ABSTRACT: Auth configures how the Operator authenticates with the BeyondTrust Workload Credentials API.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s apikey => '+IO::K8s::ExternalSecrets::V1::BeyondtrustWorkloadCredentialsAuthSecretRef', { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::AzureInterface;
 # ABSTRACT: AzureInterface represents an Azure Interface
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s addresses        => ['+IO::K8s::Cilium::V2::AzureAddress'];

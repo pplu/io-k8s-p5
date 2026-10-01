@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumLocalRedirectPolicySpec;
 # ABSTRACT: Spec is the desired behavior of the local redirect policy.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s description             => Str;

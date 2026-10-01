@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::OrderSpec;
 # ABSTRACT: OrderSpec
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use utf8;
 use IO::K8s::Resource;
 

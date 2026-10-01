@@ -1,6 +1,6 @@
 package IO::K8s::Api::Core::V1::VolumeHealthCondition;
 # ABSTRACT: VolumeHealthCondition represents an adverse health condition reported for a volume.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s message => Str;

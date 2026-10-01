@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::AzureAD;
 # ABSTRACT: azureAd for the URL.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s cloud            => Str, { enum => [qw(AzureChina AzureGovernment AzurePublic)] };

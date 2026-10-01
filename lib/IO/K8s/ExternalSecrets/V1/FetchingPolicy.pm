@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::FetchingPolicy;
 # ABSTRACT: FetchingPolicy configures the provider to interpret the `data.secretKey.remoteRef.key` field in ExternalSecret as secret ID or secret name
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s byID   => Opaque;

@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::ControllerStatus;
 # ABSTRACT: ControllerStatus is the status of a failing controller.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s configuration => '+IO::K8s::Cilium::V2::ControllerStatusConfiguration';

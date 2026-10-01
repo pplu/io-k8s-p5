@@ -1,6 +1,6 @@
 package IO::K8s::Api::Autoscaling::V1::HorizontalPodAutoscaler;
 # ABSTRACT: configuration of a horizontal pod autoscaler.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::APIObject;
 with 'IO::K8s::Role::Namespaced';
 

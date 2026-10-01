@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::Buffering;
 # ABSTRACT: Buffering holds the buffering middleware configuration.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s maxRequestBodyBytes  => Int;

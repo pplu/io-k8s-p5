@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::DVLSAuthSecretRef;
 # ABSTRACT: SecretRef contains the Application ID and Application Secret for authentication.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s appId     => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector', { required => 'schema' };

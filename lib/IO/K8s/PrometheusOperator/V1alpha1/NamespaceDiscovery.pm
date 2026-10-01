@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::NamespaceDiscovery;
 # ABSTRACT: namespaces defines the namespace discovery.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s names        => [Str];

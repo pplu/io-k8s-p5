@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::CertificateCondition;
 # ABSTRACT: CertificateCondition contains condition information for a Certificate.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s lastTransitionTime => Time;

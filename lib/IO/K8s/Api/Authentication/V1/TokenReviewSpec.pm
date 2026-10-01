@@ -1,6 +1,6 @@
 package IO::K8s::Api::Authentication::V1::TokenReviewSpec;
 # ABSTRACT: TokenReviewSpec is a description of the token authentication request.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s audiences => [Str];

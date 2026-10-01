@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::BGPAttributes;
 # ABSTRACT: Attributes defines additional attributes to set to the advertised routes.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s communities     => '+IO::K8s::Cilium::V2alpha1::BGPCommunities';

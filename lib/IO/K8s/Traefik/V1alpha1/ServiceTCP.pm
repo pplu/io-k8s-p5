@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::ServiceTCP;
 # ABSTRACT: ServiceTCP defines an upstream TCP service to proxy traffic to.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s name             => Str, { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::WorkloadBinding;
 # ABSTRACT: WorkloadBinding is a link between a configuration resource and a workload resource.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s conditions => ['+IO::K8s::PrometheusOperator::V1::WorkloadBindingCondition'];

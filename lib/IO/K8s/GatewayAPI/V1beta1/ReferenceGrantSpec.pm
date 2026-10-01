@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1beta1::ReferenceGrantSpec;
 # ABSTRACT: Spec defines the desired state of ReferenceGrant.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s from => ['+IO::K8s::GatewayAPI::V1beta1::ReferenceGrantFrom'], { required => 'schema' };

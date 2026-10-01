@@ -1,6 +1,6 @@
 package IO::K8s::K3s::V1::HelmChartSpec;
 # ABSTRACT: HelmChartSpec represents the user-configurable details for installation and upgrade of a Helm chart release.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s authPassCredentials   => Bool;

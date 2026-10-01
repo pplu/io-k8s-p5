@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::PreviderAuthSecretRef;
 # ABSTRACT: PreviderAuthSecretRef holds secret references for Previder Vault credentials.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s accessToken => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector', { required => 'schema' };

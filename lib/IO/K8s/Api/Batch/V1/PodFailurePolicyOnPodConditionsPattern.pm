@@ -1,6 +1,6 @@
 package IO::K8s::Api::Batch::V1::PodFailurePolicyOnPodConditionsPattern;
 # ABSTRACT: PodFailurePolicyOnPodConditionsPattern describes a pattern for matching an actual pod condition type.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s status => Str, 'required';

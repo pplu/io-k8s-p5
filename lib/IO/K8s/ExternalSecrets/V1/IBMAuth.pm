@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::IBMAuth;
 # ABSTRACT: Auth configures how secret-manager authenticates with the IBM secrets manager.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s containerAuth => '+IO::K8s::ExternalSecrets::V1::IBMAuthContainerAuth';

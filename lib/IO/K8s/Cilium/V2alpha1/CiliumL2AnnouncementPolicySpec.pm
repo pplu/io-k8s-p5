@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumL2AnnouncementPolicySpec;
 # ABSTRACT: Spec is a human readable description of a L2 announcement policy
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s externalIPs     => Bool;

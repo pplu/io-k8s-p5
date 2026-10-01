@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::CSMAuthSecretRef;
 # ABSTRACT: CSMAuthSecretRef holds secret references for Cloud.ru credentials.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s accessKeyIDSecretRef     => '+IO::K8s::ExternalSecrets::V1::SecretKeySelector', { required => 'schema' };

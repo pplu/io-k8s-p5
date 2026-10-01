@@ -1,6 +1,6 @@
 package IO::K8s::Resource;
 # ABSTRACT: Base class for all Kubernetes resources
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use v5.10;
 use strict;
 use warnings;

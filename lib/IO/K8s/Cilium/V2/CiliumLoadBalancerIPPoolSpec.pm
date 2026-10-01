@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumLoadBalancerIPPoolSpec;
 # ABSTRACT: Spec is a human readable description for a BGP load balancer ip pool.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s allowFirstLastIPs => Str, { enum => [qw(Yes No)] };

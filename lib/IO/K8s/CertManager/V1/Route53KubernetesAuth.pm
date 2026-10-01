@@ -1,6 +1,6 @@
 package IO::K8s::CertManager::V1::Route53KubernetesAuth;
 # ABSTRACT: Kubernetes authenticates with Route53 using AssumeRoleWithWebIdentity by passing a bound ServiceAccount token.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s serviceAccountRef => '+IO::K8s::CertManager::V1::ServiceAccountRef', { required => 'schema' };

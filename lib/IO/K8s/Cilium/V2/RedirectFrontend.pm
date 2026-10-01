@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::RedirectFrontend;
 # ABSTRACT: RedirectFrontend specifies frontend configuration to redirect traffic from.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s addressMatcher => '+IO::K8s::Cilium::V2::Frontend';

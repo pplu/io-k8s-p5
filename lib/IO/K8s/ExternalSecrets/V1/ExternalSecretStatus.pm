@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ExternalSecretStatus;
 # ABSTRACT: ExternalSecretStatus defines the observed state of ExternalSecret.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s binding               => '+IO::K8s::ExternalSecrets::V1::LocalObjectReference';

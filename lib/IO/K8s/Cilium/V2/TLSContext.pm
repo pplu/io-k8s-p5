@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::TLSContext;
 # ABSTRACT: TerminatingTLS is the TLS context for the connection terminated by the L7 proxy.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s certificate => Str;

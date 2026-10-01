@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::ProbeParam;
 # ABSTRACT: ProbeParam defines specification of extra parameters for a Probe.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s name   => Str, { required => 'schema' };

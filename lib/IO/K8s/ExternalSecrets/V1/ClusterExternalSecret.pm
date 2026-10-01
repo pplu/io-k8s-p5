@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ClusterExternalSecret;
 # ABSTRACT: ClusterExternalSecret is the Schema for the clusterexternalsecrets API.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::APIObject
     api_version     => 'external-secrets.io/v1',
     resource_plural => 'clusterexternalsecrets',

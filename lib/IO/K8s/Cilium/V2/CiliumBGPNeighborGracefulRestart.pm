@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::CiliumBGPNeighborGracefulRestart;
 # ABSTRACT: GracefulRestart defines graceful restart parameters which are negotiated with this peer.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s enabled            => Bool, { required => 'schema' };

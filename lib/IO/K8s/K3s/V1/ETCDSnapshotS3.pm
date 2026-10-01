@@ -1,6 +1,6 @@
 package IO::K8s::K3s::V1::ETCDSnapshotS3;
 # ABSTRACT: ETCDSnapshotS3 holds information about the S3 storage system holding the snapshot.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s bucket        => Str;

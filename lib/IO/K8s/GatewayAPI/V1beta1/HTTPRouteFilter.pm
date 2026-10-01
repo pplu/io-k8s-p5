@@ -1,6 +1,6 @@
 package IO::K8s::GatewayAPI::V1beta1::HTTPRouteFilter;
 # ABSTRACT: HTTPRouteFilter defines processing steps that must be completed during the request or response lifecycle.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s cors                   => '+IO::K8s::GatewayAPI::V1beta1::HTTPCORSFilter';

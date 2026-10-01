@@ -1,6 +1,6 @@
 package IO::K8s::VolumeSnapshot::V1::VolumeSnapshotStatus;
 # ABSTRACT: status represents the current information of a snapshot.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s boundVolumeSnapshotContentName => Str;

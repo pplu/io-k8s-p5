@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ClusterExternalSecretStatus;
 # ABSTRACT: ClusterExternalSecretStatus defines the observed state of ClusterExternalSecret.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s conditions            => ['+IO::K8s::ExternalSecrets::V1::ClusterExternalSecretStatusCondition'];

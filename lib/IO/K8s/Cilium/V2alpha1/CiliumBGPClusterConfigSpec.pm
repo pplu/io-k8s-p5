@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumBGPClusterConfigSpec;
 # ABSTRACT: Spec defines the desired cluster configuration of the BGP control plane.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s bgpInstances => ['+IO::K8s::Cilium::V2alpha1::CiliumBGPInstance'], { required => 'schema' };

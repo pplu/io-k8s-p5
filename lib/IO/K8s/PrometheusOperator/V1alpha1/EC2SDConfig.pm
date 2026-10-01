@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::EC2SDConfig;
 # ABSTRACT: EC2SDConfig allow retrieving scrape targets from AWS EC2 instances.
-our $VERSION = '1.110';
+our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s accessKey            => 'Core::V1::ConfigMapKeySelector';
