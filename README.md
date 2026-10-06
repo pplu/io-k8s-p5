@@ -410,7 +410,7 @@ shipped. The list lives in `IO::K8s::Deprecated`'s POD (install it from
 CPAN — it provides a redirect message pointing at the modern
 replacement). Highlights:
 
-- The 76 `*List` classes (`PodList`, `ServiceList`, `DeploymentList`,
+- The 74 `*List` classes (`PodList`, `ServiceList`, `DeploymentList`,
   ...) have not been real classes since the 1.00 Moose-to-Moo rewrite.
   Use `IO::K8s::List` to inflate any List-shaped payload.
 - Four namespaces held nothing but a `*List` stub and were removed
@@ -429,8 +429,9 @@ If you are upgrading from a pre-1.100 release:
   v1.36, the bundled CRD providers moved to their current upstream
   versions (Cilium v1.20.0, K3s v1.36.3+k3s1, Traefik v3.7.10,
   cert-manager v1.21.1, Gateway API v1.6.1, Agent Sandbox v0.5.4).
-  The 76 `*List` classes were removed; the four stub-only namespaces
-  above were dropped.
+  The 76 `*List` classes were removed (two of them, the discovery Kinds
+  `APIGroupList` and `APIResourceList`, are real classes again since
+  1.106); the four stub-only namespaces above were dropped.
 - **1.105 → current:** `inflate()` now honours `apiVersion` for every
   shipped multi-version Kind (k11). `api_version()` now produces
   the correct wire `apiVersion` for `storagemigration.k8s.io` and
@@ -464,7 +465,7 @@ If you are upgrading from a pre-1.100 release:
     AutoGen GVK constant).
   See `Changes` for the full k33–k72 history.
 
-Code that still references one of the 76 removed `*List` class names
+Code that still references one of the 74 removed `*List` class names
 will fail to install; install `IO::K8s::Deprecated` from CPAN for a
 clear redirect message.
 

@@ -2462,7 +2462,7 @@ replaced with the unified L<IO::K8s::List> class. The old class names emitted
 deprecation warnings for a while; as of this release they have been dropped
 from this distribution entirely. If you need the old name to fail loudly
 instead of silently resolving to a stale prior release, install
-L<IO::K8s::Deprecated>, which ships CPAN redirect stubs for all 76 of them.
+L<IO::K8s::Deprecated>, which ships CPAN redirect stubs for all 74 of them.
 
 =item * B<Updated to Kubernetes v1.37 API>
 
