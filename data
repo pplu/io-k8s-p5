@@ -1,0 +1,25 @@
+---
+class: standard
+completed: 2026-10-06T22:33:19Z
+created: 2026-10-06T19:38:00Z
+id: 197
+priority: medium
+started: 2026-10-06T22:33:19Z
+status: done
+tags:
+- hygiene
+- release
+- deprecated
+- review-2026-10-06
+title: APIGroupList / APIResourceList collide with die-stubs shipped by IO-K8s-Deprecated
+updated: 2026-10-06T22:33:19Z
+---
+
+IO-K8s 1.106 added `IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::APIGroupList` and `::APIResourceList` as real classes (Changes, 1.106 section; lib/IO/K8s/Apimachinery/Pkg/Apis/Meta/V1/APIGroupList.pm). The sibling dist IO-K8s-Deprecated 1.105, released five days earlier, ships tombstones under exactly these two names that `die` on load (~/dev/io-k8s-p5-deprecated/lib/IO/K8s/Apimachinery/Pkg/Apis/Meta/V1/APIGroupList.pm:9). Both dists install the same file path, so whoever installs IO-K8s-Deprecated after IO-K8s replaces the working discovery classes with stubs.
+
+The fix belongs in io-k8s-p5-deprecated (remove the two stubs, see the finding there); this card is the IO-K8s side: decide it together and add a guard so it cannot recur - e.g. a maint check or author test that fails when a module path in lib/ also exists in ../io-k8s-p5-deprecated/lib.
+
+Done when: no module name is shipped by both dists, and a check on one of the two sides enforces it.
+
+---
+Fleet review 2026-10-06 · kind: hygiene · confidence: verified
