@@ -479,6 +479,14 @@ C<< $class->_k8s_attr_info >> and mirrors L<IO::K8s::AutoGen>'s
 schema-to-DSL mapping (C<_schema_to_type_spec>) field by field, in
 reverse, keyed by each field's C<json_key>.
 
+Field options are emitted onto the property's schema, with one split for an
+C<[X]> array and a typed map (C<HashRef[X]>, C<< { X => 1 } >>): the value
+constraints C<enum>, C<minimum>, C<maximum> and C<pattern> constrain each
+element or value, so they land on C<items> or C<additionalProperties> (the
+place L<IO::K8s::AutoGen> reads them back from). The options that describe
+the container itself -- C<description>, C<default>, C<nullable>,
+C<preserve_unknown> -- stay on the array or object schema.
+
 For a top-level Kind (C<< $class->can('_is_resource') >>) the registry's
 own C<metadata> entry is skipped and C<apiVersion>/C<kind>/C<metadata>
 get the standard envelope stubs instead -- the same three fields
@@ -550,7 +558,22 @@ sub _ensure_class_loaded {
 sub _property_schema {
     my ($entry, $seen, $where) = @_;
     my $schema = _type_schema($entry, $seen);
-    _apply_options($schema, $entry->{options}, $where, $entry->{is_bool}) if $entry->{options};
+    return $schema unless $entry->{options};
+
+    # Value constraints (enum/minimum/maximum/pattern) of an [X] array or a
+    # typed map constrain each element / each value, so they belong on
+    # items / additionalProperties (k195), as IO::K8s::AutoGen reads them
+    # back. Everything else (description, default, nullable,
+    # preserve_unknown) describes the container itself and stays on it.
+    my %opts  = %{ $entry->{options} };
+    my $inner = ref $schema->{items} eq 'HASH'                ? $schema->{items}
+              : ref $schema->{additionalProperties} eq 'HASH' ? $schema->{additionalProperties}
+              :                                                  undef;
+    if ($inner) {
+        my %value = map { $_ => delete $opts{$_} } grep { exists $opts{$_} } qw(enum minimum maximum pattern);
+        _apply_options($inner, \%value, $where, 0) if %value;
+    }
+    _apply_options($schema, \%opts, $where, $entry->{is_bool});
     return $schema;
 }
 

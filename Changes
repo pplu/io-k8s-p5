@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - to_crd puts the value constraints (enum, minimum, maximum, pattern) of an
+    [X] array on items and those of a typed map on additionalProperties
+    instead of on the array/object itself (k195). description, default,
+    nullable and preserve_unknown stay on the container. A CRD emitted
+    earlier for such a field constrained the container, so re-applying it
+    changes what the apiserver validates.
+
   - add_crd no longer fails for a CRD with a property named like a Moo
     keyword, a type or a method (k200), e.g. Kong's KongPlugin
     ordering.after / ordering.before. A class no longer carries the k8s DSL,
