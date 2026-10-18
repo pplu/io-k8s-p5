@@ -2,6 +2,10 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - maint/crd-schema-audit.pl descends into the values of object maps again
+    (k192): the walk keyed on a registry flag that is never set, so it never
+    entered them. It now uses is_hash_of_objects.
+
   - to_crd puts the value constraints (enum, minimum, maximum, pattern) of an
     [X] array on items and those of a typed map on additionalProperties
     instead of on the array/object itself (k195). description, default,
