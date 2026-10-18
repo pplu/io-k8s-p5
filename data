@@ -1,0 +1,41 @@
+---
+claimed_at: 2026-10-18T06:47:07Z
+claimed_by: abbau-1018
+class: standard
+created: 2026-10-06T19:38:20Z
+id: 200
+priority: medium
+started: 2026-10-18T05:44:47Z
+status: review
+tags:
+- bug
+- crd
+- autogen
+- review-2026-10-06
+title: add_crd fails for a CRD with a property named like a Moo keyword or imported
+  type (after, before, with, extends, has, meta, import, Str, ...)
+updated: 2026-10-18T06:47:07Z
+---
+
+`IO::K8s::Resource::_setup_class` (lib/IO/K8s/Resource.pm:241-249) imports Moo and the type names into every class it sets up - shipped, inline-struct and AutoGen alike - and only `HashRef`/`Opaque` are swept again (line 234-239). So every class still `can` `has`, `with`, `extends`, `before`, `after`, `around`, `k8s`, `Str`, `Int`, `Bool`, `Num`, `IntOrStr`, `Quantity`, `Time`, next to Moo's own `new`, `meta`, `does`, `import`, `BUILD`:
+
+```
+perl -Ilib -MIO::K8s -e 'require IO::K8s::Api::Core::V1::PodSpec; print join(",", grep { IO::K8s::Api::Core::V1::PodSpec->can($_) } qw(has with extends before after around k8s Str Int)), "\n"'
+```
+
+The declaration preflight (k144, lib/IO/K8s/Resource.pm:562-567) then refuses any schema property of one of these names with 'collides with the method ...', and because a generation run fails as a whole, the entire CRD is unusable. That is not exotic: Kong's `KongPlugin` has `ordering.after` / `ordering.before`. A CRD of that shape:
+
+```
+add_crd: k8s: field 'after' of ...::KongPlugin::Ordering collides with the method 'after' of ...::KongPlugin::Ordering, which is not an attribute
+```
+
+The AutoGen POD only documents the top-level case (role methods such as `label`, `save`) and says of nested classes 'these names are ordinary fields there' (lib/IO/K8s/AutoGen.pm:2146-2161), which does not hold for the names above. Two JSON keys that sanitize to one accessor (`a-b` and `a_b`) end the same way.
+
+Done when: the compile-time sugar (Moo keywords, `k8s`, the type names) is removed from each class once its declarations are done, so those names are free as fields; a property that still collides with a real method (`new`, `meta`, `does`, `can`, `isa`, `import`, `TO_JSON`, ...) gets a renamed accessor with the JSON key kept via the existing json_key/init_arg mapping instead of failing the CRD; t/27_no_import_leak.t covers the keyword names and a test loads a CRD with `after`/`before`/`with` properties.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: verified
+
+2026-10-18 06:35 Done in lib/IO/K8s/Resource.pm + AutoGen.pm. (1) Sugar (extends has with before after around k8s Str Int Bool Num IntOrStr Quantity Time) swept via namespace::clean at end of compile scope for source classes, immediately (_sweep_sugar) for inline-struct/AutoGen classes; _declare_field uses stored %_has closure; AutoGen calls IO::K8s::Resource->_k8s directly. (2) _accessor_name: real-method or other-JSON-key clash -> leading underscore (new->_new->__new), json_key kept; adopt/yielding(conditions) unchanged. Green: t/27, t/156, t/02, t/25, t/26, 04, 73, 74, 77, 79, 70-72, 118, 29 and ~50 more AutoGen/CRD tests. Tests to rewrite (intent changed): t/107, t/117, t/128, t/46 (->can('k8s') / Pkg::k8s() runtime calls, collision croaks now rename), t/34 (uses defined &{target::k8s} as inline-struct proxy). Also: renaming applies to hand-written classes too (loses the typo guard) - maintainer call.
+
+Commit c71a7bfc auf Branch abbau-1018. Offene Maintainer-Frage: die Umbenennung gilt auch für handgeschriebene Klassen (ein Tippfehler-Feld wie 'label' wird still zu _label; der k144-Tippfehlerschutz entfällt dort). Empfehlung: einheitlich lassen, wie die Karte es beschreibt; ein Flag nur für Quelltext-Klassen wäre möglich. Ausserdem: nullable-Prädikate has_x/clear_x croaken bei Kollision weiter (ausserhalb der Karte).
