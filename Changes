@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - save() writes UTF-8 and checks print and close (k199). Before, non-ASCII
+    text below U+0100 (German, French, Spanish) was written as Latin-1 --
+    not valid UTF-8, so load_yaml and kubectl did not read back what was
+    saved -- and anything above U+00FF raised a 'Wide character' warning.
+    A failed write or close now croaks. The to_yaml POD called its result a
+    byte string; it is a character string, and save is the UTF-8 step.
+
   - load_yaml and IO::K8s::CRD->load resolve plain scalars like kubectl (k198):
     yes/no/on/off/y/n in any case are booleans and a leading-zero integer
     such as 0644 is octal (420). Before, 'privileged: no' loaded as true

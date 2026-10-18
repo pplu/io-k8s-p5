@@ -575,8 +575,9 @@ sub to_yaml {
 
     my $yaml_string = $pod->to_yaml;
 
-Returns a YAML byte string for the object, suitable for C<kubectl apply
--f>. Thin wrapper over L</TO_YAML>; provided so the role offers both
+Returns the YAML document for the object as a character string (not encoded
+bytes), suitable for C<kubectl apply -f> once written out as UTF-8;
+L<IO::K8s::APIObject/save> does that encoding. Thin wrapper over L</TO_YAML>; provided so the role offers both
 C<TO_JSON> and L<IO::K8s::APIObject/save> a single canonical entry
 point.
 

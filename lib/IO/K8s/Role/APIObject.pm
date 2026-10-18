@@ -684,9 +684,12 @@ Serialize the object to YAML format suitable for C<kubectl apply -f>.
 
 sub save {
     my ($self, $file) = @_;
-    open my $fh, '>', $file or die "Cannot write to $file: $!";
-    print $fh $self->to_yaml;
-    close $fh;
+    open my $fh, '>:encoding(UTF-8)', $file
+        or croak 'Cannot write to '.$file.': '.$!;
+    print $fh $self->to_yaml
+        or croak 'Cannot write to '.$file.': '.$!;
+    close $fh
+        or croak 'Cannot write to '.$file.': '.$!;
     return $self;
 }
 
@@ -694,7 +697,8 @@ sub save {
 
     $pod->save('pod.yaml');
 
-Save the object to a YAML file. Returns the object for chaining.
+Save the object to a YAML file, encoded as UTF-8. Croaks if the file cannot
+be written or closed. Returns the object for chaining.
 
 =cut
 
