@@ -45,8 +45,8 @@ k8s nomadSDConfigs                 => ['+IO::K8s::PrometheusOperator::V1alpha1::
 k8s oauth2                         => '+IO::K8s::PrometheusOperator::V1alpha1::OAuth2';
 k8s openstackSDConfigs             => ['+IO::K8s::PrometheusOperator::V1alpha1::OpenStackSDConfig'];
 k8s ovhcloudSDConfigs              => ['+IO::K8s::PrometheusOperator::V1alpha1::OVHCloudSDConfig'];
-k8s params                         => Opaque;
-k8s proxyConnectHeader             => Opaque;
+k8s params                         => HashRef[ArrayRef[Str]];
+k8s proxyConnectHeader             => HashRef[ArrayRef[InstanceOf['IO::K8s::Api::Core::V1::SecretKeySelector']]];
 k8s proxyFromEnvironment           => Bool;
 k8s proxyUrl                       => Str, { pattern => qr/^(http|https|socks5):\/\/.+$/ };
 k8s puppetDBSDConfigs              => ['+IO::K8s::PrometheusOperator::V1alpha1::PuppetDBSDConfig'];

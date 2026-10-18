@@ -9,7 +9,7 @@ use Digest::SHA qw( sha1_hex );
 use Module::Runtime qw( use_module );
 use Package::Stash;
 use Scalar::Util qw(blessed reftype refaddr looks_like_number);
-use Types::Standard qw( Bool HashRef Int Num Str );
+use Types::Standard qw( ArrayRef Bool HashRef InstanceOf Int Num Str );
 # Type::Tiny object for the [IntOrStr] array items (k167); see the array
 # branch of _schema_to_type_spec for why a bareword does not do. [Time]
 # items go through $GENERATED_TIME instead (k178), so Time is not imported.
@@ -892,6 +892,22 @@ sub _schema_type_kind {
     return 'string';  # 'string', '', and anything unmodeled alike (k42's own Str fallback)
 }
 
+# What the items of a map of lists (additionalProperties of type array, k194)
+# are, as the generator and the reuse check read them: 'Str' for plain
+# strings, 'ref' for a $ref to an object definition or an apiextensions
+# union, 'props' for an inline object with properties, 'other' for anything
+# the DSL has no map-of-lists form for (the map is then the free Opaque).
+sub _array_map_item_kind {
+    my ($items) = @_;
+    if (defined(my $ref = $items->{'$ref'})) {
+        $ref =~ s{^#/definitions/}{};
+        return (_scalar_ref_type($ref) || $OPAQUE_TYPES{$ref}) ? 'other' : 'ref';
+    }
+    return 'props' if _has_properties($items);
+    my $kind = ($items->{type} // '') eq 'string' ? _map_value_kind($items) : '';
+    return $kind eq 'Str' ? 'Str' : 'other';
+}
+
 # The value type of a map whose additionalProperties is a scalar schema
 # (k191) -- the DSL kind name Str, Int, Num, Bool, IntOrStr or Time -- or
 # undef when the generator types the map as the free Opaque instead: an
@@ -1107,6 +1123,24 @@ sub _object_compatible {
     }
     return $entry->{is_hash_of_objects} && _class_compatible($entry->{class}, $addl, $ctx)
         if _has_properties($addl);
+    # a map of lists (k194): what the generator makes of it
+    if (($addl->{type} // '') eq 'array' && ref($addl->{items} // {}) eq 'HASH') {
+        my $items = $addl->{items} // {};
+        my $item_kind = _array_map_item_kind($items);
+        return !!$entry->{is_hash_of_str_arrays} if $item_kind eq 'Str';
+        if ($item_kind eq 'ref') {
+            return 0 unless $entry->{is_hash_of_object_arrays};
+            (my $ref = $items->{'$ref'}) =~ s{^#/definitions/}{};
+            if (my $union = _union_class($ref)) {
+                return ($entry->{class} // '') eq $union;
+            }
+            my $def = _ref_definition($ref, $ctx) or return 0;
+            return _class_compatible($entry->{class}, $def, $ctx);
+        }
+        return $entry->{is_hash_of_object_arrays} && _class_compatible($entry->{class}, $items, $ctx)
+            if $item_kind eq 'props';
+        return !!$entry->{is_hash_opaque};
+    }
     # a scalar value schema is the string or typed map the generator makes
     # of it, by the scalar rules; anything else it types as the opaque map
     return !!$entry->{is_hash_opaque} unless _map_value_kind($addl);
@@ -1566,6 +1600,32 @@ sub _schema_to_type_spec {
             if (_has_properties($addl)) {
                 return { '+' . _nested_class($class, $field_name, 'Value', $addl, $all_defs, $namespace, $reuse_core, $reuse_core_except) => 1 };
             }
+            # A map of lists (k194): additionalProperties an array of
+            # strings -- HashRef[ArrayRef[Str]] -- or of objects, a $ref'd
+            # definition or an items schema with properties --
+            # HashRef[ArrayRef[InstanceOf[Class]]]. Any other array value
+            # stays the free map.
+            if (($addl->{type} // '') eq 'array' && ref($addl->{items} // {}) eq 'HASH') {
+                my $items = $addl->{items} // {};
+                my $item_kind = _array_map_item_kind($items);
+                return HashRef[ ArrayRef[Str] ] if $item_kind eq 'Str';
+                if ($item_kind eq 'ref') {
+                    (my $ref = $items->{'$ref'}) =~ s{^#/definitions/}{};
+                    if (my $union = _union_class($ref)) {
+                        return HashRef[ ArrayRef[ InstanceOf[$union] ] ];
+                    }
+                    if ($all_defs && $all_defs->{$ref}) {
+                        my $ref_class = get_or_generate($ref, $all_defs->{$ref}, $all_defs, $namespace);
+                        return HashRef[ ArrayRef[ InstanceOf[$ref_class] ] ];
+                    }
+                    _croak_unresolved_ref($ref, "the items of the additionalProperties of $where");
+                }
+                if ($item_kind eq 'props') {
+                    my $core = $may_reuse->('Item') ? _core_class_for($items, $all_defs) : undef;
+                    my $item_class = $core // _nested_class($class, $field_name, 'Item', $items, $all_defs, $namespace, $reuse_core, $reuse_core_except);
+                    return HashRef[ ArrayRef[ InstanceOf[$item_class] ] ];
+                }
+            }
             # A scalar value schema is the string map HashRef[Str] or the
             # typed map of its kind; anything else -- object or array
             # values, a value schema without a type -- the free map (k191).
@@ -2000,6 +2060,12 @@ object> (or one with C<x-kubernetes-preserve-unknown-fields>) becomes
 C<Opaque>, and an C<additionalProperties>-only map (no C<properties> of
 their own) a C<HashRef[X]>, with nothing underneath to attach options to. Scalar properties carry their options at every level
 regardless.
+
+An C<additionalProperties> whose value is an array of strings becomes
+C<HashRef[ArrayRef[Str]]>, one whose items are objects (a C<$ref>, or an
+inline schema with C<properties>)
+C<HashRef[ArrayRef[InstanceOf[Class]]]> (k194); an array of anything else
+stays C<Opaque>.
 
 A path-derived nested class name that would run past Perl's 251-character
 limit on a fully qualified identifier (cert-manager's CRDs inline a full

@@ -22,7 +22,7 @@ The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
 
 =cut
 
-k8s extra => Opaque;
+k8s extra => HashRef[ArrayRef[Str]];
 
 =attr extra
 

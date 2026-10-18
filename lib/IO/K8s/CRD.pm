@@ -637,6 +637,11 @@ sub _type_schema {
     # The string map (k191) -- HashRef[Str] and { Str => 1 } alike, a
     # map[string]string upstream -- and the free map, Opaque / HashRef,
     # which is what { Str => 1 } used to stand for here.
+    return { type => 'object', additionalProperties => { type => 'array', items => { type => 'string' } } }
+        if $entry->{is_hash_of_str_arrays};
+    return { type => 'object',
+             additionalProperties => { type => 'array', items => _schema_for_class($entry->{class}, $seen) } }
+        if $entry->{is_hash_of_object_arrays};
     return { type => 'object', additionalProperties => { type => 'string' } } if $entry->{is_hash_of_str};
     return _opaque_object() if $entry->{is_hash_opaque};
     return { type => 'object', additionalProperties => { type => 'integer' } } if $entry->{is_hash_of_int};

@@ -2,6 +2,19 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - New DSL forms HashRef[ArrayRef[Str]] and
+    HashRef[ArrayRef[InstanceOf['Full::Class']]] for map[string][]X (k194).
+    They are strict, serialize Str elements as strings, and to_crd emits
+    additionalProperties of type array; AutoGen reads that back into the
+    same form. UserInfo, SubjectAccessReviewSpec,
+    CertificateSigningRequestSpec and CertManager CertificateRequestSpec
+    extra, TokenRequestSpec attestations, ExternalSecrets getParameters and
+    PrometheusOperator params / proxyConnectHeader (28 classes) were Opaque
+    and are now typed: a value that is not a list of strings (or of
+    SecretKeySelector objects) is refused at construction. Other element
+    types (Int, Quantity, ...) are not supported in this form and stay
+    Opaque.
+
   - The shipped classes and the CRD emitter declare typed maps as HashRef[X]
     instead of the { X => 1 } sugar (k193). This also drops the lenient
     { Str => 1 } from the real string maps: HashRef[Str] refuses a

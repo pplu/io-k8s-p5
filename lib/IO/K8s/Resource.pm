@@ -224,19 +224,21 @@ sub import {
     $class->_sweep_sugar($caller, 'scope');
 }
 
-# HashRef and Opaque for map declarations (k191): `k8s data => HashRef[Str]`,
-# `k8s raw => Opaque`. Only here, where a class is compiled from source --
+# HashRef, ArrayRef, InstanceOf and Opaque for map declarations (k191, k194):
+# `k8s data => HashRef[Str]`, `k8s extra => HashRef[ArrayRef[Str]]`,
+# `k8s m => HashRef[ArrayRef[InstanceOf['Some::Class']]]`, `k8s raw => Opaque`.
+# Only here, where a class is compiled from source --
 # _setup_class also serves inline structs and IO::K8s::AutoGen, which build
-# their fields at runtime and never name a type in code. Both names are
+# their fields at runtime and never name a type in code. All four names are
 # swept from the package again once the scope that said `use` has finished
 # compiling (namespace::clean, the explicit-list form): the declarations
 # compiled against them keep working, but neither becomes a method of every
 # shipped class, which is what k118 took HashRef off (t/27_no_import_leak.t).
 sub _import_map_types {
     my ($class, $target) = @_;
-    Types::Standard->import::into($target, qw( HashRef ));
+    Types::Standard->import::into($target, qw( ArrayRef HashRef InstanceOf ));
     IO::K8s::Types->import::into($target, qw( Opaque ));
-    namespace::clean->import(-cleanee => $target, qw( HashRef Opaque ));
+    namespace::clean->import(-cleanee => $target, qw( ArrayRef HashRef InstanceOf Opaque ));
 }
 
 # The compile-time sugar _setup_class gives a class: the Moo keywords, the
@@ -466,6 +468,10 @@ sub _takes_any_value {
 # and a lenient Str-based Time (IO::K8s::AutoGen's) stays lenient.
 sub _typed_map {
     my ($info, $value_type, $opts, $where) = @_;
+    # HashRef[ArrayRef[X]]: the map of lists (k194)
+    return _array_map($info, $value_type->type_parameter, $opts, $where)
+        if $value_type->is_parameterized
+        && $value_type->parameterized_from->name eq 'ArrayRef';
     my $kind = $value_type->name;
     if ($kind eq 'Str') {
         $info->{is_hash_of_str} = 1;
@@ -479,6 +485,26 @@ sub _typed_map {
         if $value_type->isa('Type::Tiny::Class');
     croak "k8s: cannot interpret the value type of $where: HashRef["
         . $value_type->display_name . '] (a scalar type, or InstanceOf[Class])';
+}
+
+# The map of lists (k194), map[string][]X upstream: HashRef[ArrayRef[Str]]
+# (every element a JSON string, the strict form) and
+# HashRef[ArrayRef[InstanceOf[Class]]] (every element an object). Other
+# element types are not modelled; a field of that shape stays Opaque.
+sub _array_map {
+    my ($info, $elem_type, $opts, $where) = @_;
+    if ($elem_type->name eq 'Str') {
+        $info->{is_hash_of_str_arrays} = 1;
+        return HashRef[ ArrayRef[ _constrain($elem_type, 'Str', $opts, $where) ] ];
+    }
+    if ($elem_type->isa('Type::Tiny::Class')) {
+        $info->{is_hash_of_object_arrays} = 1;
+        $info->{class} = $elem_type->class;
+        _reject_value_options($opts, $where);
+        return HashRef[ ArrayRef[ InstanceOf[ $elem_type->class ] ] ];
+    }
+    croak "k8s: cannot interpret the element type of $where: HashRef[ArrayRef["
+        . $elem_type->display_name . ']] (Str, or InstanceOf[Class])';
 }
 
 # The map of objects: { Class => 1 } and HashRef[InstanceOf[Class]].
@@ -1073,6 +1099,52 @@ sub _declare_field {
             return \%out;
         });
     }
+    # Map of lists of objects (k194): each list built element-wise, the
+    # failure naming the key and the index. Same scan-first shortcut and
+    # element rule as the array and hash forms above.
+    elsif ($info{is_hash_of_object_arrays}) {
+        my $oc = $info{class};
+        my $builds = _object_builds($oc);
+        @coerce = (coerce => sub {
+            return $_[0] unless ref $_[0] eq 'HASH';
+            my $in = $_[0];
+            my $needed = 0;
+            KEY: for my $key (keys %$in) {
+                next unless ref $in->{$key} eq 'ARRAY';
+                for my $elem (@{ $in->{$key} }) {
+                    next unless $builds->($elem);
+                    $needed = 1;
+                    last KEY;
+                }
+            }
+            return $in unless $needed;
+            my %out;
+            for my $key (sort keys %$in) {
+                my $list = $in->{$key};
+                unless (ref $list eq 'ARRAY') {
+                    $out{$key} = $list;
+                    next;
+                }
+                my @built;
+                for my $i (0 .. $#$list) {
+                    if ($builds->($list->[$i])) {
+                        push @built, eval {
+                            IO::K8s::Role::Resource::_default_k8s()
+                                ->_struct_to_object_expanded($oc, $list->[$i])
+                        };
+                        if (my $err = $@) {
+                            $err =~ s/\n\z//;
+                            die "$err at key '$key' element $i\n";
+                        }
+                    } else {
+                        push @built, $list->[$i];
+                    }
+                }
+                $out{$key} = \@built;
+            }
+            return \%out;
+        });
+    }
     # Map of Bool (k191): a JSON boolean value -- what a decoded document
     # carries -- becomes the 0/1 the value check accepts, through the same
     # normalization the Bool field uses. Only reference values are touched:
@@ -1236,6 +1308,8 @@ Just C<use IO::K8s::Resource;> - no need for C<use Moo> or C<extends>.
     k8s raw => Opaque;                         # Free map, values untyped (also bare HashRef)
     k8s limits => HashRef[Quantity];           # Typed value map (also Int/Num/Bool/Time/IntOrStr)
     k8s ports => HashRef[Int];                 # The same, as HashRef[X]
+    k8s extra => HashRef[ArrayRef[Str]];       # Map of string lists (map[string][]string)
+    k8s headers => HashRef[ArrayRef[InstanceOf['IO::K8s::Api::Core::V1::SecretKeySelector']]];  # Map of object lists
     k8s rows => [ {} ];                         # Array of opaque hashes
     k8s matrix => [ [] ];                       # Array of opaque arrays
     k8s spec => {                              # Inline struct
@@ -1264,6 +1338,18 @@ map upstream declares as C<map[X]Quantity> rejects a bad value at
 construction rather than at the API server; C<HashRef[Quantity]> and the
 other C<HashRef[X]>, including C<HashRef[InstanceOf['Some::Class']]> for a
 map of objects, are the same declarations spelled the other way.
+
+C<HashRef[ArrayRef[Str]]> declares a map of string lists, C<map[string][]string>
+upstream (C<UserInfo.extra>, C<TokenRequestSpec.attestations>), and
+C<HashRef[ArrayRef[InstanceOf['Some::Class']]]> a map of object lists,
+C<map[string][]Object> (PrometheusOperator C<proxyConnectHeader>); the class
+is named in full, since C<InstanceOf> takes no short name. Both are strict:
+a value that is not an array, or an element of the wrong kind, is refused at
+construction. Elements of a string list go out as JSON strings, objects in
+the lists are built from hashes on construction and inflate, and C<to_crd>
+emits C<additionalProperties: {type: array, items: ...}>. Other element
+types (C<HashRef[ArrayRef[Int]]>) are not modelled; declare such a field
+C<Opaque>.
 
 Inline structs auto-generate an inner class (e.g. C<MyClass::_Spec>) with
 the declared fields. Hashrefs are auto-coerced to the inner class on

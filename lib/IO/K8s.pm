@@ -1308,6 +1308,18 @@ sub _inflate_struct {
                 $_ => $self->_struct_to_object_expanded($inner_class, $value->{$_},
                     $class.' field '.$attr." at key '".$_."'")
             } keys %$value };
+        } elsif ($info->{is_hash_of_object_arrays}) {
+            my $inner_class = $info->{class};
+            $args{$attr} = { map {
+                my $key  = $_;
+                my $list = $value->{$key};
+                $key => (ref $list eq 'ARRAY'
+                    ? [ map {
+                        $self->_struct_to_object_expanded($inner_class, $list->[$_],
+                            $class.' field '.$attr." at key '".$key."' element ".$_)
+                    } 0 .. $#$list ]
+                    : $list)
+            } keys %$value };
         } elsif ($info->{is_object}) {
             $args{$attr} = $self->_struct_to_object_expanded($info->{class}, $value,
                 $class.' field '.$attr);

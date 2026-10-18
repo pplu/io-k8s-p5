@@ -3,7 +3,7 @@ package IO::K8s::Api::Authentication::V1::UserInfo;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s extra => Opaque;
+k8s extra => HashRef[ArrayRef[Str]];
 
 =attr extra
 

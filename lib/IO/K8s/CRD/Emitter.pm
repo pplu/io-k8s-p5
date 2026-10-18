@@ -305,6 +305,13 @@ sub _is_external_ref {
     return index($self->package_for($class), $self->base . '::') != 0;
 }
 
+# The full package name of a registry class, for the one DSL form that takes
+# it unexpanded: HashRef[ArrayRef[InstanceOf['...']]] (k194).
+sub _full_class {
+    my ($self, $class) = @_;
+    return $self->_is_generated($class) ? $self->package_for($class) : $class;
+}
+
 sub _class_ref {
     my ($self, $class) = @_;
 
@@ -385,6 +392,9 @@ sub _type_source {
     return ($self->_class_ref($info->{class}), $nested)                if $info->{is_object};
     return ('[' . $self->_class_ref($info->{class}) . ']', $nested)    if $info->{is_array_of_objects};
     return ('{ ' . $self->_class_ref($info->{class}) . ' => 1 }', $nested) if $info->{is_hash_of_objects};
+    return ('HashRef[ArrayRef[Str]]') if $info->{is_hash_of_str_arrays};
+    return ("HashRef[ArrayRef[InstanceOf['" . $self->_full_class($info->{class}) . "']]]", $nested)
+        if $info->{is_hash_of_object_arrays};
     return ('[Str]')      if $info->{is_array_of_str};
     return ('[Int]')      if $info->{is_array_of_int};
     return ('[Bool]')     if $info->{is_array_of_bool};

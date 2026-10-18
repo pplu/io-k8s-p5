@@ -3,7 +3,7 @@ package IO::K8s::Api::Authentication::V1::TokenRequestSpec;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s attestations => Opaque;
+k8s attestations => HashRef[ArrayRef[Str]];
 
 =attr attestations
 

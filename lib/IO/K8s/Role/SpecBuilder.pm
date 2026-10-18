@@ -320,6 +320,7 @@ sub _sb_fresh {
                 is_hash_of_str is_hash_of_objects is_hash_of_int is_hash_of_num
                 is_hash_of_bool is_hash_of_quantity is_hash_of_time
                 is_hash_of_int_or_string is_hash_opaque
+                is_hash_of_str_arrays is_hash_of_object_arrays
             );
             croak "spec path '$path': cannot descend through scalar field '$seg'";
         }
