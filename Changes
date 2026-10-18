@@ -2,6 +2,14 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - load_yaml and IO::K8s::CRD->load resolve plain scalars like kubectl (k198):
+    yes/no/on/off/y/n in any case are booleans and a leading-zero integer
+    such as 0644 is octal (420). Before, 'privileged: no' loaded as true
+    and 'defaultMode: 0644' as decimal 644. Quote a value to keep it a
+    string. Mapping keys are never converted (y:, on:, no: stay "y", "on",
+    "no"), unlike kubectl, so CRD properties with such names survive.
+    Writing is unchanged.
+
 1.110     2026-10-01 15:57:19Z
 
   - Fix a 1.109 regression: JSONSchemaProps minimum, maximum and multipleOf

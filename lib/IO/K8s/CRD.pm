@@ -81,6 +81,12 @@ file, or an arrayref of any of those. Dies on a document that is not a
 C<CustomResourceDefinition> or lacks C<spec.group>, C<spec.names.kind> or
 C<spec.versions>.
 
+YAML text is read as YAML 1.1 for plain scalars, like C<kubectl> and
+L<IO::K8s/load_yaml>: C<yes>/C<no>/C<on>/C<off>/C<y>/C<n> are booleans and
+C<0644> is octal. Quote a value to keep it a string. Mapping keys are not
+converted: a property named C<y> or C<on> under C<properties> stays that
+name (C<kubectl> would make it C<"true">).
+
 A string is read by the same rule as L<IO::K8s/load_yaml>: without
 a newline and naming an existing file, it is read from that file, as UTF-8;
 anything else is YAML or JSON text in decoded characters. A one-line string
@@ -115,8 +121,7 @@ sub load {
         # UTF-8, a directory is refused, and a one-line argument that is no
         # file and only parses to plain scalars -- a mistyped path -- dies
         # instead of giving [] and an add_crd that registers nothing.
-        require YAML::PP;
-        my ($refused, @found) = IO::K8s->_yaml_documents($input, YAML::PP->new(boolean => 'JSON::PP'));
+        my ($refused, @found) = IO::K8s->_yaml_documents($input, IO::K8s->_yaml_parser('JSON::PP'));
         croak "IO::K8s::CRD->load: '".$input."' ".$refused if defined $refused;
         @docs = grep { ref $_ eq 'HASH' } @found;
     }
