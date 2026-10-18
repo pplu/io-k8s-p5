@@ -2,6 +2,20 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - add_crd no longer fails for a CRD with a property named like a Moo
+    keyword, a type or a method (k200), e.g. Kong's KongPlugin
+    ordering.after / ordering.before. A class no longer carries the k8s DSL,
+    the Moo keywords or the type names (Str, Int, ...) as methods once its
+    declarations are done, so after, before, with, extends, has, Str and the
+    like are ordinary fields. A property that still collides with a real
+    method (new, meta, does, can, isa, import, TO_JSON, role helpers such as
+    label or save) or whose sanitized name another key already holds (a-b
+    and a_b) gets an accessor with a leading underscore (_new, _label,
+    __new on a second collision); its JSON key is unchanged. Before, such a
+    property refused the whole CRD. Hand-written classes follow the same
+    rule: a field named like a method is renamed, not rejected, and the
+    runtime entry point for declaring fields is IO::K8s::Resource->_k8s.
+
   - save() writes UTF-8 and checks print and close (k199). Before, non-ASCII
     text below U+0100 (German, French, Spanish) was written as Latin-1 --
     not valid UTF-8, so load_yaml and kubectl did not read back what was

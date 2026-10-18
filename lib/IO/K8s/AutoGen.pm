@@ -327,9 +327,12 @@ sub _generate_class {
     require IO::K8s::Resource;
     IO::K8s::Resource->_setup_class($class);
 
-    # Get the k8s function for this class
-    my $k8s = $class->can('k8s')
-        or croak "Failed to set up k8s DSL for $class";
+    # Fields are declared through IO::K8s::Resource->_k8s directly, so the
+    # compile-time sugar (has, with, after, k8s, Str, ...) the setup just
+    # gave the class is swept at once: a property may be called any of
+    # those names (k200).
+    IO::K8s::Resource->_sweep_sugar($class);
+    my $k8s = sub { IO::K8s::Resource->_k8s($class, @_) };
 
     # A top-level class -- one with a GVK -- gets its identity methods and
     # IO::K8s::Role::APIObject (and with it IO::K8s::Role::SpecBuilder)
@@ -337,13 +340,11 @@ sub _generate_class {
     # gives a hand-written class (k150). The other way round, Role::Tiny's
     # "class wins" let a property whose accessor has the name of a role
     # method (label, save, is_ready, spec_get, ...) silently replace that
-    # method. Now the k144 declaration preflight in IO::K8s::Resource sees
-    # the role method and refuses the property, naming the class, the
-    # property and the method, which fails the whole generation run (k149).
-    # There is no renaming: the property would have to change its accessor
-    # name, and with it what the class looks like, to get past a clash its
-    # schema cannot know about. conditions keeps its k144 exception -- the
-    # role helper yields to a declared field of that name.
+    # method. Now IO::K8s::Resource sees the role method when it picks the
+    # property's accessor and gives the property another one (_label, k200),
+    # keeping the JSON key as the field's json_key; the role method stays
+    # what it is. conditions keeps its k144 exception -- the role helper
+    # yields to a declared field of that name.
     #
     # The identity methods still go in before the role, so the role sees
     # them and does not install its own class-name-derived api_version, kind
@@ -2141,26 +2142,29 @@ the schema's C<x-kubernetes-group-version-kind> metadata is ambiguous for
 the requested C<api_version>, or names no entry matching it -- the GVK
 selection fails closed rather than pick a version.
 
-=item *
-
-a top-level class -- one with an C<api_version> and a C<kind> -- has a
-property whose accessor would take the name of a method of
-L<IO::K8s::Role::APIObject> (C<label>, C<save>, C<is_ready>, ..., and the
-C<spec_*> methods of L<IO::K8s::Role::SpecBuilder>, which it composes) or of
-the identity methods C<api_version> and C<resource_plural>. The
-identity methods and the role are in place before the first property is
-declared, the order C<use IO::K8s::APIObject> gives a hand-written class,
-so the declaration check of L<IO::K8s::Resource/k8s> refuses the property
-with C<< k8s: field 'label' of <class> collides with the method 'label' of
-<class>, which is not an attribute >>. Before, such a property silently
-replaced the role method on the generated class. The exceptions are that
-check's own: a C<conditions> property takes over the role's condition
-helper, and C<apiVersion>, C<kind> and C<metadata> are not declared from
-the schema at all, since the class already supplies them. A nested class
-composes no role, so these names are ordinary fields there. Nothing is
-renamed.
-
 =back
+
+A property name never fails a run. A property may be called anything, including
+a Moo keyword or a type name (C<after>, C<before>, C<with>, C<extends>,
+C<has>, C<Str>, C<Int>, ...): a generated class has the compile-time sugar swept
+before its first property is declared, so those names are ordinary fields, on
+a nested class as on a top-level one. A property whose name is a real method
+of the class -- C<new>, C<meta>, C<does>, C<can>, C<isa>, C<import>,
+C<TO_JSON>, and on a top-level class every method of
+L<IO::K8s::Role::APIObject> (C<label>, C<save>, C<is_ready>, ..., and the
+C<spec_*> methods of L<IO::K8s::Role::SpecBuilder>) and the identity methods
+C<api_version> and C<resource_plural> -- gets an accessor with a leading
+underscore (C<_label>, C<__label> if that is taken as well), as does the
+second of two keys that sanitize to the same name (C<a-b> and C<a_b>: the
+first in sorted order keeps C<a_b>, the other becomes C<_a_b>). The JSON key
+is kept as the field's C<json_key> and constructor argument, so the wire
+format, C<< ->new(label => ...) >>, C<FROM_HASH> and C<to_crd> still use the
+property's own name; only the Perl method differs. Before, such a property
+failed the whole run with C<< k8s: field 'label' of <class> collides with the
+method 'label' of <class> >>, and a class replaced the role method silently
+(k150). The exceptions are unchanged: a C<conditions> property takes over the
+role's condition helper, and C<apiVersion>, C<kind> and C<metadata> are not
+declared from the schema at all, since the class already supplies them.
 
 A failure anywhere in this process is a failure of the whole generation run,
 not just of the one class being built: the root class, every
