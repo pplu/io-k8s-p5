@@ -1,0 +1,22 @@
+---
+claimed_at: 2026-10-18T07:04:07Z
+claimed_by: abbau-1018
+class: standard
+created: 2026-09-30T16:20:33Z
+id: 195
+priority: low
+started: 2026-10-18T05:44:53Z
+status: review
+tags:
+- crd
+title: 'to_crd: value options of [X] and typed maps land on the container schema'
+updated: 2026-10-18T07:04:07Z
+---
+
+Pre-existing, found during k191: CRD.pm _apply_options writes enum/pattern/minimum/maximum of an [X] array and of a typed map (now also HashRef[Str]) onto the container schema instead of items / additionalProperties. The emitted CRD then constrains the array/object itself, not its values.
+
+2026-10-18 06:49 Fix in CRD.pm _property_schema: enum/minimum/maximum/pattern of [X]/typed map now go to items/additionalProperties; description/default/nullable/preserve_unknown stay on container. POD in _schema_for_class. AutoGen reverse already read items/additionalProperties: roundtrip verified (add_crd class enforces element/value constraints). t/*crd*, t/79, t/151, new t/157 green.
+
+2026-10-18 06:49 Done: CRD.pm split of value options; t/*crd*, t/79, t/151, t/157 green
+
+Commit f40eefd0 auf Branch abbau-1018
