@@ -1,0 +1,44 @@
+---
+claimed_at: 2026-10-18T08:10:26Z
+claimed_by: abbau-1018
+class: standard
+created: 2026-10-06T19:38:06Z
+id: 198
+priority: high
+started: 2026-10-18T05:44:36Z
+status: review
+tags:
+- bug
+- yaml
+- load
+- review-2026-10-06
+title: 'load_yaml reads manifests as YAML 1.2: ''privileged: no'' becomes true and
+  ''defaultMode: 0644'' becomes 644'
+updated: 2026-10-18T08:10:26Z
+---
+
+`load_yaml` parses with a bare `YAML::PP->new` (lib/IO/K8s.pm:1416), i.e. the YAML 1.2 core schema. kubectl and the API server read manifests as YAML 1.1 (sigs.k8s.io/yaml on go-yaml v2). k188 closed this gap on the way out (`TO_YAML` quotes for all three schemas, lib/IO/K8s/Role/Resource.pm:565); the way in still disagrees with kubectl, silently and in the unsafe direction:
+
+1. Booleans. `no`, `No`, `off`, `n` load as the strings they are, and `_normalize_bool` (lib/IO/K8s/Resource.pm:332-349) only special-cases the string `false`, so every other non-empty string is true:
+
+```
+perl -Ilib -MIO::K8s -e 'my $o=IO::K8s->new->load_yaml("apiVersion: v1\nkind: Pod\nmetadata:\n  name: x\nspec:\n  hostNetwork: no\n  containers:\n  - name: c\n    image: i\n    securityContext:\n      privileged: off\n")->[0]->TO_JSON; print $o->{spec}{hostNetwork} ? "true":"false", " ", $o->{spec}{containers}[0]{securityContext}{privileged} ? "true":"false", "\n"'
+# true true        (kubectl: false false)
+```
+
+The same manifest that kubectl applies with `privileged: false` comes out of load_yaml -> to_yaml / create as `privileged: true`.
+
+2. Octal integers. `defaultMode: 0644` - the form the Kubernetes docs use - is octal 420 for kubectl and decimal 644 here (`0400` -> 400 = mode 0620, a group-writable secret; `0644`/`0755` -> values above 0777 that the API server rejects). `0o644` and `0x1A4` load correctly.
+
+`IO::K8s::CRD->load` (lib/IO/K8s/CRD.pm:119) parses the same way. Direct `->new`/`.pk8s` callers passing the string 'no' to a Bool field hit point 1 as well.
+
+Done when: YAML read by load_yaml and CRD->load resolves plain scalars the way kubectl does (YAML 1.1 booleans and leading-zero octal at least), or - if 1.2 is to stay - a Bool field refuses a string that is neither true nor false instead of taking it as true, and the POD states the dialect; tests cover `no/off/yes/on` on a Bool field and `0644` on an Int field through load_yaml.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: verified
+
+2026-10-18 05:59 Worker: load_yaml and CRD->load parse via shared private IO::K8s->_yaml_parser (YAML 1.1 bools in all spellings + leading-zero octal, Core 1.2 underneath). Not the YAML1_1 schema: it reads 22:22/10:30 as sexagesimal (kubectl does not) and drops 0o644. Open: unquoted bool-looking mapping keys (y:, on:) become boolean keys (duplicate-key croak or garbage key). 29 related test files green incl. t/154.
+
+Commit 3a082618 auf Branch abbau-1018
+
+Also found: maint/core-shape-index-gen.pl Zeile 102 öffnet ohne Encoding-Layer (Dev-Skript, nicht behoben)
