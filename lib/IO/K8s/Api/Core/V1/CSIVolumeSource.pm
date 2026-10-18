@@ -35,7 +35,7 @@ readOnly specifies a read-only configuration for the volume. Defaults to false (
 
 =cut
 
-k8s volumeAttributes => { Str => 1 };
+k8s volumeAttributes => HashRef[Str];
 
 =attr volumeAttributes
 

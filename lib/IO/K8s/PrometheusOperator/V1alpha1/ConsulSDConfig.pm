@@ -13,7 +13,7 @@ k8s followRedirects      => Bool;
 k8s healthFilter         => Str;
 k8s namespace            => Str;
 k8s noProxy              => Str;
-k8s nodeMeta             => { Str => 1 };
+k8s nodeMeta             => HashRef[Str];
 k8s oauth2               => '+IO::K8s::PrometheusOperator::V1alpha1::OAuth2';
 k8s partition            => Str;
 k8s pathPrefix           => Str;

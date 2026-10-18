@@ -3,7 +3,7 @@ package IO::K8s::GatewayAPI::V1::BackendTLSPolicySpec;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s options    => { Str => 1 };
+k8s options    => HashRef[Str];
 k8s targetRefs => ['+IO::K8s::GatewayAPI::V1::LocalPolicyTargetReferenceWithSectionName'], { required => 'schema' };
 k8s validation => '+IO::K8s::GatewayAPI::V1::BackendTLSPolicyValidation', { required => 'schema' };
 

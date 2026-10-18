@@ -22,7 +22,7 @@ Name of the CSI driver This field is immutable.
 
 =cut
 
-k8s parameters => { Str => 1 };
+k8s parameters => HashRef[Str];
 
 =attr parameters
 

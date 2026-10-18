@@ -7,8 +7,8 @@ k8s 'assigned-static-ip' => Str;
 k8s 'ipv6-used'          => { '+IO::K8s::Cilium::V2::AllocationIP' => 1 };
 k8s 'operator-status'    => '+IO::K8s::Cilium::V2::OperatorStatus';
 k8s 'pod-cidrs'          => { '+IO::K8s::Cilium::V2::PodCIDRMapEntry' => 1 };
-k8s 'release-ips'        => { Str => 1 };
-k8s 'release-ipv6s'      => { Str => 1 };
+k8s 'release-ips'        => HashRef[Str];
+k8s 'release-ipv6s'      => HashRef[Str];
 k8s used                 => { '+IO::K8s::Cilium::V2::AllocationIP' => 1 };
 
 =attr assigned-static-ip

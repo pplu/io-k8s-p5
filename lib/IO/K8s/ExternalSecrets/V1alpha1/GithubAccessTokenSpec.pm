@@ -6,7 +6,7 @@ use IO::K8s::Resource;
 k8s appID        => Str, { required => 'schema' };
 k8s auth         => '+IO::K8s::ExternalSecrets::V1alpha1::GithubAuth', { required => 'schema' };
 k8s installID    => Str, { required => 'schema' };
-k8s permissions  => { Str => 1 };
+k8s permissions  => HashRef[Str];
 k8s repositories => [Str];
 k8s url          => Str;
 

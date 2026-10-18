@@ -19,7 +19,7 @@ fsType is the filesystem type to mount. Must be a filesystem type supported by t
 
 =cut
 
-k8s options => { Str => 1 };
+k8s options => HashRef[Str];
 
 =attr options
 

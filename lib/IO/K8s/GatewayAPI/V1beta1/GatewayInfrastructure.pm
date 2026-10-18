@@ -3,8 +3,8 @@ package IO::K8s::GatewayAPI::V1beta1::GatewayInfrastructure;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s annotations   => { Str => 1 };
-k8s labels        => { Str => 1 };
+k8s annotations   => HashRef[Str];
+k8s labels        => HashRef[Str];
 k8s parametersRef => '+IO::K8s::GatewayAPI::V1beta1::LocalParametersReference';
 
 =attr annotations

@@ -19,7 +19,7 @@ Replicas is the number of desired replicas. This is a pointer to distinguish bet
 
 =cut
 
-k8s selector => { Str => 1 };
+k8s selector => HashRef[Str];
 
 =attr selector
 

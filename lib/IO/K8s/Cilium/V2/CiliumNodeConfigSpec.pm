@@ -3,7 +3,7 @@ package IO::K8s::Cilium::V2::CiliumNodeConfigSpec;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s defaults     => { Str => 1 }, { required => 'schema' };
+k8s defaults     => HashRef[Str], { required => 'schema' };
 k8s nodeSelector => 'Meta::V1::LabelSelector', { required => 'schema' };
 
 =attr defaults

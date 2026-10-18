@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s additionalRoles   => [Str];
 k8s auth              => '+IO::K8s::ExternalSecrets::V1::AWSAuth';
-k8s customSessionTags => { Str => 1 };
+k8s customSessionTags => HashRef[Str];
 k8s externalID        => Str;
 k8s prefix            => Str;
 k8s region            => Str, { required => 'schema' };

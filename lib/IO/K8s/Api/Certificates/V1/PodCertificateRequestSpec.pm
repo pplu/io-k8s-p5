@@ -87,7 +87,7 @@ Signer implementations do not need to support all key types supported by kube-ap
 
 =cut
 
-k8s unverifiedUserAnnotations => { Str => 1 };
+k8s unverifiedUserAnnotations => HashRef[Str];
 
 =attr unverifiedUserAnnotations
 

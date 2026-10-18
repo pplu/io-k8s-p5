@@ -24,7 +24,7 @@ k8s repoCA                => Str;
 k8s repoCAConfigMap       => 'Core::V1::LocalObjectReference';
 k8s securityContext       => 'Core::V1::SecurityContext';
 k8s serverSide            => Str, { enum => [qw(true false auto)] };
-k8s set                   => { IntOrStr => 1 };
+k8s set                   => HashRef[IntOrStr];
 k8s takeOwnership         => Bool;
 k8s targetNamespace       => Str;
 k8s timeout               => Str, { pattern => "^([0-9]+(ns|us|\x{b5}s|ms|s|m|h)?)+\$" };

@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s dnsNames    => [Str];
 k8s dnsZones    => [Str];
-k8s matchLabels => { Str => 1 };
+k8s matchLabels => HashRef[Str];
 
 =attr dnsNames
 

@@ -6,7 +6,7 @@ use IO::K8s::APIObject
     resource_plural => 'ciliumidentities',
     subresources    => { status => {} };
 
-k8s 'security-labels' => { Str => 1 }, { required => 'schema' };
+k8s 'security-labels' => HashRef[Str], { required => 'schema' };
 
 =attr security-labels
 

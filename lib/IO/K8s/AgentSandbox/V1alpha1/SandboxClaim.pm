@@ -12,8 +12,8 @@ k8s spec => {
     },
     warmpool => Str,
     additionalPodMetadata => {
-        annotations => { Str => 1 },
-        labels      => { Str => 1 },
+        annotations => HashRef[Str],
+        labels      => HashRef[Str],
     },
     env => ['+IO::K8s::AgentSandbox::V1beta1::EnvVar'],
     lifecycle => {

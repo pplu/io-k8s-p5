@@ -42,7 +42,7 @@ mountOptions controls the mountOptions for dynamically provisioned PersistentVol
 
 =cut
 
-k8s parameters => { Str => 1 };
+k8s parameters => HashRef[Str];
 
 =attr parameters
 

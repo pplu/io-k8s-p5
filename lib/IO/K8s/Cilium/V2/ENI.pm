@@ -15,7 +15,7 @@ k8s prefixes            => [Str];
 k8s 'public-ip'         => Str;
 k8s 'security-groups'   => [Str];
 k8s subnet              => '+IO::K8s::Cilium::V2::AwsSubnet';
-k8s tags                => { Str => 1 };
+k8s tags                => HashRef[Str];
 k8s vpc                 => '+IO::K8s::Cilium::V2::AwsVPC';
 
 =attr addresses

@@ -8,7 +8,7 @@ use IO::K8s::APIObject
 
 k8s deletionPolicy => Str, { required => 'schema', enum => [qw(Delete Retain)] };
 k8s driver         => Str, { required => 'schema' };
-k8s parameters     => { Str => 1 };
+k8s parameters     => HashRef[Str];
 
 =attr deletionPolicy
 

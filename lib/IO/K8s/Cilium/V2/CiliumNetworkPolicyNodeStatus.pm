@@ -3,7 +3,7 @@ package IO::K8s::Cilium::V2::CiliumNetworkPolicyNodeStatus;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s annotations         => { Str => 1 };
+k8s annotations         => HashRef[Str];
 k8s enforcing           => Bool;
 k8s error               => Str;
 k8s lastUpdated         => Time;

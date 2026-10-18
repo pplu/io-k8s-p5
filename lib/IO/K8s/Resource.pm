@@ -1234,14 +1234,14 @@ Just C<use IO::K8s::Resource;> - no need for C<use Moo> or C<extends>.
     k8s labels => { Str => 1 };                # String map (lenient legacy spelling)
     k8s data => HashRef[Str];                  # String map, strict
     k8s raw => Opaque;                         # Free map, values untyped (also bare HashRef)
-    k8s limits => { Quantity => 1 };           # Typed value map (also Int/Num/Bool/Time/IntOrStr)
+    k8s limits => HashRef[Quantity];           # Typed value map (also Int/Num/Bool/Time/IntOrStr)
     k8s ports => HashRef[Int];                 # The same, as HashRef[X]
     k8s rows => [ {} ];                         # Array of opaque hashes
     k8s matrix => [ [] ];                       # Array of opaque arrays
     k8s spec => {                              # Inline struct
         replicas => Int,
         selector => Str,
-        template => { Str => 1 },
+        template => HashRef[Str],
     };
 
 C<< { Str => 1 } >> and C<HashRef[Str]> declare a B<string map> -- labels,

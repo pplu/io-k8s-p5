@@ -2,6 +2,13 @@ Revision history for IO-K8s
 
 {{$NEXT}}
 
+  - The shipped classes and the CRD emitter declare typed maps as HashRef[X]
+    instead of the { X => 1 } sugar (k193). This also drops the lenient
+    { Str => 1 } from the real string maps: HashRef[Str] refuses a
+    reference value instead of passing it through. The { X => 1 } form
+    itself stays valid in the DSL. maint/crd-drift-check.pl no longer
+    equates the two spellings.
+
   - maint/crd-schema-audit.pl descends into the values of object maps again
     (k192): the walk keyed on a registry flag that is never set, so it never
     entered them. It now uses is_hash_of_objects.

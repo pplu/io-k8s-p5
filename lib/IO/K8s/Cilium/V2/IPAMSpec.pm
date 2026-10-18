@@ -11,7 +11,7 @@ k8s podCIDRs              => [Str];
 k8s pool                  => { '+IO::K8s::Cilium::V2::AllocationIP' => 1 };
 k8s pools                 => '+IO::K8s::Cilium::V2::IPAMPoolSpec';
 k8s 'pre-allocate'        => Int, { minimum => 0 };
-k8s 'static-ip-tags'      => { Str => 1 };
+k8s 'static-ip-tags'      => HashRef[Str];
 
 =attr ipv6-pool
 

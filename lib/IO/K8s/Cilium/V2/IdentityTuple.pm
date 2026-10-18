@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s 'dest-port'       => Int;
 k8s identity          => Int;
-k8s 'identity-labels' => { Str => 1 };
+k8s 'identity-labels' => HashRef[Str];
 k8s protocol          => Int;
 
 =attr dest-port

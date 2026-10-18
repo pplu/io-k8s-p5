@@ -3,7 +3,7 @@ package IO::K8s::Apimachinery::Pkg::Apis::Meta::V1::ObjectMeta;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s annotations => { Str => 1 };
+k8s annotations => HashRef[Str];
 
 =attr annotations
 
@@ -59,7 +59,7 @@ A sequence number representing a specific generation of the desired state. Popul
 
 =cut
 
-k8s labels => { Str => 1 };
+k8s labels => HashRef[Str];
 
 =attr labels
 

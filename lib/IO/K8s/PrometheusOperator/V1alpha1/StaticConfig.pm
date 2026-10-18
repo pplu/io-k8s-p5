@@ -3,7 +3,7 @@ package IO::K8s::PrometheusOperator::V1alpha1::StaticConfig;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s labels  => { Str => 1 };
+k8s labels  => HashRef[Str];
 k8s targets => [Str], { required => 'schema' };
 
 =attr labels

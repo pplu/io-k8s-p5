@@ -7,7 +7,7 @@ k8s auth       => '+IO::K8s::ExternalSecrets::V1::AuthorizationProtocol';
 k8s body       => Str;
 k8s caBundle   => Str;
 k8s caProvider => '+IO::K8s::ExternalSecrets::V1::WebhookCAProvider';
-k8s headers    => { Str => 1 };
+k8s headers    => HashRef[Str];
 k8s method     => Str;
 k8s result     => '+IO::K8s::ExternalSecrets::V1::WebhookResult';
 k8s secrets    => ['+IO::K8s::ExternalSecrets::V1::WebhookSecret'];

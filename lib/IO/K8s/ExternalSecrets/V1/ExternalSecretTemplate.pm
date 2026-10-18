@@ -3,7 +3,7 @@ package IO::K8s::ExternalSecrets::V1::ExternalSecretTemplate;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s data          => { Str => 1 };
+k8s data          => HashRef[Str];
 k8s engineVersion => Str, { enum => [qw(v2)], default => 'v2' };
 k8s mergePolicy   => Str, { enum => [qw(Replace Merge)], default => 'Replace' };
 k8s metadata      => '+IO::K8s::ExternalSecrets::V1::ExternalSecretTemplateMetadata';

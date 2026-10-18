@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s certificateRefs => ['+IO::K8s::GatewayAPI::V1::SecretObjectReference'];
 k8s mode            => Str, { enum => [qw(Terminate Passthrough)], default => 'Terminate' };
-k8s options         => { Str => 1 };
+k8s options         => HashRef[Str];
 
 =attr certificateRefs
 

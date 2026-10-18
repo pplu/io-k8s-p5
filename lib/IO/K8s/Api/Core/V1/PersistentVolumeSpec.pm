@@ -35,7 +35,7 @@ azureFile represents an Azure File Service mount on the host and bind mount to t
 
 =cut
 
-k8s capacity => { Quantity => 1 };
+k8s capacity => HashRef[Quantity];
 
 =attr capacity
 

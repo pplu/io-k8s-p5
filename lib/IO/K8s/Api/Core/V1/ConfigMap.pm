@@ -14,7 +14,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s binaryData => { Str => 1 };
+k8s binaryData => HashRef[Str];
 
 =attr binaryData
 
@@ -23,7 +23,7 @@ BinaryData contains the binary data. Each key must consist of alphanumeric chara
 
 =cut
 
-k8s data => { Str => 1 };
+k8s data => HashRef[Str];
 
 =attr data
 

@@ -67,7 +67,7 @@ readOnly value to pass to ControllerPublishVolumeRequest. Defaults to false (rea
 
 =cut
 
-k8s volumeAttributes => { Str => 1 };
+k8s volumeAttributes => HashRef[Str];
 
 =attr volumeAttributes
 

@@ -11,7 +11,7 @@ accessModes contains the actual access modes the volume backing the PVC has. Mor
 
 =cut
 
-k8s allocatedResourceStatuses => { Str => 1 };
+k8s allocatedResourceStatuses => HashRef[Str];
 
 =attr allocatedResourceStatuses
 
@@ -48,7 +48,7 @@ This is an alpha field and requires enabling RecoverVolumeExpansionFailure featu
 
 =cut
 
-k8s allocatedResources => { Quantity => 1 };
+k8s allocatedResources => HashRef[Quantity];
 
 =attr allocatedResources
 
@@ -66,7 +66,7 @@ This is an alpha field and requires enabling RecoverVolumeExpansionFailure featu
 
 =cut
 
-k8s capacity => { Quantity => 1 };
+k8s capacity => HashRef[Quantity];
 
 =attr capacity
 

@@ -317,7 +317,7 @@ __END__
 
     package My::Route;
     use IO::K8s::APIObject api_version => 'gateway.networking.k8s.io/v1';
-    k8s spec => { Str => 1 };
+    k8s spec => HashRef[Str];
     with 'IO::K8s::Role::Routable';
 
     sub _route_format { 'gateway' }   # or 'traefik', 'ingress'

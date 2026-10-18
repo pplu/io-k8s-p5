@@ -13,7 +13,7 @@ C<metadata>, C<api_version()>, and C<kind()>.
 
 =cut
 
-k8s data => { Str => 1 };
+k8s data => HashRef[Str];
 
 =attr data
 
@@ -29,7 +29,7 @@ Immutable, if set to true, ensures that data stored in the Secret cannot be upda
 
 =cut
 
-k8s stringData => { Str => 1 };
+k8s stringData => HashRef[Str];
 
 =attr stringData
 

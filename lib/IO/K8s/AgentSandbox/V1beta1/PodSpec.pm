@@ -21,7 +21,7 @@ k8s hostnameOverride              => Str;
 k8s imagePullSecrets              => ['+IO::K8s::AgentSandbox::V1beta1::LocalObjectReference'];
 k8s initContainers                => ['Core::V1::Container'];
 k8s nodeName                      => Str;
-k8s nodeSelector                  => { Str => 1 };
+k8s nodeSelector                  => HashRef[Str];
 k8s os                            => '+IO::K8s::AgentSandbox::V1beta1::PodOS';
 k8s overhead                      => HashRef[Quantity];
 k8s preemptionPolicy              => Str;

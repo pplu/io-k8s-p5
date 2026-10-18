@@ -5,7 +5,7 @@ use IO::K8s::Resource;
 
 k8s clientId             => '+IO::K8s::PrometheusOperator::V1::SecretOrConfigMap', { required => 'schema' };
 k8s clientSecret         => 'Core::V1::ConfigMapKeySelector', { required => 'schema' };
-k8s endpointParams       => { Str => 1 };
+k8s endpointParams       => HashRef[Str];
 k8s noProxy              => Str;
 k8s proxyConnectHeader   => Opaque;
 k8s proxyFromEnvironment => Bool;

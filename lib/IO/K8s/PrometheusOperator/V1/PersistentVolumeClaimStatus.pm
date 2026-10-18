@@ -4,7 +4,7 @@ our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s accessModes                      => [Str];
-k8s allocatedResourceStatuses        => { Str => 1 };
+k8s allocatedResourceStatuses        => HashRef[Str];
 k8s allocatedResources               => HashRef[Quantity];
 k8s capacity                         => HashRef[Quantity];
 k8s conditions                       => ['Core::V1::PersistentVolumeClaimCondition'];

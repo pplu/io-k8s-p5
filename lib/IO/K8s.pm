@@ -1658,7 +1658,7 @@ The C<k8s> DSL supports these type specifications:
   k8s ready    => 'Bool';                  # boolean attribute
   k8s spec     => 'Core::V1::PodSpec';     # nested IO::K8s object
   k8s ports    => ['Core::V1::ServicePort']; # array of objects
-  k8s labels   => { Str => 1 };            # map of strings
+  k8s labels   => HashRef[Str];           # map of strings
   k8s data     => HashRef[Str];            # map of strings (strict)
   k8s raw      => Opaque;                  # free map, values untyped
   k8s items    => ['+Full::Class::Name'];  # array with full class (+ prefix)

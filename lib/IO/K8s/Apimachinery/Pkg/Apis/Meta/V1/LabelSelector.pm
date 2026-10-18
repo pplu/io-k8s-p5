@@ -11,7 +11,7 @@ matchExpressions is a list of label selector requirements. The requirements are 
 
 =cut
 
-k8s matchLabels => { Str => 1 };
+k8s matchLabels => HashRef[Str];
 
 =attr matchLabels
 

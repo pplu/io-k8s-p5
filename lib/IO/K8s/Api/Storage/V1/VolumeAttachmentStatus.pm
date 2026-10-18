@@ -19,7 +19,7 @@ attached indicates the volume is successfully attached. This field must only be 
 
 =cut
 
-k8s attachmentMetadata => { Str => 1 };
+k8s attachmentMetadata => HashRef[Str];
 
 =attr attachmentMetadata
 

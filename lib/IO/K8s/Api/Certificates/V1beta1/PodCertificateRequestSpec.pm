@@ -109,7 +109,7 @@ The subject public key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, EC
 
 =cut
 
-k8s unverifiedUserAnnotations => { Str => 1 };
+k8s unverifiedUserAnnotations => HashRef[Str];
 
 =attr unverifiedUserAnnotations
 

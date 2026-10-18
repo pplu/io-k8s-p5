@@ -8,7 +8,7 @@ k8s decodingStrategy   => Str, { enum => [qw(Auto Base64 Base64URL None)] };
 k8s name               => '+IO::K8s::ExternalSecrets::V1::FindName';
 k8s nullBytePolicy     => Str, { enum => [qw(Ignore Fail)] };
 k8s path               => Str;
-k8s tags               => { Str => 1 };
+k8s tags               => HashRef[Str];
 
 =attr conversionStrategy
 

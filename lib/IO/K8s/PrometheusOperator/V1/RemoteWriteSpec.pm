@@ -10,7 +10,7 @@ k8s bearerToken          => Str;
 k8s bearerTokenFile      => Str;
 k8s enableHTTP2          => Bool;
 k8s followRedirects      => Bool;
-k8s headers              => { Str => 1 };
+k8s headers              => HashRef[Str];
 k8s messageVersion       => Str, { enum => [qw(V1.0 V2.0)] };
 k8s metadataConfig       => '+IO::K8s::PrometheusOperator::V1::MetadataConfig';
 k8s name                 => Str;

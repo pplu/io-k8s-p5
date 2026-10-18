@@ -4,7 +4,7 @@ our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s followRedirects   => Bool;
-k8s headers           => { Str => 1 };
+k8s headers           => HashRef[Str];
 k8s hostname          => Str;
 k8s interval          => IntOrStr;
 k8s method            => Str;

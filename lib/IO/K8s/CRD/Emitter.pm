@@ -398,15 +398,15 @@ sub _type_source {
     # lenient legacy form only where the registry says lenient, a strict
     # one -- AutoGen's additionalProperties {type: string} -- as
     # HashRef[Str]. The free map is Opaque.
-    return ('{ Str => 1 }')      if $info->{is_hash_of_str} && $info->{is_hash_of_str_lenient};
-    return ('HashRef[Str]')      if $info->{is_hash_of_str};
-    return ('Opaque')            if $info->{is_hash_opaque};
-    return ('{ Int => 1 }')      if $info->{is_hash_of_int};
-    return ('{ Num => 1 }')      if $info->{is_hash_of_num};
-    return ('{ Bool => 1 }')     if $info->{is_hash_of_bool};
-    return ('{ Quantity => 1 }') if $info->{is_hash_of_quantity};
-    return ('{ Time => 1 }')     if $info->{is_hash_of_time};
-    return ('{ IntOrStr => 1 }') if $info->{is_hash_of_int_or_string};
+    return ('{ Str => 1 }')          if $info->{is_hash_of_str} && $info->{is_hash_of_str_lenient};
+    return ('HashRef[Str]')          if $info->{is_hash_of_str};
+    return ('Opaque')                if $info->{is_hash_opaque};
+    return ('HashRef[Int]')          if $info->{is_hash_of_int};
+    return ('HashRef[Num]')          if $info->{is_hash_of_num};
+    return ('HashRef[Bool]')         if $info->{is_hash_of_bool};
+    return ('HashRef[Quantity]')     if $info->{is_hash_of_quantity};
+    return ('HashRef[Time]')         if $info->{is_hash_of_time};
+    return ('HashRef[IntOrStr]')     if $info->{is_hash_of_int_or_string};
     return ('Str')      if $info->{is_str};
     return ('Int')      if $info->{is_int};
     return ('Num')      if $info->{is_num};

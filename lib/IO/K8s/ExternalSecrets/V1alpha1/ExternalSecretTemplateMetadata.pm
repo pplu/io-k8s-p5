@@ -3,9 +3,9 @@ package IO::K8s::ExternalSecrets::V1alpha1::ExternalSecretTemplateMetadata;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s annotations => { Str => 1 };
+k8s annotations => HashRef[Str];
 k8s finalizers  => [Str];
-k8s labels      => { Str => 1 };
+k8s labels      => HashRef[Str];
 
 =attr annotations
 

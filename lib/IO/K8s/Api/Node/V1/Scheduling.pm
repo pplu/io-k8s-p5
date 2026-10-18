@@ -3,7 +3,7 @@ package IO::K8s::Api::Node::V1::Scheduling;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s nodeSelector => { Str => 1 };
+k8s nodeSelector => HashRef[Str];
 
 =attr nodeSelector
 

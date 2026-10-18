@@ -6,10 +6,10 @@ use IO::K8s::Resource;
 k8s 'availability-zone'   => Str;
 k8s 'cidr-block'          => Str;
 k8s 'instance-type'       => Str;
-k8s 'security-group-tags' => { Str => 1 };
+k8s 'security-group-tags' => HashRef[Str];
 k8s 'security-groups'     => [Str];
 k8s 'vpc-id'              => Str;
-k8s 'vswitch-tags'        => { Str => 1 };
+k8s 'vswitch-tags'        => HashRef[Str];
 k8s vswitches             => [Str];
 
 =attr availability-zone

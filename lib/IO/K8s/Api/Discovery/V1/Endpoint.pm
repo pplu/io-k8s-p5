@@ -19,7 +19,7 @@ conditions contains information about the current status of the endpoint.
 
 =cut
 
-k8s deprecatedTopology => { Str => 1 };
+k8s deprecatedTopology => HashRef[Str];
 
 =attr deprecatedTopology
 

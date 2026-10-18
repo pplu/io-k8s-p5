@@ -77,7 +77,7 @@ user is Optional: The owner UID of the created file. If specified, the item-leve
 
 =cut
 
-k8s userAnnotations => { Str => 1 };
+k8s userAnnotations => HashRef[Str];
 
 =attr userAnnotations
 

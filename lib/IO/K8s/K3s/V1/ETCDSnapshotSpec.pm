@@ -4,7 +4,7 @@ our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s location     => Str, { required => 'schema' };
-k8s metadata     => { Str => 1 };
+k8s metadata     => HashRef[Str];
 k8s nodeName     => Str, { required => 'schema' };
 k8s s3           => '+IO::K8s::K3s::V1::ETCDSnapshotS3';
 k8s snapshotName => Str, { required => 'schema' };

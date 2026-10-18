@@ -127,7 +127,7 @@ publishNotReadyAddresses indicates that any agent which deals with endpoints for
 
 =cut
 
-k8s selector => { Str => 1 };
+k8s selector => HashRef[Str];
 
 =attr selector
 

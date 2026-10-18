@@ -4,7 +4,7 @@ our $VERSION = '1.111';
 use IO::K8s::Resource;
 
 k8s controller => Str;
-k8s data       => { Str => 1 };
+k8s data       => HashRef[Str];
 
 =attr controller
 

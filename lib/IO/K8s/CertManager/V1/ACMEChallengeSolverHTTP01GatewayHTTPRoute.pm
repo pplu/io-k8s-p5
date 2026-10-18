@@ -3,7 +3,7 @@ package IO::K8s::CertManager::V1::ACMEChallengeSolverHTTP01GatewayHTTPRoute;
 our $VERSION = '1.111';
 use IO::K8s::Resource;
 
-k8s labels      => { Str => 1 };
+k8s labels      => HashRef[Str];
 k8s parentRefs  => ['+IO::K8s::CertManager::V1::ParentReference'];
 k8s podTemplate => '+IO::K8s::CertManager::V1::ACMEChallengeSolverHTTP01IngressPodTemplate';
 k8s serviceType => Str;

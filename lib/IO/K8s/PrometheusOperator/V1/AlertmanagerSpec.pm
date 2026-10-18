@@ -39,7 +39,7 @@ k8s listenLocal                          => Bool;
 k8s logFormat                            => Str, { enum => ['','logfmt','json'] };
 k8s logLevel                             => Str, { enum => ['','debug','info','warn','error'] };
 k8s minReadySeconds                      => Int, { minimum => 0 };
-k8s nodeSelector                         => { Str => 1 };
+k8s nodeSelector                         => HashRef[Str];
 k8s paused                               => Bool;
 k8s persistentVolumeClaimRetentionPolicy => 'Apps::V1::StatefulSetPersistentVolumeClaimRetentionPolicy';
 k8s podManagementPolicy                  => Str, { enum => [qw(OrderedReady Parallel)] };
