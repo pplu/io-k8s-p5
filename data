@@ -1,0 +1,23 @@
+---
+claimed_at: 2026-10-18T07:43:28Z
+claimed_by: abbau-1018
+class: standard
+created: 2026-09-30T16:20:33Z
+id: 193
+priority: low
+started: 2026-10-18T05:45:04Z
+status: review
+tags:
+- dsl
+- cosmetic
+title: 'Cosmetic: remaining { X => 1 } maps to HashRef[X]'
+updated: 2026-10-18T07:43:28Z
+---
+
+Out of scope for k191 per spec (/home/getty/dev/perl-developer/docs/superpowers/specs/2026-09-30-io-k8s-typed-maps-design.md, 'Nicht im Scope'): switch the remaining { X => 1 } declarations in the tree to HashRef[X], target 1.110. Also removes the lenient { Str => 1 } from real string maps (HashRef[Str] is strict), which lets maint/crd-drift-check.pl drop its HashRef[X] == { X => 1 } normalization in _structural_signature.
+
+Converted 128 k8s decls in 94 lib files + SandboxClaim inline struct (2) to HashRef[X]; Emitter scalar maps emit HashRef[X]; dropped HashRef/{X=>1} normalization in crd-drift-check. Left legacy: Emitter lenient Str and object maps, Resource.pm DSL + POD.
+
+2026-10-18 07:19 Done: see notes; t/02,25,26,151,152,159, drift/emitter/provider tests green
+
+Commit 6d2eb816 auf Branch abbau-1018. Offen für den Maintainer: das Legacy-DSL { X => 1 } bleibt gültig (Resource.pm, AutoGen.pm erzeugt es noch, Emitter rendert Objekt-Maps weiter als { '+Class' => 1 }, 29 Tests nutzen es); Entfernen wäre eine eigene Entscheidung.
