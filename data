@@ -1,0 +1,39 @@
+---
+claimed_at: 2026-10-18T06:25:50Z
+claimed_by: abbau-1018
+class: standard
+created: 2026-10-06T19:38:13Z
+id: 199
+priority: medium
+started: 2026-10-18T05:44:41Z
+status: review
+tags:
+- bug
+- yaml
+- encoding
+- review-2026-10-06
+title: 'save() writes the YAML character string without an encoding layer: Latin-1
+  bytes for non-ASCII text, ''Wide character'' otherwise'
+updated: 2026-10-18T06:25:50Z
+---
+
+`save` (lib/IO/K8s/Role/APIObject.pm:685-691) does `open my $fh, '>', $file` and prints `to_yaml`, which is a character string (YAML::PP `dump_string`; t/05_utf8.t feeds it straight back into `load_yaml`, which wants characters). Without `:encoding(UTF-8)`:
+
+- a document whose non-ASCII characters are all below U+0100 (German, French, Spanish text in an annotation or ConfigMap) is written as Latin-1 - not valid UTF-8. `load_yaml` on that file does not return what was saved, and kubectl reads garbage;
+- any character above U+00FF makes Perl emit UTF-8 with a 'Wide character in print' warning.
+
+```
+perl -Ilib -MIO::K8s -e 'my $k=IO::K8s->new; my $f="/tmp/s.yaml"; $k->new_object("ConfigMap",{metadata=>{name=>"x"},data=>{a=>"gr\x{fc}n"}})->save($f); print $k->load_yaml($f)->[0]->data->{a} eq "gr\x{fc}n" ? "same" : "DIFFERENT", "\n"'
+# DIFFERENT      (file holds 67 72 fc 6e)
+```
+
+k159 fixed the reading side (`_slurp_utf8`); the writing side was left. The POD of `to_yaml` in Role::Resource also calls the result 'a YAML byte string' (lib/IO/K8s/Role/Resource.pm:578), which it is not.
+
+Done when: `save` writes UTF-8 (`'>:encoding(UTF-8)'`, close checked), a save/load_yaml round trip with Latin-1-range and wide characters is tested, and the POD says characters for to_yaml and UTF-8 for save.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: verified
+
+2026-10-18 06:11 save: UTF-8 layer + croak on open/print/close; POD to_yaml=characters, save=UTF-8. Round trip verified (U+00FC, U+263A); t/05_utf8.t green. Regression test left to test-writer. Other writers: none in lib/ (only maint/core-shape-index-gen.pl:102 writes without encoding layer, dev script, not touched).
+
+Commit 024c696d auf Branch abbau-1018
