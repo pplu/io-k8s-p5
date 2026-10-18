@@ -1,0 +1,20 @@
+---
+claimed_at: 2026-10-18T08:07:50Z
+claimed_by: abbau-1018
+class: standard
+created: 2026-09-30T16:20:33Z
+id: 194
+priority: low
+started: 2026-10-18T05:45:16Z
+status: review
+tags:
+- dsl
+title: Own DSL form for map[string][]string
+updated: 2026-10-18T08:07:50Z
+---
+
+k191 declared map[string][]string fields (UserInfo/SubjectAccessReviewSpec/CSR/CertManager extra, TokenRequestSpec attestations, PrometheusOperator params, ExternalSecrets getParameters) as Opaque, because there is no typed form for them (spec: 'eigene Form spaeter'). Also map[string][]SecretKeySelector (PrometheusOperator proxyConnectHeader, 28x). Design a form such as HashRef[ArrayRef[Str]], then reclassify.
+
+2026-10-18 07:57 Implemented HashRef[ArrayRef[Str]] / HashRef[ArrayRef[InstanceOf[Class]]] (flags is_hash_of_str_arrays / is_hash_of_object_arrays); 6 core+CertManager+ExternalSecrets fields and 28 PrometheusOperator classes converted; t/160, 151, 25, 26, 02, 27, 42, 85, AutoGen/CRD/Emitter slice green. Also found: none further (all map[string][]X in spec/crd + v1.37 swagger are covered).
+
+Commit 82423d80 auf Branch abbau-1018. Komplett (Form + alle genannten Felder). Offene Maintainer-Fragen: (1) Objektform ist InstanceOf['Voller::Klassenname'] (verbose), Alternative eigener Zucker; (2) AutoGen kann für gleiche Form ConfigMapKeySelector statt SecretKeySelector wiederverwenden (bestehende Tie-Break-Logik); (3) andere Elementtypen (Int/Quantity) croaken bei der Deklaration, bleiben Opaque.
