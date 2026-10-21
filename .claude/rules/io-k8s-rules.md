@@ -74,7 +74,7 @@ Every write publishes under the maintainer's account.
 ## Hazards specific to this distribution — mechanics in skill `io-k8s-core`
 
 - **`prove -l t/` is not recursive** and silently skips subdirectory tests, exiting 0. Use
-  `dzil test` or `prove -lr t/` (~16s for the full suite); reserve non-`-r` for one named file.
+  `dzil test` or `prove -lr t/` (~70s for the full suite); reserve non-`-r` for one named file.
 - **`our $VERSION` in every module is correct here** — do not "clean it up" to the main module; every package needs its own version for PAUSE indexing.
 - **There is no codegen step** — the API classes are hand-maintained; `IO::K8s::AutoGen` never writes files.
 - **A mass edit across `lib/` hits ~850 files at once** — always follow a sweep with the full
