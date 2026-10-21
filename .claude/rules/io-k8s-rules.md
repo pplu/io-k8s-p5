@@ -24,10 +24,10 @@ speed on non-trivial work. Subagents get their conventions from the skills force
 
 ## Delegation
 
-- **You can spawn subagents** (orchestrating main agent): Do NOT touch behavior-relevant code
-  yourself — delegate. Your lane: coordinate, inspect, plan, review diffs, run tests, edit
-  `Changes`/`README`. When in doubt, delegate — only the `io-k8s-*` agents get their skills
-  force-loaded via `briefing.skills`; you would touch the DSL and role mesh with too little context.
+- **You can spawn subagents** (orchestrating main agent): Do NOT touch behavior-relevant code yourself —
+  delegate. Your lane: coordinate, inspect, plan, review diffs, run tests, edit `Changes`/`README`. When in
+  doubt, delegate — only `io-k8s-*` agents get their skills force-loaded via `briefing.skills`; you get no
+  briefing and would touch the DSL and role mesh with too little context.
 
   | Task | Agent |
   |---|---|
