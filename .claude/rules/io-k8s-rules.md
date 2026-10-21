@@ -8,11 +8,12 @@ speed on non-trivial work. Subagents get their conventions from the skills force
 
 1. **Think before coding** — State assumptions; ask rather than guess. Push back when a
    simpler approach exists. Stop when confused; name what's unclear.
-2. **Simplicity first, surgically applied** — minimum code, nothing speculative; touch only what you must, don't "improve" adjacent code.
+2. **Simplicity first, surgically applied** — minimum code, nothing speculative; touch only what you must, don't "improve" adjacent code or formatting.
 3. **Goal-driven execution** — Define success criteria, loop until verified.
-4. **Surface conflicts, don't average them** — pick one (more recent / more tested), explain why, flag the other.
+4. **Surface conflicts, don't average them** — pick one (more recent / more tested), explain why, flag the other. Don't blend.
 5. **Read before you write** — read `lib/IO/K8s/Resource.pm`, `APIObject.pm` and the role
-   you're about to touch; the `k8s` DSL, the attribute registry and serialization are one mechanism.
+   you're about to touch; the `k8s` DSL, the attribute registry and serialization are one
+   mechanism — "looks orthogonal" is dangerous here.
 6. **Tests verify intent, not just behavior** — a test that only checks accessors cannot fail
    when serialization breaks. Reproduce a bug before fixing it; leave the regression test.
 7. **A red test is a claim before it is a failure** — say what the test asserts and whether
@@ -65,9 +66,10 @@ is **co-maintained** (`authority = cpan:JLMARTIN`): releasing is no unilateral c
 
 ## Public issues (GitHub) — never act without instruction
 
-`github.com/pplu/io-k8s-p5` is a **public tracker on someone else's repository**. Never act
-on an issue or PR there on your own initiative — not even to read it: no listing, viewing,
-commenting, editing, closing or creating unless explicitly told; writes publish under the maintainer's account.
+`github.com/pplu/io-k8s-p5` is a **public tracker on someone else's repository**. Never act on
+an issue or PR there on your own initiative — not even to read it: no listing, viewing,
+commenting, editing, closing or creating unless explicitly told to handle a specific item.
+Every write publishes under the maintainer's account.
 
 ## Hazards specific to this distribution — mechanics in skill `io-k8s-core`
 
@@ -82,6 +84,6 @@ commenting, editing, closing or creating unless explicitly told; writes publish 
 
 ## Perl conventions — reference, don't restate
 
-Module loading, Moo patterns, dependency pinning and house style live in skills `getty-perl-core`,
-`getty-perl-moo`, `io-k8s-core` and `getty-perl-release-author-getty` (force-loaded per lane via
+House style, module loading, Moo patterns and pinning live in skills `getty-perl-core`,
+`getty-perl-moo`, `io-k8s-core` and `getty-perl-release-author-getty` (per lane via
 `briefing.skills`) — do not duplicate that content here.
