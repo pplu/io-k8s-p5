@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::BasicAuth;
 # ABSTRACT: basicAuth defines the Basic Authentication credentials used by the client.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s password => 'Core::V1::ConfigMapKeySelector';

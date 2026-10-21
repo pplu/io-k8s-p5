@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::ExternalSecretMetadata;
 # ABSTRACT: The metadata of the external secrets to be created
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s annotations => HashRef[Str];

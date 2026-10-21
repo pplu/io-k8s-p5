@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::GitlabProvider;
 # ABSTRACT: GitLab configures this store to sync secrets using GitLab Variables provider
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s auth              => '+IO::K8s::ExternalSecrets::V1::GitlabAuth', { required => 'schema' };

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::KubernetesSDConfig;
 # ABSTRACT: KubernetesSDConfig allows retrieving scrape targets from Kubernetes' REST API.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s apiServer            => Str;

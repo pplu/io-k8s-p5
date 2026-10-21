@@ -1,6 +1,6 @@
 package IO::K8s::AgentSandbox::V1beta1::PodMetadata;
 # ABSTRACT: PodMetadata
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s annotations => HashRef[Str];

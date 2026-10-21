@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::ForwardAuth;
 # ABSTRACT: ForwardAuth holds the forward auth middleware configuration.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s addAuthCookiesToResponse => [Str];

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::ScalewaySDConfig;
 # ABSTRACT: ScalewaySDConfig configurations allow retrieving scrape targets from Scaleway instances and baremetal services.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s accessKey            => Str, { required => 'schema' };

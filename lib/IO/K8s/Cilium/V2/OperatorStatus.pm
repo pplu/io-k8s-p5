@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::OperatorStatus;
 # ABSTRACT: Operator is the Operator status of the node
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s error => Str;

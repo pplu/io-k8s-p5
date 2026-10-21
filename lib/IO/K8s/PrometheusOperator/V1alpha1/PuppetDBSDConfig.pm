@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1alpha1::PuppetDBSDConfig;
 # ABSTRACT: PuppetDBSDConfig configurations allow retrieving scrape targets from PuppetDB resources.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s authorization        => '+IO::K8s::PrometheusOperator::V1alpha1::SafeAuthorization';

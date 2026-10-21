@@ -1,6 +1,6 @@
 package IO::K8s::Traefik::V1alpha1::TCPIPWhiteList;
 # ABSTRACT: IPWhiteList defines the IPWhiteList middleware configuration.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s sourceRange => [Str];

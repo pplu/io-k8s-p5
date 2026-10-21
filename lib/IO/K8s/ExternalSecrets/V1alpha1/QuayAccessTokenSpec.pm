@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1alpha1::QuayAccessTokenSpec;
 # ABSTRACT: QuayAccessTokenSpec defines the desired state to generate a Quay access token.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s robotAccount      => Str, { required => 'schema' };

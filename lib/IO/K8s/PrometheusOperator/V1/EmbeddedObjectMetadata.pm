@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::EmbeddedObjectMetadata;
 # ABSTRACT: metadata defines EmbeddedMetadata contains metadata relevant to an EmbeddedResource.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s annotations => HashRef[Str];

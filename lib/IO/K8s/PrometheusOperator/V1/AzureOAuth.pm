@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::AzureOAuth;
 # ABSTRACT: oauth defines the oauth config that is being used to authenticate.
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s clientId     => Str, { required => 'schema' };

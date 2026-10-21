@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::CiliumBGPNodeInstanceStatus;
 # ABSTRACT: CiliumBGPNodeInstanceStatus
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s localASN => Int;

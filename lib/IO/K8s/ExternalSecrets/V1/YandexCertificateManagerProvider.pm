@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::YandexCertificateManagerProvider;
 # ABSTRACT: YandexCertificateManager configures this store to sync secrets using Yandex Certificate Manager provider
-our $VERSION = '1.111';
+our $VERSION = '1.112';
 use IO::K8s::Resource;
 
 k8s apiEndpoint => Str;
