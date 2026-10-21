@@ -1,6 +1,6 @@
 Revision history for IO-K8s
 
-{{$NEXT}}
+1.111     2026-10-21 18:03:05Z
 
   - New DSL forms HashRef[ArrayRef[Str]] and
     HashRef[ArrayRef[InstanceOf['Full::Class']]] for map[string][]X (k194).
