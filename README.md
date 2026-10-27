@@ -417,6 +417,11 @@ replacement). Highlights:
   entirely in 1.105: `IO::K8s::ApiExtensionsApiServer`,
   `IO::K8s::Api::Auditregistration`, `IO::K8s::Api::Extensions`,
   `IO::K8s::Api::Settings`.
+- The classes only 0.01 to 0.03 (2018) shipped: the alpha and beta API
+  versions Kubernetes has retired since (`extensions/v1beta1`,
+  `apps/v1beta1` and `v1beta2`, `apiextensions.k8s.io/v1beta1`, ...),
+  PodSecurityPolicy, PodPreset and the Initializers. For each one
+  `IO::K8s::Deprecated` names the successor or says why there is none.
 
 The full old-name list and the redirect target for each is in
 `IO::K8s::Deprecated`.

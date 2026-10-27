@@ -2555,6 +2555,15 @@ from this distribution entirely. If you need the old name to fail loudly
 instead of silently resolving to a stale prior release, install
 L<IO::K8s::Deprecated>, which ships CPAN redirect stubs for all 74 of them.
 
+=item * B<Classes of retired API versions>
+
+The classes only C<0.01> to C<0.03> shipped for the alpha and beta API
+versions Kubernetes has retired since (C<extensions/v1beta1>,
+C<apps/v1beta1> and C<v1beta2>, C<apiextensions.k8s.io/v1beta1>, ...), and
+for PodSecurityPolicy, PodPreset and the Initializers, are not part of the
+C<1.x> series. L<IO::K8s::Deprecated> ships a redirect stub for each that
+names the successor class or says why there is none.
+
 =item * B<Updated to Kubernetes v1.37 API>
 
 API objects have been updated from v1.14 to v1.37. Some fields may have changed,
