@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::EphemeralVolumeSource;
 # ABSTRACT: ephemeral to be used by the StatefulSet.
-our $VERSION = '1.112';
+our $VERSION = '1.113';
 use IO::K8s::Resource;
 
 k8s volumeClaimTemplate => 'Core::V1::PersistentVolumeClaimTemplate';

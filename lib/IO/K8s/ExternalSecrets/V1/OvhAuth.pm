@@ -1,6 +1,6 @@
 package IO::K8s::ExternalSecrets::V1::OvhAuth;
 # ABSTRACT: Authentication method (mtls or token).
-our $VERSION = '1.112';
+our $VERSION = '1.113';
 use IO::K8s::Resource;
 
 k8s mtls  => '+IO::K8s::ExternalSecrets::V1::OvhClientMTLS';

@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2alpha1::IPPoolSpec;
 # ABSTRACT: IPPoolSpec
-our $VERSION = '1.112';
+our $VERSION = '1.113';
 use utf8;
 use IO::K8s::Resource;
 

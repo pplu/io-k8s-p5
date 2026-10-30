@@ -1,5 +1,7 @@
 Revision history for IO-K8s
 
+{{$NEXT}}
+
 1.112     2026-10-30 22:10:05Z
 
   - t/156_k200_keyword_property_names.t reads to_yaml back with YAML::PP,

@@ -1,6 +1,6 @@
 package IO::K8s::PrometheusOperator::V1::ShardRetentionPolicy;
 # ABSTRACT: shardRetentionPolicy defines the retention policy for the Prometheus shards.
-our $VERSION = '1.112';
+our $VERSION = '1.113';
 use IO::K8s::Resource;
 
 k8s retain     => '+IO::K8s::PrometheusOperator::V1::RetainConfig';

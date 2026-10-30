@@ -1,6 +1,6 @@
 package IO::K8s::Cilium::V2::AwsSubnet;
 # ABSTRACT: Subnet is the subnet the ENI is associated with
-our $VERSION = '1.112';
+our $VERSION = '1.113';
 use IO::K8s::Resource;
 
 k8s cidr => Str;
