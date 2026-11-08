@@ -2064,7 +2064,7 @@ regardless.
 An C<additionalProperties> whose value is an array of strings becomes
 C<HashRef[ArrayRef[Str]]>, one whose items are objects (a C<$ref>, or an
 inline schema with C<properties>)
-C<HashRef[ArrayRef[InstanceOf[Class]]]> (k194); an array of anything else
+C<HashRef[ArrayRef[InstanceOf[Class]]]>; an array of anything else
 stays C<Opaque>.
 
 A path-derived nested class name that would run past Perl's 251-character
@@ -2225,10 +2225,10 @@ second of two keys that sanitize to the same name (C<a-b> and C<a_b>: the
 first in sorted order keeps C<a_b>, the other becomes C<_a_b>). The JSON key
 is kept as the field's C<json_key> and constructor argument, so the wire
 format, C<< ->new(label => ...) >>, C<FROM_HASH> and C<to_crd> still use the
-property's own name; only the Perl method differs. Before, such a property
-failed the whole run with C<< k8s: field 'label' of <class> collides with the
-method 'label' of <class> >>, and a class replaced the role method silently
-(k150). The exceptions are unchanged: a C<conditions> property takes over the
+property's own name; only the Perl method differs. The generator neither
+fails the run with C<< k8s: field 'label' of <class> collides with the
+method 'label' of <class> >> nor lets a class replace the role method
+silently. The exceptions are unchanged: a C<conditions> property takes over the
 role's condition helper, and C<apiVersion>, C<kind> and C<metadata> are not
 declared from the schema at all, since the class already supplies them.
 

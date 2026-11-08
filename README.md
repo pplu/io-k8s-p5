@@ -438,37 +438,37 @@ If you are upgrading from a pre-1.100 release:
   `APIGroupList` and `APIResourceList`, are real classes again since
   1.106); the four stub-only namespaces above were dropped.
 - **1.105 → current:** `inflate()` now honours `apiVersion` for every
-  shipped multi-version Kind (k11). `api_version()` now produces
+  shipped multi-version Kind. `api_version()` now produces
   the correct wire `apiVersion` for `storagemigration.k8s.io` and
-  `internal.apiserver.k8s.io` (k13); before the fix, manifests
-  serialised for these two groups were rejected by the API server.
+  `internal.apiserver.k8s.io`, so manifests serialised for these two
+  groups are accepted by the API server.
   The release between 1.105 and now also carried a substantial body of
   behaviour changes worth knowing about before upgrading:
-  - **Upstream sync to v1.37** (k72) — 11 new Kinds, a new
+  - **Upstream sync to v1.37** — 11 new Kinds, a new
     `IO::K8s::Api::Lifecycle` namespace, and ten fields upstream made
     required are now required at construction.
   - **Seven embedded template classes** (`PodTemplateSpec`,
     `JobTemplateSpec`, `PersistentVolumeClaimTemplate`,
     `ResourceClaimTemplateSpec` × 4 versions) no longer compose
-    `IO::K8s::APIObject` (k45), so `kind()`, `api_version()`,
+    `IO::K8s::APIObject`, so `kind()`, `api_version()`,
     `add_label()` and the rest of the role are gone from their
     instances. Use the role on a wrapping object instead.
-  - **`set_owner()` became strict** (k47): owners without a `uid` are
+  - **`set_owner()` became strict**: owners without a `uid` are
     refused; `controller` is now an explicit parameter (default 1);
     a second distinct controller reference is rejected; adding the same
     owner UID again is an idempotent no-op.
-  - **Booleans stop inventing `false` from `undef`** (k48); an explicit
+  - **Booleans stop inventing `false` from `undef`**: an explicit
     `undef` now omits the field, matching the inflation path.
-  - **`FROM_HASH` now inflates nested objects recursively** (k59), making
+  - **`FROM_HASH` now inflates nested objects recursively**, making
     class-level `to_json` / `from_json` symmetric. Unknown fields remain
     preserved by default; recursive inflation does not imply strict mode.
-  - **`kind()` and `api_version()` croak on an argument** (k67, k70) —
+  - **`kind()` and `api_version()` croak on an argument** —
     they are derived read-only identity accessors and silently
     swallowing an argument was the source of hidden bugs.
-  - **`resource_plural()` croaks on an argument** too (k70), in the
+  - **`resource_plural()` croaks on an argument** too, in the
     three spots it lives (role accessor, `APIObject` import param,
     AutoGen GVK constant).
-  See `Changes` for the full k33–k72 history.
+  See `Changes` for the full history.
 
 Code that still references one of the 74 removed `*List` class names
 will fail to install; install `IO::K8s::Deprecated` from CPAN for a
