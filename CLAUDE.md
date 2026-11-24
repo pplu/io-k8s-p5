@@ -46,7 +46,7 @@ this repo's hazards are in `.claude/rules/io-k8s-rules.md`.
 
 `io-k8s-doc-writer` is this repo's documentation lane.
 
-The agents carry their conventions via `briefing.skills` (see `.claude/agents/`); the main
+The agents carry their conventions via `skills:` (see `.claude/agents/`); the main
 agent delegates rather than loading them. Skill sources live in `.claude/skills/` —
 `io-k8s-core` holds the distribution internals, `perl-io-k8s-kubernetes-classes` the consumer-facing
 API. Work is tracked on the local `karr` board.

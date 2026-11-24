@@ -54,4 +54,4 @@ The dist is **co-maintained** (`authority = cpan:JLMARTIN`): releasing is no uni
 
 House style, module loading, Moo patterns and pinning live in skills `getty-perl-core`,
 `getty-perl-moo`, `io-k8s-core` and `getty-perl-release-author-getty` (per lane via
-`briefing.skills`).
+`skills:`).

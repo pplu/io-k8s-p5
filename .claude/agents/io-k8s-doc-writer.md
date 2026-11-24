@@ -3,11 +3,10 @@ name: io-k8s-doc-writer
 description: "Write and maintain IO::K8s POD in the @Author::GETTY PodWeaver house format (inline =attr/=method, =description/=synopsis/=seealso, # ABSTRACT). Covers both the hand-written core (base classes, roles, providers) and the uniform per-field docs on the API classes. Specify the files to work on."
 model: sonnet
 disallowedTools: Write, NotebookEdit, Bash
-briefing:
-  skills:
-    - io-k8s-core
-    - perl-io-k8s-kubernetes-classes
-    - getty-perl-pod
+skills:
+  - io-k8s-core
+  - perl-io-k8s-kubernetes-classes
+  - getty-perl-pod
 ---
 
 You write POD for **IO::K8s**, an `[@Author::GETTY]` Dist::Zilla distribution. The
